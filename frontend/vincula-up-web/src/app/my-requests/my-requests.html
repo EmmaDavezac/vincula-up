@@ -1,0 +1,29 @@
+<section class="requests-page">
+  <p class="eyebrow">Tu actividad</p>
+  <h1>Mis solicitudes</h1>
+  <p class="intro">Acá vas a encontrar el estado de cada pedido y los próximos pasos.</p>
+
+  @if (requests().length) {
+    <div class="request-list">
+      @for (request of requests(); track request.id) {
+        <article class="request-card">
+          <div>
+            <span class="status">{{ request.status }}</span>
+            <h2>{{ request.specialty }}</h2>
+            <p>Con {{ request.professionalName }}</p>
+          </div>
+          <div class="request-details">
+            <span>{{ request.date }} · {{ request.time }}</span>
+            <span>{{ request.address }}</span>
+          </div>
+        </article>
+      }
+    </div>
+  } @else {
+    <div class="empty-state">
+      <h2>Todavia no tenes solicitudes.</h2>
+      <p>Buscá un profesional para pedir tu primer turno.</p>
+      <a routerLink="/directorio">Ir al directorio <span aria-hidden="true">→</span></a>
+    </div>
+  }
+</section>

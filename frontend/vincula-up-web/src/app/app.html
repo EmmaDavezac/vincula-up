@@ -6,6 +6,12 @@
   <nav aria-label="Navegacion principal">
     <a routerLink="/directorio" routerLinkActive="active">Directorio</a>
     <a routerLink="/como-funciona" routerLinkActive="active">Como funciona</a>
+    @if (auth.hasRole('CLIENTE')) {
+      <a routerLink="/mis-solicitudes" routerLinkActive="active">Mis solicitudes</a>
+    }
+    @if (auth.hasRole('ADMIN')) {
+      <a routerLink="/admin" routerLinkActive="active">Administracion</a>
+    }
   </nav>
   @if (auth.currentUser(); as user) {
     <div class="session-tools">

@@ -29,11 +29,7 @@ export const routes: Routes = [
 	{
 		path: 'mis-solicitudes',
 		canActivate: [requireRole('CLIENTE')],
-		loadComponent: () => import('./access-page').then((module) => module.AccessPage),
-		data: {
-			title: 'Tus solicitudes',
-			message: 'Desde aca vas a seguir tus turnos y conversaciones con profesionales.',
-		},
+		loadComponent: () => import('./my-requests/my-requests').then((module) => module.MyRequests),
 		title: 'Vincula-UP | Mis solicitudes',
 	},
 	{
