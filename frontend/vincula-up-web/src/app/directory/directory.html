@@ -1,0 +1,45 @@
+<section class="directory-page">
+  <div class="directory-intro">
+    <div>
+      <p class="eyebrow">Directorio Vincula-UP</p>
+      <h1>Encontrá a la persona indicada para tu trabajo.</h1>
+    </div>
+    <p class="intro-copy">Profesionales activos, con especialidad declarada y disponibilidad para coordinar un turno.</p>
+  </div>
+
+  <label class="search-box">
+    <span>Buscar por oficio, nombre o zona</span>
+    <input [(ngModel)]="search" type="search" placeholder="Ej. electricidad" />
+  </label>
+
+  <div class="directory-meta">
+    <span>{{ filteredProfessionals().length }} profesionales disponibles</span>
+    <span>Datos de demostracion</span>
+  </div>
+
+  @if (filteredProfessionals().length) {
+    <div class="professional-grid">
+      @for (professional of filteredProfessionals(); track professional.id) {
+        <article class="professional-card">
+          <div class="card-topline">
+            <span class="avatar" [class]="professional.accent">{{ professional.initials }}</span>
+            <span class="verified">Validado</span>
+          </div>
+          <h2>{{ professional.name }}</h2>
+          <p class="specialty">{{ professional.specialty }}</p>
+          <p class="zone">{{ professional.zone }}</p>
+          <div class="card-details">
+            <span><strong>{{ professional.rating }}</strong> / 5 ({{ professional.reviews }})</span>
+            <span>{{ professional.availability }}</span>
+          </div>
+          <button type="button">Ver perfil <span aria-hidden="true">→</span></button>
+        </article>
+      }
+    </div>
+  } @else {
+    <div class="empty-state">
+      <h2>No encontramos profesionales con esa búsqueda.</h2>
+      <p>Probá con otra especialidad o una zona cercana.</p>
+    </div>
+  }
+</section>
