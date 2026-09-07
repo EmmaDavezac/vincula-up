@@ -1,0 +1,57 @@
+<section class="activation-page">
+  @if (completed()) {
+    <div class="complete-state">
+      <span class="complete-mark">✓</span>
+      <p class="eyebrow">Perfil listo</p>
+      <h1>Ya estás dentro de la red.</h1>
+      <p>Tu perfil quedó preparado para aparecer en el directorio cuando se confirme la activación.</p>
+      <a routerLink="/directorio">Ver directorio <span aria-hidden="true">→</span></a>
+    </div>
+  } @else {
+    <div class="activation-heading">
+      <p class="eyebrow">Activar perfil profesional</p>
+      <h1>Completá tu ficha para empezar a recibir solicitudes.</h1>
+      <p>Solo necesitamos tres datos para mostrarte en el directorio de Vincula-UP.</p>
+    </div>
+
+    <div class="progress" aria-label="Progreso de activacion">
+      @for (item of [1, 2, 3]; track item) {
+        <span [class.current]="step() === item" [class.done]="step() > item">{{ item }}</span>
+      }
+    </div>
+
+    <form (ngSubmit)="next()">
+      @if (step() === 1) {
+        <div class="step-content">
+          <h2>Tu imagen profesional</h2>
+          <p class="step-help">Una foto clara ayuda a que los clientes reconozcan tu perfil.</p>
+          <label class="file-picker">
+            <span class="photo-placeholder">{{ photoName() ? '✓' : '+' }}</span>
+            <span>{{ photoName() || 'Elegir una foto' }}</span>
+            <input type="file" accept="image/*" (change)="selectPhoto($event)" />
+          </label>
+        </div>
+      }
+      @if (step() === 2) {
+        <div class="step-content">
+          <h2>Tu zona de cobertura</h2>
+          <p class="step-help">Indicá desde dónde trabajás. No mostraremos una dirección exacta.</p>
+          <label>Localidad o zona<input [ngModel]="zone()" (ngModelChange)="zone.set($event)" name="zone" placeholder="Ej. Concepcion del Uruguay" required /></label>
+          <label>Radio de cobertura: {{ radius() }} km<input [ngModel]="radius()" (ngModelChange)="radius.set($event)" name="radius" type="range" min="1" max="50" /></label>
+        </div>
+      }
+      @if (step() === 3) {
+        <div class="step-content">
+          <h2>Tu disponibilidad</h2>
+          <p class="step-help">Podés ajustar estos horarios más adelante.</p>
+          <label>Día<select [ngModel]="day()" (ngModelChange)="day.set($event)" name="day"><option>Lunes</option><option>Martes</option><option>Miércoles</option><option>Jueves</option><option>Viernes</option><option>Sábado</option></select></label>
+          <div class="time-row"><label>Desde<input [ngModel]="start()" (ngModelChange)="start.set($event)" name="start" type="time" /></label><label>Hasta<input [ngModel]="end()" (ngModelChange)="end.set($event)" name="end" type="time" /></label></div>
+        </div>
+      }
+      <div class="form-actions">
+        @if (step() > 1) { <button class="back" type="button" (click)="previous()">Volver</button> }
+        <button class="next" type="submit">{{ step() === 3 ? 'Activar mi perfil' : 'Continuar' }} <span aria-hidden="true">→</span></button>
+      </div>
+    </form>
+  }
+</section>

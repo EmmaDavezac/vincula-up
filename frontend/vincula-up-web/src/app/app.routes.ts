@@ -49,6 +49,12 @@ export const routes: Routes = [
 		title: 'Vincula-UP | Administracion',
 	},
 	{
+		path: 'activar-perfil',
+		canActivate: [requireRole('PROFESIONAL')],
+		loadComponent: () => import('./activation/activation').then((module) => module.Activation),
+		title: 'Vincula-UP | Activar perfil',
+	},
+	{
 		path: 'no-autorizado',
 		loadComponent: () => import('./access-page').then((module) => module.AccessPage),
 		data: {

@@ -12,6 +12,9 @@
     @if (auth.hasRole('ADMIN')) {
       <a routerLink="/admin" routerLinkActive="active">Administracion</a>
     }
+    @if (auth.hasRole('PROFESIONAL')) {
+      <a routerLink="/activar-perfil" routerLinkActive="active">Activar perfil</a>
+    }
   </nav>
   @if (auth.currentUser(); as user) {
     <div class="session-tools">
