@@ -163,19 +163,20 @@ h1 {
   color: var(--ink);
 }
 
-.professional-card button {
+.request-link {
   background: none;
   border: 0;
   border-bottom: 1px solid var(--coral);
   color: var(--ink);
   cursor: pointer;
-  font: inherit;
+  font-size: 0.82rem;
   font-size: 0.82rem;
   margin-top: 1.25rem;
   padding: 0.2rem 0;
+  text-decoration: none;
 }
 
-.professional-card button span {
+.request-link span {
   color: var(--coral);
   font-size: 1.1rem;
   margin-left: 0.5rem;

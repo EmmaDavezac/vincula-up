@@ -1,0 +1,23 @@
+<section class="request-page">
+  @if (submitted()) {
+    <div class="confirmation">
+      <p class="eyebrow">Solicitud enviada</p>
+      <h1>Tu pedido quedo pendiente de respuesta.</h1>
+      <p>{{ professional.name }} va a revisar el horario que propusiste. Te avisaremos cuando responda.</p>
+      <a routerLink="/directorio">Volver al directorio</a>
+    </div>
+  } @else {
+    <div class="request-heading">
+      <p class="eyebrow">Solicitar turno</p>
+      <h1>Coordiná tu visita con {{ professional.name }}.</h1>
+      <p>{{ professional.specialty }} · {{ professional.zone }}</p>
+    </div>
+    <form (ngSubmit)="submit()">
+      <label>Fecha propuesta<input [ngModel]="date()" (ngModelChange)="date.set($event)" name="date" type="date" required /></label>
+      <label>Horario aproximado<input [ngModel]="time()" (ngModelChange)="time.set($event)" name="time" type="time" required /></label>
+      <label>Direccion del servicio<input [ngModel]="address()" (ngModelChange)="address.set($event)" name="address" type="text" placeholder="Calle y altura, localidad" required /></label>
+      <p class="privacy-note">La direccion exacta se comparte con el profesional cuando acepta la solicitud.</p>
+      <button type="submit">Enviar solicitud <span aria-hidden="true">→</span></button>
+    </form>
+  }
+</section>

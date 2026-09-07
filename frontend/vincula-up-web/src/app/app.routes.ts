@@ -37,6 +37,12 @@ export const routes: Routes = [
 		title: 'Vincula-UP | Mis solicitudes',
 	},
 	{
+		path: 'solicitar',
+		canActivate: [requireRole('CLIENTE')],
+		loadComponent: () => import('./request/request').then((module) => module.Request),
+		title: 'Vincula-UP | Solicitar turno',
+	},
+	{
 		path: 'admin',
 		canActivate: [requireRole('ADMIN')],
 		loadComponent: () => import('./access-page').then((module) => module.AccessPage),

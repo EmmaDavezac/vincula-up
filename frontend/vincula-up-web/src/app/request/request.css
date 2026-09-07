@@ -1,0 +1,13 @@
+:host { display: block; }
+.request-page { margin: 0 auto; max-width: 760px; padding: 5rem 1.5rem; }
+.eyebrow { color: var(--coral); font-size: .75rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+h1 { color: var(--ink); font-family: Georgia, 'Times New Roman', serif; font-size: clamp(2.8rem, 6vw, 5rem); font-weight: 400; line-height: .98; margin: 1rem 0; max-width: 12ch; }
+.request-heading > p:last-child, .confirmation > p:not(.eyebrow) { color: var(--muted); line-height: 1.7; }
+form { display: grid; gap: 1.25rem; margin-top: 3rem; max-width: 30rem; }
+label { color: var(--ink); display: grid; font-size: .8rem; gap: .45rem; }
+input { background: #fffdf8; border: 1px solid var(--line); color: var(--ink); font: inherit; min-height: 46px; padding: .7rem; }
+input:focus { border-color: var(--coral); outline: 2px solid #f2c1b6; }
+.privacy-note { color: var(--muted); font-size: .78rem; line-height: 1.5; }
+form button { background: var(--coral); border: 0; color: var(--paper); cursor: pointer; font: inherit; min-height: 48px; padding: .8rem 1rem; }
+form button span { font-size: 1.15rem; margin-left: .5rem; }
+.confirmation a { border-bottom: 1px solid var(--coral); color: var(--ink); display: inline-block; margin-top: 1rem; padding-bottom: .25rem; text-decoration: none; }

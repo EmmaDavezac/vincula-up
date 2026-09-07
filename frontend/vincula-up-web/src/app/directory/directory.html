@@ -32,7 +32,7 @@
             <span><strong>{{ professional.rating }}</strong> / 5 ({{ professional.reviews }})</span>
             <span>{{ professional.availability }}</span>
           </div>
-          <button type="button">Ver perfil <span aria-hidden="true">→</span></button>
+          <a class="request-link" [routerLink]="['/solicitar']" [queryParams]="{ professionalId: professional.id }">Solicitar turno <span aria-hidden="true">→</span></a>
         </article>
       }
     </div>
