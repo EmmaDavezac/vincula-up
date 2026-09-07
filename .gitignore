@@ -1,0 +1,17 @@
+# Frontend dependencies and build output
+frontend/vincula-up-web/node_modules/
+frontend/vincula-up-web/dist/
+.angular/
+
+# Java build output
+**/target/
+
+# Local environment and IDE files
+.env
+.idea/
+.vscode/
+*.iml
+
+# Local database data
+db/postgres/
+db/pgadmin/

@@ -1,0 +1,26 @@
+:root {
+	--paper: #f6f3ec;
+	--ink: #1e2926;
+	--muted: #67716c;
+	--coral: #e35f43;
+	--line: #d8d8ce;
+	background: var(--paper);
+	color: var(--ink);
+	font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+	font-synthesis: none;
+	text-rendering: optimizeLegibility;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	background: var(--paper);
+	margin: 0;
+}
+
+button,
+a {
+	-webkit-tap-highlight-color: transparent;
+}
