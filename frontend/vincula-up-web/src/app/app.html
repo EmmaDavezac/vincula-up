@@ -7,7 +7,14 @@
     <a routerLink="/directorio" routerLinkActive="active">Directorio</a>
     <a routerLink="/como-funciona" routerLinkActive="active">Como funciona</a>
   </nav>
-  <a class="header-action" routerLink="/ingresar">Ingresar</a>
+  @if (auth.currentUser(); as user) {
+    <div class="session-tools">
+      <span class="session-name">{{ user.name }}</span>
+      <button type="button" (click)="auth.logout()">Salir</button>
+    </div>
+  } @else {
+    <a class="header-action" routerLink="/ingresar">Ingresar</a>
+  }
 </header>
 
 <main>

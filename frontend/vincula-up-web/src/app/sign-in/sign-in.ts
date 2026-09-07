@@ -1,0 +1,19 @@
+import { Component, inject } from '@angular/core';
+import { Router } from '@angular/router';
+import { UserRole } from '../core/models/user-profile';
+import { AuthService } from '../core/services/auth.service';
+
+@Component({
+  selector: 'app-sign-in',
+  templateUrl: './sign-in.html',
+  styleUrl: './sign-in.css',
+})
+export class SignIn {
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+
+  chooseRole(role: UserRole): void {
+    this.auth.login(role);
+    this.router.navigate(['/']);
+  }
+}

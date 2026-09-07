@@ -1,0 +1,11 @@
+:host { display: block; }
+.auth-page { display: grid; gap: 4rem; grid-template-columns: minmax(0, 1fr) 22rem; margin: 0 auto; max-width: 900px; padding: 6rem 1.5rem; }
+.eyebrow, .role-label { color: var(--coral); font-size: .75rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+h1 { color: var(--ink); font-family: Georgia, 'Times New Roman', serif; font-size: clamp(3rem, 6vw, 5.5rem); font-weight: 400; line-height: .98; margin: 1rem 0; max-width: 9ch; }
+.auth-copy > p:last-child { color: var(--muted); line-height: 1.7; max-width: 28rem; }
+.role-list { display: flex; flex-direction: column; gap: .75rem; }
+.role-label { color: var(--muted); letter-spacing: 0; margin: 0 0 .5rem; text-transform: none; }
+.role-list button { background: #fffdf8; border: 1px solid var(--line); color: var(--ink); cursor: pointer; display: flex; flex-direction: column; font: inherit; gap: .3rem; padding: 1rem; text-align: left; }
+.role-list button:hover { border-color: var(--coral); transform: translateX(3px); }
+.role-list span { color: var(--muted); font-size: .8rem; }
+@media (max-width: 700px) { .auth-page { display: block; padding-top: 3.5rem; } .role-list { margin-top: 3rem; } }
