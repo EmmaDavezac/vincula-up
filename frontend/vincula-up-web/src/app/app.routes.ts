@@ -41,11 +41,7 @@ export const routes: Routes = [
 	{
 		path: 'admin',
 		canActivate: [requireRole('ADMIN')],
-		loadComponent: () => import('./access-page').then((module) => module.AccessPage),
-		data: {
-			title: 'Panel de administracion',
-			message: 'Desde aca vas a cargar profesionales y hacer seguimiento de activaciones.',
-		},
+		loadComponent: () => import('./admin/admin').then((module) => module.Admin),
 		title: 'Vincula-UP | Administracion',
 	},
 	{

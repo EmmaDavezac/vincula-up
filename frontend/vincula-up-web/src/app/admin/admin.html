@@ -1,0 +1,32 @@
+<section class="admin-page">
+  <div class="admin-heading">
+    <div>
+      <p class="eyebrow">Panel institucional</p>
+      <h1>Seguimiento de profesionales</h1>
+    </div>
+    <p>Revisá quiénes completaron su perfil y quiénes todavía están pendientes de activar.</p>
+  </div>
+
+  @if (message()) { <p class="feedback">{{ message() }}</p> }
+  @if (loading()) {
+    <div class="loading">Cargando padrón...</div>
+  } @else if (professionals().length) {
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Legajo</th><th>Especialidad</th><th>Estado</th><th></th></tr></thead>
+        <tbody>
+          @for (professional of professionals(); track professional.id) {
+            <tr>
+              <td>{{ professional.legajo }}</td>
+              <td>{{ professional.especialidades[0]?.nombre || 'Sin especialidad' }}</td>
+              <td><span class="status" [class]="professional.estado.toLowerCase()">{{ professional.estado }}</span></td>
+              <td>@if (professional.estado === 'ACTIVO') { <button type="button" (click)="suspend(professional)">Suspender</button> }</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else {
+    <div class="empty-state"><h2>No hay profesionales cargados todavía.</h2><p>La carga individual y masiva será el próximo bloque administrativo.</p></div>
+  }
+</section>

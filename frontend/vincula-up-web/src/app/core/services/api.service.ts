@@ -19,6 +19,10 @@ export class ApiService {
     return this.http.get<unknown[]>(`${this.baseUrl}/especialidades`);
   }
 
+  suspendProfessional(id: string): Observable<unknown> {
+    return this.http.patch(`${this.baseUrl}/profesionales/${id}/suspender`, {});
+  }
+
   createRequest(request: {
     clienteId: string;
     profesionalId: string;
