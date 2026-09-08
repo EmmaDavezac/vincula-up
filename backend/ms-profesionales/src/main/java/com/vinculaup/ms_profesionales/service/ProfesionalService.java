@@ -53,6 +53,16 @@ public class ProfesionalService {
         return profesionalRepository.findByEstado(estado).stream().map(this::toResponse).toList();
     }
 
+    public ProfesionalResponse activarPorUsuario(ActivarProfesionalRequest request) {
+        Profesional profesional = profesionalRepository.findByUsuarioId(request.usuarioId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Profesional no encontrado"));
+        if (profesional.getEstado() == EstadoProfesional.SUSPENDIDO) {
+            throw conflict("Un profesional suspendido no puede activarse desde este flujo");
+        }
+        profesional.activar(request.fotoUrl(), request.zonaCoberturaLat(), request.zonaCoberturaLng(), request.radioKm());
+        return toResponse(profesional);
+    }
+
     public ProfesionalResponse activar(UUID id, ActivarProfesionalRequest request) {
         Profesional profesional = findProfesional(id);
         if (profesional.getEstado() == EstadoProfesional.SUSPENDIDO) {

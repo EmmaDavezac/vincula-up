@@ -31,8 +31,20 @@ public class BackendGateway {
         return get(profesionales, "/profesionales", estado == null ? null : "estado", estado);
     }
 
+    public JsonNode crearProfesional(JsonNode body) {
+        return post(profesionales, "/profesionales", body);
+    }
+
     public JsonNode listarEspecialidades() {
         return get(profesionales, "/especialidades", null, null);
+    }
+
+    public JsonNode buscarUsuarioPorKeycloakId(UUID keycloakId) {
+        return get(usuarios, "/usuarios/por-keycloak", "keycloakId", keycloakId.toString());
+    }
+
+    public JsonNode activarProfesional(JsonNode body) {
+        return patch(profesionales, "/profesionales/activar", body);
     }
 
     public JsonNode suspenderProfesional(UUID id) {

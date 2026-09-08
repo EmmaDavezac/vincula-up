@@ -1,4 +1,8 @@
 <section class="activation-page">
+  @if (errorMessage()) {
+    <p class="error-message">{{ errorMessage() }}</p>
+  }
+
   @if (completed()) {
     <div class="complete-state">
       <span class="complete-mark">✓</span>

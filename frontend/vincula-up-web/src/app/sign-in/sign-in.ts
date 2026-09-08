@@ -11,9 +11,13 @@ import { AuthService } from '../core/services/auth.service';
 export class SignIn {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  readonly loginError = this.auth.loginError;
 
   chooseRole(role: UserRole): void {
-    this.auth.login(role);
-    this.router.navigate(['/']);
+    this.auth.login(role).subscribe((ok) => {
+      if (ok) {
+        this.router.navigate(['/']);
+      }
+    });
   }
 }

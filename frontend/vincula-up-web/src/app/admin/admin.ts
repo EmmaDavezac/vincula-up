@@ -40,10 +40,26 @@ export class Admin {
   }
 
   private loadProfessionals(): void {
+    this.loading.set(true);
     forkJoin({
-      cargados: this.api.getProfessionals('CARGADO').pipe(catchError(() => of([]))),
-      activos: this.api.getProfessionals('ACTIVO').pipe(catchError(() => of([]))),
-      especialidades: this.api.getSpecialties().pipe(catchError(() => of([]))),
+      cargados: this.api.getProfessionals('CARGADO').pipe(
+        catchError((error) => {
+          this.message.set(this.api.describeError(error, 'No se pudo cargar la lista de profesionales cargados.'));
+          return of([]);
+        }),
+      ),
+      activos: this.api.getProfessionals('ACTIVO').pipe(
+        catchError((error) => {
+          this.message.set(this.api.describeError(error, 'No se pudo cargar la lista de profesionales activos.'));
+          return of([]);
+        }),
+      ),
+      especialidades: this.api.getSpecialties().pipe(
+        catchError((error) => {
+          this.message.set(this.api.describeError(error, 'No se pudieron cargar las especialidades disponibles.'));
+          return of([]);
+        }),
+      ),
     }).subscribe(({ cargados, activos, especialidades }) => {
       this.professionals.set([...cargados, ...activos] as unknown as AdminProfessional[]);
       this.specialties.set((especialidades as SpecialtyOption[]) ?? []);
@@ -72,7 +88,12 @@ export class Admin {
       usuarioId: this.form.usuarioId.trim(),
       legajo: this.form.legajo.trim(),
       especialidadIds: this.form.especialidadIds,
-    }).pipe(catchError(() => of(null))).subscribe((result) => {
+    }).pipe(
+      catchError((error) => {
+        this.message.set(this.api.describeError(error, 'No se pudo dar de alta el profesional.'));
+        return of(null);
+      }),
+    ).subscribe((result) => {
       this.submitting.set(false);
       if (result) {
         this.message.set('Profesional dado de alta correctamente.');
@@ -80,23 +101,22 @@ export class Admin {
         this.form.legajo = '';
         this.form.especialidadIds = [];
         this.loadProfessionals();
-      } else {
-        this.message.set('No se pudo dar de alta el profesional.');
       }
     });
   }
 
   suspend(professional: AdminProfessional): void {
     this.api.suspendProfessional(professional.id).pipe(
-      catchError(() => of(null)),
+      catchError((error) => {
+        this.message.set(this.api.describeError(error, 'No se pudo suspender el profesional.'));
+        return of(null);
+      }),
     ).subscribe((result) => {
       if (result) {
         this.professionals.update((items) => items.map((item) =>
           item.id === professional.id ? { ...item, estado: 'SUSPENDIDO' } : item,
         ));
         this.message.set('Profesional suspendido correctamente.');
-      } else {
-        this.message.set('No se pudo suspender el profesional.');
       }
     });
   }

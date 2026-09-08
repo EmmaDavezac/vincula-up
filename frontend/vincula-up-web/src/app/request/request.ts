@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, of } from 'rxjs';
 import { ApiService } from '../core/services/api.service';
 import { AuthService } from '../core/services/auth.service';
@@ -15,17 +15,26 @@ import { RequestService } from '../core/services/request.service';
 })
 export class Request {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly directoryService = inject(DirectoryService);
   private readonly requestService = inject(RequestService);
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
+  private readonly selectedProfessionalId = this.route.snapshot.queryParamMap.get('professionalId');
   readonly professional = this.directoryService.getProfessionals().find(
-    (item) => item.id === this.route.snapshot.queryParamMap.get('professionalId'),
+    (item) => item.id === this.selectedProfessionalId,
   ) ?? this.directoryService.getProfessionals()[0];
   readonly date = signal('');
   readonly time = signal('');
   readonly address = signal('');
   readonly submitted = signal(false);
+  readonly errorMessage = signal('');
+
+  constructor() {
+    if (!this.selectedProfessionalId || !this.professional) {
+      this.router.navigate(['/directorio']);
+    }
+  }
 
   submit(): void {
     if (!this.date() || !this.time() || !this.address().trim()) {
@@ -42,18 +51,23 @@ export class Request {
     };
 
     this.api.createRequest(payload).pipe(
-      catchError(() => of(null)),
+      catchError((error) => {
+        this.errorMessage.set(this.api.describeError(error, 'No se pudo enviar la solicitud'));
+        return of(null);
+      }),
     ).subscribe((created) => {
       if (!created) {
-        this.requestService.create({
-          professionalId: this.professional.id,
-          professionalName: this.professional.name,
-          specialty: this.professional.specialty,
-          date: this.date(),
-          time: this.time(),
-          address: this.address().trim(),
-        });
+        return;
       }
+
+      this.requestService.create({
+        professionalId: this.professional.id,
+        professionalName: this.professional.name,
+        specialty: this.professional.specialty,
+        date: this.date(),
+        time: this.time(),
+        address: this.address().trim(),
+      });
       this.submitted.set(true);
     });
   }

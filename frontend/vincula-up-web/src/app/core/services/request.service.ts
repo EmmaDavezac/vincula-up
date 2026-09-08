@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import { ServiceRequest } from '../models/service-request';
+import { RequestStatus, ServiceRequest } from '../models/service-request';
 
 @Injectable({ providedIn: 'root' })
 export class RequestService {
@@ -14,6 +14,12 @@ export class RequestService {
     };
     this.requests.update((requests) => [...requests, created]);
     return created;
+  }
+
+  updateStatus(requestId: number | string, status: RequestStatus): void {
+    this.requests.update((requests) => requests.map((request) =>
+      String(request.id) === String(requestId) ? { ...request, status } : request,
+    ));
   }
 
   replace(requests: ServiceRequest[]): void {

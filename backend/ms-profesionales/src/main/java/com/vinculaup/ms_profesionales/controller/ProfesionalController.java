@@ -40,6 +40,11 @@ public class ProfesionalController {
         return estado == null ? service.listarActivos() : service.listarPorEstado(estado);
     }
 
+    @PatchMapping("/activar")
+    public ProfesionalResponse activarPorUsuario(@Valid @RequestBody ActivarProfesionalRequest request) {
+        return service.activarPorUsuario(request);
+    }
+
     @PatchMapping("/{id}/activar")
     public ProfesionalResponse activar(@PathVariable UUID id, @Valid @RequestBody ActivarProfesionalRequest request) {
         return service.activar(id, request);

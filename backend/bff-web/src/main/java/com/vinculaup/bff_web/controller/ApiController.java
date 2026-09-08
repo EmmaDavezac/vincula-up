@@ -29,6 +29,17 @@ public class ApiController {
         return gateway.listarProfesionales(estado);
     }
 
+    @PostMapping("/profesionales")
+    @ResponseStatus(HttpStatus.CREATED)
+    public JsonNode crearProfesional(@RequestBody JsonNode body) {
+        return gateway.crearProfesional(body);
+    }
+
+    @PatchMapping("/profesionales/activar")
+    public JsonNode activarProfesional(@RequestBody JsonNode body) {
+        return gateway.activarProfesional(body);
+    }
+
     @GetMapping("/especialidades")
     public JsonNode listarEspecialidades() {
         return gateway.listarEspecialidades();
@@ -43,6 +54,11 @@ public class ApiController {
     @ResponseStatus(HttpStatus.CREATED)
     public JsonNode crearSolicitud(@RequestBody JsonNode body) {
         return gateway.crearSolicitud(body);
+    }
+
+    @GetMapping("/usuarios/por-keycloak")
+    public JsonNode buscarPorKeycloak(@RequestParam UUID keycloakId) {
+        return gateway.buscarUsuarioPorKeycloakId(keycloakId);
     }
 
     @GetMapping("/solicitudes/mias")

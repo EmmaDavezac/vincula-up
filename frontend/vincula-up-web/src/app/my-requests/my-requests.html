@@ -3,18 +3,40 @@
   <h1>Mis solicitudes</h1>
   <p class="intro">Acá vas a encontrar el estado de cada pedido y los próximos pasos.</p>
 
+  @if (errorMessage()) {
+    <p class="error-message">{{ errorMessage() }}</p>
+  }
+
+  @if (successMessage()) {
+    <p class="success-message">{{ successMessage() }}</p>
+  }
+
   @if (requests().length) {
     <div class="request-list">
       @for (request of requests(); track request.id) {
         <article class="request-card">
           <div>
-            <span class="status">{{ request.status }}</span>
+            <span class="status">{{ statusText(request.status) }}</span>
             <h2>{{ request.specialty }}</h2>
             <p>Con {{ request.professionalName }}</p>
           </div>
           <div class="request-details">
             <span>{{ request.date }} · {{ request.time }}</span>
             <span>{{ request.address }}</span>
+            <span class="next-step">{{ nextAction(request.status) }}</span>
+
+            @if (request.status === 'PENDIENTE') {
+              <div class="actions">
+                <button type="button" (click)="accept(request)">Aceptar</button>
+                <button type="button" (click)="reject(request)">Rechazar</button>
+              </div>
+            }
+
+            @if (request.status === 'ACEPTADA') {
+              <div class="actions">
+                <button type="button" (click)="complete(request)">Completar</button>
+              </div>
+            }
           </div>
         </article>
       }

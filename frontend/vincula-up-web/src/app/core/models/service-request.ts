@@ -1,7 +1,7 @@
-export type RequestStatus = 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA';
+export type RequestStatus = 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA' | 'COMPLETADA' | 'CANCELADA' | 'VENCIDA';
 
 export interface ServiceRequest {
-  id: number;
+  id: number | string;
   professionalId: string;
   professionalName: string;
   specialty: string;

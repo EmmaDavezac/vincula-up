@@ -19,6 +19,12 @@ Set-ExecutionPolicy -Scope Process Bypass
 .\scripts\start-local.ps1
 ```
 
+Si la máquina tiene poco espacio o memoria disponible, el script ya usa un perfil JVM más liviano para no fallar al arrancar Spring Boot:
+
+```powershell
+$env:JAVA_TOOL_OPTIONS = '-Xms128m -Xmx512m -Xss256k -XX:+UseSerialGC -XX:ActiveProcessorCount=2'
+```
+
 En otra terminal:
 
 ```powershell

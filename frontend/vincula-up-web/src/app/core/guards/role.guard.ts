@@ -8,6 +8,8 @@ export function requireRole(role: UserRole): CanActivateFn {
     const auth = inject(AuthService);
     const router = inject(Router);
 
+    auth.refreshSession();
+
     if (!auth.isAuthenticated()) {
       return router.createUrlTree(['/ingresar']);
     }

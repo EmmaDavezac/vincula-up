@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
+$javaOptions = '-Xms128m -Xmx512m -Xss256k -XX:+UseSerialGC -XX:ActiveProcessorCount=2'
 $services = @(
   @{ Name = 'ms-usuarios'; Path = 'backend\ms-usuarios'; Port = 8081 },
   @{ Name = 'ms-profesionales'; Path = 'backend\ms-profesionales'; Port = 8082 },
@@ -9,8 +10,18 @@ $services = @(
 
 foreach ($service in $services) {
   $workingDirectory = Join-Path $root $service.Path
-  Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '.\mvnw.cmd spring-boot:run' -WorkingDirectory $workingDirectory -WindowStyle Normal
+  $scriptCommand = "Set-Location '$workingDirectory'; `$env:JAVA_TOOL_OPTIONS = '$javaOptions'; `$env:MAVEN_OPTS = '$javaOptions'; .\mvnw.cmd spring-boot:run"
+  $arguments = @(
+    '-NoLogo',
+    '-NoProfile',
+    '-ExecutionPolicy', 'Bypass',
+    '-NoExit',
+    '-Command',
+    $scriptCommand
+  )
+  Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -WorkingDirectory $workingDirectory -WindowStyle Normal
   Write-Host "Iniciado $($service.Name) en http://localhost:$($service.Port)"
+  Start-Sleep -Seconds 5
 }
 
 Write-Host ''

@@ -1,4 +1,8 @@
 <section class="request-page">
+  @if (errorMessage()) {
+    <p class="error-message">{{ errorMessage() }}</p>
+  }
+
   @if (submitted()) {
     <div class="confirmation">
       <p class="eyebrow">Solicitud enviada</p>
