@@ -34,6 +34,11 @@ public class ApiController {
         return gateway.listarEspecialidades();
     }
 
+    @PatchMapping("/profesionales/{id}/suspender")
+    public JsonNode suspenderProfesional(@PathVariable UUID id) {
+        return gateway.suspenderProfesional(id);
+    }
+
     @PostMapping("/solicitudes")
     @ResponseStatus(HttpStatus.CREATED)
     public JsonNode crearSolicitud(@RequestBody JsonNode body) {

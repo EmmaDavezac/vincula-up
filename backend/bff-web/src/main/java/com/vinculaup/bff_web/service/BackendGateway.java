@@ -35,6 +35,10 @@ public class BackendGateway {
         return get(profesionales, "/especialidades", null, null);
     }
 
+    public JsonNode suspenderProfesional(UUID id) {
+        return patch(profesionales, "/profesionales/{id}/suspender", null, id);
+    }
+
     public JsonNode crearSolicitud(JsonNode body) {
         return post(solicitudes, "/solicitudes", body);
     }
