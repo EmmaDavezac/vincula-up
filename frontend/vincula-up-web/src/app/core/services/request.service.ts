@@ -15,4 +15,8 @@ export class RequestService {
     this.requests.update((requests) => [...requests, created]);
     return created;
   }
+
+  replace(requests: ServiceRequest[]): void {
+    this.requests.set(requests);
+  }
 }
