@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { ApiService } from './api.service';
 import { Professional } from '../models/professional';
 
 const PROFESSIONALS: Professional[] = [
@@ -50,7 +51,13 @@ const PROFESSIONALS: Professional[] = [
 
 @Injectable({ providedIn: 'root' })
 export class DirectoryService {
+  constructor(private readonly api: ApiService) {}
+
   getProfessionals(): Professional[] {
     return PROFESSIONALS;
+  }
+
+  loadProfessionals() {
+    return this.api.getProfessionals();
   }
 }
