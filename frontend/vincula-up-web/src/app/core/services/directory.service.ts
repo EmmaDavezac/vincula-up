@@ -1,10 +1,11 @@
 import { Injectable } from '@angular/core';
+import { Observable, catchError, map, of } from 'rxjs';
 import { ApiService } from './api.service';
 import { Professional } from '../models/professional';
 
 const PROFESSIONALS: Professional[] = [
   {
-    id: 1,
+    id: 'demo-1',
     name: 'Luciano Benitez',
     specialty: 'Electricidad domiciliaria',
     zone: 'Concepcion del Uruguay',
@@ -15,7 +16,7 @@ const PROFESSIONALS: Professional[] = [
     accent: 'mint',
   },
   {
-    id: 2,
+    id: 'demo-2',
     name: 'Mariana Acosta',
     specialty: 'Plomeria y gas',
     zone: 'Concepcion del Uruguay',
@@ -26,7 +27,7 @@ const PROFESSIONALS: Professional[] = [
     accent: 'sun',
   },
   {
-    id: 3,
+    id: 'demo-3',
     name: 'Jorge Sosa',
     specialty: 'Refrigeracion',
     zone: 'Colon y alrededores',
@@ -37,7 +38,7 @@ const PROFESSIONALS: Professional[] = [
     accent: 'sky',
   },
   {
-    id: 4,
+    id: 'demo-4',
     name: 'Camila Ramirez',
     specialty: 'Reparacion de electrodomesticos',
     zone: 'Concepcion del Uruguay',
@@ -57,7 +58,22 @@ export class DirectoryService {
     return PROFESSIONALS;
   }
 
-  loadProfessionals() {
-    return this.api.getProfessionals();
+  loadProfessionals(): Observable<Professional[]> {
+    return this.api.getProfessionals().pipe(
+      map((professionals) => professionals.map((professional, index) => ({
+        id: professional.id,
+        name: `Profesional ${professional.legajo ?? professional.id.slice(0, 8)}`,
+        specialty: professional.especialidades?.map((specialty) => specialty.nombre).join(' / ') || 'Servicio técnico',
+        zone: professional.zonaCoberturaLat != null && professional.zonaCoberturaLng != null
+          ? 'Zona de cobertura activa'
+          : 'Zona no informada',
+        rating: 0,
+        reviews: 0,
+        availability: 'Consultar disponibilidad',
+        initials: `P${index + 1}`,
+        accent: ['mint', 'sun', 'sky', 'rose'][index % 4],
+      }))),
+      catchError(() => of(PROFESSIONALS)),
+    );
   }
 }

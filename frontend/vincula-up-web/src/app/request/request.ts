@@ -15,7 +15,7 @@ export class Request {
   private readonly directoryService = inject(DirectoryService);
   private readonly requestService = inject(RequestService);
   readonly professional = this.directoryService.getProfessionals().find(
-    (item) => item.id === Number(this.route.snapshot.queryParamMap.get('professionalId')),
+    (item) => item.id === this.route.snapshot.queryParamMap.get('professionalId'),
   ) ?? this.directoryService.getProfessionals()[0];
   readonly date = signal('');
   readonly time = signal('');
