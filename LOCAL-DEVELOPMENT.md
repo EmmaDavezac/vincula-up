@@ -55,7 +55,17 @@ Invoke-WebRequest http://localhost:9001/api/profesionales
 
 Los servicios usan H2 en memoria, por lo que los datos se pierden al reiniciarlos.
 
-## Usar Neon
+## Variables de entorno y secretos
+
+No guardar credenciales reales en el repositorio. Copiar el ejemplo:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Y luego editar `.env` con los valores locales reales. En Docker Compose, esos valores se leen desde el archivo `.env` del directorio raíz. El repositorio ya ignora `.env` y `.env.*` a excepción de `.env.example`.
+
+### Usar Neon
 
 Neon reemplaza H2 sin cambiar el código. En PowerShell, definir las variables antes de arrancar los servicios:
 
