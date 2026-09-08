@@ -5,6 +5,18 @@
 h1 { color: var(--ink); font-family: Georgia, serif; font-size: clamp(2.8rem, 6vw, 5.5rem); font-weight: 400; line-height: .98; margin: 0; max-width: 12ch; }
 .admin-heading > p { color: var(--muted); line-height: 1.7; margin: 0; }
 .feedback { background: #dcebdc; color: #34633d; margin-top: 3rem; padding: .8rem 1rem; }
+.admin-form-panel { background: #fff; border: 1px solid var(--line); border-radius: 1.2rem; margin-top: 2.5rem; padding: 1.5rem; }
+.admin-form-panel h2 { color: var(--ink); font-family: Georgia, serif; font-size: 2rem; margin: 0 0 1.5rem; }
+.form-grid { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+label { display: grid; gap: .45rem; color: var(--muted); font-size: .82rem; }
+input[type='text'] { background: #f9faf8; border: 1px solid var(--line); border-radius: .8rem; color: var(--ink); font: inherit; padding: .75rem .9rem; }
+.specialties-block { margin-top: 1.5rem; }
+.specialties-block > span { color: var(--muted); display: block; font-size: .82rem; margin-bottom: .75rem; }
+.specialty-list { display: flex; flex-wrap: wrap; gap: .75rem; }
+.specialty-option { align-items: center; background: #f3f5f1; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); display: inline-flex; gap: .5rem; padding: .6rem .9rem; }
+.specialty-option input { accent-color: var(--coral); }
+.primary { background: var(--ink); border: none; border-radius: .9rem; color: white; cursor: pointer; font: inherit; font-weight: 700; margin-top: 1.5rem; padding: .8rem 1.2rem; }
+.primary:disabled { cursor: wait; opacity: .7; }
 .loading, .empty-state { color: var(--muted); margin-top: 3rem; padding: 3rem 1.5rem; text-align: center; }
 .empty-state { border: 1px dashed var(--line); }
 .empty-state h2 { color: var(--ink); font-family: Georgia, serif; font-size: 1.8rem; font-weight: 400; }
@@ -18,4 +30,4 @@ td { color: var(--ink); font-size: .88rem; }
 .status.activo { color: #448064; }
 .status.suspendido { color: var(--coral); }
 td button { background: transparent; border: 1px solid var(--ink); color: var(--ink); cursor: pointer; font: inherit; font-size: .78rem; padding: .55rem .7rem; }
-@media (max-width: 700px) { .admin-heading { display: block; } .admin-heading > p { margin-top: 2rem; } }
+@media (max-width: 700px) { .admin-heading { display: block; } .admin-heading > p { margin-top: 2rem; } .form-grid { grid-template-columns: 1fr; } }

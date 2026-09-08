@@ -8,6 +8,37 @@
   </div>
 
   @if (message()) { <p class="feedback">{{ message() }}</p> }
+
+  <section class="admin-form-panel">
+    <h2>Alta individual de profesional</h2>
+    <div class="form-grid">
+      <label>
+        <span>Usuario</span>
+        <input type="text" [(ngModel)]="form.usuarioId" name="usuarioId" placeholder="UUID del usuario" />
+      </label>
+      <label>
+        <span>Legajo</span>
+        <input type="text" [(ngModel)]="form.legajo" name="legajo" placeholder="Ej: P-2040" />
+      </label>
+    </div>
+
+    <div class="specialties-block">
+      <span>Especialidades</span>
+      <div class="specialty-list">
+        @for (specialty of specialties(); track specialty.id) {
+          <label class="specialty-option">
+            <input type="checkbox" [checked]="form.especialidadIds.includes(specialty.id)" (change)="toggleSpecialty(specialty.id)" />
+            <span>{{ specialty.nombre }}</span>
+          </label>
+        }
+      </div>
+    </div>
+
+    <button type="button" class="primary" (click)="createProfessional()" [disabled]="submitting()">
+      {{ submitting() ? 'Guardando...' : 'Guardar profesional' }}
+    </button>
+  </section>
+
   @if (loading()) {
     <div class="loading">Cargando padrón...</div>
   } @else if (professionals().length) {
@@ -27,6 +58,6 @@
       </table>
     </div>
   } @else {
-    <div class="empty-state"><h2>No hay profesionales cargados todavía.</h2><p>La carga individual y masiva será el próximo bloque administrativo.</p></div>
+    <div class="empty-state"><h2>No hay profesionales cargados todavía.</h2><p>Completá la carga individual para incorporar un profesional al padrón.</p></div>
   }
 </section>
