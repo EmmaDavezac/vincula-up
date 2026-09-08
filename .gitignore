@@ -8,6 +8,8 @@ frontend/vincula-up-web/dist/
 
 # Local environment and IDE files
 .env
+.env.*
+!.env.example
 .idea/
 .vscode/
 *.iml
