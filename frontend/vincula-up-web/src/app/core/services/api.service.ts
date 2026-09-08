@@ -19,7 +19,13 @@ export class ApiService {
     return this.http.get<unknown[]>(`${this.baseUrl}/especialidades`);
   }
 
-  createRequest(request: Omit<ServiceRequest, 'id' | 'status'>): Observable<ServiceRequest> {
+  createRequest(request: {
+    clienteId: string;
+    profesionalId: string;
+    especialidadId: string;
+    direccionServicio: string;
+    fechaHoraPropuesta: string;
+  }): Observable<ServiceRequest> {
     return this.http.post<ServiceRequest>(`${this.baseUrl}/solicitudes`, request);
   }
 

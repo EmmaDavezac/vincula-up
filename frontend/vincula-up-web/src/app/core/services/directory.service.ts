@@ -52,10 +52,12 @@ const PROFESSIONALS: Professional[] = [
 
 @Injectable({ providedIn: 'root' })
 export class DirectoryService {
+  private professionals = PROFESSIONALS;
+
   constructor(private readonly api: ApiService) {}
 
   getProfessionals(): Professional[] {
-    return PROFESSIONALS;
+    return this.professionals;
   }
 
   loadProfessionals(): Observable<Professional[]> {
@@ -73,7 +75,11 @@ export class DirectoryService {
         initials: `P${index + 1}`,
         accent: ['mint', 'sun', 'sky', 'rose'][index % 4],
       }))),
-      catchError(() => of(PROFESSIONALS)),
+      map((professionals) => {
+        this.professionals = professionals;
+        return professionals;
+      }),
+      catchError(() => of(this.professionals)),
     );
   }
 }
