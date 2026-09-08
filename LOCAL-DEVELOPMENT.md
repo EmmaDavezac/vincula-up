@@ -12,12 +12,24 @@ El proyecto puede ejecutarse sin Docker. Los microservicios usan H2 en memoria p
 
 ## Arranque rapido
 
+### Opcion A - sin Docker
+
 Desde PowerShell, en la raiz del repositorio:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
 .\scripts\start-local.ps1
 ```
+
+### Opcion B - con Docker Compose
+
+Cuando Docker este instalado en la máquina, en la raiz del repositorio se puede probar el stack con:
+
+```powershell
+docker compose up --build
+```
+
+Esto levanta PostgreSQL, `ms-usuarios`, `ms-profesionales`, `ms-solicitudes` y `bff-web` con la ruta interna del servicio y el `KEYCLOAK_ISSUER_URI` apuntando al contenedor de identidad.
 
 Si la máquina tiene poco espacio o memoria disponible, el script ya usa un perfil JVM más liviano para no fallar al arrancar Spring Boot:
 
