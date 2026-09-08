@@ -76,4 +76,9 @@ public class Solicitud {
         this.estado = nuevoEstado;
         this.fechaCambioEstado = LocalDateTime.now();
     }
+
+    public void rechazar(String motivo) {
+        this.motivoCancelacion = motivo;
+        cambiarEstado(EstadoSolicitud.RECHAZADA);
+    }
 }

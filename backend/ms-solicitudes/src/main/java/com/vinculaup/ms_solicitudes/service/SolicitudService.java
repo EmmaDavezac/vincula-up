@@ -3,6 +3,7 @@ package com.vinculaup.ms_solicitudes.service;
 import com.vinculaup.ms_solicitudes.client.DisponibilidadProfesional;
 import com.vinculaup.ms_solicitudes.client.ProfesionalesClient;
 import com.vinculaup.ms_solicitudes.dto.CrearSolicitudRequest;
+import com.vinculaup.ms_solicitudes.dto.CambiarEstadoRequest;
 import com.vinculaup.ms_solicitudes.dto.SolicitudResponse;
 import com.vinculaup.ms_solicitudes.entity.EstadoSolicitud;
 import com.vinculaup.ms_solicitudes.entity.Solicitud;
@@ -53,6 +54,49 @@ public class SolicitudService {
         return repository.findByClienteIdOrProfesionalId(usuarioId, usuarioId).stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    public SolicitudResponse aceptar(UUID id, CambiarEstadoRequest request) {
+        Solicitud solicitud = find(id);
+        ensureProfessionalActor(solicitud, request.actorId());
+        ensureState(solicitud, EstadoSolicitud.PENDIENTE);
+        solicitud.cambiarEstado(EstadoSolicitud.ACEPTADA);
+        return toResponse(solicitud);
+    }
+
+    public SolicitudResponse rechazar(UUID id, CambiarEstadoRequest request) {
+        Solicitud solicitud = find(id);
+        ensureProfessionalActor(solicitud, request.actorId());
+        ensureState(solicitud, EstadoSolicitud.PENDIENTE);
+        solicitud.rechazar(request.motivo());
+        return toResponse(solicitud);
+    }
+
+    public SolicitudResponse completar(UUID id, CambiarEstadoRequest request) {
+        Solicitud solicitud = find(id);
+        if (!solicitud.getClienteId().equals(request.actorId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo el cliente puede completar la solicitud");
+        }
+        ensureState(solicitud, EstadoSolicitud.ACEPTADA);
+        solicitud.cambiarEstado(EstadoSolicitud.COMPLETADA);
+        return toResponse(solicitud);
+    }
+
+    private Solicitud find(UUID id) {
+        return repository.findById(id).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Solicitud no encontrada"));
+    }
+
+    private void ensureProfessionalActor(Solicitud solicitud, UUID actorId) {
+        if (!solicitud.getProfesionalId().equals(actorId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El profesional no es dueño de esta solicitud");
+        }
+    }
+
+    private void ensureState(Solicitud solicitud, EstadoSolicitud expected) {
+        if (solicitud.getEstado() != expected) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "La solicitud no permite esta transicion desde " + solicitud.getEstado());
+        }
     }
 
     private boolean estaDentroDeDisponibilidad(UUID profesionalId, LocalDateTime fechaHora) {
