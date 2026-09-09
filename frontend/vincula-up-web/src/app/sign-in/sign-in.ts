@@ -1,6 +1,5 @@
 import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { UserRole } from '../core/models/user-profile';
 import { AuthService } from '../core/services/auth.service';
 
 @Component({
@@ -13,8 +12,8 @@ export class SignIn {
   private readonly router = inject(Router);
   readonly loginError = this.auth.loginError;
 
-  chooseRole(role: UserRole): void {
-    this.auth.login(role).subscribe((ok) => {
+  loginWithKeycloak(): void {
+    this.auth.loginWithKeycloak().subscribe((ok) => {
       if (ok) {
         this.router.navigate(['/']);
       }

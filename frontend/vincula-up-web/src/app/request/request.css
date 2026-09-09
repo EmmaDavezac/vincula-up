@@ -8,6 +8,11 @@ label { color: var(--ink); display: grid; font-size: .8rem; gap: .45rem; }
 input { background: #fffdf8; border: 1px solid var(--line); color: var(--ink); font: inherit; min-height: 46px; padding: .7rem; }
 input:focus { border-color: var(--coral); outline: 2px solid #f2c1b6; }
 .privacy-note { color: var(--muted); font-size: .78rem; line-height: 1.5; }
+.gps-actions { align-items: center; display: flex; flex-wrap: wrap; gap: .8rem; margin-top: .2rem; }
+.gps-button { background: var(--paper); border: 1px solid var(--coral); color: var(--coral); cursor: pointer; font: inherit; min-height: 42px; padding: .55rem .9rem; }
+.gps-button[disabled] { cursor: wait; opacity: .75; }
+.gps-readout, .gps-error { color: var(--muted); font-size: .76rem; }
+.gps-error { color: var(--coral); }
 form button { background: var(--coral); border: 0; color: var(--paper); cursor: pointer; font: inherit; min-height: 48px; padding: .8rem 1rem; }
 form button span { font-size: 1.15rem; margin-left: .5rem; }
 .confirmation a { border-bottom: 1px solid var(--coral); color: var(--ink); display: inline-block; margin-top: 1rem; padding-bottom: .25rem; text-decoration: none; }

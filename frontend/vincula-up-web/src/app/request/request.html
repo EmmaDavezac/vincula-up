@@ -20,6 +20,17 @@
       <label>Fecha propuesta<input [ngModel]="date()" (ngModelChange)="date.set($event)" name="date" type="date" required /></label>
       <label>Horario aproximado<input [ngModel]="time()" (ngModelChange)="time.set($event)" name="time" type="time" required /></label>
       <label>Direccion del servicio<input [ngModel]="address()" (ngModelChange)="address.set($event)" name="address" type="text" placeholder="Calle y altura, localidad" required /></label>
+      <div class="gps-actions">
+        <button type="button" class="gps-button" (click)="lookupGps()" [disabled]="gpsLoading()">
+          {{ gpsLoading() ? 'Calculando...' : 'Ver ubicación GPS' }}
+        </button>
+        @if (gpsError()) {
+          <span class="gps-error">{{ gpsError() }}</span>
+        }
+        @if (gpsPosition(); as position) {
+          <span class="gps-readout">GPS {{ position.latitude | number:'1.4-4' }}, {{ position.longitude | number:'1.4-4' }}</span>
+        }
+      </div>
       <p class="privacy-note">La direccion exacta se comparte con el profesional cuando acepta la solicitud.</p>
       <button type="submit">Enviar solicitud <span aria-hidden="true">→</span></button>
     </form>

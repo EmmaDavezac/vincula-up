@@ -1,6 +1,6 @@
 import { inject, Injectable, computed, signal } from '@angular/core';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { catchError, map, of, Observable } from 'rxjs';
+import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
+import { catchError, map, of, Observable, switchMap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { UserProfile, UserRole } from '../models/user-profile';
 
@@ -16,13 +16,18 @@ interface UsuarioLookupResponse {
   fechaAlta?: string;
 }
 
-const DEMO_USERS: Record<UserRole, UserProfile> = {
-  CLIENTE: { id: '00000000-0000-0000-0000-000000000001', name: 'Sofia Gomez', role: 'CLIENTE', roleLabel: 'Cliente' },
-  PROFESIONAL: { id: '00000000-0000-0000-0000-000000000002', name: 'Luciano Benitez', role: 'PROFESIONAL', roleLabel: 'Profesional' },
-  ADMIN: { id: '00000000-0000-0000-0000-000000000003', name: 'Admin Vincula-UP', role: 'ADMIN', roleLabel: 'Administrador' },
-};
+interface KeycloakTokenResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  token_type: string;
+  id_token?: string;
+  scope?: string;
+}
 
 const TOKEN_KEY = 'vincula-up-token';
+const KEYCLOAK_STATE_KEY = 'vincula-up-keycloak-state';
+const KEYCLOAK_NONCE_KEY = 'vincula-up-keycloak-nonce';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -32,35 +37,30 @@ export class AuthService {
   readonly isAuthenticated = computed(() => this.user() !== null);
   readonly loginError = signal('');
 
-  login(role: UserRole): Observable<boolean> {
-    const profile = DEMO_USERS[role];
-    const keycloakId = profile.id;
+  constructor() {
+    this.handleCodeCallback();
+  }
+
+  loginWithKeycloak(): Observable<boolean> {
     this.loginError.set('');
+    const state = this.randomValue();
+    const nonce = this.randomValue();
+    sessionStorage.setItem(KEYCLOAK_STATE_KEY, state);
+    sessionStorage.setItem(KEYCLOAK_NONCE_KEY, nonce);
 
-    return this.http.get<UsuarioLookupResponse>(`${environment.apiUrl}/usuarios/por-keycloak?keycloakId=${encodeURIComponent(keycloakId)}`).pipe(
-      map((usuario) => {
-        const mapped = {
-          id: usuario.id,
-          name: `${usuario.nombre} ${usuario.apellido}`.trim(),
-          role: usuario.rolNegocio,
-          roleLabel: this.roleLabel(usuario.rolNegocio),
-        } satisfies UserProfile;
+    const params = new URLSearchParams({
+      client_id: environment.keycloakClientId,
+      response_type: 'code',
+      redirect_uri: environment.keycloakRedirectUri,
+      scope: 'openid profile email',
+      state,
+      nonce,
+      response_mode: 'query',
+    });
 
-        const token = this.buildToken(mapped);
-        localStorage.setItem(TOKEN_KEY, token);
-        this.user.set(mapped);
-        return true;
-      }),
-      catchError((error: HttpErrorResponse) => {
-        if (error.status === 404) {
-          this.useDemoProfile(profile);
-          return of(true);
-        }
-
-        this.loginError.set(this.describeError(error, 'No se pudo validar tu usuario en Vincula-UP.'));
-        return of(false);
-      }),
-    );
+    const authorizeUrl = `${environment.keycloakUrl}/realms/${environment.keycloakRealm}/protocol/openid-connect/auth?${params.toString()}`;
+    window.location.href = authorizeUrl;
+    return of(true);
   }
 
   logout(): void {
@@ -80,10 +80,73 @@ export class AuthService {
     return localStorage.getItem(TOKEN_KEY);
   }
 
-  private useDemoProfile(profile: UserProfile): void {
-    const token = this.buildToken(profile);
-    localStorage.setItem(TOKEN_KEY, token);
-    this.user.set(profile);
+  private handleCodeCallback(): void {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const returnedState = params.get('state');
+    const storedState = sessionStorage.getItem(KEYCLOAK_STATE_KEY);
+
+    if (!code || !returnedState || returnedState !== storedState) {
+      return;
+    }
+
+    sessionStorage.removeItem(KEYCLOAK_STATE_KEY);
+    sessionStorage.removeItem(KEYCLOAK_NONCE_KEY);
+
+    this.loginError.set('');
+    const body = new HttpParams()
+      .set('grant_type', 'authorization_code')
+      .set('client_id', environment.keycloakClientId)
+      .set('code', code)
+      .set('redirect_uri', environment.keycloakRedirectUri)
+      .set('scope', 'openid profile email');
+
+    const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
+
+    this.http.post<KeycloakTokenResponse>(`${environment.keycloakUrl}/realms/${environment.keycloakRealm}/protocol/openid-connect/token`, body.toString(), { headers })
+      .pipe(
+        switchMap((token) => this.maybeUseToken(token)),
+        catchError((error: HttpErrorResponse) => {
+          this.loginError.set(this.describeError(error, 'No se pudo completar el login con Keycloak.'));
+          return of(false);
+        }),
+      )
+      .subscribe();
+  }
+
+  private maybeUseToken(token: KeycloakTokenResponse): Observable<boolean> {
+    try {
+      const claims = this.decodeToken(token.access_token);
+      if (!claims || !claims.sub || !claims.role) {
+        this.loginError.set('La respuesta de Keycloak no incluye la sesión necesaria para Vincula-UP.');
+        return of(false);
+      }
+
+      const lookupUrl = `${environment.apiUrl}/usuarios/por-keycloak?keycloakId=${encodeURIComponent(claims.sub)}`;
+      return this.http.get<UsuarioLookupResponse>(lookupUrl).pipe(
+        map((usuario) => {
+          const profile = {
+            id: usuario.id,
+            name: `${usuario.nombre} ${usuario.apellido}`.trim(),
+            role: usuario.rolNegocio,
+            roleLabel: this.roleLabel(usuario.rolNegocio),
+          } satisfies UserProfile;
+
+          const localJwt = this.buildToken(profile);
+          localStorage.setItem(TOKEN_KEY, localJwt);
+          this.user.set(profile);
+          this.loginError.set('');
+          return true;
+        }),
+        catchError((error: HttpErrorResponse) => {
+          this.loginError.set(this.describeError(error, 'No se pudo vincular el usuario de Keycloak con Vincula-UP.'));
+          return of(false);
+        }),
+      );
+    } catch {
+      this.loginError.set('No se pudo procesar la respuesta real de Keycloak.');
+      return of(false);
+    }
   }
 
   private restoreSession(): UserProfile | null {
@@ -99,11 +162,27 @@ export class AuthService {
     }
 
     return {
-      id: payload.sub ?? DEMO_USERS[payload.role].id,
-      name: payload.name ?? DEMO_USERS[payload.role].name,
+      id: payload.sub ?? '',
+      name: payload.name ?? 'Usuario Vincula-UP',
       role: payload.role,
-      roleLabel: DEMO_USERS[payload.role].roleLabel,
+      roleLabel: this.roleLabel(payload.role),
     };
+  }
+
+  private decodeToken(token: string): { sub?: string; name?: string; role?: UserRole } | null {
+    try {
+      const parts = token.split('.');
+      if (parts.length < 2) {
+        return null;
+      }
+      const payload = parts[1];
+      const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+      const decoded = JSON.parse(atob(normalized));
+      const role = decoded.role ?? decoded.realm_access?.roles?.[0] ?? decoded.roles?.[0];
+      return { sub: decoded.sub, name: decoded.name ?? decoded.preferred_username, role: this.isValidRole(role) ? role : undefined };
+    } catch {
+      return null;
+    }
   }
 
   private buildToken(profile: UserProfile): string {
@@ -117,20 +196,6 @@ export class AuthService {
       exp: Math.floor(Date.now() / 1000) + 60 * 60,
     };
     return `${header}.${btoa(JSON.stringify(payload))}.signature`;
-  }
-
-  private decodeToken(token: string): { sub?: string; name?: string; role?: UserRole } | null {
-    try {
-      const [, payload] = token.split('.');
-      if (!payload) {
-        return null;
-      }
-      const decoded = JSON.parse(atob(payload));
-      const role = decoded.role ?? decoded.realm_access?.roles?.[0] ?? decoded.roles?.[0];
-      return { sub: decoded.sub, name: decoded.name, role: this.isValidRole(role) ? role : undefined };
-    } catch {
-      return null;
-    }
   }
 
   private describeError(error: unknown, fallback = 'No se pudo completar la operación.'):
@@ -172,5 +237,11 @@ export class AuthService {
 
   private isValidRole(role: string): role is UserRole {
     return role === 'CLIENTE' || role === 'PROFESIONAL' || role === 'ADMIN';
+  }
+
+  private randomValue(): string {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
   }
 }

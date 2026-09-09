@@ -1,0 +1,74 @@
+{
+  "realm": "vincula-up",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "roles": {
+    "realm": [
+      { "name": "CLIENTE" },
+      { "name": "PROFESIONAL" },
+      { "name": "ADMIN" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "vincula-up-public",
+      "name": "Vincula-UP Public Client",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "implicitFlowEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "http://localhost:4200/*",
+        "https://vincula-up.local/*",
+        "http://127.0.0.1:4200/*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "cliente@vincula-up.local",
+      "enabled": true,
+      "email": "cliente@vincula-up.local",
+      "firstName": "Sofia",
+      "lastName": "Gomez",
+      "emailVerified": true,
+      "credentials": [
+        { "type": "password", "value": "password", "temporary": false }
+      ],
+      "realmRoles": ["CLIENTE"]
+    },
+    {
+      "username": "profesional@vincula-up.local",
+      "enabled": true,
+      "email": "profesional@vincula-up.local",
+      "firstName": "Luciano",
+      "lastName": "Benitez",
+      "emailVerified": true,
+      "credentials": [
+        { "type": "password", "value": "password", "temporary": false }
+      ],
+      "realmRoles": ["PROFESIONAL"]
+    },
+    {
+      "username": "admin@vincula-up.local",
+      "enabled": true,
+      "email": "admin@vincula-up.local",
+      "firstName": "Admin",
+      "lastName": "Vincula-UP",
+      "emailVerified": true,
+      "credentials": [
+        { "type": "password", "value": "password", "temporary": false }
+      ],
+      "realmRoles": ["ADMIN"]
+    }
+  ]
+}

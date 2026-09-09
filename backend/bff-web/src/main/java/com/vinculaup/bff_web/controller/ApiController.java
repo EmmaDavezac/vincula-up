@@ -2,6 +2,8 @@ package com.vinculaup.bff_web.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.vinculaup.bff_web.service.BackendGateway;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -96,5 +98,20 @@ public class ApiController {
     @ResponseStatus(HttpStatus.CREATED)
     public JsonNode crearCalificacion(@PathVariable UUID id, @RequestBody JsonNode body) {
         return gateway.crearCalificacion(id, body);
+    }
+
+    @GetMapping("/gps")
+    public Map<String, Object> obtenerUbicacionGps(@RequestParam(required = false, defaultValue = "") String direccion) {
+        String normalizedAddress = direccion == null || direccion.isBlank() ? "Vincula-UP" : direccion.trim();
+        int hash = Math.abs(normalizedAddress.hashCode());
+        double latitude = -34.6037 + ((hash % 1000) / 1000.0) * 0.02;
+        double longitude = -58.3816 + ((hash % 1000) / 1000.0) * 0.02;
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("address", normalizedAddress);
+        response.put("latitude", latitude);
+        response.put("longitude", longitude);
+        response.put("source", "demo-gps");
+        return response;
     }
 }

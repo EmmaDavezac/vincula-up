@@ -2,15 +2,13 @@
   <div class="auth-copy">
     <p class="eyebrow">Acceso Vincula-UP</p>
     <h1>Entrá a tu espacio de la red.</h1>
-    <p>En la version de desarrollo podés probar cada rol sin configurar todavía Keycloak.</p>
+    <p>Iniciá sesión con Keycloak para acceder a la plataforma.</p>
   </div>
   <div class="role-list">
     @if (loginError()) {
       <p class="error-message">{{ loginError() }}</p>
     }
-    <p class="role-label">Elegí un usuario de demostracion</p>
-    <button type="button" (click)="chooseRole('CLIENTE')"><strong>Cliente</strong><span>Buscar y solicitar servicios</span></button>
-    <button type="button" (click)="chooseRole('PROFESIONAL')"><strong>Profesional</strong><span>Gestionar perfil y solicitudes</span></button>
-    <button type="button" (click)="chooseRole('ADMIN')"><strong>Administrador</strong><span>Cargar y supervisar profesionales</span></button>
+    <p class="role-label">Autenticación real</p>
+    <button type="button" (click)="loginWithKeycloak()"><strong>Iniciar sesión con Keycloak</strong><span>Entrar con usuario y contraseña</span></button>
   </div>
 </section>

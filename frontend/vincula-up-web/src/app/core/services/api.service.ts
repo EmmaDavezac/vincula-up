@@ -32,6 +32,13 @@ interface AvailabilitySlot {
   horaFin: string;
 }
 
+interface GpsPosition {
+  address: string;
+  latitude: number;
+  longitude: number;
+  source: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private readonly http = inject(HttpClient);
@@ -120,6 +127,11 @@ export class ApiService {
     return this.http.patch<ServiceRequest>(`${this.baseUrl}/solicitudes/${requestId}/completar`, { actorId }, { headers: this.authHeaders() }).pipe(
       map((request) => this.toServiceRequest(request)),
     );
+  }
+
+  getGpsPosition(address = ''): Observable<GpsPosition> {
+    const params = new HttpParams().set('direccion', address);
+    return this.http.get<GpsPosition>(`${this.baseUrl}/gps`, { params, headers: this.authHeaders() });
   }
 
   getMessages(requestId: string, userId: string): Observable<unknown[]> {
