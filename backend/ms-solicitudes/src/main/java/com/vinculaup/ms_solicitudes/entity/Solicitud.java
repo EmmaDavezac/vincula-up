@@ -31,6 +31,12 @@ public class Solicitud {
     @Column(nullable = false, length = 500)
     private String direccionServicio;
 
+    @Column(nullable = true)
+    private Double latitud;
+
+    @Column(nullable = true)
+    private Double longitud;
+
     @Column(nullable = false)
     private LocalDateTime fechaHoraPropuesta;
 
@@ -50,11 +56,13 @@ public class Solicitud {
     }
 
     public Solicitud(UUID clienteId, UUID profesionalId, UUID especialidadId, String direccionServicio,
-            LocalDateTime fechaHoraPropuesta) {
+            Double latitud, Double longitud, LocalDateTime fechaHoraPropuesta) {
         this.clienteId = clienteId;
         this.profesionalId = profesionalId;
         this.especialidadId = especialidadId;
         this.direccionServicio = direccionServicio;
+        this.latitud = latitud;
+        this.longitud = longitud;
         this.fechaHoraPropuesta = fechaHoraPropuesta;
         this.estado = EstadoSolicitud.PENDIENTE;
         this.fechaCreacion = LocalDateTime.now();
@@ -66,6 +74,8 @@ public class Solicitud {
     public UUID getProfesionalId() { return profesionalId; }
     public UUID getEspecialidadId() { return especialidadId; }
     public String getDireccionServicio() { return direccionServicio; }
+    public Double getLatitud() { return latitud; }
+    public Double getLongitud() { return longitud; }
     public LocalDateTime getFechaHoraPropuesta() { return fechaHoraPropuesta; }
     public EstadoSolicitud getEstado() { return estado; }
     public String getMotivoCancelacion() { return motivoCancelacion; }
@@ -77,8 +87,20 @@ public class Solicitud {
         this.fechaCambioEstado = LocalDateTime.now();
     }
 
+    public void cambiarUbicacion(String direccionServicio, Double latitud, Double longitud) {
+        this.direccionServicio = direccionServicio;
+        this.latitud = latitud;
+        this.longitud = longitud;
+    }
+
     public void rechazar(String motivo) {
         this.motivoCancelacion = motivo;
         cambiarEstado(EstadoSolicitud.RECHAZADA);
     }
+
+    public void cancelar(String motivo) {
+        this.motivoCancelacion = motivo;
+        cambiarEstado(EstadoSolicitud.CANCELADA);
+    }
 }
+

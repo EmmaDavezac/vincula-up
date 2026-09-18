@@ -3,6 +3,7 @@ package com.vinculaup.ms_profesionales.service;
 import com.vinculaup.ms_profesionales.dto.DisponibilidadRequest;
 import com.vinculaup.ms_profesionales.dto.DisponibilidadResponse;
 import com.vinculaup.ms_profesionales.entity.Disponibilidad;
+import com.vinculaup.ms_profesionales.entity.Profesional;
 import com.vinculaup.ms_profesionales.repository.DisponibilidadRepository;
 import com.vinculaup.ms_profesionales.repository.ProfesionalRepository;
 import java.util.List;
@@ -25,11 +26,11 @@ public class DisponibilidadService {
     }
 
     public List<DisponibilidadResponse> reemplazar(UUID profesionalId, List<DisponibilidadRequest> requests) {
-        ensureProfessionalExists(profesionalId);
+        UUID targetId = resolveProfesionalId(profesionalId);
         requests.forEach(this::validateRange);
-        disponibilidadRepository.deleteByProfesionalId(profesionalId);
+        disponibilidadRepository.deleteByProfesionalId(targetId);
         return disponibilidadRepository.saveAll(requests.stream()
-                        .map(request -> new Disponibilidad(profesionalId, request.diaSemana(), request.horaInicio(), request.horaFin()))
+                        .map(request -> new Disponibilidad(targetId, request.diaSemana(), request.horaInicio(), request.horaFin()))
                         .toList())
                 .stream()
                 .map(this::toResponse)
@@ -38,14 +39,17 @@ public class DisponibilidadService {
 
     @Transactional(readOnly = true)
     public List<DisponibilidadResponse> listar(UUID profesionalId) {
-        ensureProfessionalExists(profesionalId);
-        return disponibilidadRepository.findByProfesionalId(profesionalId).stream().map(this::toResponse).toList();
+        UUID targetId = resolveProfesionalId(profesionalId);
+        return disponibilidadRepository.findByProfesionalId(targetId).stream().map(this::toResponse).toList();
     }
 
-    private void ensureProfessionalExists(UUID profesionalId) {
-        if (!profesionalRepository.existsById(profesionalId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Profesional no encontrado");
+    private UUID resolveProfesionalId(UUID idOrUsuarioId) {
+        if (profesionalRepository.existsById(idOrUsuarioId)) {
+            return idOrUsuarioId;
         }
+        return profesionalRepository.findByUsuarioId(idOrUsuarioId)
+                .map(Profesional::getId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Profesional no encontrado"));
     }
 
     private void validateRange(DisponibilidadRequest request) {

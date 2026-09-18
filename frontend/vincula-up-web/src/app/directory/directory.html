@@ -1,45 +1,127 @@
 <section class="directory-page">
   <div class="directory-intro">
     <div>
-      <p class="eyebrow">Directorio Vincula-UP</p>
-      <h1>Encontrá a la persona indicada para tu trabajo.</h1>
+      <p class="eyebrow">Panel de Administración</p>
+      <h1>Directorio y Gestión de Profesionales</h1>
     </div>
-    <p class="intro-copy">Profesionales activos, con especialidad declarada y disponibilidad para coordinar un turno.</p>
+    <p class="intro-copy">Consulta padrón general, estado de cobertura, y administrá la activación o suspensión de profesionales.</p>
   </div>
 
-  <label class="search-box">
-    <span>Buscar por oficio, nombre o zona</span>
-    <input [(ngModel)]="search" type="search" placeholder="Ej. electricidad" />
-  </label>
+  @if (message()) {
+    <p class="alert-banner">{{ message() }}</p>
+  }
+
+  <div class="filters-row">
+    <label class="search-box">
+      <span>Buscar por oficio, legajo, nombre o zona</span>
+      <input [(ngModel)]="search" type="search" placeholder="Ej. Electricidad, P-2040, Concepcion..." />
+    </label>
+
+    <div class="status-tabs">
+      <button type="button" [class.active]="filterStatus() === 'TODOS'" (click)="filterStatus.set('TODOS')">Todos</button>
+      <button type="button" [class.active]="filterStatus() === 'ACTIVO'" (click)="filterStatus.set('ACTIVO')">Activos</button>
+      <button type="button" [class.active]="filterStatus() === 'CARGADO'" (click)="filterStatus.set('CARGADO')">Pendientes</button>
+      <button type="button" [class.active]="filterStatus() === 'SUSPENDIDO'" (click)="filterStatus.set('SUSPENDIDO')">Suspendidos</button>
+    </div>
+  </div>
 
   <div class="directory-meta">
-    <span>{{ filteredProfessionals().length }} profesionales disponibles</span>
-    <span>Datos de demostracion</span>
+    <span>{{ filteredProfessionals().length }} profesionales encontrados</span>
+    <button type="button" class="btn-refresh" (click)="refreshProfessionals()">Actualizar datos</button>
   </div>
 
-  @if (filteredProfessionals().length) {
+  @if (loading()) {
+    <div class="loading-state">
+      <span class="spinner"></span>
+      <p>Cargando profesionales...</p>
+    </div>
+  } @else if (filteredProfessionals().length) {
     <div class="professional-grid">
       @for (professional of filteredProfessionals(); track professional.id) {
-        <article class="professional-card">
+        <article class="professional-card" [class.suspended]="professional.estado === 'SUSPENDIDO'">
           <div class="card-topline">
-            <span class="avatar" [class]="professional.accent">{{ professional.initials }}</span>
-            <span class="verified">Validado</span>
+            @if (professional.fotoUrl) {
+              <img [src]="professional.fotoUrl" [alt]="professional.name" class="avatar-photo" />
+            } @else {
+              <span class="avatar" [class]="professional.accent">{{ professional.initials }}</span>
+            }
+            <span class="status-badge" [class]="(professional.estado || 'ACTIVO').toLowerCase()">
+              {{ professional.estado || 'ACTIVO' }}
+            </span>
           </div>
+
           <h2>{{ professional.name }}</h2>
+          <p class="legajo-tag">Legajo: <strong>{{ professional.legajo || 'S/D' }}</strong></p>
           <p class="specialty">{{ professional.specialty }}</p>
           <p class="zone">{{ professional.zone }}</p>
+
           <div class="card-details">
-            <span><strong>{{ professional.rating }}</strong> / 5 ({{ professional.reviews }})</span>
-            <span>{{ professional.availability }}</span>
+            <span>Radio cobertura: <strong>{{ professional.radioKm ?? 'No def.' }} km</strong></span>
+            <span>Coord: <strong>{{ professional.zonaCoberturaLat ? (professional.zonaCoberturaLat | number:'1.2-2') + ', ' + (professional.zonaCoberturaLng | number:'1.2-2') : 'Sin GPS' }}</strong></span>
           </div>
-          <a class="request-link" [routerLink]="['/solicitar']" [queryParams]="{ professionalId: professional.id }">Solicitar turno <span aria-hidden="true">→</span></a>
+
+          @if (isAdmin()) {
+            <div class="card-admin-actions">
+              <button type="button" class="btn-action-edit" (click)="startEdit(professional)">
+                ✏️ Editar cobertura
+              </button>
+              @if (professional.estado === 'ACTIVO') {
+                <button type="button" class="btn-action-suspend" (click)="suspend(professional)">Suspender</button>
+              }
+              @if (professional.estado === 'SUSPENDIDO') {
+                <button type="button" class="btn-action-reactivate" (click)="reactivate(professional)">Reactivar</button>
+              }
+            </div>
+          } @else if (auth.hasRole('CLIENTE')) {
+            <div class="card-public-actions">
+              <a class="btn-action-solicitar" [routerLink]="['/solicitar']" [queryParams]="{ professionalId: professional.id }">
+                Solicitar servicio <span aria-hidden="true">→</span>
+              </a>
+            </div>
+          }
         </article>
       }
     </div>
   } @else {
     <div class="empty-state">
-      <h2>No encontramos profesionales con esa búsqueda.</h2>
-      <p>Probá con otra especialidad o una zona cercana.</p>
+      <h2>No encontramos profesionales con ese criterio.</h2>
+      <p>Probá cambiando el término de búsqueda o el filtro de estado.</p>
+    </div>
+  }
+
+  <!-- Modal de Edición -->
+  @if (editingProf(); as prof) {
+    <div class="modal-overlay" (click)="cancelEdit()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <h3>Editar profesional: {{ prof.name }}</h3>
+        <p class="modal-sub">Legajo: {{ prof.legajo || 'Sin legajo' }} · {{ prof.specialty }}</p>
+
+        <form (submit)="saveEdit(); $event.preventDefault()">
+          <label class="form-field">
+            <span>Radio de cobertura (km)</span>
+            <input type="number" [(ngModel)]="editForm.radioKm" name="radioKm" min="1" max="100" required />
+          </label>
+
+          <div class="coords-row">
+            <label class="form-field">
+              <span>Latitud de cobertura</span>
+              <input type="number" step="0.0001" [(ngModel)]="editForm.zonaCoberturaLat" name="zonaCoberturaLat" required />
+            </label>
+            <label class="form-field">
+              <span>Longitud de cobertura</span>
+              <input type="number" step="0.0001" [(ngModel)]="editForm.zonaCoberturaLng" name="zonaCoberturaLng" required />
+            </label>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-cancel" (click)="cancelEdit()">Cancelar</button>
+            <button type="submit" class="btn-save" [disabled]="savingEdit()">
+              {{ savingEdit() ? 'Guardando...' : 'Guardar cambios' }}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   }
 </section>
+

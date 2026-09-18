@@ -16,6 +16,7 @@ describe('Admin', () => {
           provide: ApiService,
           useValue: {
             getProfessionals: () => of([]),
+            getUsers: () => of([]),
             getSpecialties: () => of([]),
             createProfessional: () => of({}),
             suspendProfessional: () => of({}),

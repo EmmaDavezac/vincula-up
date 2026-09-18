@@ -43,6 +43,13 @@ public class CalificacionService {
         return toResponse(calificacion);
     }
 
+    @Transactional(readOnly = true)
+    public CalificacionResponse obtenerPorSolicitudId(UUID solicitudId) {
+        return calificacionRepository.findBySolicitudId(solicitudId)
+                .map(this::toResponse)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Calificacion no encontrada"));
+    }
+
     private CalificacionResponse toResponse(Calificacion calificacion) {
         return new CalificacionResponse(
                 calificacion.getId(), calificacion.getSolicitudId(), calificacion.getPuntaje(),

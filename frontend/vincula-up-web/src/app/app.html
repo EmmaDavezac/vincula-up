@@ -4,17 +4,25 @@
     <span>Vincula<span>-UP</span></span>
   </a>
   <nav aria-label="Navegacion principal">
-    <a routerLink="/directorio" routerLinkActive="active">Directorio</a>
-    <a routerLink="/como-funciona" routerLinkActive="active">Como funciona</a>
-    @if (auth.hasRole('CLIENTE')) {
-      <a routerLink="/mis-solicitudes" routerLinkActive="active">Mis solicitudes</a>
-    }
     @if (auth.hasRole('ADMIN')) {
       <a routerLink="/admin" routerLinkActive="active">Administracion</a>
+      <a routerLink="/directorio" routerLinkActive="active">Directorio</a>
     }
+
+    @if (auth.hasRole('CLIENTE')) {
+      <a routerLink="/mis-solicitudes" routerLinkActive="active">Mis solicitudes</a>
+      <a routerLink="/solicitar" routerLinkActive="active">Nueva solicitud</a>
+    }
+
     @if (auth.hasRole('PROFESIONAL')) {
-      <a routerLink="/activar-perfil" routerLinkActive="active">Activar perfil</a>
+      @if (!auth.isProfessionalActive()) {
+        <a routerLink="/activar-perfil" routerLinkActive="active">Activar perfil</a>
+      } @else {
+        <a routerLink="/mis-solicitudes" routerLinkActive="active">Mis solicitudes</a>
+      }
     }
+
+    <a routerLink="/como-funciona" routerLinkActive="active">Como funciona</a>
   </nav>
   @if (auth.currentUser(); as user) {
     <div class="session-tools">
@@ -22,7 +30,7 @@
       <button type="button" (click)="auth.logout()">Salir</button>
     </div>
   } @else {
-    <a class="header-action" routerLink="/ingresar">Ingresar</a>
+    <a class="header-action" href="javascript:void(0)" role="button" (click)="iniciarSesion()">Ingresar</a>
   }
 </header>
 

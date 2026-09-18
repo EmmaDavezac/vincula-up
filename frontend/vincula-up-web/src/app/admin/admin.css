@@ -10,6 +10,7 @@ h1 { color: var(--ink); font-family: Georgia, serif; font-size: clamp(2.8rem, 6v
 .form-grid { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 label { display: grid; gap: .45rem; color: var(--muted); font-size: .82rem; }
 input[type='text'] { background: #f9faf8; border: 1px solid var(--line); border-radius: .8rem; color: var(--ink); font: inherit; padding: .75rem .9rem; }
+input[type='text'], select { background: #f9faf8; border: 1px solid var(--line); border-radius: .8rem; color: var(--ink); font: inherit; padding: .75rem .9rem; }
 .specialties-block { margin-top: 1.5rem; }
 .specialties-block > span { color: var(--muted); display: block; font-size: .82rem; margin-bottom: .75rem; }
 .specialty-list { display: flex; flex-wrap: wrap; gap: .75rem; }
@@ -30,4 +31,7 @@ td { color: var(--ink); font-size: .88rem; }
 .status.activo { color: #448064; }
 .status.suspendido { color: var(--coral); }
 td button { background: transparent; border: 1px solid var(--ink); color: var(--ink); cursor: pointer; font: inherit; font-size: .78rem; padding: .55rem .7rem; }
+td button { background: transparent; border: 1px solid var(--ink); color: var(--ink); cursor: pointer; font: inherit; font-size: .78rem; padding: .55rem .7rem; border-radius: .4rem; }
+td button.btn-reactivate { border-color: #448064; color: #448064; font-weight: 700; }
+td button:hover { opacity: 0.8; }
 @media (max-width: 700px) { .admin-heading { display: block; } .admin-heading > p { margin-top: 2rem; } .form-grid { grid-template-columns: 1fr; } }

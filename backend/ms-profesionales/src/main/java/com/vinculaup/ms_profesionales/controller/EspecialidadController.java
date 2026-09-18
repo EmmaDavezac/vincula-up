@@ -28,6 +28,18 @@ public class EspecialidadController {
         return service.listar();
     }
 
+    @org.springframework.web.bind.annotation.PutMapping("/{id}")
+    public EspecialidadResponse actualizar(@org.springframework.web.bind.annotation.PathVariable java.util.UUID id,
+            @Valid @RequestBody CrearEspecialidadRequest request) {
+        return service.actualizar(id, request);
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void eliminar(@org.springframework.web.bind.annotation.PathVariable java.util.UUID id) {
+        service.eliminar(id);
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public EspecialidadResponse crear(@Valid @RequestBody CrearEspecialidadRequest request) {

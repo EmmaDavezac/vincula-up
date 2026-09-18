@@ -10,4 +10,8 @@ import { AuthService } from './core/services/auth.service';
 })
 export class App {
   protected readonly auth = inject(AuthService);
+
+  iniciarSesion(): void {
+    this.auth.loginWithKeycloak().subscribe();
+  }
 }

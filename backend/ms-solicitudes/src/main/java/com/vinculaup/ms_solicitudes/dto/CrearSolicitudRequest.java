@@ -11,5 +11,7 @@ public record CrearSolicitudRequest(
         @NotNull UUID profesionalId,
         @NotNull UUID especialidadId,
         @NotBlank String direccionServicio,
+        Double latitud,
+        Double longitud,
         @NotNull @Future LocalDateTime fechaHoraPropuesta) {
 }

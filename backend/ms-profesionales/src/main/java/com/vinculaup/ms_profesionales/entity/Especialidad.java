@@ -25,5 +25,6 @@ public class Especialidad {
     }
 
     public UUID getId() { return id; }
+    public void setNombre(String nombre) { this.nombre = nombre; }
     public String getNombre() { return nombre; }
 }

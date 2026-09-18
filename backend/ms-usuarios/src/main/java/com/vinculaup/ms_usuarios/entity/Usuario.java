@@ -37,6 +37,11 @@ public class Usuario {
     }
 
     public Usuario(UUID keycloakId, String nombre, String apellido, String email, String telefono, RolNegocio rolNegocio) {
+        this(null, keycloakId, nombre, apellido, email, telefono, rolNegocio);
+    }
+
+    public Usuario(UUID id, UUID keycloakId, String nombre, String apellido, String email, String telefono, RolNegocio rolNegocio) {
+        this.id = id;
         this.keycloakId = keycloakId;
         this.nombre = nombre;
         this.apellido = apellido;
@@ -48,6 +53,7 @@ public class Usuario {
 
     public UUID getId() { return id; }
     public UUID getKeycloakId() { return keycloakId; }
+    public void setKeycloakId(UUID keycloakId) { this.keycloakId = keycloakId; }
     public String getNombre() { return nombre; }
     public String getApellido() { return apellido; }
     public String getEmail() { return email; }

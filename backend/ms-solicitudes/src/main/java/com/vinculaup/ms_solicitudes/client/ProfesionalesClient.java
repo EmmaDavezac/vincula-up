@@ -1,6 +1,7 @@
 package com.vinculaup.ms_solicitudes.client;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,6 +31,39 @@ public class ProfesionalesClient {
             return response == null ? List.of() : Arrays.asList(response);
         } catch (RestClientException | IllegalStateException exception) {
             throw new IllegalStateException("No se pudo consultar la disponibilidad del profesional", exception);
+        }
+    }
+
+    public List<ProfesionalIdentidad> obtenerIdentidades(Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        try {
+            ProfesionalIdentidad[] response = restClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/profesionales/por-usuario")
+                            .queryParam("usuarioIds", ids)
+                            .build())
+                    .retrieve()
+                    .body(ProfesionalIdentidad[].class);
+            return response == null ? List.of() : Arrays.asList(response);
+        } catch (Exception ex) {
+            return List.of();
+        }
+    }
+
+    public java.util.Optional<ProfesionalIdentidad> obtenerPorId(UUID id) {
+        if (id == null) {
+            return java.util.Optional.empty();
+        }
+        try {
+            ProfesionalIdentidad response = restClient.get()
+                    .uri("/profesionales/{id}", id)
+                    .retrieve()
+                    .body(ProfesionalIdentidad.class);
+            return java.util.Optional.ofNullable(response);
+        } catch (Exception ex) {
+            return java.util.Optional.empty();
         }
     }
 }

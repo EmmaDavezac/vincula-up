@@ -1,6 +1,6 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { forkJoin, catchError, of } from 'rxjs';
+import { forkJoin, catchError, of, Observable } from 'rxjs';
 import { ApiService } from '../core/services/api.service';
 
 interface AdminProfessional {
@@ -15,6 +15,13 @@ interface SpecialtyOption {
   nombre: string;
 }
 
+interface UserOption {
+  id: string;
+  nombre: string;
+  apellido: string;
+  email: string;
+}
+
 @Component({
   selector: 'app-admin',
   imports: [FormsModule],
@@ -25,6 +32,7 @@ export class Admin {
   private readonly api = inject(ApiService);
   readonly professionals = signal<AdminProfessional[]>([]);
   readonly specialties = signal<SpecialtyOption[]>([]);
+  readonly users = signal<UserOption[]>([]);
   readonly loading = signal(true);
   readonly message = signal('');
   readonly submitting = signal(false);
@@ -42,15 +50,9 @@ export class Admin {
   private loadProfessionals(): void {
     this.loading.set(true);
     forkJoin({
-      cargados: this.api.getProfessionals('CARGADO').pipe(
+      profesionales: this.api.getProfessionals(undefined, true).pipe(
         catchError((error) => {
-          this.message.set(this.api.describeError(error, 'No se pudo cargar la lista de profesionales cargados.'));
-          return of([]);
-        }),
-      ),
-      activos: this.api.getProfessionals('ACTIVO').pipe(
-        catchError((error) => {
-          this.message.set(this.api.describeError(error, 'No se pudo cargar la lista de profesionales activos.'));
+          this.message.set(this.api.describeError(error, 'No se pudo cargar la lista de profesionales.'));
           return of([]);
         }),
       ),
@@ -60,9 +62,13 @@ export class Admin {
           return of([]);
         }),
       ),
-    }).subscribe(({ cargados, activos, especialidades }) => {
-      this.professionals.set([...cargados, ...activos] as unknown as AdminProfessional[]);
+      usuarios: this.api.getUsers('PROFESIONAL').pipe(
+        catchError(() => of([])),
+      ),
+    }).subscribe(({ profesionales, especialidades, usuarios }) => {
+      this.professionals.set(profesionales as unknown as AdminProfessional[]);
       this.specialties.set((especialidades as SpecialtyOption[]) ?? []);
+      this.users.set((usuarios as UserOption[]) ?? []);
       this.loading.set(false);
     });
   }
@@ -117,6 +123,22 @@ export class Admin {
           item.id === professional.id ? { ...item, estado: 'SUSPENDIDO' } : item,
         ));
         this.message.set('Profesional suspendido correctamente.');
+      }
+    });
+  }
+
+  reactivate(professional: AdminProfessional): void {
+    this.api.reactivateProfessional(professional.id).pipe(
+      catchError((error) => {
+        this.message.set(this.api.describeError(error, 'No se pudo reactivar el profesional.'));
+        return of(null);
+      }),
+    ).subscribe((result) => {
+      if (result) {
+        this.professionals.update((items) => items.map((item) =>
+          item.id === professional.id ? { ...item, estado: 'ACTIVO' } : item,
+        ));
+        this.message.set('Profesional reactivado correctamente.');
       }
     });
   }

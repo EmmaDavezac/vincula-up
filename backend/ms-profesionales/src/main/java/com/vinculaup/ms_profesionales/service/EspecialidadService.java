@@ -22,6 +22,24 @@ public class EspecialidadService {
         return repository.findAll().stream().map(item -> new EspecialidadResponse(item.getId(), item.getNombre())).toList();
     }
 
+    public EspecialidadResponse actualizar(java.util.UUID id, CrearEspecialidadRequest request) {
+        Especialidad especialidad = repository.findById(id).orElseThrow(() ->
+                new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Especialidad no encontrada"));
+        especialidad.setNombre(request.nombre().trim());
+        return new EspecialidadResponse(especialidad.getId(), especialidad.getNombre());
+    }
+
+    public void eliminar(java.util.UUID id) {
+        Especialidad especialidad = repository.findById(id).orElseThrow(() ->
+                new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Especialidad no encontrada"));
+        try {
+            repository.delete(especialidad);
+            repository.flush();
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "La especialidad está asignada a profesionales", ex);
+        }
+    }
+
     public EspecialidadResponse crear(CrearEspecialidadRequest request) {
         Especialidad especialidad = repository.save(new Especialidad(request.nombre()));
         return new EspecialidadResponse(especialidad.getId(), especialidad.getNombre());

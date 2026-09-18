@@ -31,6 +31,11 @@ public class Profesional {
     @Column(nullable = false, unique = true)
     private String legajo;
 
+    /**
+     * Foto del perfil. Se guarda como data URL Base64, por lo que necesita TEXT
+     * (el varchar por defecto truncaría/fallaría con imagenes reales).
+     */
+    @Column(columnDefinition = "text")
     private String fotoUrl;
     private Double zonaCoberturaLat;
     private Double zonaCoberturaLng;
@@ -63,8 +68,17 @@ public class Profesional {
         this.fechaCarga = OffsetDateTime.now();
     }
 
+    public Profesional(UUID usuarioId, String legajo, EstadoProfesional estado) {
+        this.usuarioId = usuarioId;
+        this.legajo = legajo;
+        this.estado = estado;
+        this.fechaCarga = OffsetDateTime.now();
+    }
+
     public UUID getId() { return id; }
     public UUID getUsuarioId() { return usuarioId; }
+    public void setUsuarioId(UUID usuarioId) { this.usuarioId = usuarioId; }
+    public void setLegajo(String legajo) { this.legajo = legajo; }
     public String getLegajo() { return legajo; }
     public String getFotoUrl() { return fotoUrl; }
     public Double getZonaCoberturaLat() { return zonaCoberturaLat; }
@@ -74,6 +88,9 @@ public class Profesional {
     public OffsetDateTime getFechaCarga() { return fechaCarga; }
     public OffsetDateTime getFechaActivacion() { return fechaActivacion; }
     public Set<Especialidad> getEspecialidades() { return especialidades; }
+    public void setEspecialidades(Set<Especialidad> especialidades) {
+        this.especialidades = especialidades == null ? new HashSet<>() : especialidades;
+    }
 
     public void activar(String fotoUrl, double lat, double lng, double radioKm) {
         this.fotoUrl = fotoUrl;
@@ -86,5 +103,9 @@ public class Profesional {
 
     public void suspender() {
         this.estado = EstadoProfesional.SUSPENDIDO;
+    }
+
+    public void reactivar() {
+        this.estado = EstadoProfesional.ACTIVO;
     }
 }

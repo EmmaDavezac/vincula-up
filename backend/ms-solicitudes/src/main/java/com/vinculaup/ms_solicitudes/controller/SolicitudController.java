@@ -34,9 +34,18 @@ public class SolicitudController {
         return service.crear(request);
     }
 
+    /**
+     * Solicitudes del usuario autenticado. {@code aliasIds} permite incluir identidades
+     * alternativas del mismo usuario (por ejemplo su {@code keycloakId} cuando el padron
+     * profesional todavía no fue reconciliado).
+     */
     @GetMapping("/mias")
-    public List<SolicitudResponse> listarPropias(@RequestParam UUID usuarioId) {
-        return service.listarPropias(usuarioId);
+    public List<SolicitudResponse> listarPropias(
+            @RequestParam UUID usuarioId,
+            @RequestParam(required = false) List<UUID> aliasIds,
+            @RequestParam(required = false) String tipo,
+            @RequestParam(required = false) String rol) {
+        return service.listarPropias(usuarioId, aliasIds, tipo, rol);
     }
 
     @PatchMapping("/{id}/aceptar")
@@ -52,5 +61,10 @@ public class SolicitudController {
     @PatchMapping("/{id}/completar")
     public SolicitudResponse completar(@PathVariable UUID id, @Valid @RequestBody CambiarEstadoRequest request) {
         return service.completar(id, request);
+    }
+
+    @PatchMapping("/{id}/cancelar")
+    public SolicitudResponse cancelar(@PathVariable UUID id, @Valid @RequestBody CambiarEstadoRequest request) {
+        return service.cancelar(id, request);
     }
 }

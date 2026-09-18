@@ -17,6 +17,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.vinculaup.ms_usuarios.entity.RolNegocio;
+import java.util.List;
+
 @RestController
 @RequestMapping("/usuarios")
 public class UsuarioController {
@@ -25,6 +28,11 @@ public class UsuarioController {
 
     public UsuarioController(UsuarioService service) {
         this.service = service;
+    }
+
+    @GetMapping
+    public List<UsuarioResponse> listar(@RequestParam(required = false) RolNegocio rol) {
+        return service.listar(rol);
     }
 
     @PostMapping
@@ -39,8 +47,19 @@ public class UsuarioController {
     }
 
     @GetMapping("/por-keycloak")
-    public UsuarioResponse buscarPorKeycloakId(@RequestParam UUID keycloakId) {
-        return service.buscarPorKeycloakId(keycloakId);
+    public UsuarioResponse buscarPorKeycloakId(
+            @RequestParam UUID keycloakId,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) String nombre,
+            @RequestParam(required = false) String apellido,
+            @RequestParam(required = false) RolNegocio rol) {
+        return service.buscarPorKeycloakIdOAutoCrear(keycloakId, email, nombre, apellido, rol);
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void eliminar(@PathVariable UUID id) {
+        service.eliminar(id);
     }
 
     @PatchMapping("/{id}")

@@ -6,6 +6,7 @@ import com.vinculaup.ms_solicitudes.service.CalificacionService;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -29,5 +30,10 @@ public class CalificacionController {
             @PathVariable UUID solicitudId,
             @Valid @RequestBody CrearCalificacionRequest request) {
         return service.crear(solicitudId, request);
+    }
+
+    @GetMapping
+    public CalificacionResponse obtener(@PathVariable UUID solicitudId) {
+        return service.obtenerPorSolicitudId(solicitudId);
     }
 }

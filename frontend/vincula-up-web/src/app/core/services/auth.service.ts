@@ -1,6 +1,6 @@
 import { inject, Injectable, computed, signal } from '@angular/core';
 import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
-import { catchError, map, of, Observable, switchMap } from 'rxjs';
+import { catchError, map, of, Observable, switchMap, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { UserProfile, UserRole } from '../models/user-profile';
 
@@ -26,8 +26,12 @@ interface KeycloakTokenResponse {
 }
 
 const TOKEN_KEY = 'vincula-up-token';
+const ID_TOKEN_KEY = 'vincula-up-id-token';
+const PROFILE_KEY = 'vincula-up-profile';
 const KEYCLOAK_STATE_KEY = 'vincula-up-keycloak-state';
 const KEYCLOAK_NONCE_KEY = 'vincula-up-keycloak-nonce';
+const KEYCLOAK_PKCE_VERIFIER_KEY = 'vincula-up-pkce-verifier';
+const PROF_ACTIVE_KEY = 'vincula-up-prof-active';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -35,10 +39,14 @@ export class AuthService {
   private readonly http = inject(HttpClient);
   readonly currentUser = this.user.asReadonly();
   readonly isAuthenticated = computed(() => this.user() !== null);
+  readonly isProfessionalActive = signal<boolean>(this.restoreProfActive());
   readonly loginError = signal('');
 
   constructor() {
     this.handleCodeCallback();
+    if (this.user()?.role === 'PROFESIONAL') {
+      this.checkProfessionalStatus();
+    }
   }
 
   loginWithKeycloak(): Observable<boolean> {
@@ -48,28 +56,81 @@ export class AuthService {
     sessionStorage.setItem(KEYCLOAK_STATE_KEY, state);
     sessionStorage.setItem(KEYCLOAK_NONCE_KEY, nonce);
 
-    const params = new URLSearchParams({
-      client_id: environment.keycloakClientId,
-      response_type: 'code',
-      redirect_uri: environment.keycloakRedirectUri,
-      scope: 'openid profile email',
-      state,
-      nonce,
-      response_mode: 'query',
+    const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/` : environment.keycloakRedirectUri;
+
+    // Generar PKCE code_verifier y code_challenge (S256) requerido por el realm
+    this.generatePkce().then(({ verifier, challenge }) => {
+      sessionStorage.setItem(KEYCLOAK_PKCE_VERIFIER_KEY, verifier);
+
+      const params = new URLSearchParams({
+        client_id: environment.keycloakClientId,
+        response_type: 'code',
+        redirect_uri: redirectUri,
+        scope: 'openid profile email',
+        state,
+        nonce,
+        response_mode: 'query',
+        code_challenge: challenge,
+        code_challenge_method: 'S256',
+      });
+
+      const authorizeUrl = `${this.getKeycloakUrl()}/realms/${environment.keycloakRealm}/protocol/openid-connect/auth?${params.toString()}`;
+      window.location.href = authorizeUrl;
     });
 
-    const authorizeUrl = `${environment.keycloakUrl}/realms/${environment.keycloakRealm}/protocol/openid-connect/auth?${params.toString()}`;
-    window.location.href = authorizeUrl;
     return of(true);
   }
 
+  loginDirect(username: string, password = 'password'): Observable<boolean> {
+    this.loginError.set('');
+    const body = new HttpParams()
+      .set('grant_type', 'password')
+      .set('client_id', environment.keycloakClientId)
+      .set('username', username)
+      .set('password', password)
+      .set('scope', 'openid profile email');
+
+    const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
+    const tokenUrl = `${this.getKeycloakUrl()}/realms/${environment.keycloakRealm}/protocol/openid-connect/token`;
+
+    return this.http.post<KeycloakTokenResponse>(tokenUrl, body.toString(), { headers }).pipe(
+      switchMap((token) => this.maybeUseToken(token)),
+      catchError((error: HttpErrorResponse) => {
+        this.loginError.set(this.describeError(error, 'No se pudo iniciar sesión con las credenciales indicadas.'));
+        return of(false);
+      }),
+    );
+  }
+
   logout(): void {
+    const idToken = localStorage.getItem(ID_TOKEN_KEY);
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(ID_TOKEN_KEY);
+    localStorage.removeItem(PROFILE_KEY);
+    localStorage.removeItem(PROF_ACTIVE_KEY);
     this.user.set(null);
+    this.isProfessionalActive.set(false);
+
+    // Cerrar la sesión en Keycloak (RP-Initiated Logout)
+    // Sin esto, Keycloak recuerda la sesión SSO y loguea automáticamente
+    const postLogoutUri = typeof window !== 'undefined' ? `${window.location.origin}/` : environment.keycloakRedirectUri;
+    const params = new URLSearchParams({
+      client_id: environment.keycloakClientId,
+      post_logout_redirect_uri: postLogoutUri,
+    });
+    if (idToken) {
+      params.set('id_token_hint', idToken);
+    }
+    const logoutUrl = `${this.getKeycloakUrl()}/realms/${environment.keycloakRealm}/protocol/openid-connect/logout?${params.toString()}`;
+    window.location.href = logoutUrl;
   }
 
   refreshSession(): void {
-    this.user.set(this.restoreSession());
+    const session = this.restoreSession();
+    this.user.set(session);
+    if (session?.role !== 'PROFESIONAL') {
+      this.setProfessionalActive(false);
+    }
   }
 
   hasRole(role: UserRole): boolean {
@@ -78,6 +139,13 @@ export class AuthService {
 
   getToken(): string | null {
     return localStorage.getItem(TOKEN_KEY);
+  }
+
+  getKeycloakId(): string | null {
+    const token = this.getToken();
+    if (!token) return null;
+    const claims = this.decodeToken(token);
+    return claims?.sub ?? null;
   }
 
   private handleCodeCallback(): void {
@@ -93,17 +161,33 @@ export class AuthService {
     sessionStorage.removeItem(KEYCLOAK_STATE_KEY);
     sessionStorage.removeItem(KEYCLOAK_NONCE_KEY);
 
+    // Recuperar el code_verifier PKCE generado en loginWithKeycloak()
+    const codeVerifier = sessionStorage.getItem(KEYCLOAK_PKCE_VERIFIER_KEY) ?? '';
+    sessionStorage.removeItem(KEYCLOAK_PKCE_VERIFIER_KEY);
+
+    // Limpiar params de la URL para evitar re-ejecución al recargar
+    if (typeof window !== 'undefined' && window.history) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     this.loginError.set('');
-    const body = new HttpParams()
+    const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/` : environment.keycloakRedirectUri;
+    let body = new HttpParams()
       .set('grant_type', 'authorization_code')
       .set('client_id', environment.keycloakClientId)
       .set('code', code)
-      .set('redirect_uri', environment.keycloakRedirectUri)
+      .set('redirect_uri', redirectUri)
       .set('scope', 'openid profile email');
 
-    const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
+    // Incluir code_verifier (obligatorio cuando se usó PKCE)
+    if (codeVerifier) {
+      body = body.set('code_verifier', codeVerifier);
+    }
 
-    this.http.post<KeycloakTokenResponse>(`${environment.keycloakUrl}/realms/${environment.keycloakRealm}/protocol/openid-connect/token`, body.toString(), { headers })
+    const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
+    const tokenUrl = `${this.getKeycloakUrl()}/realms/${environment.keycloakRealm}/protocol/openid-connect/token`;
+
+    this.http.post<KeycloakTokenResponse>(tokenUrl, body.toString(), { headers })
       .pipe(
         switchMap((token) => this.maybeUseToken(token)),
         catchError((error: HttpErrorResponse) => {
@@ -118,12 +202,18 @@ export class AuthService {
     try {
       const claims = this.decodeToken(token.access_token);
       if (!claims || !claims.sub || !claims.role) {
-        this.loginError.set('La respuesta de Keycloak no incluye la sesión necesaria para Vincula-UP.');
+        this.loginError.set('La respuesta de Keycloak no incluye el rol necesario para Vincula-UP.');
         return of(false);
       }
 
-      const lookupUrl = `${environment.apiUrl}/usuarios/por-keycloak?keycloakId=${encodeURIComponent(claims.sub)}`;
-      return this.http.get<UsuarioLookupResponse>(lookupUrl).pipe(
+      const lookupParams = new HttpParams()
+        .set('keycloakId', claims.sub)
+        .set('email', claims.email ?? '')
+        .set('nombre', claims.name ?? '')
+        .set('rol', claims.role ?? '');
+
+      const lookupHeaders = new HttpHeaders({ Authorization: `Bearer ${token.access_token}` });
+      return this.http.get<UsuarioLookupResponse>(`${environment.apiUrl}/usuarios/por-keycloak`, { params: lookupParams, headers: lookupHeaders }).pipe(
         map((usuario) => {
           const profile = {
             id: usuario.id,
@@ -132,15 +222,33 @@ export class AuthService {
             roleLabel: this.roleLabel(usuario.rolNegocio),
           } satisfies UserProfile;
 
-          const localJwt = this.buildToken(profile);
-          localStorage.setItem(TOKEN_KEY, localJwt);
+          localStorage.setItem(TOKEN_KEY, token.access_token);
+          if (token.id_token) localStorage.setItem(ID_TOKEN_KEY, token.id_token);
+          this.persistProfile(profile);
           this.user.set(profile);
+          if (profile.role === 'PROFESIONAL') {
+            this.checkProfessionalStatus();
+          }
           this.loginError.set('');
           return true;
         }),
-        catchError((error: HttpErrorResponse) => {
-          this.loginError.set(this.describeError(error, 'No se pudo vincular el usuario de Keycloak con Vincula-UP.'));
-          return of(false);
+        catchError(() => {
+          const profile = {
+            id: claims.sub ?? '',
+            name: claims.name ?? 'Usuario Vincula-UP',
+            role: claims.role as UserRole,
+            roleLabel: this.roleLabel(claims.role as UserRole),
+          } satisfies UserProfile;
+
+          localStorage.setItem(TOKEN_KEY, token.access_token);
+          if (token.id_token) localStorage.setItem(ID_TOKEN_KEY, token.id_token);
+          this.persistProfile(profile);
+          this.user.set(profile);
+          if (profile.role === 'PROFESIONAL') {
+            this.checkProfessionalStatus();
+          }
+          this.loginError.set('');
+          return of(true);
         }),
       );
     } catch {
@@ -152,13 +260,27 @@ export class AuthService {
   private restoreSession(): UserProfile | null {
     const token = localStorage.getItem(TOKEN_KEY);
     if (!token) {
+      localStorage.removeItem(PROFILE_KEY);
       return null;
     }
 
     const payload = this.decodeToken(token);
     if (!payload || !payload.role || !this.isValidRole(payload.role)) {
       localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(PROFILE_KEY);
       return null;
+    }
+
+    const savedProfile = localStorage.getItem(PROFILE_KEY);
+    if (savedProfile) {
+      try {
+        const parsed = JSON.parse(savedProfile) as UserProfile;
+        if (parsed && parsed.id && parsed.role && this.isValidRole(parsed.role)) {
+          return parsed;
+        }
+      } catch {
+        localStorage.removeItem(PROFILE_KEY);
+      }
     }
 
     return {
@@ -169,7 +291,56 @@ export class AuthService {
     };
   }
 
-  private decodeToken(token: string): { sub?: string; name?: string; role?: UserRole } | null {
+  private restoreProfActive(): boolean {
+    if (typeof localStorage === 'undefined') return false;
+    return localStorage.getItem(PROF_ACTIVE_KEY) === 'true';
+  }
+
+  checkProfessionalStatus(): void {
+    this.loadProfessionalStatus().subscribe();
+  }
+
+  loadProfessionalStatus(): Observable<boolean> {
+    const currentUser = this.user();
+    if (!currentUser || currentUser.role !== 'PROFESIONAL') {
+      this.setProfessionalActive(false);
+      return of(false);
+    }
+
+    const token = this.getToken();
+    const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : new HttpHeaders();
+    const keycloakId = this.getKeycloakId();
+    let params = new HttpParams().set('usuarioId', currentUser.id);
+    if (keycloakId) {
+      params = params.set('keycloakId', keycloakId);
+    }
+
+    return this.http.get<{ estado?: string }>(`${environment.apiUrl}/profesionales/mi-perfil`, {
+      params,
+      headers,
+    }).pipe(
+      catchError(() => of(null)),
+      map((perfil) => perfil?.estado === 'ACTIVO' && this.user()?.id === currentUser.id),
+      tap((active) => this.setProfessionalActive(active)),
+    );
+  }
+
+  setProfessionalActive(active: boolean): void {
+    this.isProfessionalActive.set(active);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(PROF_ACTIVE_KEY, active ? 'true' : 'false');
+    }
+  }
+
+  private persistProfile(profile: UserProfile): void {
+    try {
+      localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    } catch {
+      // ignore storage errors
+    }
+  }
+
+  private decodeToken(token: string): { sub?: string; name?: string; email?: string; role?: UserRole } | null {
     try {
       const parts = token.split('.');
       if (parts.length < 2) {
@@ -178,24 +349,25 @@ export class AuthService {
       const payload = parts[1];
       const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
       const decoded = JSON.parse(atob(normalized));
-      const role = decoded.role ?? decoded.realm_access?.roles?.[0] ?? decoded.roles?.[0];
-      return { sub: decoded.sub, name: decoded.name ?? decoded.preferred_username, role: this.isValidRole(role) ? role : undefined };
+
+      const realmRoles: string[] = [
+        ...(Array.isArray(decoded.realm_access?.roles) ? decoded.realm_access.roles : []),
+        ...(Array.isArray(decoded.roles) ? decoded.roles : []),
+      ];
+      const directRole = typeof decoded.role === 'string' ? decoded.role : undefined;
+      const matchedRole = realmRoles.find((r) => this.isValidRole(r));
+      const role = directRole && this.isValidRole(directRole) ? directRole : matchedRole;
+
+      const name = decoded.name ?? `${decoded.given_name ?? ''} ${decoded.family_name ?? ''}`.trim() ?? decoded.preferred_username;
+      return {
+        sub: decoded.sub,
+        name: name || 'Usuario Vincula-UP',
+        email: decoded.email,
+        role: role != null && this.isValidRole(role) ? role : undefined,
+      };
     } catch {
       return null;
     }
-  }
-
-  private buildToken(profile: UserProfile): string {
-    const header = btoa(JSON.stringify({ alg: 'none', typ: 'JWT' }));
-    const payload = {
-      sub: profile.id,
-      name: profile.name,
-      role: profile.role,
-      roles: [profile.role],
-      realm_access: { roles: [profile.role] },
-      exp: Math.floor(Date.now() / 1000) + 60 * 60,
-    };
-    return `${header}.${btoa(JSON.stringify(payload))}.signature`;
   }
 
   private describeError(error: unknown, fallback = 'No se pudo completar la operación.'):
@@ -244,4 +416,34 @@ export class AuthService {
     crypto.getRandomValues(bytes);
     return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
   }
+
+  private async generatePkce(): Promise<{ verifier: string; challenge: string }> {
+    // Generar un code_verifier aleatorio de 64 bytes (base64url)
+    const verifierBytes = new Uint8Array(64);
+    crypto.getRandomValues(verifierBytes);
+    const verifier = btoa(String.fromCharCode(...verifierBytes))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+
+    // Calcular code_challenge = BASE64URL(SHA256(verifier))
+    const encoded = new TextEncoder().encode(verifier);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', encoded);
+    const hashArray = new Uint8Array(hashBuffer);
+    const challenge = btoa(String.fromCharCode(...hashArray))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+
+    return { verifier, challenge };
+  }
+
+  private getKeycloakUrl(): string {
+    if (typeof window !== 'undefined') {
+      if (window.location.hostname === 'vincula-up.local') {
+        return window.location.origin;
+      }
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return `http://${window.location.hostname}:8080`;
+      }
+    }
+    return environment.keycloakUrl;
+  }
 }
+

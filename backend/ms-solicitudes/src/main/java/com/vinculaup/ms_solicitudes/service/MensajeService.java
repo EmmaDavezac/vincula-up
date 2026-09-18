@@ -19,10 +19,12 @@ public class MensajeService {
 
     private final MensajeRepository mensajeRepository;
     private final SolicitudRepository solicitudRepository;
+    private final SolicitudService solicitudService;
 
-    public MensajeService(MensajeRepository mensajeRepository, SolicitudRepository solicitudRepository) {
+    public MensajeService(MensajeRepository mensajeRepository, SolicitudRepository solicitudRepository, SolicitudService solicitudService) {
         this.mensajeRepository = mensajeRepository;
         this.solicitudRepository = solicitudRepository;
+        this.solicitudService = solicitudService;
     }
 
     public MensajeResponse enviar(UUID solicitudId, EnviarMensajeRequest request) {
@@ -44,7 +46,11 @@ public class MensajeService {
     }
 
     private void ensureParticipant(Solicitud solicitud, UUID usuarioId) {
-        if (!solicitud.getClienteId().equals(usuarioId) && !solicitud.getProfesionalId().equals(usuarioId)) {
+        if (solicitud.getClienteId().equals(usuarioId) || solicitud.getProfesionalId().equals(usuarioId)) {
+            return;
+        }
+        var identidades = solicitudService.resolverIdentidades(usuarioId, null);
+        if (!identidades.contains(solicitud.getProfesionalId()) && !identidades.contains(solicitud.getClienteId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No participas de esta solicitud");
         }
     }

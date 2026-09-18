@@ -1,6 +1,7 @@
 package com.vinculaup.ms_solicitudes.service;
 
 import com.vinculaup.ms_solicitudes.client.DisponibilidadProfesional;
+import com.vinculaup.ms_solicitudes.client.GeocodingClient;
 import com.vinculaup.ms_solicitudes.client.ProfesionalesClient;
 import com.vinculaup.ms_solicitudes.dto.CrearSolicitudRequest;
 import com.vinculaup.ms_solicitudes.dto.CambiarEstadoRequest;
@@ -10,7 +11,10 @@ import com.vinculaup.ms_solicitudes.entity.Solicitud;
 import com.vinculaup.ms_solicitudes.repository.SolicitudRepository;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -26,13 +30,25 @@ public class SolicitudService {
 
     private final SolicitudRepository repository;
     private final ProfesionalesClient profesionalesClient;
+    private final GeocodingClient geocodingClient;
 
-    public SolicitudService(SolicitudRepository repository, ProfesionalesClient profesionalesClient) {
+    public SolicitudService(SolicitudRepository repository, ProfesionalesClient profesionalesClient,
+            GeocodingClient geocodingClient) {
         this.repository = repository;
         this.profesionalesClient = profesionalesClient;
+        this.geocodingClient = geocodingClient;
     }
 
     public SolicitudResponse crear(CrearSolicitudRequest request) {
+        var profesional = profesionalesClient.obtenerPorId(request.profesionalId());
+        if (profesional.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "El profesional seleccionado no existe");
+        }
+        if (!"ACTIVO".equalsIgnoreCase(profesional.get().estado())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El profesional debe tener su perfil activado para recibir solicitudes");
+        }
         if (repository.existsByClienteIdAndEspecialidadIdAndEstadoIn(
                 request.clienteId(), request.especialidadId(), ESTADOS_ACTIVOS)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -43,15 +59,93 @@ public class SolicitudService {
                     "El horario propuesto esta fuera de la disponibilidad del profesional");
         }
 
+        // Ubicación estilo MercadoLibre: si el cliente no adjunta coordenadas,
+        // el backend transforma la dirección textual con el proveedor GPS
+        // (Nominatim, el mismo del endpoint /api/gps) y las persiste en la solicitud.
+        LocalizacionUbicacion ubicacion = resolverUbicacion(
+                request.direccionServicio(), request.latitud(), request.longitud());
+
         Solicitud solicitud = repository.save(new Solicitud(
                 request.clienteId(), request.profesionalId(), request.especialidadId(),
-                request.direccionServicio(), request.fechaHoraPropuesta()));
+                ubicacion.direccion(), ubicacion.latitud(), ubicacion.longitud(),
+                request.fechaHoraPropuesta()));
         return toResponse(solicitud);
+    }
+
+    private LocalizacionUbicacion resolverUbicacion(String direccion, Double latitud, Double longitud) {
+        if (latitud != null && longitud != null) {
+            return new LocalizacionUbicacion(direccion.trim(), latitud, longitud);
+        }
+        return geocodingClient.resolver(direccion)
+                .map(c -> new LocalizacionUbicacion(c.direccionCanonica(), c.latitud(), c.longitud()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "No se pudo determinar la ubicación de la dirección exacta: " + direccion
+                                + ". Ajustá la dirección, usá el mapa, o verificá la ubicación por texto."));
+    }
+
+    private record LocalizacionUbicacion(String direccion, Double latitud, Double longitud) {
+    }
+
+    public Set<UUID> resolverIdentidades(UUID usuarioId, List<UUID> aliasIds) {
+        Set<UUID> identidades = new LinkedHashSet<>();
+        if (usuarioId != null) {
+            identidades.add(usuarioId);
+        }
+        if (aliasIds != null) {
+            aliasIds.stream().filter(java.util.Objects::nonNull).forEach(identidades::add);
+        }
+        if (!identidades.isEmpty()) {
+            try {
+                var profesionales = profesionalesClient.obtenerIdentidades(identidades);
+                for (var p : profesionales) {
+                    if (p.id() != null) identidades.add(p.id());
+                    if (p.usuarioId() != null) identidades.add(p.usuarioId());
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return identidades;
     }
 
     @Transactional(readOnly = true)
     public List<SolicitudResponse> listarPropias(UUID usuarioId) {
-        return repository.findByClienteIdOrProfesionalId(usuarioId, usuarioId).stream()
+        return listarPropias(usuarioId, List.of(), null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SolicitudResponse> listarPropias(UUID usuarioId, List<UUID> aliasIds) {
+        return listarPropias(usuarioId, aliasIds, null, null);
+    }
+
+    /**
+     * Solicitudes donde el usuario participa como cliente o profesional.
+     * <p>
+     * Se resuelven automáticamente las identidades del profesional con ms-profesionales.
+     * Si tipo='RECIBIDAS' o rol='PROFESIONAL', devuelve únicamente solicitudes recibidas como profesional.
+     * Si tipo='ENVIADAS' o rol='CLIENTE', devuelve únicamente solicitudes enviadas como cliente.
+     */
+    @Transactional(readOnly = true)
+    public List<SolicitudResponse> listarPropias(UUID usuarioId, List<UUID> aliasIds, String tipo, String rol) {
+        Set<UUID> identidades = resolverIdentidades(usuarioId, aliasIds);
+        if (identidades.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> ids = List.copyOf(identidades);
+
+        boolean soloRecibidas = "RECIBIDAS".equalsIgnoreCase(tipo) || "PROFESIONAL".equalsIgnoreCase(rol);
+        boolean soloEnviadas = "ENVIADAS".equalsIgnoreCase(tipo) || "CLIENTE".equalsIgnoreCase(rol);
+
+        List<Solicitud> solicitudes;
+        if (soloRecibidas) {
+            solicitudes = repository.findByProfesionalIdIn(ids);
+        } else if (soloEnviadas) {
+            solicitudes = repository.findByClienteIdIn(ids);
+        } else {
+            solicitudes = repository.findByClienteIdInOrProfesionalIdIn(ids, ids);
+        }
+
+        return solicitudes.stream()
+                .sorted(Comparator.comparing(Solicitud::getFechaCreacion).reversed())
                 .map(this::toResponse)
                 .toList();
     }
@@ -82,13 +176,28 @@ public class SolicitudService {
         return toResponse(solicitud);
     }
 
+    public SolicitudResponse cancelar(UUID id, CambiarEstadoRequest request) {
+        Solicitud solicitud = find(id);
+        if (!solicitud.getClienteId().equals(request.actorId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo el cliente puede cancelar la solicitud");
+        }
+        ensureState(solicitud, EstadoSolicitud.PENDIENTE);
+        solicitud.cancelar(request.motivo());
+        return toResponse(solicitud);
+    }
+
     private Solicitud find(UUID id) {
         return repository.findById(id).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Solicitud no encontrada"));
     }
 
     private void ensureProfessionalActor(Solicitud solicitud, UUID actorId) {
-        if (!solicitud.getProfesionalId().equals(actorId)) {
+        var profesional = profesionalesClient.obtenerPorId(solicitud.getProfesionalId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "No se pudo verificar el perfil profesional"));
+        if (!"ACTIVO".equals(profesional.estado())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El perfil profesional debe estar activo");
+        }
+        if (!profesional.usuarioId().equals(actorId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El profesional no es dueño de esta solicitud");
         }
     }
@@ -100,11 +209,19 @@ public class SolicitudService {
     }
 
     private boolean estaDentroDeDisponibilidad(UUID profesionalId, LocalDateTime fechaHora) {
-        String diaEsperado = diaEnEspanol(fechaHora.getDayOfWeek());
-        return profesionalesClient.obtenerDisponibilidad(profesionalId).stream()
-                .filter(item -> item.diaSemana().equalsIgnoreCase(diaEsperado))
-                .anyMatch(item -> !fechaHora.toLocalTime().isBefore(item.horaInicio())
-                        && fechaHora.toLocalTime().isBefore(item.horaFin()));
+        try {
+            var disponibilidades = profesionalesClient.obtenerDisponibilidad(profesionalId);
+            if (disponibilidades == null || disponibilidades.isEmpty()) {
+                return true;
+            }
+            String diaEsperado = diaEnEspanol(fechaHora.getDayOfWeek());
+            return disponibilidades.stream()
+                    .filter(item -> item.diaSemana().equalsIgnoreCase(diaEsperado))
+                    .anyMatch(item -> !fechaHora.toLocalTime().isBefore(item.horaInicio())
+                            && fechaHora.toLocalTime().isBefore(item.horaFin()));
+        } catch (Exception e) {
+            return true;
+        }
     }
 
     private String diaEnEspanol(DayOfWeek day) {
@@ -122,7 +239,10 @@ public class SolicitudService {
     private SolicitudResponse toResponse(Solicitud solicitud) {
         return new SolicitudResponse(
                 solicitud.getId(), solicitud.getClienteId(), solicitud.getProfesionalId(),
-                solicitud.getEspecialidadId(), solicitud.getDireccionServicio(), solicitud.getFechaHoraPropuesta(),
-                solicitud.getEstado(), solicitud.getFechaCreacion(), solicitud.getFechaCambioEstado());
+                solicitud.getEspecialidadId(), solicitud.getDireccionServicio(),
+                solicitud.getLatitud(), solicitud.getLongitud(),
+                solicitud.getFechaHoraPropuesta(), solicitud.getEstado(),
+                solicitud.getMotivoCancelacion(), solicitud.getFechaCreacion(),
+                solicitud.getFechaCambioEstado());
     }
 }

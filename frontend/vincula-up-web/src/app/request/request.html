@@ -1,38 +1,349 @@
-<section class="request-page">
-  @if (errorMessage()) {
-    <p class="error-message">{{ errorMessage() }}</p>
-  }
+<!-- ── Modal de Selección en Mapa Interactivo (OpenStreetMap / Leaflet) ── -->
+@if (showMapModal()) {
+  <div class="map-modal-overlay" (click)="closeMapPicker()">
+    <div class="map-modal-content" (click)="$event.stopPropagation()">
+      <div class="map-modal-header">
+        <div>
+          <h3>Elegí tu ubicación en el mapa</h3>
+          <p class="map-modal-sub">Hacé clic o arrastrá el marcador para fijar tu posición exacta y calcular distancias reales.</p>
+        </div>
+        <button type="button" class="map-modal-close" (click)="closeMapPicker()" aria-label="Cerrar">✕</button>
+      </div>
 
-  @if (submitted()) {
-    <div class="confirmation">
-      <p class="eyebrow">Solicitud enviada</p>
-      <h1>Tu pedido quedo pendiente de respuesta.</h1>
-      <p>{{ professional.name }} va a revisar el horario que propusiste. Te avisaremos cuando responda.</p>
-      <a routerLink="/directorio">Volver al directorio</a>
-    </div>
-  } @else {
-    <div class="request-heading">
-      <p class="eyebrow">Solicitar turno</p>
-      <h1>Coordiná tu visita con {{ professional.name }}.</h1>
-      <p>{{ professional.specialty }} · {{ professional.zone }}</p>
-    </div>
-    <form (ngSubmit)="submit()">
-      <label>Fecha propuesta<input [ngModel]="date()" (ngModelChange)="date.set($event)" name="date" type="date" required /></label>
-      <label>Horario aproximado<input [ngModel]="time()" (ngModelChange)="time.set($event)" name="time" type="time" required /></label>
-      <label>Direccion del servicio<input [ngModel]="address()" (ngModelChange)="address.set($event)" name="address" type="text" placeholder="Calle y altura, localidad" required /></label>
-      <div class="gps-actions">
-        <button type="button" class="gps-button" (click)="lookupGps()" [disabled]="gpsLoading()">
-          {{ gpsLoading() ? 'Calculando...' : 'Ver ubicación GPS' }}
+      <div class="map-search-bar">
+        <input
+          type="text"
+          [ngModel]="mapSearchQuery()"
+          (ngModelChange)="mapSearchQuery.set($event)"
+          placeholder="Buscar dirección, calle o ciudad en el mapa..."
+          (keydown.enter)="searchAddressInMap()"
+        />
+        <button type="button" class="btn-search-map" (click)="searchAddressInMap()" [disabled]="mapSearching()">
+          {{ mapSearching() ? 'Buscando...' : 'Buscar' }}
         </button>
-        @if (gpsError()) {
-          <span class="gps-error">{{ gpsError() }}</span>
-        }
-        @if (gpsPosition(); as position) {
-          <span class="gps-readout">GPS {{ position.latitude | number:'1.4-4' }}, {{ position.longitude | number:'1.4-4' }}</span>
+        <button type="button" class="btn-gps-map" (click)="useBrowserGpsInMap()" title="Usar mi ubicación GPS actual">
+          🎯 Mi GPS
+        </button>
+      </div>
+
+      <div id="interactive-map" class="interactive-map-container"></div>
+
+      <div class="map-selected-info">
+        <span class="pin-icon" aria-hidden="true">📍</span>
+        <div class="info-text">
+          <strong>{{ tempMapLocation()?.displayName || 'Ubicación marcada' }}</strong>
+          <span class="coords-display">
+            Latitud: {{ tempMapLocation()?.lat | number:'1.5-5' }} · Longitud: {{ tempMapLocation()?.lng | number:'1.5-5' }}
+          </span>
+        </div>
+      </div>
+
+      <div class="map-modal-actions">
+        <button type="button" class="btn-cancel" (click)="closeMapPicker()">Cancelar</button>
+        <button type="button" class="btn-confirm-map" (click)="confirmMapLocation()">
+          Confirmar esta ubicación
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ── Paso 1: Elegir ubicación ─────────────────────────────────────── -->
+@if (step() === 'location') {
+  <section class="request-page">
+    <div class="request-heading">
+      <p class="eyebrow">Nueva solicitud</p>
+      <h1>¿Dónde necesitás el servicio?</h1>
+      <p class="heading-sub">
+        Definí tu ubicación para calcular distancias reales con los profesionales y coordinar la visita.
+        Escribí una dirección, usá una de las ubicaciones rápidas o tu GPS. Luego podés ajustarla visualmente en el mapa si querés.
+      </p>
+    </div>
+
+    @if (locatorError()) {
+      <p class="error-message" role="alert">{{ locatorError() }}</p>
+    }
+
+    <div class="location-step-card">
+      <div class="loc-search-row">
+        <span class="loc-icon" aria-hidden="true">🔎</span>
+        <input
+          class="loc-search-input"
+          id="loc-input"
+          [ngModel]="locationQuery()"
+          (ngModelChange)="onLocationQueryChange($event)"
+          (keydown.enter)="confirmLocationFromQuery()"
+          (blur)="hideSuggestionLater()"
+          type="text"
+          placeholder="Calle, altura, ciudad o barrio (ej: San Martín 123, Concepción del Uruguay)"
+          autocomplete="off"
+        />
+        @if (locationSearching()) {
+          <span class="loc-spinner" aria-hidden="true"></span>
         }
       </div>
-      <p class="privacy-note">La direccion exacta se comparte con el profesional cuando acepta la solicitud.</p>
-      <button type="submit">Enviar solicitud <span aria-hidden="true">→</span></button>
-    </form>
-  }
-</section>
+
+      @if (locationSuggestionOpen() && locationSuggestions().length > 0) {
+        <ul class="loc-suggestions">
+          @for (suggestion of locationSuggestions(); track suggestion.displayName) {
+            <li>
+              <button type="button" class="loc-suggestion-btn" (click)="selectSuggestion(suggestion)">
+                <span class="loc-sug-pin" aria-hidden="true">📍</span>
+                <span class="loc-sug-text">{{ suggestion.displayName }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+
+      <div class="loc-actions-row">
+        @if (geolocationAvailable() === true && geolocationPermission() !== 'denied') {
+          <button type="button" class="loc-action-btn gps" (click)="retryDetectLocation()" [disabled]="location().detecting">
+            @if (location().detecting) {
+              <span class="loc-spinner" aria-hidden="true"></span>
+              Detectando...
+            } @else {
+              🎯 Usar mi ubicación GPS
+            }
+          </button>
+        } @else {
+          <button type="button" class="loc-action-btn gps disabled-hint" disabled title="Este navegador no cuenta con GPS ni fuentes de ubicación">
+            🖥️ Sin GPS disponible
+          </button>
+        }
+      </div>
+
+      <div class="loc-presets-section">
+        <p class="loc-presets-title">O usá una ubicación rápida (sugeridas):</p>
+        <div class="loc-presets-grid">
+          @for (preset of presetLocations; track preset.label) {
+            <button type="button" class="loc-preset-chip" (click)="selectPresetLocation(preset)">
+              <span class="loc-preset-icon" aria-hidden="true">📍</span>
+              <span class="loc-preset-text">
+                <span class="loc-preset-label">{{ preset.label }}</span>
+                <span class="loc-preset-hint">{{ preset.hint }}</span>
+              </span>
+            </button>
+          }
+        </div>
+      </div>
+
+      @if (location().displayName && !location().editing) {
+        <div class="loc-selected-card">
+          <div class="loc-selected-icon" aria-hidden="true">✅</div>
+          <div class="loc-selected-info">
+            <div class="loc-selected-label">Ubicación confirmada</div>
+            <div class="loc-selected-address"><strong>{{ location().displayName }}</strong></div>
+            @if (location().lat && location().lng) {
+              <div class="loc-selected-coords">
+                Coordenadas: {{ location().lat | number:'1.4-4' }}, {{ location().lng | number:'1.4-4' }}
+              </div>
+            }
+          </div>
+          <div class="loc-selected-actions">
+            <button type="button" class="loc-selected-map" (click)="openMapPicker()">
+              🗺️ Ajustar en mapa
+            </button>
+            <button type="button" class="loc-selected-change" (click)="startEditLocation()">Editar texto</button>
+          </div>
+        </div>
+      }
+
+      @if (location().editing) {
+        <div class="loc-edit-card">
+          <input
+            id="loc-input"
+            type="text"
+            [ngModel]="locationEditValue()"
+            (ngModelChange)="locationEditValue.set($event)"
+            placeholder="Escribí la dirección..."
+          />
+          <div class="loc-edit-actions">
+            <button type="button" class="btn-cancel" (click)="cancelEditLocation()">Cancelar</button>
+            <button type="button" class="btn-confirm" (click)="confirmEditLocation()" [disabled]="gpsLoading()">
+              {{ gpsLoading() ? 'Verificando...' : 'Confirmar dirección' }}
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+
+    <div class="location-step-footer">
+      <button
+        type="button"
+        class="loc-continue-btn"
+        (click)="confirmLocation()"
+        [disabled]="!canConfirmLocation()"
+      >
+        Continuar con esta ubicación →
+      </button>
+      @if (!canConfirmLocation()) {
+        <p class="loc-hint">
+          Primero seleccioná tu ubicación: escribí una dirección y presioná Enter, seleccioná una sugerencia, o usá una de las ubicaciones rápidas.
+        </p>
+      }
+    </div>
+  </section>
+}
+
+<!-- ── Paso 2: Elegir especialidad ─────────────────────────────────── -->
+@if (step() === 'specialty') {
+  <section class="request-page">
+    <div class="request-heading">
+      <button type="button" class="back-btn" (click)="goBack()">
+        <span aria-hidden="true">←</span> Volver
+      </button>
+      <p class="eyebrow">Nueva solicitud</p>
+      <h1>¿Qué servicio necesitás?</h1>
+      <p class="heading-sub">Seleccioná la categoría y te mostramos los profesionales disponibles.</p>
+    </div>
+
+    @if (loadingProfessionals()) {
+      <div class="specialty-grid">
+        @for (i of [1, 2, 3, 4]; track i) {
+          <div class="specialty-skeleton" aria-hidden="true"></div>
+        }
+      </div>
+    } @else if (professionalsError()) {
+      <p class="error-message" role="alert">{{ professionalsError() }}</p>
+    } @else if (specialties().length === 0) {
+      <div class="empty-state">
+        <p>No hay especialidades disponibles en este momento.</p>
+      </div>
+    } @else {
+      <div class="specialty-grid">
+        @for (specialty of specialties(); track specialty) {
+          <button type="button" class="specialty-card" (click)="selectSpecialty(specialty)">
+            <span class="spec-icon" aria-hidden="true">{{ specialtyIcon(specialty) }}</span>
+            <span class="spec-name">{{ specialty }}</span>
+            <span class="spec-arrow" aria-hidden="true">→</span>
+          </button>
+        }
+      </div>
+    }
+  </section>
+}
+
+<!-- ── Paso 3: Elegir profesional ──────────────────────────────────── -->
+@if (step() === 'professionals') {
+  <section class="request-page">
+    <div class="request-heading">
+      <button type="button" class="back-btn" (click)="goBack()">
+        <span aria-hidden="true">←</span> Volver
+      </button>
+      <p class="eyebrow">{{ selectedSpecialty() }}</p>
+      <h1>Elegí tu profesional</h1>
+      <p class="heading-sub">
+        {{ filteredProfessionals().length }}
+        {{ filteredProfessionals().length === 1 ? 'disponible' : 'disponibles' }}
+        · Ordenados por reputación
+        @if (location().displayName) {
+          y distancia
+        }
+      </p>
+    </div>
+
+    @if (filteredProfessionals().length === 0) {
+      <div class="empty-state">
+        <p>No hay profesionales activos para esta especialidad.</p>
+        <button type="button" class="back-btn" style="margin-top:1rem" (click)="goBack()">← Elegir otra categoría</button>
+      </div>
+    } @else {
+      <div class="professional-grid">
+        @for (prof of filteredProfessionals(); track prof.id) {
+          <article class="professional-card">
+            <div class="card-topline">
+              @if (prof.fotoUrl && !failedPhotos().has(prof.id)) {
+                <img class="avatar avatar-photo" [src]="prof.fotoUrl" [alt]="'Foto de ' + prof.name"
+                  loading="lazy" (error)="markPhotoFailed(prof.id)" />
+              } @else {
+                <span class="avatar" [class]="prof.accent" aria-label="Sin foto disponible">{{ prof.initials }}</span>
+              }
+              <span class="verified-badge">Validado ✓</span>
+            </div>
+            <h2 class="prof-name">{{ prof.name }}</h2>
+            <p class="prof-spec">{{ prof.specialty }}</p>
+            <div class="prof-meta">
+              @if (prof.rating > 0) {
+                <span class="prof-rating">★ {{ prof.rating }}</span>
+                <span class="prof-reviews">({{ prof.reviews }})</span>
+              } @else {
+                <span class="prof-rating no-rating">Sin calificaciones aún</span>
+              }
+              @if (prof.distanceKm != null) {
+                <span class="prof-distance">· {{ prof.distanceKm | number:'1.1-1' }} km</span>
+              }
+            </div>
+            <button type="button" class="request-btn" (click)="selectProfessional(prof)">
+              Solicitar turno <span aria-hidden="true">→</span>
+            </button>
+          </article>
+        }
+      </div>
+    }
+  </section>
+}
+
+<!-- ── Paso 4: Formulario de solicitud ─────────────────────────────── -->
+@if (step() === 'form') {
+  <section class="request-page">
+    @if (submitted()) {
+      <div class="confirmation">
+        <span class="confirm-check" aria-hidden="true">✓</span>
+        <p class="eyebrow">Solicitud enviada</p>
+        <h1>Tu pedido quedó pendiente de respuesta.</h1>
+        <p>
+          <strong>{{ selectedProfessional()?.name }}</strong> va a revisar el horario propuesto.
+          Te avisaremos cuando responda.
+        </p>
+        <a routerLink="/mis-solicitudes">Ver mis solicitudes →</a>
+      </div>
+    } @else {
+      <div class="request-heading">
+        <button type="button" class="back-btn" (click)="goBack()">
+          <span aria-hidden="true">←</span> Volver
+        </button>
+        <p class="eyebrow">Solicitar turno</p>
+        <h1>Coordiná tu visita con {{ selectedProfessional()?.name }}.</h1>
+        <p class="heading-sub">{{ selectedProfessional()?.specialty }}</p>
+      </div>
+
+      @if (errorMessage()) {
+        <p class="error-message" role="alert">{{ errorMessage() }}</p>
+      }
+
+      <form class="request-form" (ngSubmit)="submit()">
+        <label for="req-date">
+          Fecha propuesta
+          <input id="req-date" [ngModel]="date()" (ngModelChange)="date.set($event)" name="date" type="date" required />
+        </label>
+        <label for="req-time">
+          Horario aproximado
+          <input id="req-time" [ngModel]="time()" (ngModelChange)="time.set($event)" name="time" type="time" required />
+        </label>
+        <div class="address-readonly">
+          <p class="address-label">Dirección del servicio</p>
+          <p class="address-value">
+            📍 <strong>{{ address() }}</strong>
+          </p>
+        </div>
+        <div class="gps-actions">
+          <button type="button" class="gps-button" (click)="openMapPicker()">
+            🗺️ Ajustar punto en el mapa
+          </button>
+          <button type="button" class="gps-button secondary" (click)="lookupGps()" [disabled]="gpsLoading()">
+            {{ gpsLoading() ? 'Calculando...' : 'Verificar coordenadas' }}
+          </button>
+          @if (gpsError()) {
+            <span class="gps-error">{{ gpsError() }}</span>
+          }
+          @if (gpsPosition(); as pos) {
+            <span class="gps-readout">GPS {{ pos.latitude | number:'1.4-4' }}, {{ pos.longitude | number:'1.4-4' }}</span>
+          }
+        </div>
+        <p class="privacy-note">La dirección exacta se comparte con el profesional solo cuando acepta la solicitud.</p>
+        <button type="submit">Enviar solicitud <span aria-hidden="true">→</span></button>
+      </form>
+    }
+  </section>
+}

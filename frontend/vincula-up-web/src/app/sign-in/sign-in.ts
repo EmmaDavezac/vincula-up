@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../core/services/auth.service';
 
@@ -7,16 +7,16 @@ import { AuthService } from '../core/services/auth.service';
   templateUrl: './sign-in.html',
   styleUrl: './sign-in.css',
 })
-export class SignIn {
+export class SignIn implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   readonly loginError = this.auth.loginError;
 
-  loginWithKeycloak(): void {
-    this.auth.loginWithKeycloak().subscribe((ok) => {
-      if (ok) {
-        this.router.navigate(['/']);
-      }
-    });
+  ngOnInit(): void {
+    if (!this.auth.isAuthenticated()) {
+      void this.auth.loginWithKeycloak().subscribe();
+    } else {
+      void this.router.navigate(['/']);
+    }
   }
 }

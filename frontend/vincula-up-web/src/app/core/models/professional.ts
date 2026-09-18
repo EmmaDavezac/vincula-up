@@ -8,8 +8,12 @@ export interface Professional {
   availability: string;
   initials: string;
   accent: string;
+  usuarioId?: string;
   legajo?: string;
   especialidades?: Array<{ id: string; nombre: string }>;
   zonaCoberturaLat?: number | null;
   zonaCoberturaLng?: number | null;
+  radioKm?: number | null;
+  fotoUrl?: string | null;
+  estado?: string;
 }

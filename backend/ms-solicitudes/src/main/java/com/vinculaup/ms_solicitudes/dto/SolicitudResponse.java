@@ -10,8 +10,11 @@ public record SolicitudResponse(
         UUID profesionalId,
         UUID especialidadId,
         String direccionServicio,
+        Double latitud,
+        Double longitud,
         LocalDateTime fechaHoraPropuesta,
         EstadoSolicitud estado,
+        String motivoCancelacion,
         LocalDateTime fechaCreacion,
         LocalDateTime fechaCambioEstado) {
 }

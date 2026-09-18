@@ -1,6 +1,9 @@
 {
   "realm": "vincula-up",
   "enabled": true,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["es"],
+  "defaultLocale": "es",
   "sslRequired": "none",
   "registrationAllowed": false,
   "roles": {
@@ -21,8 +24,10 @@
       "implicitFlowEnabled": false,
       "protocol": "openid-connect",
       "redirectUris": [
+        "http://localhost/*",
         "http://localhost:4200/*",
         "https://vincula-up.local/*",
+        "http://127.0.0.1/*",
         "http://127.0.0.1:4200/*"
       ],
       "webOrigins": [
@@ -35,6 +40,7 @@
   ],
   "users": [
     {
+      "id": "11111111-1111-1111-1111-111111111111",
       "username": "cliente@vincula-up.local",
       "enabled": true,
       "email": "cliente@vincula-up.local",
@@ -47,6 +53,7 @@
       "realmRoles": ["CLIENTE"]
     },
     {
+      "id": "22222222-2222-2222-2222-222222222222",
       "username": "profesional@vincula-up.local",
       "enabled": true,
       "email": "profesional@vincula-up.local",
@@ -59,6 +66,7 @@
       "realmRoles": ["PROFESIONAL"]
     },
     {
+      "id": "33333333-3333-3333-3333-333333333333",
       "username": "admin@vincula-up.local",
       "enabled": true,
       "email": "admin@vincula-up.local",

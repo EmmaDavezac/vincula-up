@@ -6,7 +6,11 @@
       Conectamos ciudadanos con egresados técnicos validados, cerca de tu zona y con disponibilidad clara.
     </p>
     <div class="hero-actions">
-      <a class="primary-action" routerLink="/directorio">Buscar un profesional <span aria-hidden="true">→</span></a>
+      @if (auth.isAuthenticated()) {
+        <a class="primary-action" routerLink="/solicitar">Buscar un profesional <span aria-hidden="true">→</span></a>
+      } @else {
+        <a class="primary-action" href="javascript:void(0)" role="button" (click)="iniciarSesion()">Buscar un profesional <span aria-hidden="true">→</span></a>
+      }
       <a class="secondary-action" routerLink="/como-funciona">Conocé la red</a>
     </div>
   </div>

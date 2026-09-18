@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { requireRole } from './core/guards/role.guard';
+import { redirectToKeycloak, requireActivationAccess, requireRequestsAccess, requireRole } from './core/guards/role.guard';
 
 export const routes: Routes = [
 	{
@@ -9,6 +9,7 @@ export const routes: Routes = [
 	},
 	{
 		path: 'directorio',
+		canActivate: [requireRole('ADMIN')],
 		loadComponent: () => import('./directory/directory').then((module) => module.Directory),
 		title: 'Vincula-UP | Directorio',
 	},
@@ -23,12 +24,13 @@ export const routes: Routes = [
 	},
 	{
 		path: 'ingresar',
+		canActivate: [redirectToKeycloak],
 		loadComponent: () => import('./sign-in/sign-in').then((module) => module.SignIn),
 		title: 'Vincula-UP | Ingresar',
 	},
 	{
 		path: 'mis-solicitudes',
-		canActivate: [requireRole('CLIENTE')],
+		canActivate: [requireRequestsAccess],
 		loadComponent: () => import('./my-requests/my-requests').then((module) => module.MyRequests),
 		title: 'Vincula-UP | Mis solicitudes',
 	},
@@ -46,7 +48,7 @@ export const routes: Routes = [
 	},
 	{
 		path: 'activar-perfil',
-		canActivate: [requireRole('PROFESIONAL')],
+		canActivate: [requireActivationAccess],
 		loadComponent: () => import('./activation/activation').then((module) => module.Activation),
 		title: 'Vincula-UP | Activar perfil',
 	},
@@ -55,7 +57,7 @@ export const routes: Routes = [
 		loadComponent: () => import('./access-page').then((module) => module.AccessPage),
 		data: {
 			title: 'No tenes permiso para entrar aca',
-			message: 'Cambia de usuario demo o volve al inicio para continuar.',
+			message: 'Inicia sesión con tu cuenta Keycloak o volve al inicio para continuar.',
 		},
 		title: 'Vincula-UP | Acceso restringido',
 	},
