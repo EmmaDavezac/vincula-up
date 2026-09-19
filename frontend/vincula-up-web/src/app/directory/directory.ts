@@ -28,15 +28,6 @@ export class Directory {
   readonly loading = signal(true);
   readonly message = signal('');
 
-  // Edición modal / inline
-  readonly editingProf = signal<Professional | null>(null);
-  readonly editForm = {
-    radioKm: 15,
-    zonaCoberturaLat: -32.4825,
-    zonaCoberturaLng: -58.2325,
-  };
-  readonly savingEdit = signal(false);
-
   readonly filteredProfessionals = computed(() => {
     const query = this.search().trim().toLowerCase();
     const status = this.filterStatus();
@@ -66,44 +57,6 @@ export class Directory {
       });
   }
 
-  startEdit(prof: Professional): void {
-    this.editingProf.set(prof);
-    this.editForm.radioKm = prof.radioKm ?? 15;
-    this.editForm.zonaCoberturaLat = prof.zonaCoberturaLat ?? -32.4825;
-    this.editForm.zonaCoberturaLng = prof.zonaCoberturaLng ?? -58.2325;
-    this.message.set('');
-  }
-
-  cancelEdit(): void {
-    this.editingProf.set(null);
-  }
-
-  saveEdit(): void {
-    const prof = this.editingProf();
-    if (!prof) return;
-
-    this.savingEdit.set(true);
-    this.api.activateProfessional({
-      usuarioId: prof.usuarioId || prof.id,
-      fotoUrl: prof.fotoUrl || '',
-      zonaCoberturaLat: Number(this.editForm.zonaCoberturaLat),
-      zonaCoberturaLng: Number(this.editForm.zonaCoberturaLng),
-      radioKm: Number(this.editForm.radioKm),
-    }).pipe(
-      catchError((err) => {
-        this.message.set(this.api.describeError(err, 'No se pudo guardar los cambios del profesional.'));
-        return of(null);
-      })
-    ).subscribe((res) => {
-      this.savingEdit.set(false);
-      if (res) {
-        this.message.set('Zona y cobertura actualizadas con éxito.');
-        this.editingProf.set(null);
-        this.refreshProfessionals();
-      }
-    });
-  }
-
   suspend(prof: Professional): void {
     this.api.suspendProfessional(prof.id).pipe(
       catchError((err) => {
@@ -112,10 +65,11 @@ export class Directory {
       })
     ).subscribe((res) => {
       if (res) {
+        const estado = (res as { estado?: string }).estado ?? 'SUSPENDIDO';
         this.professionals.update((list) =>
-          list.map((p) => (p.id === prof.id ? { ...p, estado: 'SUSPENDIDO' } : p))
+          list.map((p) => (p.id === prof.id ? { ...p, estado } : p))
         );
-        this.message.set(`Profesional ${prof.legajo || prof.name} suspendido.`);
+        this.message.set(`Profesional ${prof.legajo || prof.name} suspendido por incumplimiento de normas.`);
       }
     });
   }
@@ -128,10 +82,15 @@ export class Directory {
       })
     ).subscribe((res) => {
       if (res) {
+        // El backend devuelve CARGADO si el profesional nunca completó su alta:
+        // levantar el baneo no activa el perfil.
+        const estado = (res as { estado?: string }).estado ?? 'ACTIVO';
         this.professionals.update((list) =>
-          list.map((p) => (p.id === prof.id ? { ...p, estado: 'ACTIVO' } : p))
+          list.map((p) => (p.id === prof.id ? { ...p, estado } : p))
         );
-        this.message.set(`Profesional ${prof.legajo || prof.name} reactivado.`);
+        this.message.set(estado === 'CARGADO'
+          ? `Baneo levantado: ${prof.legajo || prof.name} vuelve a quedar pendiente de activación.`
+          : `Profesional ${prof.legajo || prof.name} reactivado.`);
       }
     });
   }

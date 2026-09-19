@@ -258,13 +258,35 @@ public class BackendGateway {
             String payload = httpEx.getResponseBodyAsString();
             org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(BackendGateway.class);
             log.warn("Servicio interno respondió {}: {}", httpEx.getStatusCode(), payload);
-            String message = (payload == null || payload.isBlank())
-                    ? "El servicio interno respondió " + httpEx.getStatusCode()
-                    : payload;
-            return new ResponseStatusException(httpEx.getStatusCode(), message, exception);
+            return new ResponseStatusException(
+                    httpEx.getStatusCode(), extractDownstreamMessage(payload, httpEx.getStatusCode()), exception);
         }
         org.slf4j.LoggerFactory.getLogger(BackendGateway.class)
                 .error("No se pudo contactar un servicio interno: {}", exception.getMessage());
         return new ResponseStatusException(HttpStatus.BAD_GATEWAY, "No se pudo contactar un servicio interno", exception);
+    }
+
+    /**
+     * Los microservicios devuelven sus errores como JSON con la forma
+     * {timestamp, status, error, message}. Extraemos el mensaje legible para
+     * no propagar el JSON crudo hasta el frontend; si el cuerpo no es JSON
+     * (o no trae mensaje) se conserva el texto recibido.
+     */
+    private String extractDownstreamMessage(String payload, org.springframework.http.HttpStatusCode status) {
+        if (payload == null || payload.isBlank()) {
+            return "El servicio interno respondió " + status.value();
+        }
+        try {
+            JsonNode node = tools.jackson.databind.json.JsonMapper.builder().build().readTree(payload);
+            if (node.isObject() && node.hasNonNull("message")) {
+                String message = node.get("message").asText();
+                if (!message.isBlank()) {
+                    return message;
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // Cuerpo no-JSON o inválido: se propaga el texto recibido sin procesar.
+        }
+        return payload;
     }
 }

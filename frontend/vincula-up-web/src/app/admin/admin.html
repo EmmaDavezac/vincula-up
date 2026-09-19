@@ -4,13 +4,14 @@
       <p class="eyebrow">Panel institucional</p>
       <h1>Seguimiento de profesionales</h1>
     </div>
-    <p>Revisá quiénes completaron su perfil y quiénes todavía están pendientes de activar.</p>
+    <p>Creá profesionales que quedan pendientes hasta que cada uno active su perfil desde su propia cuenta. También podés editar el padrón, banear por incumplimiento de normas y dar de baja.</p>
   </div>
 
   @if (message()) { <p class="feedback">{{ message() }}</p> }
 
   <section class="admin-form-panel">
     <h2>Alta individual de profesional</h2>
+    <p class="panel-hint">El profesional queda <strong>pendiente de activación</strong>: se activa solo cuando complete su perfil desde su cuenta.</p>
     <div class="form-grid">
       <label>
         <span>Usuario</span>
@@ -48,27 +49,88 @@
     </button>
   </section>
 
+  <section class="admin-form-panel specialties-panel">
+    <h2>Especialidades</h2>
+    <p class="panel-hint">Catálogo disponible para el padrón. No se puede eliminar una especialidad asignada a un profesional.</p>
+
+    <form class="specialty-create" (submit)="createSpecialty(); $event.preventDefault()">
+      <input type="text" [(ngModel)]="nuevaEspecialidad" name="nuevaEspecialidad" placeholder="Nueva especialidad (ej: Gasista matriculado)" />
+      <button type="submit" class="primary" [disabled]="specialtyBusy()">
+        {{ specialtyBusy() ? 'Guardando...' : 'Agregar' }}
+      </button>
+    </form>
+
+    @if (specialties().length) {
+      <ul class="specialty-manage-list">
+        @for (specialty of specialties(); track specialty.id) {
+          <li>
+            @if (renamingId() === specialty.id) {
+              <input type="text" [(ngModel)]="renameValue" name="renameValue" (keyup.enter)="saveRename(specialty)" />
+              <button type="button" class="primary small" (click)="saveRename(specialty)" [disabled]="specialtyBusy()">Guardar</button>
+              <button type="button" (click)="cancelRename()">Cancelar</button>
+            } @else {
+              <span class="specialty-name">{{ specialty.nombre }}</span>
+              <button type="button" (click)="startRename(specialty)">Renombrar</button>
+              <button type="button" class="btn-danger" (click)="deleteSpecialty(specialty)">Eliminar</button>
+            }
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="empty-inline">Todavía no hay especialidades en el catálogo.</p>
+    }
+  </section>
+
   @if (loading()) {
     <div class="loading">Cargando padrón...</div>
   } @else if (professionals().length) {
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Legajo</th><th>Especialidad</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <thead><tr><th>Legajo</th><th>Especialidades</th><th>Estado</th><th>Acciones</th></tr></thead>
         <tbody>
           @for (professional of professionals(); track professional.id) {
-            <tr>
-              <td>{{ professional.legajo }}</td>
-              <td>{{ professional.especialidades[0]?.nombre || 'Sin especialidad' }}</td>
-              <td><span class="status" [class]="professional.estado.toLowerCase()">{{ professional.estado }}</span></td>
-              <td>
-                @if (professional.estado === 'ACTIVO') {
-                  <button type="button" (click)="suspend(professional)">Suspender</button>
-                }
-                @if (professional.estado === 'SUSPENDIDO') {
-                  <button type="button" class="btn-reactivate" (click)="reactivate(professional)">Reactivar</button>
-                }
-              </td>
-            </tr>
+            @if (editingId() === professional.id) {
+              <tr class="editing-row">
+                <td>
+                  <input type="text" [(ngModel)]="editForm.legajo" name="editLegajo" />
+                </td>
+                <td>
+                  <div class="edit-specialties">
+                    @for (specialty of specialties(); track specialty.id) {
+                      <label class="specialty-option">
+                        <input type="checkbox" [checked]="editForm.especialidadIds.includes(specialty.id)" (change)="toggleEditSpecialty(specialty.id)" />
+                        <span>{{ specialty.nombre }}</span>
+                      </label>
+                    }
+                  </div>
+                </td>
+                <td><span [class]="statusClass(professional.estado)">{{ estadoLabel(professional.estado) }}</span></td>
+                <td class="actions">
+                  <button type="button" class="primary" (click)="saveEdit(professional)" [disabled]="savingEdit()">
+                    {{ savingEdit() ? 'Guardando...' : 'Guardar' }}
+                  </button>
+                  <button type="button" (click)="cancelEdit()">Cancelar</button>
+                </td>
+              </tr>
+            } @else {
+              <tr>
+                <td>{{ professional.legajo }}</td>
+                <td>{{ specialtiesLabel(professional) }}</td>
+                <td><span [class]="statusClass(professional.estado)">{{ estadoLabel(professional.estado) }}</span></td>
+                <td class="actions">
+                  @if (professional.estado === 'ACTIVO' || professional.estado === 'CARGADO') {
+                    <button type="button" (click)="suspend(professional)">Banear</button>
+                  }
+                  @if (professional.estado === 'SUSPENDIDO') {
+                    <button type="button" class="btn-reactivate" (click)="reactivate(professional)">Levantar baneo</button>
+                  }
+                  <button type="button" (click)="startEdit(professional)">Editar</button>
+                  <button type="button" class="btn-danger" (click)="remove(professional)" [disabled]="deletingId() === professional.id">
+                    {{ deletingId() === professional.id ? 'Eliminando...' : 'Eliminar' }}
+                  </button>
+                </td>
+              </tr>
+            }
           }
         </tbody>
       </table>

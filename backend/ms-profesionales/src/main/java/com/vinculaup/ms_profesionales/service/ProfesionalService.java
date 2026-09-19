@@ -124,6 +124,12 @@ public class ProfesionalService {
             profesional = profesionalRepository.save(
                     new Profesional(usuarioId, legajoProvisorio(), EstadoProfesional.CARGADO));
         }
+        if (profesional.getEstado() == EstadoProfesional.ACTIVO) {
+            // El perfil ya está activado: devolver el estado actual sin cambios.
+            // Mantiene la idempotencia cuando el usuario vuelve a intentar activar
+            // con una sesión que no reflejaba el estado actual del perfil.
+            return toResponse(profesional);
+        }
         if (profesional.getEstado() == EstadoProfesional.SUSPENDIDO) {
             throw conflict("Un profesional suspendido no puede activarse desde este flujo");
         }

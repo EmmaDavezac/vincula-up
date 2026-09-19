@@ -106,6 +106,8 @@ public class Profesional {
     }
 
     public void reactivar() {
-        this.estado = EstadoProfesional.ACTIVO;
+        // Levantar un baneo nunca "activa" el perfil: si el profesional todavía
+        // no completó su alta, vuelve a quedar pendiente de activación.
+        this.estado = fechaActivacion == null ? EstadoProfesional.CARGADO : EstadoProfesional.ACTIVO;
     }
 }

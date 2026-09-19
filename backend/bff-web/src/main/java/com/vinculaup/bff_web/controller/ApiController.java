@@ -95,7 +95,60 @@ public class ApiController {
     public JsonNode listarProfesionales(
             @RequestParam(required = false) String estado,
             @RequestParam(required = false) Boolean todos) {
-        return gateway.listarProfesionales(estado, todos);
+        return enriquecerConUsuarios(gateway.listarProfesionales(estado, todos));
+    }
+
+    /**
+     * ms-profesionales solo devuelve el usuarioId de cada profesional: el nombre
+     * y apellido reales viven en ms-usuarios. Los agregamos acá para que el
+     * directorio y el flujo de solicitud muestren la identidad del profesional
+     * en vez de un genérico con el legajo. Si ms-usuarios no puede responder por
+     * un usuario, ese profesional se entrega sin datos personales en lugar de
+     * tumbar la consulta completa.
+     */
+    private JsonNode enriquecerConUsuarios(JsonNode profesionales) {
+        if (profesionales == null || !profesionales.isArray() || profesionales.isEmpty()) {
+            return profesionales;
+        }
+        Map<UUID, JsonNode> usuarios = new HashMap<>();
+        for (JsonNode profesional : profesionales) {
+            if (!profesional.hasNonNull("usuarioId")) {
+                continue;
+            }
+            try {
+                UUID usuarioId = UUID.fromString(profesional.get("usuarioId").asText());
+                usuarios.computeIfAbsent(usuarioId, id -> {
+                    JsonNode usuario = gateway.buscarUsuarioPorId(id);
+                    return usuario != null && usuario.isObject() ? usuario : null;
+                });
+            } catch (RuntimeException ignored) {
+                // UUID inválido o usuario inexistente: se deja el profesional sin datos personales.
+            }
+        }
+        if (usuarios.isEmpty()) {
+            return profesionales;
+        }
+        var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
+        var enriquecidos = mapper.createArrayNode();
+        for (JsonNode profesional : profesionales) {
+            var copia = mapper.createObjectNode();
+            copia.setAll((tools.jackson.databind.node.ObjectNode) profesional);
+            try {
+                JsonNode usuario = usuarios.get(UUID.fromString(profesional.path("usuarioId").asText(null)));
+                if (usuario != null) {
+                    if (usuario.hasNonNull("nombre")) copia.put("nombre", usuario.get("nombre").asText());
+                    if (usuario.hasNonNull("apellido")) copia.put("apellido", usuario.get("apellido").asText());
+                    // La foto del padrón manda; la del usuario se usa solo si el profesional no cargó una.
+                    if (!copia.hasNonNull("fotoUrl") && usuario.hasNonNull("fotoUrl")) {
+                        copia.put("fotoUrl", usuario.get("fotoUrl").asText());
+                    }
+                }
+            } catch (RuntimeException ignored) {
+                // usuarioId inválido: se conserva el nodo original.
+            }
+            enriquecidos.add(copia);
+        }
+        return enriquecidos;
     }
 
     @PostMapping("/profesionales")

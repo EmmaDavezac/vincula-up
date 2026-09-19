@@ -63,6 +63,14 @@ services:
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
     ports:
       - "8081:8081"
+    # La JVM tarda ~1 minuto en levantar: sin healthcheck el BFF/nginx arrancan antes
+    # y devuelven 502 "Connection refused" durante ese lapso.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-m", "5", "http://localhost:8081/actuator/health"]
+      interval: 5s
+      timeout: 6s
+      retries: 12
+      start_period: 90s
 
   ms-profesionales:
     build:
@@ -81,6 +89,12 @@ services:
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
     ports:
       - "8082:8082"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-m", "5", "http://localhost:8082/actuator/health"]
+      interval: 5s
+      timeout: 6s
+      retries: 12
+      start_period: 90s
 
   ms-solicitudes:
     build:
@@ -100,16 +114,26 @@ services:
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
     ports:
       - "8083:8083"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-m", "5", "http://localhost:8083/actuator/health"]
+      interval: 5s
+      timeout: 6s
+      retries: 12
+      start_period: 90s
 
   bff-web:
     build:
       context: ./backend/bff-web
     container_name: vinculaup-bff-web
     depends_on:
-      - ms-usuarios
-      - ms-profesionales
-      - ms-solicitudes
-      - keycloak
+      ms-usuarios:
+        condition: service_healthy
+      ms-profesionales:
+        condition: service_healthy
+      ms-solicitudes:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
     restart: unless-stopped
     environment:
       PORT: 9001
@@ -121,6 +145,12 @@ services:
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
     ports:
       - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-m", "5", "http://localhost:9001/actuator/health"]
+      interval: 5s
+      timeout: 6s
+      retries: 12
+      start_period: 90s
 
   nginx:
     image: nginx:1.27-alpine
@@ -129,8 +159,10 @@ services:
       dockerfile: ./nginx/Dockerfile
     container_name: vinculaup-nginx
     depends_on:
-      - bff-web
-      - keycloak
+      bff-web:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
     restart: unless-stopped
     ports:
       - "80:80"

@@ -298,22 +298,6 @@ h1 {
   padding-top: 1rem;
 }
 
-.btn-action-edit {
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  color: var(--ink);
-  cursor: pointer;
-  font-size: 0.78rem;
-  font-weight: 600;
-  padding: 0.4rem 0.8rem;
-  transition: all 150ms ease;
-}
-
-.btn-action-edit:hover {
-  background: #eee8d5;
-}
-
 .btn-action-suspend {
   background: none;
   border: 1px solid #c5221f;
@@ -362,92 +346,6 @@ h1 {
 
 .empty-state p {
   color: var(--muted);
-}
-
-/* Modal styles */
-.modal-overlay {
-  align-items: center;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  inset: 0;
-  justify-content: center;
-  position: fixed;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: #fffdf8;
-  border: 1px solid var(--line);
-  box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-  max-width: 480px;
-  padding: 2rem;
-  width: 90%;
-}
-
-.modal-content h3 {
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 1.4rem;
-  margin: 0 0 0.25rem;
-}
-
-.modal-sub {
-  color: var(--muted);
-  font-size: 0.8rem;
-  margin: 0 0 1.5rem;
-}
-
-.form-field {
-  display: block;
-  margin-bottom: 1rem;
-}
-
-.form-field span {
-  color: var(--ink);
-  display: block;
-  font-size: 0.78rem;
-  font-weight: 600;
-  margin-bottom: 0.3rem;
-}
-
-.form-field input {
-  background: #fff;
-  border: 1px solid var(--line);
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.95rem;
-  padding: 0.5rem 0.75rem;
-  width: 100%;
-}
-
-.coords-row {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: 1fr 1fr;
-}
-
-.modal-actions {
-  display: flex;
-  gap: 0.8rem;
-  justify-content: flex-end;
-  margin-top: 1.5rem;
-}
-
-.btn-cancel {
-  background: none;
-  border: 1px solid var(--line);
-  cursor: pointer;
-  font-size: 0.85rem;
-  padding: 0.5rem 1rem;
-}
-
-.btn-save {
-  background: var(--ink);
-  border: 0;
-  color: #fff;
-  cursor: pointer;
-  font-size: 0.85rem;
-  font-weight: 600;
-  padding: 0.5rem 1.2rem;
 }
 
 @media (max-width: 700px) {

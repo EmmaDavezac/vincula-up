@@ -10,6 +10,8 @@ export interface Professional {
   accent: string;
   usuarioId?: string;
   legajo?: string;
+  nombre?: string | null;
+  apellido?: string | null;
   especialidades?: Array<{ id: string; nombre: string }>;
   zonaCoberturaLat?: number | null;
   zonaCoberturaLng?: number | null;

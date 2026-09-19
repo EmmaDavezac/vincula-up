@@ -7,12 +7,16 @@ import { AuthService } from '../core/services/auth.service';
 
 const image = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
 
+// Instancia real de ApiService para usar el describeError real (método puro, sin dependencias).
+const apiService = Object.create(ApiService.prototype) as ApiService;
+
 describe('Activation interactions', () => {
   let fixture: ComponentFixture<Activation>;
   let saved: Subject<unknown>;
   const api = {
     activateProfessional: vi.fn(), setAvailability: vi.fn(),
-    describeError: (_error: unknown, fallback: string) => fallback,
+    describeError: vi.fn((error: unknown, fallback: string) =>
+      apiService.describeError(error, fallback)),
   };
   const auth = {
     currentUser: () => ({ id: 'user-1' }), getKeycloakId: () => 'identity-1',
@@ -165,5 +169,34 @@ describe('Activation interactions', () => {
     fixture.componentInstance.next();
     expect(api.activateProfessional).not.toHaveBeenCalled();
     expect(fixture.componentInstance.errorMessage()).toContain('posterior');
+  });
+
+  it('shows the real backend error message on 409 instead of the generic state text', () => {
+    fixture.componentInstance.photoPreview.set(image);
+    fixture.componentInstance.step.set(3);
+
+    api.activateProfessional.mockReset().mockReturnValue(throwError(() => ({
+      status: 409,
+      message: 'Un profesional suspendido no puede activarse desde este flujo',
+      error: { message: 'Un profesional suspendido no puede activarse desde este flujo' },
+    })));
+
+    fixture.componentInstance.next();
+    expect(fixture.componentInstance.errorMessage()).toContain('suspendido');
+    expect(fixture.componentInstance.errorMessage()).not.toContain('estado distinto');
+  });
+
+  it('shows the backend 409 message when the response body uses the error.message shape', () => {
+    fixture.componentInstance.photoPreview.set(image);
+    fixture.componentInstance.step.set(3);
+
+    api.activateProfessional.mockReset().mockReturnValue(throwError(() => ({
+      status: 409,
+      error: { message: 'La solicitud no permite esta transicion desde ACEPTADA' },
+    })));
+
+    fixture.componentInstance.next();
+    expect(fixture.componentInstance.errorMessage()).toContain('transicion');
+    expect(fixture.componentInstance.errorMessage()).not.toContain('estado distinto');
   });
 });

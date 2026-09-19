@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ProfesionalRepository extends JpaRepository<Profesional, UUID> {
     Optional<Profesional> findByUsuarioId(UUID usuarioId);
+    boolean existsByUsuarioId(UUID usuarioId);
     List<Profesional> findByUsuarioIdIn(Collection<UUID> usuarioIds);
     List<Profesional> findByUsuarioIdInOrIdIn(Collection<UUID> usuarioIds, Collection<UUID> ids);
     boolean existsByLegajoIgnoreCase(String legajo);

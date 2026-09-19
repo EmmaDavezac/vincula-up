@@ -62,9 +62,6 @@
 
           @if (isAdmin()) {
             <div class="card-admin-actions">
-              <button type="button" class="btn-action-edit" (click)="startEdit(professional)">
-                ✏️ Editar cobertura
-              </button>
               @if (professional.estado === 'ACTIVO') {
                 <button type="button" class="btn-action-suspend" (click)="suspend(professional)">Suspender</button>
               }
@@ -86,41 +83,6 @@
     <div class="empty-state">
       <h2>No encontramos profesionales con ese criterio.</h2>
       <p>Probá cambiando el término de búsqueda o el filtro de estado.</p>
-    </div>
-  }
-
-  <!-- Modal de Edición -->
-  @if (editingProf(); as prof) {
-    <div class="modal-overlay" (click)="cancelEdit()">
-      <div class="modal-content" (click)="$event.stopPropagation()">
-        <h3>Editar profesional: {{ prof.name }}</h3>
-        <p class="modal-sub">Legajo: {{ prof.legajo || 'Sin legajo' }} · {{ prof.specialty }}</p>
-
-        <form (submit)="saveEdit(); $event.preventDefault()">
-          <label class="form-field">
-            <span>Radio de cobertura (km)</span>
-            <input type="number" [(ngModel)]="editForm.radioKm" name="radioKm" min="1" max="100" required />
-          </label>
-
-          <div class="coords-row">
-            <label class="form-field">
-              <span>Latitud de cobertura</span>
-              <input type="number" step="0.0001" [(ngModel)]="editForm.zonaCoberturaLat" name="zonaCoberturaLat" required />
-            </label>
-            <label class="form-field">
-              <span>Longitud de cobertura</span>
-              <input type="number" step="0.0001" [(ngModel)]="editForm.zonaCoberturaLng" name="zonaCoberturaLng" required />
-            </label>
-          </div>
-
-          <div class="modal-actions">
-            <button type="button" class="btn-cancel" (click)="cancelEdit()">Cancelar</button>
-            <button type="submit" class="btn-save" [disabled]="savingEdit()">
-              {{ savingEdit() ? 'Guardando...' : 'Guardar cambios' }}
-            </button>
-          </div>
-        </form>
-      </div>
     </div>
   }
 </section>

@@ -272,25 +272,39 @@ export class ApiService {
       ? String((error as { message?: string }).message ?? '')
       : '';
 
+    let rawPayloadMessage = '';
+    let rawPayloadError = '';
     const errorPayload = typeof error === 'object' && error && 'error' in error
-      ? (error as { error?: { message?: string; status?: number | string; error?: string } }).error
+      ? (error as { error?: unknown }).error
       : undefined;
 
-    const nestedMessage = typeof errorPayload === 'object' && errorPayload && 'message' in errorPayload
-      ? String((errorPayload as { message?: string }).message ?? '')
-      : '';
+    if (typeof errorPayload === 'object' && errorPayload !== null) {
+      const payloadRecord = errorPayload as { message?: unknown; error?: unknown };
+      rawPayloadMessage = typeof payloadRecord.message === 'string' ? payloadRecord.message : '';
+      rawPayloadError = typeof payloadRecord.error === 'string' ? payloadRecord.error : '';
+    } else if (typeof errorPayload === 'string') {
+      rawPayloadMessage = errorPayload;
+    }
 
-    const payloadError = typeof errorPayload === 'object' && errorPayload && 'error' in errorPayload
-      ? String((errorPayload as { error?: string }).error ?? '')
-      : '';
-
-    const message = rawMessage
+    const clean = (value: string): string => value
       .replace(/^Http failure response for .*?:\s*/i, '')
       .replace(/\bNot Found\b/i, 'No encontrado')
       .replace(/\bUnauthorized\b/i, 'No autorizado')
       .replace(/\bForbidden\b/i, 'Prohibido')
       .replace(/\bConflict\b/i, 'Conflicto')
-      || nestedMessage || payloadError || '';
+      .trim();
+
+    const pickMessage = (...candidates: string[]): string => {
+      for (const candidate of candidates) {
+        const cleaned = clean(candidate);
+        if (cleaned.length > 0 && !/^409\s*(conflicto)?$/i.test(cleaned)) {
+          return cleaned;
+        }
+      }
+      return '';
+    };
+
+    const message = pickMessage(rawPayloadMessage, rawMessage, rawPayloadError);
 
     if (status === 403 || /forbidden|denied|permiso|prohibido/i.test(message)) {
       return 'No tenés permiso para realizar esta acción.';
@@ -299,6 +313,9 @@ export class ApiService {
       return 'La solicitud o el recurso ya no está disponible.';
     }
     if (status === 409 || /conflict|estado|ya está en un estado/i.test(message)) {
+      if (message) {
+        return message.charAt(0).toUpperCase() + message.slice(1);
+      }
       return 'La solicitud ya está en un estado distinto y no se puede mover ahora.';
     }
     if (status === 401 || /no autorizado|unauthorized|login|sesion/i.test(message)) {

@@ -391,6 +391,9 @@ export class AuthService {
       return 'El recurso solicitado no está disponible en este momento.';
     }
     if (status === 409 || /conflict|estado/i.test(backendMessage)) {
+      if (backendMessage) {
+        return backendMessage.charAt(0).toUpperCase() + backendMessage.slice(1);
+      }
       return 'La solicitud ya está en un estado distinto y no se puede mover ahora.';
     }
     if (backendMessage) {

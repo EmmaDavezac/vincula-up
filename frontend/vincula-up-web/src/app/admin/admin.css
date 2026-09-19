@@ -35,3 +35,25 @@ td button { background: transparent; border: 1px solid var(--ink); color: var(--
 td button.btn-reactivate { border-color: #448064; color: #448064; font-weight: 700; }
 td button:hover { opacity: 0.8; }
 @media (max-width: 700px) { .admin-heading { display: block; } .admin-heading > p { margin-top: 2rem; } .form-grid { grid-template-columns: 1fr; } }
+
+/* Sección de gestión de especialidades */
+.panel-hint { color: var(--muted); font-size: .85rem; line-height: 1.5; margin: 0 0 1.25rem; }
+.specialties-panel { margin-top: 1.5rem; }
+.specialty-create { align-items: center; display: flex; gap: .75rem; margin-bottom: 1.25rem; }
+.specialty-create input[type='text'] { flex: 1; }
+.specialty-manage-list { display: grid; gap: .5rem; list-style: none; margin: 0; padding: 0; }
+.specialty-manage-list li { align-items: center; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: .5rem; justify-content: space-between; padding: .5rem 0; }
+.specialty-manage-list li input[type='text'] { flex: 1; min-width: 12rem; }
+.specialty-name { flex: 1; color: var(--ink); font-size: .88rem; }
+.specialty-manage-list button { background: transparent; border: 1px solid var(--ink); border-radius: .4rem; color: var(--ink); cursor: pointer; font: inherit; font-size: .78rem; padding: .45rem .65rem; }
+.specialty-manage-list button:hover { opacity: .8; }
+.specialty-manage-list button.btn-danger { border-color: var(--coral); color: var(--coral); }
+.primary.small { font-size: .78rem; margin-top: 0; padding: .45rem .7rem; }
+.empty-inline { color: var(--muted); margin: 0; }
+
+/* Tabla: acciones por fila y fila de edición */
+.actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+.actions button.primary { margin-top: 0; }
+td button.btn-danger { border-color: var(--coral); color: var(--coral); }
+.editing-row input[type='text'] { width: 100%; }
+.edit-specialties { display: flex; flex-wrap: wrap; gap: .5rem; }
