@@ -2,6 +2,7 @@ package com.vinculaup.ms_solicitudes.service;
 
 import com.vinculaup.ms_solicitudes.client.DisponibilidadProfesional;
 import com.vinculaup.ms_solicitudes.client.GeocodingClient;
+import com.vinculaup.ms_solicitudes.client.ProfesionalIdentidad;
 import com.vinculaup.ms_solicitudes.client.ProfesionalesClient;
 import com.vinculaup.ms_solicitudes.dto.CrearSolicitudRequest;
 import com.vinculaup.ms_solicitudes.dto.CambiarEstadoRequest;
@@ -11,9 +12,11 @@ import com.vinculaup.ms_solicitudes.entity.Solicitud;
 import com.vinculaup.ms_solicitudes.repository.SolicitudRepository;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -40,12 +43,13 @@ public class SolicitudService {
     }
 
     public SolicitudResponse crear(CrearSolicitudRequest request) {
-        var profesional = profesionalesClient.obtenerPorId(request.profesionalId());
-        if (profesional.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "El profesional seleccionado no existe");
-        }
-        if (!"ACTIVO".equalsIgnoreCase(profesional.get().estado())) {
+        // El frontend puede enviar el id del perfil del padrón o el usuarioId de ms-usuarios:
+        // se resuelve el perfil y se persiste siempre su id canónico para que la validación de
+        // disponibilidad y el listado de solicitudes funcionen con una única identidad.
+        ProfesionalIdentidad profesional = profesionalesClient.obtenerPorIdentidad(request.profesionalId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "El profesional seleccionado no existe"));
+        if (!"ACTIVO".equalsIgnoreCase(profesional.estado())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "El profesional debe tener su perfil activado para recibir solicitudes");
         }
@@ -54,7 +58,7 @@ public class SolicitudService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Ya tenes una solicitud activa para esta especialidad");
         }
-        if (!estaDentroDeDisponibilidad(request.profesionalId(), request.fechaHoraPropuesta())) {
+        if (!estaDentroDeDisponibilidad(profesional.id(), request.fechaHoraPropuesta())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "El horario propuesto esta fuera de la disponibilidad del profesional");
         }
@@ -66,7 +70,7 @@ public class SolicitudService {
                 request.direccionServicio(), request.latitud(), request.longitud());
 
         Solicitud solicitud = repository.save(new Solicitud(
-                request.clienteId(), request.profesionalId(), request.especialidadId(),
+                request.clienteId(), profesional.id(), request.especialidadId(),
                 ubicacion.direccion(), ubicacion.latitud(), ubicacion.longitud(),
                 request.fechaHoraPropuesta()));
         return toResponse(solicitud);
@@ -86,25 +90,14 @@ public class SolicitudService {
     private record LocalizacionUbicacion(String direccion, Double latitud, Double longitud) {
     }
 
+    /**
+     * Identidades con las que puede aparecer el mismo usuario: su id de ms-usuarios, sus alias
+     * (por ejemplo el {@code keycloakId} del token) y las identidades del perfil profesional del
+     * padrón (id del perfil y usuarioId). Igual que en el listado de solicitudes, esto permite
+     * reconocer solicitudes guardadas con cualquiera de esas identidades.
+     */
     public Set<UUID> resolverIdentidades(UUID usuarioId, List<UUID> aliasIds) {
-        Set<UUID> identidades = new LinkedHashSet<>();
-        if (usuarioId != null) {
-            identidades.add(usuarioId);
-        }
-        if (aliasIds != null) {
-            aliasIds.stream().filter(java.util.Objects::nonNull).forEach(identidades::add);
-        }
-        if (!identidades.isEmpty()) {
-            try {
-                var profesionales = profesionalesClient.obtenerIdentidades(identidades);
-                for (var p : profesionales) {
-                    if (p.id() != null) identidades.add(p.id());
-                    if (p.usuarioId() != null) identidades.add(p.usuarioId());
-                }
-            } catch (Exception ignored) {
-            }
-        }
-        return identidades;
+        return identidadesDe(usuarioId, aliasIds).ids();
     }
 
     @Transactional(readOnly = true)
@@ -152,7 +145,7 @@ public class SolicitudService {
 
     public SolicitudResponse aceptar(UUID id, CambiarEstadoRequest request) {
         Solicitud solicitud = find(id);
-        ensureProfessionalActor(solicitud, request.actorId());
+        ensureProfessionalActor(solicitud, request);
         ensureState(solicitud, EstadoSolicitud.PENDIENTE);
         solicitud.cambiarEstado(EstadoSolicitud.ACEPTADA);
         return toResponse(solicitud);
@@ -160,7 +153,7 @@ public class SolicitudService {
 
     public SolicitudResponse rechazar(UUID id, CambiarEstadoRequest request) {
         Solicitud solicitud = find(id);
-        ensureProfessionalActor(solicitud, request.actorId());
+        ensureProfessionalActor(solicitud, request);
         ensureState(solicitud, EstadoSolicitud.PENDIENTE);
         solicitud.rechazar(request.motivo());
         return toResponse(solicitud);
@@ -168,9 +161,7 @@ public class SolicitudService {
 
     public SolicitudResponse completar(UUID id, CambiarEstadoRequest request) {
         Solicitud solicitud = find(id);
-        if (!solicitud.getClienteId().equals(request.actorId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo el cliente puede completar la solicitud");
-        }
+        ensureClienteActor(solicitud, request, "Solo el cliente puede completar la solicitud");
         ensureState(solicitud, EstadoSolicitud.ACEPTADA);
         solicitud.cambiarEstado(EstadoSolicitud.COMPLETADA);
         return toResponse(solicitud);
@@ -178,9 +169,7 @@ public class SolicitudService {
 
     public SolicitudResponse cancelar(UUID id, CambiarEstadoRequest request) {
         Solicitud solicitud = find(id);
-        if (!solicitud.getClienteId().equals(request.actorId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo el cliente puede cancelar la solicitud");
-        }
+        ensureClienteActor(solicitud, request, "Solo el cliente puede cancelar la solicitud");
         ensureState(solicitud, EstadoSolicitud.PENDIENTE);
         solicitud.cancelar(request.motivo());
         return toResponse(solicitud);
@@ -191,15 +180,75 @@ public class SolicitudService {
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Solicitud no encontrada"));
     }
 
-    private void ensureProfessionalActor(Solicitud solicitud, UUID actorId) {
-        var profesional = profesionalesClient.obtenerPorId(solicitud.getProfesionalId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "No se pudo verificar el perfil profesional"));
-        if (!"ACTIVO".equals(profesional.estado())) {
+    /**
+     * Verifica que quien opera sea el profesional dueño de la solicitud y que su perfil siga activo.
+     * <p>
+     * El {@code profesionalId} guardado en la solicitud puede ser el id del perfil del padrón, el
+     * {@code usuarioId} de ms-usuarios o el {@code keycloakId} histórico (las solicitudes viejas se
+     * sembraron así). Por eso la comparación se hace contra todas las identidades del actor —las
+     * mismas que usa el listado de solicitudes recibidas— en lugar de exigir que la solicitud esté
+     * guardada con el id del perfil.
+     */
+    private void ensureProfessionalActor(Solicitud solicitud, CambiarEstadoRequest request) {
+        Identidades actor = identidadesDe(request.actorId(), aliasIdsDe(request));
+        ProfesionalIdentidad perfil = actor.perfiles().stream()
+                .filter(candidato -> esIdentidadDe(candidato, request.actorId())
+                        || esIdentidadDe(candidato, request.keycloakId()))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "No se pudo verificar el perfil profesional"));
+        if (!"ACTIVO".equalsIgnoreCase(perfil.estado())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El perfil profesional debe estar activo");
         }
-        if (!profesional.usuarioId().equals(actorId)) {
+        if (!actor.ids().contains(solicitud.getProfesionalId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El profesional no es dueño de esta solicitud");
         }
+    }
+
+    /** El cliente también puede estar guardado con su id de ms-usuarios o con el keycloakId histórico. */
+    private void ensureClienteActor(Solicitud solicitud, CambiarEstadoRequest request, String mensaje) {
+        boolean esCliente = identidadesDe(request.actorId(), aliasIdsDe(request)).ids()
+                .contains(solicitud.getClienteId());
+        if (!esCliente) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, mensaje);
+        }
+    }
+
+    private static List<UUID> aliasIdsDe(CambiarEstadoRequest request) {
+        return request.keycloakId() == null ? List.of() : List.of(request.keycloakId());
+    }
+
+    private static boolean esIdentidadDe(ProfesionalIdentidad perfil, UUID identidad) {
+        return identidad != null && (identidad.equals(perfil.id()) || identidad.equals(perfil.usuarioId()));
+    }
+
+    /** Identidades del usuario y perfiles profesionales del padrón que las representan. */
+    private Identidades identidadesDe(UUID usuarioId, Collection<UUID> aliasIds) {
+        Set<UUID> identidades = new LinkedHashSet<>();
+        if (usuarioId != null) {
+            identidades.add(usuarioId);
+        }
+        if (aliasIds != null) {
+            aliasIds.stream().filter(Objects::nonNull).forEach(identidades::add);
+        }
+        List<ProfesionalIdentidad> perfiles = identidades.isEmpty()
+                ? List.of()
+                : profesionalesClient.obtenerIdentidades(identidades);
+        if (perfiles == null) {
+            perfiles = List.of();
+        }
+        for (ProfesionalIdentidad perfil : perfiles) {
+            if (perfil.id() != null) {
+                identidades.add(perfil.id());
+            }
+            if (perfil.usuarioId() != null) {
+                identidades.add(perfil.usuarioId());
+            }
+        }
+        return new Identidades(identidades, perfiles);
+    }
+
+    private record Identidades(Set<UUID> ids, List<ProfesionalIdentidad> perfiles) {
     }
 
     private void ensureState(Solicitud solicitud, EstadoSolicitud expected) {

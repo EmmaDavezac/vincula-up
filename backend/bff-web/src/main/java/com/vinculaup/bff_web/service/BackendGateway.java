@@ -96,12 +96,73 @@ public class BackendGateway {
         }
     }
 
-    public JsonNode listarUsuarios(String rol) {
-        return get(usuarios, "/usuarios", rol == null ? null : "rol", rol);
+    public JsonNode listarUsuarios(String rol, String estado) {
+        try {
+            return usuarios.get().uri(uriBuilder -> {
+                var builder = uriBuilder.path("/usuarios");
+                if (rol != null && !rol.isBlank()) {
+                    builder.queryParam("rol", rol.trim());
+                }
+                if (estado != null && !estado.isBlank()) {
+                    builder.queryParam("estado", estado.trim());
+                }
+                return builder.build();
+            }).retrieve().body(JsonNode.class);
+        } catch (RestClientException exception) {
+            throw unavailable(exception);
+        }
+    }
+
+    /** Búsqueda por email: devuelve {@code null} cuando no existe (404 esperado). */
+    public JsonNode buscarUsuarioPorEmail(String email) {
+        try {
+            return usuarios.get().uri(uriBuilder -> uriBuilder.path("/usuarios/por-email")
+                    .queryParam("email", email)
+                    .build()).retrieve().toEntity(JsonNode.class).getBody();
+        } catch (org.springframework.web.client.HttpStatusCodeException notFound) {
+            if (notFound.getStatusCode().value() == 404) {
+                return null;
+            }
+            throw unavailable(notFound);
+        } catch (RestClientException exception) {
+            throw unavailable(exception);
+        }
+    }
+
+    /** Baneo administrativo de la cuenta (reversible). */
+    public JsonNode suspenderUsuario(UUID id) {
+        return patch(usuarios, "/usuarios/{id}/suspender", null, id);
+    }
+
+    public JsonNode reactivarUsuario(UUID id) {
+        return patch(usuarios, "/usuarios/{id}/reactivar", null, id);
     }
 
     public JsonNode buscarUsuarioPorId(UUID id) {
         return get(usuarios, "/usuarios/{id}", null, null, id);
+    }
+
+    /**
+     * Busca un perfil profesional por id de perfil o, si no existe con ese id,
+     * por id de usuario: el frontend guarda el {@code usuarioId} del profesional
+     * en la solicitud, y ambos identificadores circulan según la versión con la
+     * que se creó el pedido. Devuelve {@code null} si no se encuentra de ninguna
+     * de las dos formas (la tarjeta del profesional se muestra con genéricos).
+     */
+    public JsonNode buscarProfesionalPorIdOUsuario(UUID id) {
+        try {
+            return get(profesionales, "/profesionales/{id}", null, null, id);
+        } catch (ResponseStatusException notFound) {
+            if (notFound.getStatusCode().value() != 404) {
+                throw notFound;
+            }
+        }
+        try {
+            JsonNode lista = get(profesionales, "/profesionales/por-usuario", "usuarioIds", id.toString());
+            return lista != null && lista.isArray() && !lista.isEmpty() ? lista.get(0) : null;
+        } catch (RestClientException ignored) {
+            return null;
+        }
     }
 
     public JsonNode activarProfesional(JsonNode body) {
@@ -186,8 +247,23 @@ public class BackendGateway {
         return patch(solicitudes, "/solicitudes/{id}/cancelar", body, id);
     }
 
-    public JsonNode listarMensajes(UUID solicitudId, UUID usuarioId) {
-        return get(solicitudes, "/solicitudes/{id}/mensajes", "usuarioId", usuarioId.toString(), solicitudId);
+    /**
+     * Mensajes de una solicitud. El BFF resuelve la identidad desde el token y envía el
+     * {@code keycloakId} como alias para reconocer al usuario en las solicitudes históricas.
+     */
+    public JsonNode listarMensajes(UUID solicitudId, UUID usuarioId, UUID keycloakId) {
+        try {
+            return solicitudes.get().uri(uriBuilder -> {
+                var builder = uriBuilder.path("/solicitudes/{id}/mensajes")
+                        .queryParam("usuarioId", usuarioId);
+                if (keycloakId != null) {
+                    builder.queryParam("keycloakId", keycloakId);
+                }
+                return builder.build(solicitudId);
+            }).retrieve().body(JsonNode.class);
+        } catch (RestClientException exception) {
+            throw unavailable(exception);
+        }
     }
 
     public JsonNode enviarMensaje(UUID solicitudId, JsonNode body) {

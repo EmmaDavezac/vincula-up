@@ -3,6 +3,7 @@ package com.vinculaup.ms_usuarios.controller;
 import com.vinculaup.ms_usuarios.dto.ActualizarUsuarioRequest;
 import com.vinculaup.ms_usuarios.dto.CrearUsuarioRequest;
 import com.vinculaup.ms_usuarios.dto.UsuarioResponse;
+import com.vinculaup.ms_usuarios.entity.EstadoUsuario;
 import com.vinculaup.ms_usuarios.service.UsuarioService;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -31,8 +32,10 @@ public class UsuarioController {
     }
 
     @GetMapping
-    public List<UsuarioResponse> listar(@RequestParam(required = false) RolNegocio rol) {
-        return service.listar(rol);
+    public List<UsuarioResponse> listar(
+            @RequestParam(required = false) RolNegocio rol,
+            @RequestParam(required = false) EstadoUsuario estado) {
+        return service.listar(rol, estado);
     }
 
     @PostMapping
@@ -41,9 +44,27 @@ public class UsuarioController {
         return service.crear(request);
     }
 
+    /** Búsqueda por email: permite detectar invitaciones pendientes antes de dar de alta. */
+    @GetMapping("/por-email")
+    public UsuarioResponse buscarPorEmail(@RequestParam String email) {
+        return service.buscarPorEmail(email);
+    }
+
     @GetMapping("/{id}")
     public UsuarioResponse buscarPorId(@PathVariable UUID id) {
         return service.buscarPorId(id);
+    }
+
+    /** Baneo administrativo: deja la cuenta suspendida (reversible). */
+    @PatchMapping("/{id}/suspender")
+    public UsuarioResponse suspender(@PathVariable UUID id) {
+        return service.suspender(id);
+    }
+
+    /** Levanta el baneo y devuelve la cuenta a ACTIVO. */
+    @PatchMapping("/{id}/reactivar")
+    public UsuarioResponse reactivar(@PathVariable UUID id) {
+        return service.reactivar(id);
     }
 
     @GetMapping("/por-keycloak")

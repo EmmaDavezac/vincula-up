@@ -120,7 +120,9 @@ class ProfessionalAccessTests {
                 .content("{\"actorId\":\"ignored\",\"usuarioId\":\"ignored\"}"))
                 .andExpect(status().isOk());
         verify(gateway).aceptarSolicitud(eq(requestId), argThat(body ->
-                userId.toString().equals(body.path("actorId").asText()) && !body.has("usuarioId")));
+                userId.toString().equals(body.path("actorId").asText())
+                        && subject.toString().equals(body.path("keycloakId").asText())
+                        && !body.has("usuarioId")));
         when(gateway.obtenerMiPerfil(userId, subject)).thenReturn(ResponseEntity.ok(profile("SUSPENDIDO")));
         mvc.perform(get("/api/solicitudes/mias").param("usuarioId", userId.toString())
                 .header("Authorization", "Bearer PROFESIONAL")).andExpect(status().isForbidden());
@@ -129,5 +131,31 @@ class ProfessionalAccessTests {
                 .andExpect(status().isForbidden());
         verify(gateway, times(1)).listarSolicitudes(any(), any(), any(), any());
         verify(gateway, times(1)).aceptarSolicitud(any(), any());
+    }
+
+    /**
+     * El chat resuelve la identidad desde el token (ignora lo que manda el frontend) y reenvía el
+     * subject de Keycloak como alias, para reconocer al participante en solicitudes históricas.
+     */
+    @Test
+    void messageEndpointsBindIdentityToSessionAndForwardKeycloakAlias() throws Exception {
+        when(gateway.obtenerMiPerfil(userId, subject)).thenReturn(ResponseEntity.ok(profile("ACTIVO")));
+        when(gateway.listarMensajes(requestId, userId, subject)).thenReturn(mapper.createArrayNode());
+        when(gateway.enviarMensaje(eq(requestId), any()))
+                .thenReturn(mapper.createObjectNode().put("texto", "hola"));
+
+        mvc.perform(get("/api/solicitudes/" + requestId + "/mensajes")
+                .param("usuarioId", UUID.randomUUID().toString())
+                .header("Authorization", "Bearer PROFESIONAL")).andExpect(status().isOk());
+        verify(gateway).listarMensajes(requestId, userId, subject);
+
+        mvc.perform(post("/api/solicitudes/" + requestId + "/mensajes")
+                .header("Authorization", "Bearer PROFESIONAL").contentType("application/json")
+                .content("{\"emisorId\":\"ignored\",\"texto\":\"hola\"}"))
+                .andExpect(status().isCreated());
+        verify(gateway).enviarMensaje(eq(requestId), argThat(body ->
+                userId.toString().equals(body.path("emisorId").asText())
+                        && subject.toString().equals(body.path("keycloakId").asText())
+                        && "hola".equals(body.path("texto").asText())));
     }
 }

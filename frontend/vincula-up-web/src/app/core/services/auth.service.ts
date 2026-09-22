@@ -26,6 +26,7 @@ interface KeycloakTokenResponse {
 }
 
 const TOKEN_KEY = 'vincula-up-token';
+const REFRESH_TOKEN_KEY = 'vincula-up-refresh-token';
 const ID_TOKEN_KEY = 'vincula-up-id-token';
 const PROFILE_KEY = 'vincula-up-profile';
 const KEYCLOAK_STATE_KEY = 'vincula-up-keycloak-state';
@@ -41,6 +42,8 @@ export class AuthService {
   readonly isAuthenticated = computed(() => this.user() !== null);
   readonly isProfessionalActive = signal<boolean>(this.restoreProfActive());
   readonly loginError = signal('');
+  /** Evita reintentos en loop al refrescar el token tras una promoción de rol. */
+  private roleRefreshRequested = false;
 
   constructor() {
     this.handleCodeCallback();
@@ -81,6 +84,40 @@ export class AuthService {
     return of(true);
   }
 
+  /**
+   * Abre la página de registro del realm. Los clientes se auto-gestionan y un
+   * profesional invitado crea acá su cuenta con el email que cargó el
+   * administrador: al entrar por primera vez el sistema lo reconoce por email y
+   * le otorga el rol PROFESIONAL.
+   */
+  registerWithKeycloak(): void {
+    this.loginError.set('');
+    const state = this.randomValue();
+    const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/` : environment.keycloakRedirectUri;
+    // Se reutiliza la misma clave de state que el login: el callback lo valida igual.
+    sessionStorage.setItem(KEYCLOAK_STATE_KEY, state);
+
+    // PKCE (S256) es obligatorio en el realm: la URL de registro debe
+    // construirse DESPUÉS de generar el challenge, no antes.
+    this.generatePkce().then(({ verifier, challenge }) => {
+      sessionStorage.setItem(KEYCLOAK_PKCE_VERIFIER_KEY, verifier);
+
+      const params = new URLSearchParams({
+        client_id: environment.keycloakClientId,
+        response_type: 'code',
+        redirect_uri: redirectUri,
+        scope: 'openid profile email',
+        state,
+        response_mode: 'query',
+        code_challenge: challenge,
+        code_challenge_method: 'S256',
+      });
+
+      window.location.href =
+        `${this.getKeycloakUrl()}/realms/${environment.keycloakRealm}/protocol/openid-connect/registrations?${params.toString()}`;
+    });
+  }
+
   loginDirect(username: string, password = 'password'): Observable<boolean> {
     this.loginError.set('');
     const body = new HttpParams()
@@ -105,6 +142,7 @@ export class AuthService {
   logout(): void {
     const idToken = localStorage.getItem(ID_TOKEN_KEY);
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(ID_TOKEN_KEY);
     localStorage.removeItem(PROFILE_KEY);
     localStorage.removeItem(PROF_ACTIVE_KEY);
@@ -222,14 +260,7 @@ export class AuthService {
             roleLabel: this.roleLabel(usuario.rolNegocio),
           } satisfies UserProfile;
 
-          localStorage.setItem(TOKEN_KEY, token.access_token);
-          if (token.id_token) localStorage.setItem(ID_TOKEN_KEY, token.id_token);
-          this.persistProfile(profile);
-          this.user.set(profile);
-          if (profile.role === 'PROFESIONAL') {
-            this.checkProfessionalStatus();
-          }
-          this.loginError.set('');
+          this.persistSession(token, profile);
           return true;
         }),
         catchError(() => {
@@ -240,14 +271,7 @@ export class AuthService {
             roleLabel: this.roleLabel(claims.role as UserRole),
           } satisfies UserProfile;
 
-          localStorage.setItem(TOKEN_KEY, token.access_token);
-          if (token.id_token) localStorage.setItem(ID_TOKEN_KEY, token.id_token);
-          this.persistProfile(profile);
-          this.user.set(profile);
-          if (profile.role === 'PROFESIONAL') {
-            this.checkProfessionalStatus();
-          }
-          this.loginError.set('');
+          this.persistSession(token, profile);
           return of(true);
         }),
       );
@@ -255,6 +279,71 @@ export class AuthService {
       this.loginError.set('No se pudo procesar la respuesta real de Keycloak.');
       return of(false);
     }
+  }
+
+  /**
+   * Guarda la sesión (access + refresh token) y dispara las tareas posteriores
+   * al login. Se usa tanto en el login exitoso como en el fallback cuando
+   * ms-usuarios todavía no responde.
+   */
+  private persistSession(token: KeycloakTokenResponse, profile: UserProfile): void {
+    localStorage.setItem(TOKEN_KEY, token.access_token);
+    if (token.refresh_token) localStorage.setItem(REFRESH_TOKEN_KEY, token.refresh_token);
+    if (token.id_token) localStorage.setItem(ID_TOKEN_KEY, token.id_token);
+    this.persistProfile(profile);
+    this.user.set(profile);
+    if (profile.role === 'PROFESIONAL') {
+      this.checkProfessionalStatus();
+    }
+    this.loginError.set('');
+    this.sincronizarRolConKeycloak(token.access_token, profile);
+  }
+
+  /**
+   * Un profesional invitado se auto-registra con el rol CLIENTE por defecto: el
+   * backend le otorga PROFESIONAL en Keycloak durante ese primer login, pero el
+   * token ya emitido sigue diciendo CLIENTE. Acá pedimos un token nuevo para que
+   * el rol viaje actualizado y pueda activar su perfil. Se intenta una sola vez.
+   */
+  private sincronizarRolConKeycloak(accessToken: string, profile: UserProfile): void {
+    if (profile.role !== 'PROFESIONAL' || this.tokenRole(accessToken) === 'PROFESIONAL' || this.roleRefreshRequested) {
+      return;
+    }
+    this.roleRefreshRequested = true;
+    this.refreshAccessToken().subscribe(() => {
+      this.roleRefreshRequested = false;
+    });
+  }
+
+  /**
+   * Canjea el refresh token por un access token nuevo. Keycloak re-evalúa los
+   * roles al emitirlo, así el token refleja la promoción recién aplicada.
+   */
+  refreshAccessToken(): Observable<boolean> {
+    const refreshToken = this.getRefreshToken();
+    if (!refreshToken) {
+      return of(false);
+    }
+    const body = new HttpParams()
+      .set('grant_type', 'refresh_token')
+      .set('client_id', environment.keycloakClientId)
+      .set('refresh_token', refreshToken);
+    const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
+    const tokenUrl = `${this.getKeycloakUrl()}/realms/${environment.keycloakRealm}/protocol/openid-connect/token`;
+
+    return this.http.post<KeycloakTokenResponse>(tokenUrl, body.toString(), { headers }).pipe(
+      switchMap((token) => this.maybeUseToken(token)),
+      catchError(() => of(false)),
+    );
+  }
+
+  private getRefreshToken(): string | null {
+    if (typeof localStorage === 'undefined') return null;
+    return localStorage.getItem(REFRESH_TOKEN_KEY);
+  }
+
+  private tokenRole(token: string): UserRole | undefined {
+    return this.decodeToken(token)?.role;
   }
 
   private restoreSession(): UserProfile | null {
@@ -298,6 +387,26 @@ export class AuthService {
 
   checkProfessionalStatus(): void {
     this.loadProfessionalStatus().subscribe();
+  }
+
+  /**
+   * Refresca los datos visibles de la sesión (nombre/email) tras editar el
+   * perfil en "Mi cuenta", sin obligar a un re-login.
+   */
+  refreshProfile(patch: { id?: string; name?: string }): void {
+    const current = this.user();
+    if (!current) return;
+    const updated: UserProfile = {
+      ...current,
+      id: patch.id ?? current.id,
+      name: patch.name ?? current.name,
+    };
+    this.user.set(updated);
+    try {
+      localStorage.setItem(PROFILE_KEY, JSON.stringify(updated));
+    } catch {
+      /* almacenamiento no disponible: se mantiene la sesión en memoria */
+    }
   }
 
   loadProfessionalStatus(): Observable<boolean> {

@@ -51,3 +51,132 @@ describe('Received request specialties', () => {
     expect(fixture.nativeElement.querySelector('[role="alert"]')).not.toBeNull();
   });
 });
+
+describe('Request filters', () => {
+  const specialtyA = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const specialtyB = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+  const api = { getMyRequests: vi.fn(), getSpecialtiesMap: vi.fn() };
+  beforeEach(() => {
+    api.getMyRequests.mockReturnValue(of([
+      emptyServiceRequest({
+        id: 1, status: 'PENDIENTE', especialidadId: specialtyA, specialty: specialtyA,
+        professionalName: 'Ana Fontanera', address: 'Calle Uno 1',
+        date: '2026-09-01', time: '10:00', fechaCreacion: '2026-09-01T10:00:00',
+      }),
+      emptyServiceRequest({
+        id: 2, status: 'ACEPTADA', especialidadId: specialtyB, specialty: specialtyB,
+        professionalName: 'Bruno Electricista', address: 'Calle Dos 2',
+        date: '2026-09-02', time: '11:00', fechaCreacion: '2026-09-02T10:00:00',
+      }),
+      emptyServiceRequest({
+        id: 3, status: 'COMPLETADA', especialidadId: specialtyA, specialty: specialtyA,
+        professionalName: 'Carla Gasista', address: 'Calle Tres 3',
+        date: '2026-08-30', time: '09:00', fechaCreacion: '2026-08-30T10:00:00',
+      }),
+    ]));
+    api.getSpecialtiesMap.mockReturnValue(of({ [specialtyA]: 'Plomería', [specialtyB]: 'Electricidad' }));
+    TestBed.configureTestingModule({
+      imports: [MyRequests], providers: [provideRouter([]),
+        { provide: ApiService, useValue: api },
+        { provide: AuthService, useValue: {
+          currentUser: () => ({ id: 'client-user' }), getKeycloakId: () => 'client-user',
+          hasRole: (role: string) => role === 'CLIENTE',
+        } },
+      ],
+    });
+  });
+
+  const ids = (cmp: MyRequests) => cmp.filteredRequests().map((r) => r.id);
+
+  it('shows every request by default, newest first', () => {
+    const fixture = TestBed.createComponent(MyRequests);
+    const cmp = fixture.componentInstance as MyRequests;
+    expect(ids(cmp)).toEqual([2, 1, 3]);
+  });
+
+  it('filters by status', () => {
+    const fixture = TestBed.createComponent(MyRequests);
+    const cmp = fixture.componentInstance as MyRequests;
+    cmp.statusFilter.set('ACEPTADA');
+    expect(ids(cmp)).toEqual([2]);
+  });
+
+  it('filters by search term and clears back to all', () => {
+    const fixture = TestBed.createComponent(MyRequests);
+    const cmp = fixture.componentInstance as MyRequests;
+    cmp.searchTerm.set('carla');
+    expect(ids(cmp)).toEqual([3]);
+    cmp.clearFilters();
+    expect(ids(cmp)).toEqual([2, 1, 3]);
+  });
+
+  it('filters by specialty', () => {
+    const fixture = TestBed.createComponent(MyRequests);
+    const cmp = fixture.componentInstance as MyRequests;
+    expect(cmp.specialtyOptions().map((o) => o.label)).toEqual(['Electricidad', 'Plomería']);
+    cmp.specialtyFilter.set(specialtyB);
+    expect(ids(cmp)).toEqual([2]);
+  });
+
+  it('sorts by upcoming appointment when selected', () => {
+    const fixture = TestBed.createComponent(MyRequests);
+    const cmp = fixture.componentInstance as MyRequests;
+    cmp.sortOrder.set('PROXIMAS');
+    expect(ids(cmp)).toEqual([3, 1, 2]);
+  });
+
+  it('returns empty when nothing matches', () => {
+    const fixture = TestBed.createComponent(MyRequests);
+    const cmp = fixture.componentInstance as MyRequests;
+    cmp.searchTerm.set('inexistente-xyz');
+    expect(cmp.filteredRequests()).toEqual([]);
+    expect(cmp.hasActiveFilters()).toBe(true);
+  });
+});
+
+describe('Request location map', () => {
+  const api = { getMyRequests: vi.fn(), getSpecialtiesMap: vi.fn() };
+  beforeEach(() => {
+    api.getMyRequests.mockReturnValue(of([
+      emptyServiceRequest({ id: 10, latitude: -31.41, longitude: -64.49, address: 'Calle Falsa 123' }),
+      emptyServiceRequest({ id: 11, latitude: null, longitude: null, address: 'Sin coords 456' }),
+    ]));
+    api.getSpecialtiesMap.mockReturnValue(of({}));
+    TestBed.configureTestingModule({
+      imports: [MyRequests], providers: [provideRouter([]),
+        { provide: ApiService, useValue: api },
+        { provide: AuthService, useValue: {
+          currentUser: () => ({ id: 'professional-user' }), getKeycloakId: () => 'professional-user',
+          hasRole: (role: string) => role === 'PROFESIONAL',
+        } },
+      ],
+    });
+  });
+
+  it('shows the address, an embedded map and a Google Maps button without raw coordinates', () => {
+    const fixture = TestBed.createComponent(MyRequests);
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    const visibleText = [...root.querySelectorAll('.location-box p, .location-box h4')]
+      .map((el) => el.textContent ?? '')
+      .join(' ');
+    expect(visibleText).toContain('Calle Falsa 123');
+    expect(visibleText).not.toContain('-31.41');
+    expect(visibleText).not.toContain('-64.49');
+    expect(visibleText).not.toMatch(/-?\d{1,3}\.\d{3,}/);
+    const frame: HTMLIFrameElement | null = fixture.nativeElement.querySelector('iframe.embedded-map');
+    expect(frame).not.toBeNull();
+    expect(frame?.src ?? '').toContain('openstreetmap.org/export/embed.html');
+    const mapsLink: HTMLAnchorElement | null = fixture.nativeElement.querySelector('a.link-btn');
+    expect(mapsLink?.href ?? '').toContain('google.com/maps/search');
+  });
+
+  it('returns no embedded map when there are no coordinates', () => {
+    const fixture = TestBed.createComponent(MyRequests);
+    const cmp = fixture.componentInstance as MyRequests;
+    const withCoords = cmp.requests().find((r) => r.id === 10)!;
+    expect(String(cmp.embeddedMapUrl(withCoords))).toContain('openstreetmap.org/export/embed.html');
+    expect(cmp.embeddedMapUrl(cmp.requests().find((r) => r.id === 11)!)).toBeNull();
+    expect(cmp.googleMapsUrl(cmp.requests().find((r) => r.id === 11)!)).toContain(encodeURIComponent('Sin coords 456'));
+  });
+});

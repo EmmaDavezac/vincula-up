@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { redirectToKeycloak, requireActivationAccess, requireRequestsAccess, requireRole } from './core/guards/role.guard';
+import { redirectToKeycloak, requireActivationAccess, requireAnyRole, requireRequestsAccess, requireRole } from './core/guards/role.guard';
 
 export const routes: Routes = [
 	{
@@ -29,10 +29,10 @@ export const routes: Routes = [
 		title: 'Vincula-UP | Ingresar',
 	},
 	{
-		path: 'mis-solicitudes',
+		path: 'solicitudes',
 		canActivate: [requireRequestsAccess],
 		loadComponent: () => import('./my-requests/my-requests').then((module) => module.MyRequests),
-		title: 'Vincula-UP | Mis solicitudes',
+		title: 'Vincula-UP | Solicitudes',
 	},
 	{
 		path: 'solicitar',
@@ -51,6 +51,12 @@ export const routes: Routes = [
 		canActivate: [requireActivationAccess],
 		loadComponent: () => import('./activation/activation').then((module) => module.Activation),
 		title: 'Vincula-UP | Activar perfil',
+	},
+	{
+		path: 'mi-cuenta',
+		canActivate: [requireAnyRole(['CLIENTE', 'PROFESIONAL', 'ADMIN'])],
+		loadComponent: () => import('./account/account').then((module) => module.Account),
+		title: 'Vincula-UP | Mi cuenta',
 	},
 	{
 		path: 'no-autorizado',

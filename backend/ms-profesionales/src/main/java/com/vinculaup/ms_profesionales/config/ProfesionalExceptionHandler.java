@@ -88,11 +88,20 @@ public class ProfesionalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleDataIntegrity(DataIntegrityViolationException ex) {
         Logger log = LoggerFactory.getLogger(ProfesionalExceptionHandler.class);
         log.warn("Violación de integridad en ms-profesionales: {}", ex.getMessage());
+        // El mensaje de Hibernate incluye el SQL completo (todas las columnas), así
+        // que la clasificación se hace por el error concreto del motor y no por un
+        // substring del statement.
+        String lower = (ex.getMostSpecificCause().getMessage() + " | " + ex.getMessage()).toLowerCase();
+        String msg = "Conflicto de datos: el registro ya existe o viola una restricción única.";
+        if (lower.contains("value too long") || lower.contains("data truncation")
+                || lower.contains("right truncation") || lower.contains("too long for")) {
+            msg = "Uno de los campos supera el tamaño permitido (típicamente la foto de perfil). Probá con una imagen más liviana.";
+        }
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("timestamp", Instant.now().toString());
         body.put("status", HttpStatus.CONFLICT.value());
         body.put("error", "Conflict");
-        body.put("message", "Conflicto de datos: el registro ya existe o viola una restricción única.");
+        body.put("message", msg);
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
 

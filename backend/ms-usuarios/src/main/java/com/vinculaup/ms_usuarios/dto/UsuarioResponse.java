@@ -1,5 +1,6 @@
 package com.vinculaup.ms_usuarios.dto;
 
+import com.vinculaup.ms_usuarios.entity.EstadoUsuario;
 import com.vinculaup.ms_usuarios.entity.RolNegocio;
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -13,5 +14,6 @@ public record UsuarioResponse(
         String telefono,
         String fotoUrl,
         RolNegocio rolNegocio,
+        EstadoUsuario estado,
         OffsetDateTime fechaAlta) {
 }

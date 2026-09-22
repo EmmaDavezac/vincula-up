@@ -255,7 +255,7 @@
             <div class="card-topline">
               @if (prof.fotoUrl && !failedPhotos().has(prof.id)) {
                 <img class="avatar avatar-photo" [src]="prof.fotoUrl" [alt]="'Foto de ' + prof.name"
-                  loading="lazy" (error)="markPhotoFailed(prof.id)" />
+                  loading="lazy" referrerpolicy="no-referrer" (error)="markPhotoFailed(prof.id)" />
               } @else {
                 <span class="avatar" [class]="prof.accent" aria-label="Sin foto disponible">{{ prof.initials }}</span>
               }
@@ -296,7 +296,7 @@
           <strong>{{ selectedProfessional()?.name }}</strong> va a revisar el horario propuesto.
           Te avisaremos cuando responda.
         </p>
-        <a routerLink="/mis-solicitudes">Ver mis solicitudes →</a>
+        <a routerLink="/solicitudes">Ver mis solicitudes →</a>
       </div>
     } @else {
       <div class="request-heading">

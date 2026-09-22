@@ -1,6 +1,7 @@
 package com.vinculaup.bff_web.controller;
 
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 import com.vinculaup.bff_web.service.BackendGateway;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,9 +29,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class ApiController {
 
     private final BackendGateway gateway;
+    private final com.vinculaup.bff_web.service.KeycloakAdminService keycloakAdmin;
 
-    public ApiController(BackendGateway gateway) {
+    public ApiController(BackendGateway gateway, com.vinculaup.bff_web.service.KeycloakAdminService keycloakAdmin) {
         this.gateway = gateway;
+        this.keycloakAdmin = keycloakAdmin;
     }
 
     private JsonNode authenticatedUser() {
@@ -38,9 +41,38 @@ public class ApiController {
         if (authentication == null || !(authentication.getPrincipal() instanceof Jwt jwt)) {
             throw new org.springframework.web.server.ResponseStatusException(HttpStatus.UNAUTHORIZED, "Iniciá sesión para continuar");
         }
-        return gateway.buscarUsuarioPorKeycloakId(UUID.fromString(jwt.getSubject()),
+        JsonNode user = gateway.buscarUsuarioPorKeycloakId(UUID.fromString(jwt.getSubject()),
                 jwt.getClaimAsString("email"), jwt.getClaimAsString("given_name"),
                 jwt.getClaimAsString("family_name"), authenticatedRole());
+        sincronizarRolProfesional(user);
+        return requireActive(user);
+    }
+
+    /**
+     * El profesional invitado se auto-registra en Keycloak con el email que cargó
+     * el administrador: ms-usuarios lo reconoce como PROFESIONAL (por email) pero
+     * su token todavía dice CLIENTE. Acá se promueve el rol en Keycloak para que
+     * el próximo token lo traiga y pueda activar su perfil.
+     * <p>
+     * Sólo promueve CLIENTE → PROFESIONAL: nunca otorga ADMIN desde el padrón.
+     */
+    private void sincronizarRolProfesional(JsonNode user) {
+        if (user == null || !"PROFESIONAL".equalsIgnoreCase(user.path("rolNegocio").asText(""))) {
+            return;
+        }
+        if ("PROFESIONAL".equals(authenticatedRole())) {
+            return;
+        }
+        keycloakAdmin.promoverAProfesional(authenticatedSubject());
+    }
+
+    /** Las cuentas baneadas no pueden operar: corta cualquier llamada autenticada. */
+    private JsonNode requireActive(JsonNode user) {
+        if (user != null && "SUSPENDIDO".equalsIgnoreCase(user.path("estado").asText(""))) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Tu cuenta está suspendida por incumplimiento de normas. Contactá a la universidad para revisar tu situación.");
+        }
+        return user;
     }
 
     private String authenticatedRole() {
@@ -91,6 +123,25 @@ public class ApiController {
         return result;
     }
 
+    /**
+     * Cuerpo para operar sobre una solicitud existente (aceptar, rechazar, completar, cancelar).
+     * <p>
+     * La identidad del actor sale siempre del token y se agrega el {@code subject} de Keycloak como
+     * alias, porque las solicitudes históricas quedaron guardadas con esa identidad mientras que el
+     * resto de la aplicación usa el id de ms-usuarios.
+     */
+    private JsonNode actorIdentityBody(JsonNode body, JsonNode user) {
+        return actorIdentityBody(body, user, "actorId");
+    }
+
+    private JsonNode actorIdentityBody(JsonNode body, JsonNode user, String field) {
+        JsonNode identity = identityBody(body, user, field);
+        if (identity instanceof ObjectNode object) {
+            object.put("keycloakId", authenticatedSubject().toString());
+        }
+        return identity;
+    }
+
     @GetMapping("/profesionales")
     public JsonNode listarProfesionales(
             @RequestParam(required = false) String estado,
@@ -128,27 +179,66 @@ public class ApiController {
         if (usuarios.isEmpty()) {
             return profesionales;
         }
-        var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
-        var enriquecidos = mapper.createArrayNode();
+        var enriquecidos = tools.jackson.databind.json.JsonMapper.builder().build().createArrayNode();
         for (JsonNode profesional : profesionales) {
-            var copia = mapper.createObjectNode();
-            copia.setAll((tools.jackson.databind.node.ObjectNode) profesional);
+            JsonNode usuario = null;
             try {
-                JsonNode usuario = usuarios.get(UUID.fromString(profesional.path("usuarioId").asText(null)));
-                if (usuario != null) {
-                    if (usuario.hasNonNull("nombre")) copia.put("nombre", usuario.get("nombre").asText());
-                    if (usuario.hasNonNull("apellido")) copia.put("apellido", usuario.get("apellido").asText());
-                    // La foto del padrón manda; la del usuario se usa solo si el profesional no cargó una.
-                    if (!copia.hasNonNull("fotoUrl") && usuario.hasNonNull("fotoUrl")) {
-                        copia.put("fotoUrl", usuario.get("fotoUrl").asText());
-                    }
-                }
+                usuario = usuarios.get(UUID.fromString(profesional.path("usuarioId").asText(null)));
             } catch (RuntimeException ignored) {
                 // usuarioId inválido: se conserva el nodo original.
             }
-            enriquecidos.add(copia);
+            enriquecidos.add(enriquecerConUsuario(profesional, usuario));
         }
         return enriquecidos;
+    }
+
+    /**
+     * Enriquecimiento de UN nodo de profesional con su ficha del padrón
+     * (nombre, apellido y foto de respaldo). Reutilizado por el listado y por
+     * la ficha individual que consume la tarjeta de la solicitud del cliente.
+     */
+    private JsonNode enriquecerUnProfesional(JsonNode profesional) {
+        if (profesional == null || !profesional.isObject()) {
+            return profesional;
+        }
+        JsonNode usuario = null;
+        try {
+            if (profesional.hasNonNull("usuarioId")) {
+                usuario = gateway.buscarUsuarioPorId(UUID.fromString(profesional.get("usuarioId").asText()));
+                if (usuario != null && !usuario.isObject()) {
+                    usuario = null;
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // UUID inválido o usuario inexistente: se dejan los datos del padrón.
+        }
+        return enriquecerConUsuario(profesional, usuario);
+    }
+
+    private JsonNode enriquecerConUsuario(JsonNode profesional, JsonNode usuario) {
+        var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
+        var copia = mapper.createObjectNode();
+        copia.setAll((tools.jackson.databind.node.ObjectNode) profesional);
+        if (usuario != null) {
+            if (usuario.hasNonNull("nombre")) copia.put("nombre", usuario.get("nombre").asText());
+            if (usuario.hasNonNull("apellido")) copia.put("apellido", usuario.get("apellido").asText());
+            // La foto del padrón manda; la del usuario se usa solo si el profesional no cargó una.
+            if (!copia.hasNonNull("fotoUrl") && usuario.hasNonNull("fotoUrl")) {
+                copia.put("fotoUrl", usuario.get("fotoUrl").asText());
+            }
+        }
+        return copia;
+    }
+
+    /**
+     * Ficha individual del profesional para la tarjeta de la solicitud del
+     * cliente ("Con profesional: …"): nombre real, especialidad y foto. El id
+     * de la solicitud suele ser el usuarioId; se resuelve en ese orden.
+     */
+    @GetMapping("/profesionales/{id}")
+    public JsonNode obtenerProfesional(@PathVariable UUID id) {
+        JsonNode profesional = gateway.buscarProfesionalPorIdOUsuario(id);
+        return profesional == null ? null : enriquecerUnProfesional(profesional);
     }
 
     @PostMapping("/profesionales")
@@ -194,8 +284,105 @@ public class ApiController {
     @ResponseStatus(HttpStatus.CREATED)
     public JsonNode crearUsuario(@RequestBody JsonNode body) { return gateway.crearUsuario(body); }
 
+    /**
+     * Alta administrativa de un profesional en un solo paso: crea el usuario
+     * <b>invitado</b> en ms-usuarios (todavía sin cuenta Keycloak) y su perfil
+     * profesional pendiente de activación.
+     * <p>
+     * Si el email ya existe (por ejemplo una invitación previa) se reutiliza ese
+     * usuario; si la creación del perfil falla y el usuario se acababa de crear,
+     * se elimina para no dejar invitaciones huérfanas.
+     */
+    @PostMapping("/profesionales/alta")
+    @ResponseStatus(HttpStatus.CREATED)
+    public JsonNode altaProfesional(@RequestBody JsonNode body) {
+        if (!(body instanceof tools.jackson.databind.node.ObjectNode object)) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST, "Se esperaba un objeto");
+        }
+        String email = object.path("email").asText("").trim();
+        String legajo = object.path("legajo").asText("").trim();
+        if (email.isEmpty() || legajo.isEmpty()) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El email y el legajo son obligatorios");
+        }
+
+        var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
+
+        JsonNode usuario = gateway.buscarUsuarioPorEmail(email);
+        boolean usuarioNuevo = false;
+        if (usuario == null) {
+            var usuarioBody = mapper.createObjectNode();
+            usuarioBody.put("nombre", object.path("nombre").asText(""));
+            usuarioBody.put("apellido", object.path("apellido").asText(""));
+            usuarioBody.put("email", email);
+            usuarioBody.put("telefono", object.path("telefono").asText(""));
+            usuarioBody.put("rolNegocio", "PROFESIONAL");
+            usuario = gateway.crearUsuario(usuarioBody);
+            usuarioNuevo = true;
+        }
+
+        var perfilBody = mapper.createObjectNode();
+        perfilBody.put("usuarioId", usuario.path("id").asText());
+        perfilBody.put("legajo", legajo);
+        var especialidades = mapper.createArrayNode();
+        for (JsonNode especialidadId : object.path("especialidadIds")) {
+            especialidades.add(especialidadId.asText());
+        }
+        perfilBody.set("especialidadIds", especialidades);
+
+        try {
+            JsonNode perfil = gateway.crearProfesional(perfilBody);
+            var respuesta = mapper.createObjectNode();
+            respuesta.set("usuario", usuario);
+            respuesta.set("profesional", perfil);
+            return respuesta;
+        } catch (RuntimeException ex) {
+            if (usuarioNuevo) {
+                try {
+                    gateway.eliminarUsuario(UUID.fromString(usuario.path("id").asText()));
+                } catch (RuntimeException rollback) {
+                    org.slf4j.LoggerFactory.getLogger(ApiController.class)
+                            .warn("No se pudo revertir el usuario invitado {}: {}",
+                                    usuario.path("id").asText(), rollback.getMessage());
+                }
+            }
+            throw ex;
+        }
+    }
+
+    /** Devuelve el usuario por email o 204 cuando no existe (invitación pendiente de alta). */
+    @GetMapping("/usuarios/por-email")
+    public ResponseEntity<JsonNode> buscarUsuarioPorEmail(@RequestParam String email) {
+        JsonNode usuario = gateway.buscarUsuarioPorEmail(email);
+        return usuario == null ? ResponseEntity.noContent().build() : ResponseEntity.ok(usuario);
+    }
+
+    /** Baneo de una cuenta (clientes incluidos) por incumplimiento de normas. */
+    @PatchMapping("/usuarios/{id}/suspender")
+    public JsonNode suspenderUsuario(@PathVariable UUID id) { return gateway.suspenderUsuario(id); }
+
+    /** Levanta el baneo y devuelve la cuenta a ACTIVO. */
+    @PatchMapping("/usuarios/{id}/reactivar")
+    public JsonNode reactivarUsuario(@PathVariable UUID id) { return gateway.reactivarUsuario(id); }
+
     @PatchMapping("/usuarios/{id}")
     public JsonNode actualizarUsuario(@PathVariable UUID id, @RequestBody JsonNode body) { return gateway.actualizarUsuario(id, body); }
+
+    /**
+     * Actualización del perfil propio ("Mi cuenta"). El id se resuelve desde el
+     * token, nunca desde la URL: así un usuario sólo puede editar su propia
+     * cuenta (sin IDOR posible) y el email se ignora siempre.
+     */
+    @PatchMapping("/usuarios/yo")
+    public JsonNode actualizarMiPerfil(@RequestBody JsonNode body) {
+        JsonNode user = authenticatedUser();
+        ObjectNode propio = tools.jackson.databind.json.JsonMapper.builder().build().createObjectNode();
+        if (body.has("nombre")) propio.set("nombre", body.get("nombre"));
+        if (body.has("apellido")) propio.set("apellido", body.get("apellido"));
+        if (body.has("telefono")) propio.set("telefono", body.get("telefono"));
+        if (body.has("fotoUrl")) propio.set("fotoUrl", body.get("fotoUrl"));
+        return gateway.actualizarUsuario(userId(user), propio);
+    }
 
     @org.springframework.web.bind.annotation.DeleteMapping("/usuarios/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -231,9 +418,19 @@ public class ApiController {
     }
 
     @GetMapping("/usuarios")
-    public JsonNode listarUsuarios(@RequestParam(required = false) String rol) {
-        return gateway.listarUsuarios(rol);
+    public JsonNode listarUsuarios(
+            @RequestParam(required = false) String rol,
+            @RequestParam(required = false) String estado) {
+        return gateway.listarUsuarios(rol, estado);
     }
+
+    /**
+     * Perfil propio ("Mi cuenta"): lectura. El id se resuelve desde el token.
+     * Debe declararse ANTES que {@code /usuarios/{id}} para que Spring no
+     * intente bindear "yo" como UUID.
+     */
+    @GetMapping("/usuarios/yo")
+    public JsonNode miCuenta() { return authenticatedUser(); }
 
     @GetMapping("/usuarios/{id}")
     public JsonNode buscarUsuarioPorId(@PathVariable UUID id) {
@@ -285,41 +482,51 @@ public class ApiController {
     public JsonNode aceptar(@PathVariable UUID id, @RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
         professionalProfile(user, true);
-        return gateway.aceptarSolicitud(id, identityBody(body, user, "actorId"));
+        return gateway.aceptarSolicitud(id, actorIdentityBody(body, user));
     }
 
     @PatchMapping("/solicitudes/{id}/rechazar")
     public JsonNode rechazar(@PathVariable UUID id, @RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
         professionalProfile(user, true);
-        return gateway.rechazarSolicitud(id, identityBody(body, user, "actorId"));
+        return gateway.rechazarSolicitud(id, actorIdentityBody(body, user));
     }
 
     @PatchMapping("/solicitudes/{id}/completar")
     public JsonNode completar(@PathVariable UUID id, @RequestBody JsonNode body) {
-        return gateway.completarSolicitud(id, body);
+        JsonNode user = authenticatedUser();
+        return gateway.completarSolicitud(id, actorIdentityBody(body, user));
     }
 
     @PatchMapping("/solicitudes/{id}/cancelar")
     public JsonNode cancelar(@PathVariable UUID id, @RequestBody JsonNode body) {
-        return gateway.cancelarSolicitud(id, body);
+        JsonNode user = authenticatedUser();
+        return gateway.cancelarSolicitud(id, actorIdentityBody(body, user));
     }
 
+    /**
+     * Mensajes de la solicitud. La identidad se resuelve desde el token (el {@code usuarioId} que
+     * manda el frontend se ignora) y se agrega el subject de Keycloak como alias, porque las
+     * solicitudes históricas guardaron esa identidad como participante.
+     */
     @GetMapping("/solicitudes/{id}/mensajes")
-    public JsonNode listarMensajes(@PathVariable UUID id, @RequestParam UUID usuarioId) {
-        return gateway.listarMensajes(id, usuarioId);
+    public JsonNode listarMensajes(@PathVariable UUID id, @RequestParam(required = false) UUID usuarioId) {
+        JsonNode user = authenticatedUser();
+        return gateway.listarMensajes(id, userId(user), authenticatedSubject());
     }
 
     @PostMapping("/solicitudes/{id}/mensajes")
     @ResponseStatus(HttpStatus.CREATED)
     public JsonNode enviarMensaje(@PathVariable UUID id, @RequestBody JsonNode body) {
-        return gateway.enviarMensaje(id, body);
+        JsonNode user = authenticatedUser();
+        return gateway.enviarMensaje(id, actorIdentityBody(body, user, "emisorId"));
     }
 
     @PostMapping("/solicitudes/{id}/calificacion")
     @ResponseStatus(HttpStatus.CREATED)
     public JsonNode crearCalificacion(@PathVariable UUID id, @RequestBody JsonNode body) {
-        return gateway.crearCalificacion(id, body);
+        JsonNode user = authenticatedUser();
+        return gateway.crearCalificacion(id, actorIdentityBody(body, user, "clienteId"));
     }
 
     @GetMapping("/solicitudes/{id}/calificacion")

@@ -49,15 +49,25 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/usuarios/por-keycloak").authenticated()
                 .requestMatchers("/api/profesionales/activar", "/api/profesionales/mi-perfil", "/api/profesionales/vincular").hasRole("PROFESIONAL")
                 // ADMIN permissions
+                .requestMatchers(HttpMethod.GET, "/api/usuarios").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/usuarios/yo", "/api/usuarios/por-keycloak").authenticated()
+                // Ficha de la contraparte: el profesional necesita los datos del
+                // cliente (y viceversa) para coordinar la solicitud, así que la
+                // lectura de un usuario por id exige sesión válida, no un rol puntual.
+                .requestMatchers(HttpMethod.GET, "/api/usuarios/*").authenticated()
+                .requestMatchers(HttpMethod.PATCH, "/api/usuarios/yo").authenticated()
+                .requestMatchers(HttpMethod.PATCH, "/api/usuarios/*").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/especialidades", "/api/usuarios").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/especialidades/*", "/api/profesionales/*").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/api/usuarios/*").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/api/especialidades/*", "/api/profesionales/*", "/api/usuarios/*").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/profesionales").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/profesionales/alta").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/api/profesionales/*/suspender").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/api/profesionales/*/reactivar").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/usuarios").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/usuarios/*").authenticated()
+                .requestMatchers(HttpMethod.PATCH, "/api/usuarios/*/suspender").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PATCH, "/api/usuarios/*/reactivar").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/usuarios/por-email").hasRole("ADMIN")
                 // PROFESIONAL permissions
                 .requestMatchers(HttpMethod.PUT, "/api/profesionales/*/disponibilidad").hasRole("PROFESIONAL")
                 .requestMatchers(HttpMethod.PATCH, "/api/solicitudes/*/aceptar").hasRole("PROFESIONAL")
@@ -73,6 +83,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/solicitudes/*/mensajes").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/solicitudes/*/calificacion").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/profesionales/*/disponibilidad").authenticated()
+                // Ficha del profesional para la tarjeta de la solicitud del cliente:
+                // mismos datos públicos que el listado (nombre, especialidad, foto).
+                .requestMatchers(HttpMethod.GET, "/api/profesionales/*").authenticated()
                 .anyRequest().authenticated())
             .oauth2ResourceServer(oauth2 -> oauth2
                 .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));

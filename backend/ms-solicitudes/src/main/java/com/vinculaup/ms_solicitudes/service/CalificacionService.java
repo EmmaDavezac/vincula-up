@@ -7,6 +7,7 @@ import com.vinculaup.ms_solicitudes.entity.EstadoSolicitud;
 import com.vinculaup.ms_solicitudes.entity.Solicitud;
 import com.vinculaup.ms_solicitudes.repository.CalificacionRepository;
 import com.vinculaup.ms_solicitudes.repository.SolicitudRepository;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -19,16 +20,24 @@ public class CalificacionService {
 
     private final CalificacionRepository calificacionRepository;
     private final SolicitudRepository solicitudRepository;
+    private final SolicitudService solicitudService;
 
-    public CalificacionService(CalificacionRepository calificacionRepository, SolicitudRepository solicitudRepository) {
+    public CalificacionService(CalificacionRepository calificacionRepository, SolicitudRepository solicitudRepository,
+            SolicitudService solicitudService) {
         this.calificacionRepository = calificacionRepository;
         this.solicitudRepository = solicitudRepository;
+        this.solicitudService = solicitudService;
     }
 
     public CalificacionResponse crear(UUID solicitudId, CrearCalificacionRequest request) {
         Solicitud solicitud = solicitudRepository.findById(solicitudId).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Solicitud no encontrada"));
-        if (!solicitud.getClienteId().equals(request.clienteId())) {
+        // El cliente puede estar guardado con su id de ms-usuarios o con el keycloakId histórico:
+        // se comparan todas sus identidades (incluido el alias que envía el BFF).
+        List<UUID> aliasIds = request.keycloakId() == null ? List.of() : List.of(request.keycloakId());
+        boolean esCliente = solicitudService.resolverIdentidades(request.clienteId(), aliasIds).stream()
+                .anyMatch(identidad -> identidad.equals(solicitud.getClienteId()));
+        if (!esCliente) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo el cliente puede calificar esta solicitud");
         }
         if (solicitud.getEstado() != EstadoSolicitud.COMPLETADA) {

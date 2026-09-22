@@ -36,10 +36,12 @@ public class ProfesionalDataInitializer {
     public CommandLineRunner seedProfesionales(
             org.springframework.transaction.support.TransactionTemplate transactionTemplate,
             jakarta.persistence.EntityManager entityManager,
+            org.springframework.jdbc.core.JdbcTemplate jdbcTemplate,
             EspecialidadRepository especialidadRepo,
             ProfesionalRepository profesionalRepo,
             DisponibilidadRepository disponibilidadRepo) {
         return args -> {
+            ampliarFotoUrl(jdbcTemplate);
             try {
                 transactionTemplate.executeWithoutResult(
                         status -> seed(entityManager, especialidadRepo, profesionalRepo, disponibilidadRepo));
@@ -48,6 +50,24 @@ public class ProfesionalDataInitializer {
                         ex.getMessage(), ex);
             }
         };
+    }
+
+    /**
+     * La foto del perfil profesional se guarda como data URL (base64): una imagen
+     * de ~600 KB ocupa varios cientos de miles de caracteres, muy por encima del
+     * {@code varchar(255)} con el que se creó la columna en bases preexistentes
+     * (ddl-auto=update no modifica el tipo de una columna ya creada, aunque la
+     * entidad hoy la declare {@code text}). La ampliamos a {@code text} al
+     * arrancar. Best-effort, igual que en ms-usuarios: si el motor no soporta la
+     * sentencia (H2 crea la tabla nueva por arranque) se registra y sigue.
+     */
+    private void ampliarFotoUrl(org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
+        try {
+            jdbcTemplate.execute("ALTER TABLE profesionales ALTER COLUMN foto_url TYPE text");
+            log.info("Columna profesionales.foto_url ampliada a text: fotos de perfil en base64 habilitadas.");
+        } catch (RuntimeException ex) {
+            log.debug("No se pudo ampliar profesionales.foto_url (probablemente ya es text): {}", ex.getMessage());
+        }
     }
 
     private void seed(
@@ -82,8 +102,10 @@ public class ProfesionalDataInitializer {
             especialidades.add(elec);
         }
         Profesional luciano = new Profesional(lucianoUsuarioId, "P-2001", especialidades);
+        // randomuser.me admite hotlink (a diferencia de Unsplash, que devuelve
+        // 403 fuera de su CDN): la foto de demo se ve en Solicitar y Mis solicitudes.
         luciano.activar(
-                "https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=200",
+                "https://randomuser.me/api/portraits/men/32.jpg",
                 -32.4844, -58.2328, 20.0
         );
         luciano = profesionalRepo.save(luciano);

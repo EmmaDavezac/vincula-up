@@ -1,112 +1,35 @@
 :host {
-	display: block;
-	min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
 }
 
-.site-header,
-.site-footer {
-	align-items: center;
-	display: flex;
-	justify-content: space-between;
-	margin: 0 auto;
-	max-width: 1180px;
-	padding: 1.25rem 1.5rem;
+main {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: visible;
 }
 
-.site-header {
-	border-bottom: 1px solid var(--line);
+/* Footer: espacio arriba para que no tape contenido en móvil */
+@media (max-width: 720px) {
+  :host {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+  }
+
+  main {
+    overflow: visible;
+  }
 }
 
-.brand {
-	align-items: center;
-	color: var(--ink);
-	display: inline-flex;
-	font-size: 1.2rem;
-	font-weight: 800;
-	gap: 0.6rem;
-	text-decoration: none;
+app-footer {
+  margin-top: 1.5rem;
 }
 
-.brand > span:last-child span {
-	color: var(--coral);
-}
-
-.brand-mark {
-	align-items: center;
-	background: var(--ink);
-	border-radius: 50%;
-	color: var(--paper);
-	display: inline-flex;
-	height: 2rem;
-	justify-content: center;
-	width: 2rem;
-}
-
-nav {
-	display: flex;
-	gap: 1.5rem;
-}
-
-nav a {
-	color: var(--muted);
-	font-size: 0.9rem;
-	text-decoration: none;
-}
-
-nav a:hover,
-nav a.active {
-	color: var(--ink);
-}
-
-.header-action {
-	border: 1px solid var(--ink);
-	color: var(--ink);
-	font-size: 0.9rem;
-	padding: 0.7rem 1rem;
-	text-decoration: none;
-}
-
-.session-tools {
-	align-items: center;
-	display: flex;
-	gap: 0.75rem;
-}
-
-.session-name {
-	color: var(--muted);
-	font-size: 0.8rem;
-}
-
-.session-tools button {
-	background: transparent;
-	border: 1px solid var(--ink);
-	color: var(--ink);
-	cursor: pointer;
-	font: inherit;
-	font-size: 0.8rem;
-	min-height: 40px;
-	padding: 0.5rem 0.8rem;
-}
-
-.site-footer {
-	color: var(--muted);
-	font-size: 0.75rem;
-	gap: 1rem;
-}
-
-@media (max-width: 640px) {
-	.site-header {
-		flex-wrap: wrap;
-		gap: 1rem;
-	}
-
-	nav {
-		order: 3;
-		width: 100%;
-	}
-
-	.site-footer {
-		align-items: flex-start;
-		flex-direction: column;
-	}
+@media (min-width: 721px) {
+  /* En desktop mantenemos pie pegado al fondo sin tape */
+  app-footer {
+    margin-top: 1.5rem;
+  }
 }

@@ -1,12 +1,16 @@
 package com.vinculaup.ms_usuarios.dto;
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-
+/**
+ * Actualización parcial del perfil ("Mi cuenta" o panel admin). Todos los
+ * campos son opcionales: solo se modifican los que llegan no nulos. Los
+ * vacíos/en blanco se ignoran (salvo fotoUrl, donde null/vacío = quitar foto)
+ * para nunca borrar datos por accidente. El email nunca se cambia por acá:
+ * {@code Usuario.update} ignora nulos/vacíos.
+ */
 public record ActualizarUsuarioRequest(
-        @NotBlank String nombre,
-        @NotBlank String apellido,
-        @NotBlank @Email String email,
-        @NotBlank String telefono,
+        String nombre,
+        String apellido,
+        String email,
+        String telefono,
         String fotoUrl) {
 }

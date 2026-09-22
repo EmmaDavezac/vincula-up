@@ -86,6 +86,6 @@ export const requireActivationAccess: CanActivateFn = () => {
   }
 
   return auth.loadProfessionalStatus().pipe(
-    map((active) => active ? router.createUrlTree(['/mis-solicitudes']) : true),
+    map((active) => active ? router.createUrlTree(['/solicitudes']) : true),
   );
 };

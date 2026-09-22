@@ -2,156 +2,276 @@
   display: block;
 }
 
-.hero {
+.landing {
   display: grid;
-  gap: 4rem;
+  gap: 3rem;
   grid-template-columns: minmax(0, 1fr) 18rem;
   margin: 0 auto;
   max-width: 1180px;
-  min-height: 34rem;
   padding: 5rem 1.5rem 4rem;
 }
 
-.hero-copy {
+/* estilos huérfanos del header quitado */
+.landing-header,
+.land-brand {
+  display: none;
+}
+
+.land-eyebrow {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin: 0 0 1.5rem;
+}
+
+.land-targets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.land-targets li {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.land-tag {
+  --tag-size: 3.25rem;
+  color: var(--paper);
+  background: var(--coral);
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  height: var(--tag-size);
+  min-width: var(--tag-size);
+  width: var(--tag-size);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.land-hero {
   align-self: center;
+  align-items: start;
+  justify-content: start;
+  display: grid;
+  gap: 2.5rem;
+  grid-template-columns: 1fr 1fr;
+}
+
+.land-copy {
   max-width: 42rem;
 }
 
-.eyebrow {
-  color: var(--coral);
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  margin: 0 0 1.5rem;
-  text-transform: uppercase;
-}
-
-h1 {
+.land-hero h1 {
   color: var(--ink);
   font-family: Georgia, 'Times New Roman', serif;
-  font-size: clamp(3rem, 7vw, 6.5rem);
+  font-size: clamp(2rem, 5vw, 3rem);
   font-weight: 400;
   letter-spacing: 0;
-  line-height: 0.95;
-  margin: 0;
-  max-width: 11ch;
+  line-height: 1.05;
+  margin: 0 0 1.5rem;
+  max-width: 14ch;
 }
 
-.hero-text {
+.land-hero p {
   color: var(--muted);
   font-size: 1.05rem;
   line-height: 1.7;
-  margin: 2rem 0;
-  max-width: 35rem;
+  margin: 0 0 1.5rem;
 }
 
-.hero-actions {
+.land-list {
+  list-style: none;
+  margin: 0 0 2rem;
+  padding: 0;
+}
+
+.land-list li {
+  color: var(--ink);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0 0 0.75rem;
+}
+
+.land-list li strong {
+  color: var(--coral);
+}
+
+.land-actions {
   align-items: center;
   display: flex;
+  gap: 0.9rem;
   flex-wrap: wrap;
-  gap: 1.25rem;
 }
 
-.primary-action,
-.secondary-action {
+.land-cta {
+  background: var(--coral);
+  color: var(--paper);
   font-size: 0.9rem;
   min-height: 44px;
-  padding: 0.8rem 1.1rem;
+  padding: 0.8rem 1.2rem;
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  transition: background 0.2s;
 }
 
-.primary-action {
-  background: var(--coral);
+.land-cta.alt {
+  background: transparent;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+}
+
+.land-cta:hover {
+  background: var(--ink);
   color: var(--paper);
 }
 
-.primary-action span {
-  font-size: 1.25rem;
-  margin-left: 0.7rem;
+.land-cta.alt:hover {
+  background: var(--ink);
+  color: var(--paper);
 }
 
-.secondary-action {
-  border-bottom: 1px solid var(--ink);
-  color: var(--ink);
-}
-
-.hero-note {
+.land-aside {
   align-self: end;
   border-left: 1px solid var(--line);
+  padding: 0 0 0 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  margin-bottom: 1rem;
-  padding: 0 0 0 1.5rem;
+  gap: 1.2rem;
 }
 
-.note-number {
-  color: var(--coral);
-  font-size: 0.8rem;
-  font-weight: 800;
-}
-
-.hero-note p {
+.land-aside h2 {
   color: var(--ink);
   font-family: Georgia, 'Times New Roman', serif;
-  font-size: 1.5rem;
+  font-size: 1.6rem;
+  font-weight: 400;
   line-height: 1.2;
+  margin: 0 0 0.75rem;
+}
+
+.land-aside h3 {
+  color: var(--coral);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin: 1.2rem 0 0.4rem;
+}
+
+.land-aside p {
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
   margin: 0;
 }
 
-.note-line {
-  background: var(--coral);
-  height: 3px;
-  margin-top: 2rem;
-  width: 3rem;
-}
-
-.note-caption {
-  color: var(--muted);
-  font-size: 0.75rem;
-}
-
-.trust-strip {
-  border-bottom: 1px solid var(--line);
-  border-top: 1px solid var(--line);
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(3, 1fr);
-  margin: 0 auto;
-  max-width: 1180px;
-  padding: 1.5rem;
-}
-
-.trust-strip div {
-  border-left: 2px solid var(--coral);
+.land-aside ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  padding-left: 1rem;
+  gap: 0.5rem;
 }
-
-.trust-strip strong {
+.land-note {
   color: var(--ink);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  margin-top: 0.4rem;
 }
 
-.trust-strip span {
+.land-trust {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  margin: 0 auto;
+  max-width: 1180px;
+  padding: 2rem 1.5rem;
+  display: flex;
+  gap: 3rem;
+  align-items: center;
+}
+
+.land-trusted {
+  color: var(--coral);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+.land-trust-content {
+  max-width: 42rem;
+}
+
+.land-trust-content h3 {
+  color: var(--ink);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.5rem;
+  font-weight: 400;
+  margin: 0 0 0.5rem;
+}
+
+.land-trust-content p {
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 1rem;
+  margin: 0;
 }
 
-@media (max-width: 700px) {
-  .hero {
-    display: block;
-    min-height: auto;
-    padding-top: 3.5rem;
-  }
+.land-footer {
+  align-self: end;
+  color: var(--muted);
+  font-size: 0.75rem;
+  margin: 0 0 0 1.5rem;
+}
 
-  .hero-note {
-    margin-top: 4rem;
-  }
-
-  .trust-strip {
+@media (max-width: 720px) {
+  .landing {
     grid-template-columns: 1fr;
+    min-height: auto;
+    padding-top: 3rem;
+  }
+
+  .landing-header {
+    align-self: start;
+  }
+
+  .land-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .land-aside {
+    align-self: stretch;
+    border-left: none;
+    border-top: 1px solid var(--line);
+    padding: 2rem 0 0;
+    text-align: center;
+  }
+.land-note {
+    text-align: center;
+  }
+
+  .land-trust {
+    flex-direction: column;
+    padding: 2rem 1.5rem;
+  }
+
+  .land-trusted {
+    writing-mode: horizontal-tb;
+  }
+
+  .land-footer {
+    align-self: stretch;
+    text-align: center;
+    margin-bottom: 1.5rem;
   }
 }

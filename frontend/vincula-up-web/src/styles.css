@@ -20,6 +20,10 @@ body {
 	margin: 0;
 }
 
+/* Ajustes del tema Material a la paleta de Vincula-UP (filtros de actividad) */
+.filters-panel .mdc-evolution-chip--selected{background:#e35f43}
+.filters-panel .mdc-evolution-chip--selected .mdc-evolution-chip__text-label{color:#fff}
+
 button,
 a {
 	-webkit-tap-highlight-color: transparent;

@@ -23,8 +23,69 @@
   }
 
   @if (requests().length) {
+    <div class="request-header-bar">
+      @if (!isProfessional()) {
+        <a class="btn-primary land-cta" routerLink="/solicitar">
+          <mat-icon>add</mat-icon>Nueva solicitud
+        </a>
+      }
+      <h2 class="request-count">
+        {{ filteredRequests().length }} de {{ requests().length }} solicitud{{ requests().length !== 1 ? 'es' : '' }}
+      </h2>
+    </div>
+
+    <div class="filters-panel">
+      <mat-chip-listbox class="status-chips" [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event)" aria-label="Filtrar por estado">
+        @for (option of statusOptions; track option.value) {
+          <mat-chip-option [value]="option.value">{{ option.label }}</mat-chip-option>
+        }
+      </mat-chip-listbox>
+
+      <div class="filters-row">
+        <mat-form-field class="filter-field search-field" appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Buscar</mat-label>
+          <input matInput [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)" placeholder="Especialidad, persona, dirección…" />
+          @if (searchTerm()) {
+            <button matSuffix mat-icon-button type="button" aria-label="Limpiar búsqueda" (click)="searchTerm.set('')">
+              <mat-icon>close</mat-icon>
+            </button>
+          } @else {
+            <mat-icon matSuffix>search</mat-icon>
+          }
+        </mat-form-field>
+
+        @if (specialtyOptions().length > 1) {
+          <mat-form-field class="filter-field" appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Especialidad</mat-label>
+            <mat-select [ngModel]="specialtyFilter()" (ngModelChange)="specialtyFilter.set($event)">
+              <mat-option value="TODAS">Todas</mat-option>
+              @for (option of specialtyOptions(); track option.value) {
+                <mat-option [value]="option.value">{{ option.label }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        }
+
+        <mat-form-field class="filter-field" appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Ordenar</mat-label>
+          <mat-select [ngModel]="sortOrder()" (ngModelChange)="sortOrder.set($event)">
+            @for (option of sortOptions; track option.value) {
+              <mat-option [value]="option.value">{{ option.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        @if (hasActiveFilters()) {
+          <button mat-stroked-button type="button" class="clear-filters" (click)="clearFilters()">
+            <mat-icon>filter_alt_off</mat-icon>Limpiar
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (filteredRequests().length) {
     <div class="request-list">
-      @for (request of requests(); track request.id) {
+      @for (request of filteredRequests(); track request.id) {
         <article class="request-card">
           <div class="request-header-info">
             <div class="status-wrap">
@@ -33,6 +94,15 @@
             <h2>{{ especialidadNombre(request) }}</h2>
             <p class="counterpart">
               @if (isProfessional()) {
+                <!-- Avatar del cliente: muestra su foto de perfil (si tiene) al
+                     revisar y aceptar la solicitud; iniciales como fallback. -->
+                <span class="client-avatar" aria-hidden="true">
+                  @if (clienteDe(request)?.fotoUrl) {
+                    <img [src]="clienteDe(request)!.fotoUrl" [alt]="'Foto de ' + clienteNombre(request)" />
+                  } @else {
+                    <span class="client-avatar-fallback">{{ clienteInitials(request) }}</span>
+                  }
+                </span>
                 Solicitado por <strong>{{ clienteNombre(request) }}</strong>
                 @if (clienteDe(request); as c) {
                   <span class="client-contact">
@@ -41,7 +111,20 @@
                   </span>
                 }
               } @else {
-                Con profesional: <strong>{{ request.professionalName }}</strong>
+                <!-- Avatar del profesional: muestra su foto de perfil (si tiene)
+                     junto al nombre real; iniciales como fallback. -->
+                <span class="client-avatar" aria-hidden="true">
+                  @if (fotoProfesional(request); as foto) {
+                    <img [src]="foto" [alt]="'Foto de ' + profesionalNombre(request)"
+                      loading="lazy" referrerpolicy="no-referrer" (error)="markPhotoFailed(profesionalDe(request)?.id || request.professionalId)" />
+                  } @else {
+                    <span class="client-avatar-fallback">{{ profesionalInitials(request) }}</span>
+                  }
+                </span>
+                Con profesional: <strong>{{ profesionalNombre(request) }}</strong>
+                @if (profesionalDe(request); as prof) {
+                  <span class="client-contact">· {{ prof.specialty }}</span>
+                }
               }
             </p>
             <div class="request-meta">
@@ -78,49 +161,52 @@
                     <div>
                       <h4>👤 Cliente</h4>
                       @if (clienteDe(request); as cli) {
-                        <ul>
-                          <li><strong>Nombre:</strong> {{ cli.nombre }} {{ cli.apellido }}</li>
-                          <li><strong>Email:</strong> {{ cli.email }}</li>
-                          @if (cli.telefono) {
-                            <li><strong>Teléfono:</strong> {{ cli.telefono }}</li>
-                          }
-                          @if (cli.fechaAlta) {
-                            <li><strong>Cliente desde:</strong> {{ cli.fechaAlta | slice:0:10 }}</li>
-                          }
-                        </ul>
+                        <div class="client-card">
+                          <span class="client-avatar large" aria-hidden="true">
+                            @if (cli.fotoUrl) {
+                              <img [src]="cli.fotoUrl" [alt]="'Foto de ' + clienteNombre(request)" />
+                            } @else {
+                              <span class="client-avatar-fallback">{{ clienteInitials(request) }}</span>
+                            }
+                          </span>
+                          <ul>
+                            <li><strong>Nombre:</strong> {{ cli.nombre }} {{ cli.apellido }}</li>
+                            <li><strong>Email:</strong> {{ cli.email }}</li>
+                            @if (cli.telefono) {
+                              <li><strong>Teléfono:</strong> {{ cli.telefono }}</li>
+                            }
+                            @if (cli.fechaAlta) {
+                              <li><strong>Cliente desde:</strong> {{ cli.fechaAlta | slice:0:10 }}</li>
+                            }
+                          </ul>
+                        </div>
                       } @else {
                         <p class="muted-sm">Cargando ficha del cliente… (ID {{ request.clienteId }})</p>
                       }
                     </div>
                   </div>
-                  <div class="location-box">
-                    <h4>📍 Ubicación del servicio</h4>
-                    <p class="location-address">{{ request.address }}</p>
-                    @if (hasCoords(request)) {
-                      <p class="coords-line">📌 {{ coordsText(request) }}</p>
-                      <div class="location-actions">
-                        <button type="button" class="btn-primary" (click)="openLocationMap(request)">🗺️ Ver en mapa</button>
-                        <a class="btn-secondary link-btn" [href]="googleMapsUrl(request)" target="_blank" rel="noopener">Abrir en Google Maps ↗</a>
-                      </div>
-                    } @else {
-                      <p class="muted-sm">Esta solicitud no trae coordenadas GPS. Usá la dirección para ubicarla.</p>
-                      <div class="location-actions">
-                        <a class="btn-secondary link-btn" [href]="googleMapsUrl(request)" target="_blank" rel="noopener">Buscar dirección en Google Maps ↗</a>
-                      </div>
-                    }
-                  </div>
                 </div>
               } @else {
                 <!-- Resumen compacto de ubicación para el profesional -->
                 <div class="location-summary">
-                  @if (hasCoords(request)) {
-                    <button type="button" class="btn-text-sm link" (click)="openLocationMap(request)">🗺️ Ver ubicación en mapa · {{ coordsText(request) }}</button>
-                  } @else {
-                    <span class="muted-sm">📍 {{ request.address }}</span>
-                  }
+                  <span class="muted-sm">📍 {{ request.address }}</span>
                 </div>
               }
             }
+
+            <!-- Ubicación del servicio: visible para profesional y cliente -->
+            <div class="location-box">
+              <h4>📍 {{ isProfessional() ? 'Dirección donde tenés que ir' : 'Dirección donde se realizará el servicio' }}</h4>
+              <p class="location-address">{{ request.address }}</p>
+              @if (embeddedMapUrl(request); as mapUrl) {
+                <iframe class="embedded-map" title="Mapa de la ubicación: {{ request.address }}" [src]="mapUrl" loading="lazy"></iframe>
+              } @else {
+                <p class="muted-sm">Usá la dirección para ubicar el servicio.</p>
+              }
+              <div class="location-actions">
+                <a class="btn-secondary link-btn" [href]="googleMapsUrl(request)" target="_blank" rel="noopener">Ver en Google Maps ↗</a>
+              </div>
+            </div>
 
             @if (request.motivoCancelacion) {
               <div class="motivo-box">
@@ -247,6 +333,15 @@
         </article>
       }
     </div>
+    } @else {
+      <div class="empty-state empty-filtered">
+        <h2>No hay solicitudes con esos filtros.</h2>
+        <p>Probá cambiar el estado, la búsqueda o el orden, o limpiá los filtros para ver todo de nuevo.</p>
+        <button mat-stroked-button type="button" (click)="clearFilters()">
+          <mat-icon>filter_alt_off</mat-icon>Limpiar filtros
+        </button>
+      </div>
+    }
   } @else {
     @if (isProfessional()) {
       <div class="empty-state">
@@ -262,27 +357,5 @@
     }
   }
 
-  <!-- ── Modal mapa ubicación de la solicitud (Leaflet / OSM) ── -->
-  @if (showLocationMap(); as mapId) {
-    @if (locationRequest(); as locReq) {
-      <div class="map-modal-overlay" (click)="closeLocationMap()">
-        <div class="map-modal-content" (click)="$event.stopPropagation()">
-          <div class="map-modal-header">
-            <div>
-              <h3>Ubicación del servicio</h3>
-              <p class="map-modal-sub">{{ especialidadNombre(locReq) }} · {{ locReq.date }} {{ locReq.time }} · Cliente: {{ clienteNombre(locReq) }}</p>
-            </div>
-            <button type="button" class="map-modal-close" (click)="closeLocationMap()" aria-label="Cerrar">✕</button>
-          </div>
-          <p class="map-modal-address">📍 {{ locReq.address }} <span class="coords-display">({{ coordsText(locReq) }})</span></p>
-          <div id="request-location-map" class="location-map-container"></div>
-          <div class="map-modal-actions">
-            <a class="btn-secondary link-btn" [href]="googleMapsUrl(locReq)" target="_blank" rel="noopener">Abrir en Google Maps ↗</a>
-            <button type="button" class="btn-primary" (click)="closeLocationMap()">Cerrar mapa</button>
-          </div>
-        </div>
-      </div>
-    }
-  }
 </section>
 

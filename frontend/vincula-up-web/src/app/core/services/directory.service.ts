@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { Observable, catchError, map, throwError } from 'rxjs';
 import { ApiService } from './api.service';
 import { Professional } from '../models/professional';
+import { fotoUtil } from '../utils/photo';
 
 @Injectable({ providedIn: 'root' })
 export class DirectoryService {
@@ -46,7 +47,7 @@ export class DirectoryService {
           zonaCoberturaLat: professional.zonaCoberturaLat,
           zonaCoberturaLng: professional.zonaCoberturaLng,
           radioKm: professional.radioKm,
-          fotoUrl: professional.fotoUrl,
+          fotoUrl: fotoUtil(professional.fotoUrl),
           estado: professional.estado ?? 'ACTIVO',
         };
       })),

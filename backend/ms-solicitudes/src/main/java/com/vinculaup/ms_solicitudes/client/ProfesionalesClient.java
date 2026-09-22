@@ -66,4 +66,21 @@ public class ProfesionalesClient {
             return java.util.Optional.empty();
         }
     }
+
+    /**
+     * Resuelve el perfil profesional por cualquiera de las identidades que usa la aplicación:
+     * el id del perfil del padrón o el {@code usuarioId} de ms-usuarios (que es el id con el que
+     * el frontend arma las solicitudes). Primero se intenta el camino canónico
+     * ({@code /profesionales/{id}}) y, si no hay perfil con ese id, se busca por usuario.
+     */
+    public java.util.Optional<ProfesionalIdentidad> obtenerPorIdentidad(UUID identidad) {
+        if (identidad == null) {
+            return java.util.Optional.empty();
+        }
+        java.util.Optional<ProfesionalIdentidad> porPerfil = obtenerPorId(identidad);
+        if (porPerfil.isPresent()) {
+            return porPerfil;
+        }
+        return obtenerIdentidades(List.of(identidad)).stream().findFirst();
+    }
 }

@@ -1,12 +1,21 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { MatButtonModule } from '@angular/material/button';
+import { MatChipsModule } from '@angular/material/chips';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { catchError, of } from 'rxjs';
 import { RequestStatus, ServiceRequest } from '../core/models/service-request';
+import { Professional } from '../core/models/professional';
 import { ApiService, ClienteInfo } from '../core/services/api.service';
 import { AuthService } from '../core/services/auth.service';
 import { RequestService } from '../core/services/request.service';
+import { fotoUtil } from '../core/utils/photo';
 
 interface MessageItem {
   id: string;
@@ -24,7 +33,7 @@ interface RatingItem {
 }
 
 @Component({
-  imports: [CommonModule, RouterLink, FormsModule],
+    imports: [CommonModule, RouterLink, FormsModule, MatButtonModule, MatChipsModule, MatFormFieldModule, MatIconModule, MatInputModule, MatSelectModule],
   selector: 'app-my-requests',
   styleUrl: './my-requests.css',
   templateUrl: './my-requests.html',
@@ -33,10 +42,95 @@ export class MyRequests {
   private readonly api = inject(ApiService);
   readonly auth = inject(AuthService);
   private readonly requestService = inject(RequestService);
+  private readonly sanitizer = inject(DomSanitizer);
 
   readonly requests = this.requestService.myRequests;
   readonly errorMessage = signal('');
   readonly successMessage = signal('');
+
+  // Filtros y orden (Material)
+  readonly statusFilter = signal<'TODAS' | RequestStatus>('TODAS');
+  readonly searchTerm = signal('');
+  readonly specialtyFilter = signal<string>('TODAS');
+  readonly sortOrder = signal<'RECIENTES' | 'PROXIMAS' | 'ANTIGUAS'>('RECIENTES');
+
+  readonly statusOptions: ReadonlyArray<{ value: 'TODAS' | RequestStatus; label: string }> = [
+    { value: 'TODAS', label: 'Todas' },
+    { value: 'PENDIENTE', label: 'Pendientes' },
+    { value: 'ACEPTADA', label: 'Aceptadas' },
+    { value: 'RECHAZADA', label: 'Rechazadas' },
+    { value: 'COMPLETADA', label: 'Completadas' },
+    { value: 'CANCELADA', label: 'Canceladas' },
+    { value: 'VENCIDA', label: 'Vencidas' },
+  ];
+
+  readonly sortOptions: ReadonlyArray<{ value: 'RECIENTES' | 'PROXIMAS' | 'ANTIGUAS'; label: string }> = [
+    { value: 'RECIENTES', label: 'Más recientes primero' },
+    { value: 'PROXIMAS', label: 'Próximos turnos primero' },
+    { value: 'ANTIGUAS', label: 'Más antiguas primero' },
+  ];
+
+  readonly specialtyOptions = computed(() => {
+    const names = new Map<string, string>();
+    for (const request of this.requests()) {
+      const key = request.especialidadId ?? request.specialty ?? '';
+      if (key) names.set(key, this.especialidadNombre(request));
+    }
+    return [...names.entries()]
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'es'));
+  });
+
+  /** Solicitudes visibles según filtros + búsqueda + orden. */
+  readonly filteredRequests = computed(() => {
+    const status = this.statusFilter();
+    const specialty = this.specialtyFilter();
+    const term = this.searchTerm().trim().toLowerCase();
+    const order = this.sortOrder();
+
+    const matches = this.requests().filter((request) => {
+      if (status !== 'TODAS' && request.status !== status) return false;
+      if (specialty !== 'TODAS') {
+        const key = request.especialidadId ?? request.specialty ?? '';
+        if (key !== specialty) return false;
+      }
+      if (term) {
+        const haystack = [
+          this.especialidadNombre(request),
+          request.professionalName,
+          this.clienteNombre(request),
+          request.address,
+          request.date,
+          request.id,
+        ]
+          .join(' ')
+          .toLowerCase();
+        if (!haystack.includes(term)) return false;
+      }
+      return true;
+    });
+
+    return [...matches].sort((a, b) => {
+      if (order === 'PROXIMAS') return this.requestDateTime(a) - this.requestDateTime(b);
+      const aCreated = this.createdTimestamp(a);
+      const bCreated = this.createdTimestamp(b);
+      if (aCreated !== bCreated) return order === 'RECIENTES' ? bCreated - aCreated : aCreated - bCreated;
+      return this.requestDateTime(a) - this.requestDateTime(b);
+    });
+  });
+
+  readonly hasActiveFilters = computed(
+    () =>
+      this.statusFilter() !== 'TODAS' ||
+      this.specialtyFilter() !== 'TODAS' ||
+      this.searchTerm().trim().length > 0,
+  );
+
+  clearFilters(): void {
+    this.statusFilter.set('TODAS');
+    this.specialtyFilter.set('TODAS');
+    this.searchTerm.set('');
+  }
 
   // Chat state
   readonly activeChatId = signal<string | null>(null);
@@ -56,13 +150,20 @@ export class MyRequests {
 
   // Detalle enriquecido para el profesional: cliente + especialidad + mapa
   readonly clientes = signal<Record<string, ClienteInfo | null>>({});
+  // Detalle del profesional para el cliente: foto + nombre + especialidad
+  readonly profesionales = signal<Record<string, Professional | null>>({});
+  // Fotos que devolvieron error al cargar (hotlink bloqueado, URL vencida…):
+  // se ocultan para mostrar las iniciales en su lugar.
+  readonly failedPhotos = signal<Set<string>>(new Set());
+
+  markPhotoFailed(id: string): void {
+    if (!id) return;
+    this.failedPhotos.update((ids) => new Set([...ids, id]));
+  }
   readonly especialidades = signal<Record<string, string>>({});
   readonly loadingSpecialties = signal(true);
   readonly specialtiesError = signal('');
   readonly detailOpen = signal<Record<string, boolean>>({});
-  readonly showLocationMap = signal<string | null>(null);
-  private locationMapInstance: any = null;
-  private locationMapMarker: any = null;
 
   constructor() {
     this.reloadRequests();
@@ -100,6 +201,10 @@ export class MyRequests {
             if (this.isProfessional() && req.clienteId) {
               this.loadCliente(req.clienteId);
             }
+            // Si soy cliente, traigo la ficha del profesional asignado (foto + nombre)
+            if (!this.isProfessional() && req.professionalId) {
+              this.loadProfesional(req.professionalId);
+            }
           }
         }
       });
@@ -128,6 +233,72 @@ export class MyRequests {
     if (!c) return request.clienteId ? 'Cliente Vincula-UP' : 'Cliente';
     const full = `${c.nombre ?? ''} ${c.apellido ?? ''}`.trim();
     return full || c.email || 'Cliente Vincula-UP';
+  }
+
+  /** Iniciales del cliente para el avatar (foto o iniciales) de la solicitud. */
+  clienteInitials(request: ServiceRequest): string {
+    const c = this.clienteDe(request);
+    const parts = [c?.nombre, c?.apellido].filter((p) => p && p.trim().length > 0);
+    if (parts.length === 0) return 'VU';
+    return parts.map((p) => p!.trim()[0]!.toUpperCase()).join('').slice(0, 2);
+  }
+
+  // ── Ficha del profesional (a quién le pediste el turno) ──
+  loadProfesional(profesionalId: string): void {
+    if (!profesionalId || this.profesionales()[profesionalId] !== undefined) return;
+    // marcado como pendiente para no repetir llamadas
+    this.profesionales.update((prev) => ({ ...prev, [profesionalId]: null }));
+    this.api.getProfessionalById(profesionalId).pipe(catchError(() => of(null))).subscribe((prof) => {
+      if (prof) {
+        this.profesionales.update((prev) => ({ ...prev, [profesionalId]: { ...prof, fotoUrl: fotoUtil(prof.fotoUrl) } }));
+      }
+    });
+  }
+
+  profesionalDe(request: ServiceRequest): Professional | null {
+    const key = request.professionalId;
+    const cached = key ? this.profesionales()[key] ?? null : null;
+    if (cached) return cached;
+    // Las solicitudes viejas pueden guardar el id de perfil en vez del usuarioId
+    // (o viceversa): si ya tenemos cargada la ficha bajo la otra clave, la
+    // reutilizamos para no dejar el avatar sin foto.
+    for (const prof of Object.values(this.profesionales())) {
+      if (!prof) continue;
+      if (prof.id === key || prof.usuarioId === key) return prof;
+    }
+    return null;
+  }
+
+  /**
+   * Foto del profesional lista para el `<img>`: `null` si no hay foto o si ya
+   * falló la carga (hotlink bloqueado, URL vencida…), para mostrar iniciales.
+   */
+  fotoProfesional(request: ServiceRequest): string | null {
+    const prof = this.profesionalDe(request);
+    const foto = fotoUtil(prof?.fotoUrl);
+    if (!foto) return null;
+    if (prof?.id && this.failedPhotos().has(prof.id)) return null;
+    if (!prof?.id && this.failedPhotos().has(request.professionalId)) return null;
+    return foto;
+  }
+
+  profesionalNombre(request: ServiceRequest): string {
+    const p = this.profesionalDe(request);
+    if (p) {
+      const full = `${p.nombre ?? ''} ${p.apellido ?? ''}`.trim();
+      if (full) return full;
+    }
+    // Fallback: el nombre que traía la solicitud (evitando el genérico).
+    const previo = (request.professionalName ?? '').trim();
+    return previo && previo !== 'Profesional Vincula-UP' ? previo : 'Profesional';
+  }
+
+  /** Iniciales del profesional para el avatar (foto o iniciales) de la solicitud. */
+  profesionalInitials(request: ServiceRequest): string {
+    const p = this.profesionalDe(request);
+    const parts = [p?.nombre, p?.apellido].filter((parte) => parte && parte.trim().length > 0);
+    if (parts.length === 0) return 'P';
+    return parts.map((parte) => parte!.trim()[0]!.toUpperCase()).join('').slice(0, 2);
   }
 
   // ── Especialidad (nombre real en vez de "Servicio técnico") ──
@@ -164,89 +335,36 @@ export class MyRequests {
     return !!this.detailOpen()[String(requestId)];
   }
 
-  // ── Mapa de ubicación de la solicitud (Leaflet / OSM) ──
-  hasCoords(request: ServiceRequest): boolean {
-    return request.latitude != null && request.longitude != null;
+  // ── Ubicación: dirección + mapa embebido OSM (sin exponer coordenadas) ──
+  /** Coordenadas válidas solo para construir el mapa; nunca se muestran en el texto. */
+  private mapCoords(request: ServiceRequest): { lat: number; lng: number } | null {
+    const lat = Number(request.latitude);
+    const lng = Number(request.longitude);
+    if (
+      request.latitude == null || request.longitude == null ||
+      Number.isNaN(lat) || Number.isNaN(lng) ||
+      lat < -90 || lat > 90 || lng < -180 || lng > 180
+    ) {
+      return null;
+    }
+    return { lat, lng };
   }
 
-  coordsText(request: ServiceRequest): string {
-    if (!this.hasCoords(request)) return 'Sin coordenadas';
-    return `${Number(request.latitude).toFixed(5)}, ${Number(request.longitude).toFixed(5)}`;
+  /**
+   * URL del mapa embebido de OpenStreetMap centrada en la ubicación del servicio.
+   * Marca solo el punto (bbox pequeño alrededor); null si no hay coords válidas.
+   */
+  embeddedMapUrl(request: ServiceRequest): SafeResourceUrl | null {
+    const coords = this.mapCoords(request);
+    if (!coords) return null;
+    const delta = 0.008;
+    const bbox = `${coords.lng - delta}%2C${coords.lat - delta}%2C${coords.lng + delta}%2C${coords.lat + delta}`;
+    const url = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${coords.lat}%2C${coords.lng}`;
+    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
   }
 
   googleMapsUrl(request: ServiceRequest): string {
-    if (this.hasCoords(request)) {
-      return `https://www.google.com/maps?q=${request.latitude},${request.longitude}`;
-    }
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(request.address || '')}`;
-  }
-
-  openLocationMap(request: ServiceRequest): void {
-    if (!this.hasCoords(request)) return;
-    this.showLocationMap.set(String(request.id));
-    this.scheduleLocationMapInit(request, 0);
-  }
-
-  /** Espera a que Angular renderice el contenedor del modal antes de crear el mapa. */
-  private scheduleLocationMapInit(request: ServiceRequest, attempt: number): void {
-    setTimeout(() => {
-      if (!document.getElementById('request-location-map')) {
-        if (attempt < 10) {
-          this.scheduleLocationMapInit(request, attempt + 1);
-        }
-        return;
-      }
-      this.initLocationMap(request);
-    }, 60);
-  }
-
-  closeLocationMap(): void {
-    this.showLocationMap.set(null);
-    if (this.locationMapInstance) {
-      try { this.locationMapInstance.remove(); } catch { /* noop */ }
-      this.locationMapInstance = null;
-      this.locationMapMarker = null;
-    }
-  }
-
-  locationRequest(): ServiceRequest | null {
-    const id = this.showLocationMap();
-    if (!id) return null;
-    return this.requests().find((r) => String(r.id) === id) ?? null;
-  }
-
-  private initLocationMap(request: ServiceRequest): void {
-    const leaflet = (window as any).L;
-    if (!leaflet) return;
-    const container = document.getElementById('request-location-map');
-    if (!container) return;
-    const lat = Number(request.latitude);
-    const lng = Number(request.longitude);
-    if (Number.isNaN(lat) || Number.isNaN(lng)) return;
-
-    if (this.locationMapInstance && !document.body.contains(this.locationMapInstance.getContainer())) {
-      this.locationMapInstance.remove();
-      this.locationMapInstance = null;
-      this.locationMapMarker = null;
-    }
-    if (this.locationMapInstance) {
-      try { this.locationMapInstance.remove(); } catch { /* noop */ }
-      this.locationMapInstance = null;
-      this.locationMapMarker = null;
-    }
-
-    this.locationMapInstance = leaflet.map('request-location-map').setView([lat, lng], 16);
-    leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap contributors',
-    }).addTo(this.locationMapInstance);
-    this.locationMapMarker = leaflet.marker([lat, lng]).addTo(this.locationMapInstance);
-    const cliente = this.clienteNombre(request);
-    const esp = this.especialidadNombre(request);
-    this.locationMapMarker
-      .bindPopup(`<b>${esp}</b><br/>${request.address}<br/>Cliente: ${cliente}`)
-      .openPopup();
-    setTimeout(() => this.locationMapInstance?.invalidateSize(), 200);
   }
 
   isProfessional(): boolean {
@@ -443,6 +561,24 @@ export class MyRequests {
         this.loadRating(reqId);
       }
     });
+  }
+
+  private requestDateTime(request: ServiceRequest): number {
+    if (!request.date) return Number.MAX_SAFE_INTEGER;
+    const time = request.time?.trim() ? request.time : '00:00';
+    const parsed = new Date(`${request.date}T${time}`);
+    const value = parsed.getTime();
+    return Number.isNaN(value) ? Number.MAX_SAFE_INTEGER : value;
+  }
+
+  private createdTimestamp(request: ServiceRequest): number {
+    if (request.fechaCreacion) {
+      const value = new Date(request.fechaCreacion).getTime();
+      if (!Number.isNaN(value)) return value;
+    }
+    const numericId = Number(request.id);
+    if (!Number.isNaN(numericId) && numericId > 0) return numericId;
+    return this.requestDateTime(request);
   }
 
   statusText(status: RequestStatus): string {

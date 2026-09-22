@@ -5,7 +5,24 @@
   "supportedLocales": ["es"],
   "defaultLocale": "es",
   "sslRequired": "none",
-  "registrationAllowed": false,
+  "smtpServer": {
+    "host": "${env.KEYCLOAK_SMTP_HOST:smtp.gmail.com}",
+    "port": "${env.KEYCLOAK_SMTP_PORT:587}",
+    "from": "${env.KEYCLOAK_SMTP_FROM:}",
+    "fromDisplayName": "${env.KEYCLOAK_SMTP_FROM_DISPLAY_NAME:Vincula-UP}",
+    "replyTo": "${env.KEYCLOAK_SMTP_FROM:}",
+    "starttls": "${env.KEYCLOAK_SMTP_STARTTLS:true}",
+    "auth": "${env.KEYCLOAK_SMTP_AUTH:true}",
+    "user": "${env.KEYCLOAK_SMTP_USER:}",
+    "password": "${env.KEYCLOAK_SMTP_PASSWORD:}"
+  },
+  "registrationAllowed": true,
+  "registrationEmailAsUsername": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "verifyEmail": false,
+  "resetPasswordAllowed": true,
+  "defaultRoles": ["CLIENTE"],
   "roles": {
     "realm": [
       { "name": "CLIENTE" },
@@ -36,6 +53,19 @@
       "attributes": {
         "pkce.code.challenge.method": "S256"
       }
+    },
+    {
+      "clientId": "vincula-up-admin",
+      "name": "Vincula-UP Admin Service Account",
+      "description": "Client de servicio del BFF: promueve a PROFESIONAL al profesional invitado que se auto-registra en Keycloak con el email cargado por el administrador.",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "vincula-up-admin-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "protocol": "openid-connect"
     }
   ],
   "users": [
@@ -77,6 +107,14 @@
         { "type": "password", "value": "password", "temporary": false }
       ],
       "realmRoles": ["ADMIN"]
+    },
+    {
+      "username": "service-account-vincula-up-admin",
+      "enabled": true,
+      "serviceAccountClientId": "vincula-up-admin",
+      "clientRoles": {
+        "realm-management": ["manage-users", "view-users", "query-users", "view-realm"]
+      }
     }
   ]
 }

@@ -29,14 +29,14 @@ public class MensajeService {
 
     public MensajeResponse enviar(UUID solicitudId, EnviarMensajeRequest request) {
         Solicitud solicitud = findSolicitud(solicitudId);
-        ensureParticipant(solicitud, request.emisorId());
+        ensureParticipant(solicitud, request.emisorId(), request.keycloakId());
         Mensaje mensaje = mensajeRepository.save(new Mensaje(solicitudId, request.emisorId(), request.texto().trim()));
         return toResponse(mensaje);
     }
 
     @Transactional(readOnly = true)
-    public List<MensajeResponse> listar(UUID solicitudId, UUID usuarioId) {
-        ensureParticipant(findSolicitud(solicitudId), usuarioId);
+    public List<MensajeResponse> listar(UUID solicitudId, UUID usuarioId, UUID keycloakId) {
+        ensureParticipant(findSolicitud(solicitudId), usuarioId, keycloakId);
         return mensajeRepository.findBySolicitudIdOrderByFechaEnvioAsc(solicitudId).stream().map(this::toResponse).toList();
     }
 
@@ -45,12 +45,17 @@ public class MensajeService {
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Solicitud no encontrada"));
     }
 
-    private void ensureParticipant(Solicitud solicitud, UUID usuarioId) {
-        if (solicitud.getClienteId().equals(usuarioId) || solicitud.getProfesionalId().equals(usuarioId)) {
-            return;
-        }
-        var identidades = solicitudService.resolverIdentidades(usuarioId, null);
-        if (!identidades.contains(solicitud.getProfesionalId()) && !identidades.contains(solicitud.getClienteId())) {
+    /**
+     * El cliente y el profesional pueden estar guardados en la solicitud con su id de ms-usuarios
+     * o con el {@code keycloakId} histórico, así que se comparan todas las identidades del usuario
+     * (incluido el alias que envía el BFF) contra los participantes de la solicitud.
+     */
+    private void ensureParticipant(Solicitud solicitud, UUID usuarioId, UUID keycloakId) {
+        List<UUID> aliasIds = keycloakId == null ? List.of() : List.of(keycloakId);
+        boolean participa = solicitudService.resolverIdentidades(usuarioId, aliasIds).stream()
+                .anyMatch(identidad -> identidad.equals(solicitud.getClienteId())
+                        || identidad.equals(solicitud.getProfesionalId()));
+        if (!participa) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No participas de esta solicitud");
         }
     }

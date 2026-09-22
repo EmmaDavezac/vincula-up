@@ -43,7 +43,7 @@ describe('Role guards', () => {
     },
   );
 
-  it.each(['admin', 'solicitar', 'mis-solicitudes', 'activar-perfil'])(
+  it.each(['admin', 'solicitar', 'solicitudes', 'activar-perfil'])(
     'blocks anonymous access to the configured private route: %s', async (path) => {
       const guards = routes.find((route) => route.path === path)?.canActivate;
       expect(guards).toHaveLength(1);
@@ -92,7 +92,7 @@ describe('Role guards', () => {
     role = 'PROFESIONAL';
     const result = run(requireActivationAccess);
     status.next(active);
-    expect(await result).toBe(active ? '/mis-solicitudes' : true);
+    expect(await result).toBe(active ? '/solicitudes' : true);
     expect(await run(requireRole('CLIENTE'))).toBe('/no-autorizado');
   });
 });

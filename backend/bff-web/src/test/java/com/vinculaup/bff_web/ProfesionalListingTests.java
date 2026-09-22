@@ -1,11 +1,14 @@
 package com.vinculaup.bff_web;
 
 import com.vinculaup.bff_web.service.BackendGateway;
+import jakarta.servlet.Filter;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -35,7 +38,10 @@ class ProfesionalListingTests {
 
     @BeforeEach
     void setUp() {
-        mvc = MockMvcBuilders.webAppContextSetup(context).build();
+        // Con el filtro de seguridad: el listado es público, pero la ficha
+        // individual (/api/profesionales/{id}) exige un usuario autenticado.
+        mvc = MockMvcBuilders.webAppContextSetup(context)
+                .addFilters(context.getBean("springSecurityFilterChain", Filter.class)).build();
     }
 
     private ObjectNode profesional(UUID usuarioId, String legajo) {
@@ -90,5 +96,38 @@ class ProfesionalListingTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].legajo").value("P-2003"))
                 .andExpect(jsonPath("$[0].nombre").doesNotExist());
+    }
+
+    /**
+     * Tarjeta de la solicitud del cliente ("Con profesional: …"): la ficha
+     * individual llega con el nombre real y la foto del padrón (o del usuario
+     * como respaldo), exigida a un usuario autenticado (cualquier rol).
+     */
+    @Test
+    void professionalCardIncludesNameAndPhotoForAuthenticatedClient() throws Exception {
+        when(decoder.decode("CLIENTE")).thenReturn(Jwt.withTokenValue("CLIENTE").header("alg", "RS256")
+                .subject(UUID.randomUUID().toString()).claim("roles", List.of("CLIENTE")).build());
+        UUID usuarioId = UUID.randomUUID();
+        UUID profileId = UUID.randomUUID();
+        when(gateway.buscarProfesionalPorIdOUsuario(profileId)).thenReturn(mapper.createObjectNode()
+                .put("id", profileId.toString())
+                .put("usuarioId", usuarioId.toString())
+                .put("legajo", "P-2004"));
+        when(gateway.buscarUsuarioPorId(usuarioId)).thenReturn(mapper.createObjectNode()
+                .put("id", usuarioId.toString())
+                .put("nombre", "Luciano")
+                .put("apellido", "González")
+                .put("fotoUrl", "data:image/png;base64,AAA"));
+        mvc.perform(get("/api/profesionales/" + profileId).header("Authorization", "Bearer CLIENTE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nombre").value("Luciano"))
+                .andExpect(jsonPath("$.apellido").value("González"))
+                .andExpect(jsonPath("$.fotoUrl").value("data:image/png;base64,AAA"));
+    }
+
+    @Test
+    void professionalCardRequiresAuthentication() throws Exception {
+        mvc.perform(get("/api/profesionales/" + UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
     }
 }

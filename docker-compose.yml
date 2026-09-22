@@ -62,7 +62,9 @@ services:
       JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
     ports:
-      - "8081:8081"
+      # Sólo accesible desde el host: ms-usuarios no expone autenticación propia,
+      # así que no debe quedar publicado en la red. Toda entrada pasa por nginx/BFF.
+      - "127.0.0.1:8081:8081"
     # La JVM tarda ~1 minuto en levantar: sin healthcheck el BFF/nginx arrancan antes
     # y devuelven 502 "Connection refused" durante ese lapso.
     healthcheck:
@@ -88,7 +90,7 @@ services:
       JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
     ports:
-      - "8082:8082"
+      - "127.0.0.1:8082:8082"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-m", "5", "http://localhost:8082/actuator/health"]
       interval: 5s
@@ -113,7 +115,7 @@ services:
       PROFESIONALES_URL: http://ms-profesionales:8082
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
     ports:
-      - "8083:8083"
+      - "127.0.0.1:8083:8083"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-m", "5", "http://localhost:8083/actuator/health"]
       interval: 5s
@@ -142,6 +144,12 @@ services:
       SOLICITUDES_URL: http://ms-solicitudes:8083
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://keycloak:8080/realms/vincula-up}
       KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/vincula-up/protocol/openid-connect/certs}
+      # Client de servicio para promover a PROFESIONAL al profesional invitado
+      # que se auto-registra con el email cargado por el administrador.
+      KEYCLOAK_ADMIN_BASE_URL: ${KEYCLOAK_ADMIN_BASE_URL:-http://keycloak:8080}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-vincula-up}
+      KEYCLOAK_ADMIN_CLIENT_ID: ${KEYCLOAK_ADMIN_CLIENT_ID:-vincula-up-admin}
+      KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-vincula-up-admin-secret}
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
     ports:
       - "9001:9001"

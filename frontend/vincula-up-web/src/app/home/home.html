@@ -1,38 +1,73 @@
-<section class="hero">
-  <div class="hero-copy">
-    <p class="eyebrow">Red tecnica de la Universidad Popular</p>
-    <h1>Encontrá ayuda confiable para lo que necesitás resolver.</h1>
-    <p class="hero-text">
-      Conectamos ciudadanos con egresados técnicos validados, cerca de tu zona y con disponibilidad clara.
-    </p>
-    <div class="hero-actions">
-      @if (auth.isAuthenticated()) {
-        <a class="primary-action" routerLink="/solicitar">Buscar un profesional <span aria-hidden="true">→</span></a>
-      } @else {
-        <a class="primary-action" href="javascript:void(0)" role="button" (click)="iniciarSesion()">Buscar un profesional <span aria-hidden="true">→</span></a>
-      }
-      <a class="secondary-action" routerLink="/como-funciona">Conocé la red</a>
+<section class="landing">
+  <section class="land-hero">
+    <div class="land-copy">
+      <p class="land-eyebrow">Universidad Popular de Concepción del Uruguay</p>
+      <h1>Una red técnica con respaldo universitario.</h1>
+      <p>
+        Vincula-UP conecta a la comunidad con profesionales técnicos validados,
+        cerca de tu zona y con disponibilidad clara.
+      </p>
+      <ul class="land-list">
+        <li><strong>Servicios cercanos</strong> — Profesionales en tu zona, con disponibilidad visible.</li>
+        <li><strong>Solicitudes claras</strong> — Elegís un horario y seguís tu pedido desde un solo lugar.</li>
+        <li><strong>Respaldo institucional</strong> — Una red validada por la Universidad Popular.</li>
+      </ul>
+      <div class="land-actions">
+        @if (auth.isAuthenticated()) {
+          <a class="land-cta" routerLink="/solicitudes">Ver mis solicitudes <span aria-hidden="true">→</span></a>
+        } @else {
+          <a class="land-cta" routerLink="/ingresar">Buscar un profesional <span aria-hidden="true">→</span></a>
+          <a class="land-cta alt" (click)="auth.registerWithKeycloak()">Crear cuenta</a>
+        }
+      </div>
     </div>
-  </div>
-  <div class="hero-note" aria-label="Resumen de Vincula-UP">
-    <span class="note-number">01</span>
-    <p>Servicios técnicos con respaldo y trazabilidad institucional.</p>
-    <span class="note-line"></span>
-    <span class="note-caption">Desde la búsqueda hasta el turno</span>
-  </div>
-</section>
 
-<section class="trust-strip" aria-label="Beneficios de la plataforma">
-  <div>
-    <strong>Profesionales validados</strong>
-    <span>Una red vinculada a la universidad</span>
-  </div>
-  <div>
-    <strong>Disponibilidad real</strong>
-    <span>Elegí un horario antes de solicitar</span>
-  </div>
-  <div>
-    <strong>Proceso claro</strong>
-    <span>Seguimiento de cada solicitud</span>
-  </div>
+    <aside class="land-aside" aria-label="Vincula-UP en sociedad">
+      <span class="aside-number">01</span>
+      <h2>Servicio técnico comunitario.</h2>
+      <p>
+        Desde fontanería básica hasta mantenimiento de equipos, la Universidad Popular
+        pone en camino una red de técnicos para la gente.
+      </p>
+
+      <h3>¿Para quién es?</h3>
+      <ul class="land-targets">
+        <li>
+          <span class="land-tag" aria-label="Vecinos">V</span>
+          <span>Ayuda técnica de proximidad.</span>
+        </li>
+        <li>
+          <span class="land-tag" aria-label="Profesionales">P</span>
+          <span>Un canal para ejercer tu técnica en la comunidad.</span>
+        </li>
+        <li>
+          <span class="land-tag" aria-label="Universidad">U</span>
+          <span>Valor social del saber técnico.</span>
+        </li>
+      </ul>
+
+      <h3>Más información</h3>
+      <p class="land-note">
+        Vincula-UP es una iniciativa de la Universidad Popular de Concepción del Uruguay,
+        dedicada a articular servicios técnicos de calidad para la gente.
+      </p>
+    </aside>
+  </section>
+
+  <section class="land-trust" aria-label="Por qué Vincula-UP">
+    <div class="land-trusted">
+      <span class="trust-mark">NUNCA</span>
+    </div>
+    <div class="land-trust-content">
+      <h3>Sin intermediarios, con acompañamiento.</h3>
+      <p>
+        Pensamos la ayuda técnica como un servicio a la comunidad, no como un
+        Marketplace de servicios cualquiera.
+      </p>
+    </div>
+  </section>
+
+  <footer class="land-footer">
+    <p>Vincula-UP · Universidad Popular de Concepción del Uruguay.</p>
+  </footer>
 </section>

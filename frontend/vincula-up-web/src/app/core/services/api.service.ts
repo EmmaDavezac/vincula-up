@@ -28,8 +28,28 @@ export interface ClienteInfo {
   apellido: string;
   email: string;
   telefono?: string;
-  fotoUrl?: string;
+  fotoUrl?: string | null;
   fechaAlta?: string;
+}
+
+export interface UserAccount {
+  id: string;
+  keycloakId?: string | null;
+  nombre: string;
+  apellido: string;
+  email: string;
+  telefono?: string;
+  fotoUrl?: string | null;
+  rolNegocio: string;
+  estado?: string;
+  fechaAlta?: string;
+}
+
+export interface UserAccountUpdate {
+  nombre?: string;
+  apellido?: string;
+  telefono?: string;
+  fotoUrl?: string | null;
 }
 
 interface ProfessionalActivationResponse {
@@ -77,6 +97,56 @@ export class ApiService {
     return this.http.get<Professional[]>(`${this.baseUrl}/profesionales`, { params, headers: this.authHeaders() });
   }
 
+  /**
+   * Ficha individual del profesional (id de perfil o usuarioId) para la
+   * tarjeta de la solicitud: nombre real, especialidad y foto, ya enriquecida
+   * por el BFF. Devuelve null si el perfil no existe (solicitud histórica).
+   */
+  getProfessionalById(id: string): Observable<Professional | null> {
+    if (!id) return of(null);
+    return this.http.get<Record<string, unknown>>(`${this.baseUrl}/profesionales/${id}`, { headers: this.authHeaders() }).pipe(
+      map((raw) => this.mapProfessionalProfile(raw)),
+      catchError(() => of(null)),
+    );
+  }
+
+  /** Normaliza la ficha del profesional al modelo que usa la UI. */
+  private mapProfessionalProfile(raw: Record<string, unknown>): Professional {
+    const nombre = typeof raw['nombre'] === 'string' ? (raw['nombre'] as string).trim() : '';
+    const apellido = typeof raw['apellido'] === 'string' ? (raw['apellido'] as string).trim() : '';
+    const realName = `${nombre} ${apellido}`.trim();
+    const legajo = typeof raw['legajo'] === 'string' ? (raw['legajo'] as string) : '';
+    const especialidades = Array.isArray(raw['especialidades'])
+      ? (raw['especialidades'] as Array<Record<string, unknown>>)
+          .filter((item) => item && typeof item['nombre'] === 'string')
+          .map((item) => ({ id: String(item['id'] ?? ''), nombre: String(item['nombre']) }))
+      : [];
+    const name = realName || (legajo ? `Profesional ${legajo}` : 'Profesional Vincula-UP');
+    const initials = realName
+      ? realName.split(/\s+/).slice(0, 2).map((parte) => parte.charAt(0).toUpperCase()).join('')
+      : 'P';
+    return {
+      id: String(raw['id'] ?? ''),
+      name,
+      specialty: especialidades.map((item) => item.nombre).join(' / ') || 'Servicio técnico',
+      zone: raw['zonaCoberturaLat'] != null && raw['zonaCoberturaLng'] != null
+        ? 'Zona de cobertura activa'
+        : 'Zona no informada',
+      rating: 0,
+      reviews: 0,
+      availability: 'Consultar disponibilidad',
+      initials,
+      accent: 'sky',
+      usuarioId: raw['usuarioId'] ? String(raw['usuarioId']) : undefined,
+      legajo: legajo || undefined,
+      nombre: nombre || null,
+      apellido: apellido || null,
+      especialidades,
+      fotoUrl: typeof raw['fotoUrl'] === 'string' ? (raw['fotoUrl'] as string) : null,
+      estado: typeof raw['estado'] === 'string' ? (raw['estado'] as string) : 'ACTIVO',
+    };
+  }
+
   saveSpecialty(id: string | null, nombre: string): Observable<unknown> {
     const options = { headers: this.authHeaders() };
     return id ? this.http.put(`${this.baseUrl}/especialidades/${id}`, { nombre }, options)
@@ -87,7 +157,20 @@ export class ApiService {
     return this.http.delete<void>(`${this.baseUrl}/especialidades/${id}`, { headers: this.authHeaders() });
   }
 
-  updateProfessional(id: string, request: { usuarioId: string; legajo: string; especialidadIds: string[] }): Observable<unknown> {
+  /**
+   * Edición del padrón: ms-profesionales sólo valida {@code usuarioId},
+   * {@code legajo} y {@code especialidadIds} (los datos personales viven en
+   * ms-usuarios), así que el resto de los campos es opcional y no se envía.
+   */
+  updateProfessional(id: string, request: {
+    usuarioId: string;
+    legajo: string;
+    especialidadIds: string[];
+    nombre?: string;
+    apellido?: string;
+    email?: string;
+    telefono?: string;
+  }): Observable<unknown> {
     return this.http.put(`${this.baseUrl}/profesionales/${id}`, request, { headers: this.authHeaders() });
   }
 
@@ -153,17 +236,58 @@ export class ApiService {
     return this.http.patch(`${this.baseUrl}/profesionales/${id}/reactivar`, {}, { headers: this.authHeaders() });
   }
 
-  getUsers(role?: string): Observable<Array<{ id: string; nombre: string; apellido: string; email: string; rolNegocio: string }>> {
+  getUsers(role?: string, estado?: string): Observable<Array<{ id: string; nombre: string; apellido: string; email: string; telefono?: string; fotoUrl?: string; rolNegocio: string; estado?: string; keycloakId?: string | null }>> {
     let params = new HttpParams();
     if (role) {
       params = params.set('rol', role);
     }
-    return this.http.get<Array<{ id: string; nombre: string; apellido: string; email: string; rolNegocio: string }>>(`${this.baseUrl}/usuarios`, { params, headers: this.authHeaders() });
+    if (estado) {
+      params = params.set('estado', estado);
+    }
+    return this.http.get<Array<{ id: string; nombre: string; apellido: string; email: string; telefono?: string; fotoUrl?: string; rolNegocio: string; estado?: string; keycloakId?: string | null }>>(`${this.baseUrl}/usuarios`, { params, headers: this.authHeaders() });
+  }
+
+  /**
+   * Alta de un profesional con sus datos: crea el usuario invitado (todavía sin
+   * cuenta Keycloak) y su perfil pendiente de activación. El profesional
+   * completa el alta registrándose en Keycloak con este email y activando su perfil.
+   */
+  createProfessionalInvite(request: {
+    nombre: string;
+    apellido: string;
+    email: string;
+    telefono: string;
+    legajo: string;
+    especialidadIds: string[];
+  }): Observable<unknown> {
+    return this.http.post(`${this.baseUrl}/profesionales/alta`, request, { headers: this.authHeaders() });
+  }
+
+  /** Baneo administrativo de una cuenta (clientes incluidos). */
+  suspendUser(id: string): Observable<unknown> {
+    return this.http.patch(`${this.baseUrl}/usuarios/${id}/suspender`, {}, { headers: this.authHeaders() });
+  }
+
+  /** Levanta el baneo de una cuenta y la devuelve a ACTIVO. */
+  reactivateUser(id: string): Observable<unknown> {
+    return this.http.patch(`${this.baseUrl}/usuarios/${id}/reactivar`, {}, { headers: this.authHeaders() });
   }
 
   getUserById(id: string): Observable<ClienteInfo | null> {
     if (!id) return of(null);
     return this.http.get<ClienteInfo>(`${this.baseUrl}/usuarios/${id}`, { headers: this.authHeaders() });
+  }
+
+  /**
+   * Perfil propio ("Mi cuenta"). El BFF resuelve el id desde el token: el
+   * email se ignora siempre (no se cambia desde el perfil).
+   */
+  getMyAccount(): Observable<UserAccount> {
+    return this.http.get<UserAccount>(`${this.baseUrl}/usuarios/yo`, { headers: this.authHeaders() });
+  }
+
+  updateMyAccount(request: UserAccountUpdate): Observable<UserAccount> {
+    return this.http.patch<UserAccount>(`${this.baseUrl}/usuarios/yo`, request, { headers: this.authHeaders() });
   }
 
   getSpecialtiesMap(): Observable<Record<string, string>> {

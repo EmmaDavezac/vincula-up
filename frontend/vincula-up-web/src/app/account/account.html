@@ -1,0 +1,168 @@
+<section class="account-page">
+  <p class="eyebrow">Mi cuenta</p>
+  <div class="account-heading">
+    <h1>Tu información</h1>
+    <p>Acá ves tus datos y los actualizás por partes: tocá <strong>Editar</strong> en la tarjeta que quieras cambiar.</p>
+  </div>
+
+  @if (loading()) {
+    <div class="card skeleton" aria-busy="true">
+      <div class="skeleton-avatar"></div>
+      <div class="skeleton-lines"><span></span><span></span><span></span></div>
+    </div>
+  } @else if (loadError()) {
+    <div class="card error-card" role="alert">
+      <p>{{ loadError() }}</p>
+      <button type="button" class="secondary" (click)="load()">Reintentar</button>
+    </div>
+  } @else if (account(); as user) {
+    @if (cardNotice()) {
+      <p class="notice" role="status">{{ cardNotice() }}</p>
+    }
+
+    <div class="card profile-hero">
+      <!-- Avatar clicable: el input vive acá adentro, así elegir la foto no
+           obliga a saltar a otra tarjeta en el otro extremo de la página. -->
+      <label class="avatar avatar-editable" title="Elegir una nueva foto de perfil">
+        @if (photoPreview()) {
+          <img [src]="photoPreview()" alt="" />
+        } @else {
+          <span>{{ initials() }}</span>
+        }
+        <input #photoInput type="file" accept="image/jpeg,image/png" (change)="onPhotoSelected($event)" hidden />
+        <span class="avatar-edit-hint" aria-hidden="true">📷</span>
+      </label>
+      <div class="hero-info">
+        <h2>{{ fullName() }}</h2>
+        <p class="hero-email">{{ user.email }}</p>
+        <div class="hero-badges">
+          <span class="badge role">{{ roleLabel() }}</span>
+          @if (memberSince()) {
+            <span class="hero-since">Miembro desde {{ memberSince() }}</span>
+          }
+        </div>
+      </div>
+      @if (editing() === 'photo') {
+        <div class="hero-photo-edit">
+          <p class="hint">JPG o PNG de hasta 2 MB.</p>
+          @if (photoLoading()) { <p class="hint">Leyendo imagen…</p> }
+          @if (photoError()) { <p class="error" role="alert">{{ photoError() }}</p> }
+          @if (cardError()) { <p class="error" role="alert">{{ cardError() }}</p> }
+          <div class="hero-photo-actions">
+            <button type="button" class="primary" [disabled]="saving() || photoLoading()" (click)="savePhoto()">
+              {{ saving() ? 'Guardando…' : 'Guardar foto' }}
+            </button>
+            @if (photoPreview()) {
+              <button type="button" class="secondary" [disabled]="saving()" (click)="clearPhoto()">Quitar foto</button>
+            }
+            <button type="button" class="link" [disabled]="saving()" (click)="cancelEdit()">Cancelar</button>
+          </div>
+        </div>
+      } @else {
+        <button type="button" class="link" (click)="openPhotoPicker()">Cambiar foto</button>
+      }
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Datos personales</h2>
+          <p>Tu nombre como aparece en la plataforma.</p>
+        </div>
+        @if (editing() !== 'personal') {
+          <button type="button" class="link" (click)="startEdit('personal')">Editar</button>
+        }
+      </div>
+      @if (editing() === 'personal') {
+        <div class="form-grid">
+          <label>Nombre
+            <input type="text" [(ngModel)]="personalDraft().nombre" name="nombre" autocomplete="given-name" />
+          </label>
+          <label>Apellido
+            <input type="text" [(ngModel)]="personalDraft().apellido" name="apellido" autocomplete="family-name" />
+          </label>
+        </div>
+        @if (cardError()) { <p class="error" role="alert">{{ cardError() }}</p> }
+        <div class="card-actions">
+          <button type="button" class="primary" [disabled]="saving()" (click)="savePersonal()">
+            {{ saving() ? 'Guardando…' : 'Guardar cambios' }}
+          </button>
+          <button type="button" class="secondary" [disabled]="saving()" (click)="cancelEdit()">Cancelar</button>
+        </div>
+      } @else {
+        <dl class="facts">
+          <div><dt>Nombre</dt><dd>{{ user.nombre }}</dd></div>
+          <div><dt>Apellido</dt><dd>{{ user.apellido }}</dd></div>
+        </dl>
+      }
+    </div>
+
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Contacto</h2>
+          <p>Cómo te ubican los profesionales y la universidad.</p>
+        </div>
+        @if (editing() !== 'contact') {
+          <button type="button" class="link" (click)="startEdit('contact')">Editar</button>
+        }
+      </div>
+      @if (editing() === 'contact') {
+        <div class="form-grid">
+          <label>Teléfono
+            <input type="text" [(ngModel)]="contactDraft().telefono" name="telefono" autocomplete="tel" placeholder="Ej.: 3764 12-3456" />
+          </label>
+        </div>
+        <div class="locked-field">
+          <span>Email</span>
+          <strong>{{ user.email }}</strong>
+          <small>El email no se cambia desde acá: es tu identidad de acceso y se gestiona en tu cuenta.</small>
+        </div>
+        @if (cardError()) { <p class="error" role="alert">{{ cardError() }}</p> }
+        <div class="card-actions">
+          <button type="button" class="primary" [disabled]="saving()" (click)="saveContact()">
+            {{ saving() ? 'Guardando…' : 'Guardar cambios' }}
+          </button>
+          <button type="button" class="secondary" [disabled]="saving()" (click)="cancelEdit()">Cancelar</button>
+        </div>
+      } @else {
+        <dl class="facts">
+          <div><dt>Teléfono</dt><dd>{{ user.telefono || '—' }}</dd></div>
+          <div>
+            <dt>Email</dt>
+            <dd>{{ user.email }} <span class="locked">No editable</span></dd>
+          </div>
+        </dl>
+      }
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Seguridad</h2>
+          <p>Tu contraseña vive en tu cuenta de acceso, no en Vincula-UP.</p>
+        </div>
+      </div>
+      <div class="security-row">
+        <div>
+          <strong>Cambiar contraseña</strong>
+          <p>Te llevamos a tu cuenta de acceso para actualizarla de forma segura.</p>
+        </div>
+        <button type="button" class="secondary" (click)="openPasswordChange()">Cambiar contraseña</button>
+      </div>
+    </div>
+
+    @if (user.rolNegocio === 'PROFESIONAL') {
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Perfil profesional</h2>
+            <p>Tu legajo y tu estado se gestionan con la universidad.</p>
+          </div>
+        </div>
+        <a class="link" routerLink="/activar-perfil">Ver mi perfil profesional →</a>
+      </div>
+    }
+  }
+</section>

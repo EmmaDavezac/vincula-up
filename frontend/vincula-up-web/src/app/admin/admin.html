@@ -11,20 +11,26 @@
 
   <section class="admin-form-panel">
     <h2>Alta individual de profesional</h2>
-    <p class="panel-hint">El profesional queda <strong>pendiente de activación</strong>: se activa solo cuando complete su perfil desde su cuenta.</p>
+    <p class="panel-hint">
+      Cargá los datos del profesional: queda <strong>pendiente de activación</strong> hasta que se registre en
+      Keycloak con este email y complete su perfil desde su cuenta.
+    </p>
     <div class="form-grid">
       <label>
-        <span>Usuario</span>
-        @if (users().length) {
-          <select [(ngModel)]="form.usuarioId" name="usuarioId">
-            <option value="">-- Seleccionar usuario profesional --</option>
-            @for (user of users(); track user.id) {
-              <option [value]="user.id">{{ user.nombre }} {{ user.apellido }} ({{ user.email }})</option>
-            }
-          </select>
-        } @else {
-          <input type="text" [(ngModel)]="form.usuarioId" name="usuarioId" placeholder="UUID del usuario" />
-        }
+        <span>Nombre</span>
+        <input type="text" [(ngModel)]="form.nombre" name="nombre" placeholder="Ej: Luciano" />
+      </label>
+      <label>
+        <span>Apellido</span>
+        <input type="text" [(ngModel)]="form.apellido" name="apellido" placeholder="Ej: Benitez" />
+      </label>
+      <label>
+        <span>Email (con el que se registrará en Keycloak)</span>
+        <input type="text" [(ngModel)]="form.email" name="email" placeholder="luciano@vincula-up.local" />
+      </label>
+      <label>
+        <span>Teléfono</span>
+        <input type="text" [(ngModel)]="form.telefono" name="telefono" placeholder="3442-555555" />
       </label>
       <label>
         <span>Legajo</span>
@@ -44,8 +50,8 @@
       </div>
     </div>
 
-    <button type="button" class="primary" (click)="createProfessional()" [disabled]="submitting()">
-      {{ submitting() ? 'Guardando...' : 'Guardar profesional' }}
+    <button type="button" class="primary" (click)="createProfessionalInvite()" [disabled]="submitting()">
+      {{ submitting() ? 'Guardando...' : 'Registrar profesional' }}
     </button>
   </section>
 
@@ -85,12 +91,24 @@
     <div class="loading">Cargando padrón...</div>
   } @else if (professionals().length) {
     <div class="table-wrap">
-      <table>
-        <thead><tr><th>Legajo</th><th>Especialidades</th><th>Estado</th><th>Acciones</th></tr></thead>
+      <table class="mat-table">
+        <thead><tr>
+          <th class="col-user">Profesional</th>
+          <th>Legajo</th>
+          <th>Especialidades</th>
+          <th>Estado</th>
+          <th class="col-actions">Acciones</th>
+        </tr></thead>
         <tbody>
           @for (professional of professionals(); track professional.id) {
             @if (editingId() === professional.id) {
               <tr class="editing-row">
+                <td>
+                  <div class="user-cell">
+                    <span class="user-photo"></span>
+                    <span class="user-name">{{ professionName(professional) }}</span>
+                  </div>
+                </td>
                 <td>
                   <input type="text" [(ngModel)]="editForm.legajo" name="editLegajo" />
                 </td>
@@ -114,18 +132,36 @@
               </tr>
             } @else {
               <tr>
-                <td>{{ professional.legajo }}</td>
+                <td class="user-cell">
+                  <span class="user-photo" [class.empty]="!(professionalFoto(professional) && professionalFoto(professional)!.startsWith('data:'))">
+                    @if (professionalFoto(professional) && professionalFoto(professional)!.startsWith('data:')) {
+                      <img [src]="professionalFoto(professional)" alt="" loading="lazy" />
+                    }
+                  </span>
+                  <span class="user-name">{{ professionName(professional) }}</span>
+                  @if (invitacionPendiente(professional)) {
+                    <span class="invite-badge">Invitación pendiente</span>
+                  }
+                </td>
+                <td>
+                  {{ professional.legajo }}
+                </td>
                 <td>{{ specialtiesLabel(professional) }}</td>
                 <td><span [class]="statusClass(professional.estado)">{{ estadoLabel(professional.estado) }}</span></td>
                 <td class="actions">
+                  <button type="button" mat-stroked-button matTooltip="Ver más info" (click)="openDetail(professionalToUser(professional))"
+                    [disabled]="detailBusyId() !== null">
+                    <mat-icon>info</mat-icon>
+                    Más info
+                  </button>
                   @if (professional.estado === 'ACTIVO' || professional.estado === 'CARGADO') {
-                    <button type="button" (click)="suspend(professional)">Banear</button>
+                    <button type="button" (click)="suspend(professional)" [disabled]="detailBusyId() !== null">Banear</button>
                   }
                   @if (professional.estado === 'SUSPENDIDO') {
-                    <button type="button" class="btn-reactivate" (click)="reactivate(professional)">Levantar baneo</button>
+                    <button type="button" class="btn-reactivate" (click)="reactivate(professional)" [disabled]="detailBusyId() !== null">Levantar baneo</button>
                   }
-                  <button type="button" (click)="startEdit(professional)">Editar</button>
-                  <button type="button" class="btn-danger" (click)="remove(professional)" [disabled]="deletingId() === professional.id">
+                  <button type="button" (click)="startEdit(professional)" [disabled]="detailBusyId() !== null">Editar</button>
+                  <button type="button" class="btn-danger" (click)="remove(professional)" [disabled]="deletingId() === professional.id || detailBusyId() !== null">
                     {{ deletingId() === professional.id ? 'Eliminando...' : 'Eliminar' }}
                   </button>
                 </td>
@@ -138,4 +174,108 @@
   } @else {
     <div class="empty-state"><h2>No hay profesionales cargados todavía.</h2><p>Completá la carga individual para incorporar un profesional al padrón.</p></div>
   }
+
+  <section class="admin-form-panel clients-panel">
+    <h2>Clientes</h2>
+    <p class="panel-hint">
+      Los clientes se registran solos desde <strong>Crear cuenta</strong>. Desde acá podés banear a quien
+      incumpla las normas: la cuenta suspendida no puede operar hasta que se levante el baneo.
+    </p>
+
+    @if (clients().length) {
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Cliente</th><th>Email</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody>
+            @for (client of clients(); track client.id) {
+              <tr>
+                <td class="user-cell">
+                  <span class="user-photo" [class.empty]="!(client.fotoUrl && client.fotoUrl.startsWith('data:'))">
+                    @if (client.fotoUrl && client.fotoUrl.startsWith('data:')) {
+                      <img [src]="client.fotoUrl" [alt]="clientName(client)" loading="lazy" />
+                    }
+                  </span>
+                  <span class="user-name">{{ clientName(client) }}</span>
+                </td>
+                <td>{{ client.email }}</td>
+                <td><span [class]="statusClass(client.estado)">{{ estadoLabel(client.estado) }}</span></td>
+                <td class="actions">
+                  <button type="button" mat-stroked-button matTooltip="Ver más info" (click)="openDetail(client)"
+                    [disabled]="detailBusyId() !== null">
+                    <mat-icon>info</mat-icon>
+                    Más info
+                  </button>
+                  @if ((client.estado || 'ACTIVO') === 'ACTIVO') {
+                    <button type="button" class="btn-danger" matTooltip="Banear" (click)="banClient(client)"
+                      [disabled]="clientBusyId() === client.id || detailBusyId() !== null">
+                      {{ clientBusyId() === client.id ? 'Baneando...' : 'Banear' }}
+                    </button>
+                  } @else {
+                    <button type="button" class="btn-reactivate" matTooltip="Levantar baneo"
+                      (click)="unbanClient(client)"
+                      [disabled]="clientBusyId() === client.id || detailBusyId() !== null">
+                      {{ clientBusyId() === client.id ? 'Guardando...' : 'Levantar baneo' }}
+                    </button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="empty-inline">Todavía no hay clientes registrados.</p>
+    }
+  </section>
 </section>
+
+  <!-- Ficha de detalle de profesionales y clientes (botón "Más info") -->
+  @if (detailUser(); as detalle) {
+    <div class="detail-overlay" (click)="closeDetail()">
+      <section class="detail-card" role="dialog" aria-modal="true" aria-labelledby="admin-detail-title"
+        (click)="$event.stopPropagation()">
+        <header class="detail-header">
+          <span class="user-photo" [class.empty]="!(detalle.fotoUrl && detalle.fotoUrl.startsWith('data:'))">
+            @if (detalle.fotoUrl && detalle.fotoUrl.startsWith('data:')) {
+              <img [src]="detalle.fotoUrl" [alt]="detailName(detalle)" loading="lazy" />
+            }
+          </span>
+          <div class="detail-identity">
+            <h2 id="admin-detail-title">{{ detailName(detalle) }}</h2>
+            <p>{{ detalle.rolNegocio === 'PROFESIONAL' ? 'Profesional del padrón' : 'Cliente registrado' }}</p>
+          </div>
+          <button type="button" class="detail-close" (click)="closeDetail()">Cerrar</button>
+        </header>
+
+        <dl class="detail-grid">
+          <div>
+            <dt>Email</dt>
+            <dd>{{ detalle.email || 'Sin email' }}</dd>
+          </div>
+          <div>
+            <dt>Teléfono</dt>
+            <dd>{{ detalle.telefono || 'Sin teléfono' }}</dd>
+          </div>
+          <div>
+            <dt>Estado</dt>
+            <dd><span [class]="statusClass(detalle.estado)">{{ estadoLabel(detalle.estado) }}</span></dd>
+          </div>
+          @if (detalle.rolNegocio === 'PROFESIONAL') {
+            <div>
+              <dt>Legajo</dt>
+              <dd>{{ detalle.legajo || 'Sin legajo' }}</dd>
+            </div>
+            <div>
+              <dt>Especialidades</dt>
+              <dd>{{ detailSpecialties(detalle) }}</dd>
+            </div>
+            <div>
+              <dt>Cuenta Keycloak</dt>
+              <dd>{{ detalle.keycloakId ? 'Registrada' : 'Invitación pendiente' }}</dd>
+            </div>
+          }
+        </dl>
+      </section>
+    </div>
+  }
+

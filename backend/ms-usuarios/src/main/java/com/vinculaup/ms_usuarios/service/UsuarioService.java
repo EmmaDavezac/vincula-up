@@ -3,9 +3,12 @@ package com.vinculaup.ms_usuarios.service;
 import com.vinculaup.ms_usuarios.dto.ActualizarUsuarioRequest;
 import com.vinculaup.ms_usuarios.dto.CrearUsuarioRequest;
 import com.vinculaup.ms_usuarios.dto.UsuarioResponse;
+import com.vinculaup.ms_usuarios.entity.EstadoUsuario;
 import com.vinculaup.ms_usuarios.entity.RolNegocio;
 import com.vinculaup.ms_usuarios.entity.Usuario;
 import com.vinculaup.ms_usuarios.repository.UsuarioRepository;
+import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -22,8 +25,13 @@ public class UsuarioService {
         this.repository = repository;
     }
 
+    /**
+     * Alta de usuario. Cuando {@code keycloakId} viene nulo se trata de una
+     * <b>invitación</b>: el administrador precargó los datos (típicamente de un
+     * profesional) y la cuenta de Keycloak se vincula sola en el primer login.
+     */
     public UsuarioResponse crear(CrearUsuarioRequest request) {
-        if (repository.findByKeycloakId(request.keycloakId()).isPresent()) {
+        if (request.keycloakId() != null && repository.findByKeycloakId(request.keycloakId()).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "El usuario de Keycloak ya esta registrado");
         }
         if (repository.existsByEmailIgnoreCase(request.email())) {
@@ -34,10 +42,36 @@ public class UsuarioService {
                 request.keycloakId(),
                 request.nombre(),
                 request.apellido(),
-                request.email(),
+                request.email().trim().toLowerCase(Locale.ROOT),
                 request.telefono(),
                 request.rolNegocio());
         return toResponse(repository.save(usuario));
+    }
+
+    @Transactional(readOnly = true)
+    public UsuarioResponse buscarPorEmail(String email) {
+        if (email == null || email.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El email es obligatorio");
+        }
+        return repository.findByEmailIgnoreCase(email.trim()).map(this::toResponse).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+    }
+
+    public UsuarioResponse suspender(UUID id) {
+        Usuario usuario = findUsuario(id);
+        usuario.suspender();
+        return toResponse(usuario);
+    }
+
+    public UsuarioResponse reactivar(UUID id) {
+        Usuario usuario = findUsuario(id);
+        usuario.reactivar();
+        return toResponse(usuario);
+    }
+
+    private Usuario findUsuario(UUID id) {
+        return repository.findById(id).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
     }
 
     @Transactional(readOnly = true)
@@ -60,6 +94,7 @@ public class UsuarioService {
                 if (byEmail.isPresent()) {
                     Usuario existing = byEmail.get();
                     existing.setKeycloakId(keycloakId);
+                    existing.completarDatosPersonales(nombre, apellido);
                     return toResponse(existing);
                 }
                 // Auto-create user from Keycloak claims
@@ -74,14 +109,29 @@ public class UsuarioService {
     }
 
     @Transactional(readOnly = true)
-    public java.util.List<UsuarioResponse> listar(RolNegocio rol) {
-        if (rol != null) {
-            return repository.findByRolNegocio(rol).stream().map(this::toResponse).toList();
+    public List<UsuarioResponse> listar(RolNegocio rol, EstadoUsuario estado) {
+        if (rol != null && estado != null) {
+            return repository.findByRolNegocioAndEstado(rol, estado).stream().map(this::toResponse).toList();
         }
-        return repository.findAll().stream().map(this::toResponse).toList();
+        return repository.findAll().stream()
+                .filter(usuario -> rol == null || usuario.getRolNegocio() == rol)
+                .filter(usuario -> estado == null || usuario.getEstado() == estado)
+                .map(this::toResponse)
+                .toList();
     }
 
     public UsuarioResponse actualizar(UUID id, ActualizarUsuarioRequest request) {
+        // Un PATCH que no trae ningún cambio efectivo (todo nulo o en blanco,
+        // sin pedido de quitar la foto) es un error del cliente, no un guardado.
+        // Ojo: fotoUrl "" sí es un cambio (quita la foto guardada).
+        boolean tieneCambios = (request.nombre() != null && !request.nombre().isBlank())
+                || (request.apellido() != null && !request.apellido().isBlank())
+                || (request.email() != null && !request.email().isBlank())
+                || (request.telefono() != null && !request.telefono().isBlank())
+                || request.fotoUrl() != null;
+        if (!tieneCambios) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No hay cambios para aplicar");
+        }
         Usuario usuario = repository.findById(id).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
         usuario.update(request.nombre(), request.apellido(), request.email(), request.telefono(), request.fotoUrl());
@@ -104,6 +154,7 @@ public class UsuarioService {
                 usuario.getTelefono(),
                 usuario.getFotoUrl(),
                 usuario.getRolNegocio(),
+                usuario.getEstado(),
                 usuario.getFechaAlta());
     }
 }

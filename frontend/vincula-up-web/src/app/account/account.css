@@ -1,0 +1,61 @@
+:host { display: block; }
+.account-page { margin: 0 auto; max-width: 880px; padding: 4.5rem 1.5rem 5rem; }
+.eyebrow { color: var(--coral); font-size: .75rem; font-weight: 800; letter-spacing: .12em; margin: 0 0 1rem; text-transform: uppercase; }
+.account-heading h1 { color: var(--ink); font-family: Georgia, serif; font-size: clamp(2.2rem, 5vw, 3.6rem); font-weight: 400; margin: 0; }
+.account-heading p { color: var(--muted); line-height: 1.7; margin: .75rem 0 0; max-width: 60ch; }
+.card { background: #fff; border: 1px solid var(--line); border-radius: 1.2rem; margin-top: 1.5rem; padding: 1.5rem; }
+.card h2 { color: var(--ink); font-family: Georgia, serif; font-size: 1.4rem; font-weight: 400; margin: 0; }
+.card-head { align-items: start; display: flex; gap: 1rem; justify-content: space-between; }
+.card-head p { color: var(--muted); font-size: .85rem; margin: .35rem 0 0; }
+.link { background: none; border: none; color: var(--coral); cursor: pointer; font: inherit; font-weight: 700; padding: 0; text-decoration: none; white-space: nowrap; }
+.link:hover { text-decoration: underline; }
+.facts { display: grid; gap: .9rem; margin: 1.25rem 0 0; padding: 0; }
+.facts > div { display: grid; gap: .2rem; }
+.facts dt { color: var(--muted); font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; }
+.facts dd { color: var(--ink); margin: 0; }
+.locked { background: #f3f5f1; border-radius: 999px; color: var(--muted); font-size: .68rem; font-weight: 700; margin-left: .5rem; padding: .15rem .5rem; text-transform: uppercase; }
+.form-grid { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 1.25rem; }
+label { color: var(--muted); display: grid; font-size: .82rem; gap: .45rem; }
+input[type='text'] { background: #f9faf8; border: 1px solid var(--line); border-radius: .8rem; color: var(--ink); font: inherit; padding: .75rem .9rem; }
+.locked-field { background: #f9faf8; border: 1px dashed var(--line); border-radius: .8rem; display: grid; gap: .2rem; margin-top: 1rem; padding: .75rem .9rem; }
+.locked-field span { color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; }
+.locked-field strong { color: var(--ink); }
+.locked-field small { color: var(--muted); font-size: .78rem; }
+.card-actions { display: flex; gap: .75rem; margin-top: 1.25rem; }
+.primary { background: var(--ink); border: none; border-radius: .9rem; color: #fff; cursor: pointer; font: inherit; font-weight: 700; padding: .8rem 1.2rem; }
+.primary:disabled { cursor: wait; opacity: .7; }
+.secondary { background: transparent; border: 1px solid var(--ink); border-radius: .9rem; color: var(--ink); cursor: pointer; font: inherit; padding: .8rem 1.2rem; }
+.secondary:disabled { cursor: wait; opacity: .6; }
+.error { color: var(--coral); font-size: .85rem; margin: .75rem 0 0; }
+.notice { background: #dcebdc; border-radius: .8rem; color: #34633d; margin-top: 1.5rem; padding: .8rem 1rem; }
+.error-card { display: grid; gap: 1rem; }
+.profile-hero { align-items: center; display: flex; flex-wrap: wrap; gap: 1.25rem; }
+.avatar { align-items: center; background: var(--ink); border-radius: 50%; color: #fff; display: flex; flex-shrink: 0; font-weight: 800; height: 4rem; justify-content: center; overflow: hidden; width: 4rem; }
+.avatar.large { height: 5.5rem; width: 5.5rem; font-size: 1.4rem; }
+.avatar img { height: 100%; object-fit: cover; width: 100%; }
+/* Avatar clicable: el input vive acá adentro, así "Cambiar foto" y el selector
+   quedan en el mismo lugar del hero (nada de saltar a una tarjeta lejana). */
+.avatar-editable { cursor: pointer; position: relative; }
+.avatar-editable:focus-visible { outline: 2px solid var(--coral); outline-offset: 3px; }
+.avatar-editable:hover .avatar-edit-hint { opacity: 1; transform: scale(1.05); }
+.avatar-edit-hint { align-items: center; background: rgba(17, 24, 39, .65); border-radius: 50%; bottom: -2px; display: flex; font-size: .85rem; height: 1.5rem; justify-content: center; opacity: .9; position: absolute; right: -2px; transition: opacity .15s ease, transform .15s ease; width: 1.5rem; }
+.hero-photo-edit { border-top: 1px dashed var(--line); flex-basis: 100%; padding-top: 1rem; }
+.hero-photo-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: .6rem; }
+.hero-info { flex: 1; }
+.hero-info h2 { font-size: 1.6rem; }
+.hero-email { color: var(--muted); margin: .25rem 0 0; }
+.hero-badges { align-items: center; display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .5rem; }
+.badge.role { background: #eef3ee; border-radius: 999px; color: #34633d; font-size: .72rem; font-weight: 800; letter-spacing: .05em; padding: .25rem .7rem; text-transform: uppercase; }
+.hero-since { color: var(--muted); font-size: .8rem; }
+.photo-row { align-items: center; display: flex; gap: 1.25rem; margin-top: 1.25rem; }
+.hint { color: var(--muted); font-size: .82rem; margin: 0; }
+.security-row { align-items: center; display: flex; gap: 1rem; justify-content: space-between; margin-top: 1.25rem; }
+.security-row p { color: var(--muted); font-size: .85rem; margin: .3rem 0 0; }
+.skeleton { align-items: center; display: flex; gap: 1.25rem; }
+.skeleton-avatar { background: #eef0ec; border-radius: 50%; height: 4rem; width: 4rem; }
+.skeleton-lines { display: grid; flex: 1; gap: .6rem; }
+.skeleton-lines span { background: #eef0ec; border-radius: .5rem; height: 1rem; }
+@media (max-width: 640px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .profile-hero, .security-row { flex-direction: column; align-items: start; }
+}

@@ -88,11 +88,21 @@ public class UsuarioExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleDataIntegrity(DataIntegrityViolationException ex) {
         Logger log = LoggerFactory.getLogger(UsuarioExceptionHandler.class);
         log.warn("Violación de integridad en ms-usuarios: {}", ex.getMessage());
+        // El mensaje de Hibernate incluye el SQL completo del UPDATE/INSERT (con el
+        // nombre de TODAS las columnas), así que no alcanza con buscar "email": eso
+        // marcaba como "email duplicado" cualquier violación (ej. foto demasiado
+        // larga para la columna). Clasificamos por el error concreto del motor.
+        String lower = (ex.getMostSpecificCause().getMessage() + " | " + ex.getMessage()).toLowerCase();
+        boolean truncamiento = lower.contains("value too long") || lower.contains("data truncation")
+                || lower.contains("right truncation") || lower.contains("too long for");
+        boolean claveDuplicada = lower.contains("duplicate key") || lower.contains("unique constraint")
+                || lower.contains("unique index") || lower.contains("unique key");
         String msg = "Conflicto de datos: el registro ya existe o viola una restricción única.";
-        String lower = ex.getMessage() == null ? "" : ex.getMessage().toLowerCase();
-        if (lower.contains("email")) {
+        if (truncamiento) {
+            msg = "Uno de los campos supera el tamaño permitido (típicamente la foto de perfil). Probá con una imagen más liviana.";
+        } else if (claveDuplicada && lower.contains("email")) {
             msg = "El email ya está registrado.";
-        } else if (lower.contains("keycloak")) {
+        } else if (claveDuplicada && lower.contains("keycloak")) {
             msg = "El usuario de Keycloak ya está registrado.";
         }
         Map<String, Object> body = new LinkedHashMap<>();

@@ -1,0 +1,70 @@
+<mat-toolbar color="none" class="vincula-toolbar">
+  <div class="toolbar-row">
+    <a class="brand" routerLink="/" aria-label="Vincula-UP, inicio" (click)="cerrarMenuMobile()">
+      <span class="brand-mark"><mat-icon>apps</mat-icon></span>
+      <span>Vincula<span>-UP</span></span>
+    </a>
+
+    <nav class="nav-links" aria-label="Navegación principal">
+      @if (auth.hasRole('ADMIN')) {
+        <a routerLink="/admin" routerLinkActive="active" (click)="cerrarMenuMobile()">Administración</a>
+      }
+
+      @if (auth.hasRole('CLIENTE')) {
+        <a routerLink="/solicitudes" routerLinkActive="active" (click)="cerrarMenuMobile()">Mis solicitudes</a>
+      }
+
+      @if (auth.hasRole('PROFESIONAL')) {
+        @if (!auth.isProfessionalActive()) {
+          <a routerLink="/activar-perfil" routerLinkActive="active" (click)="cerrarMenuMobile()">Activar perfil</a>
+        } @else {
+          <a routerLink="/solicitudes" routerLinkActive="active" (click)="cerrarMenuMobile()">Mis solicitudes</a>
+        }
+      }
+    </nav>
+
+    <div class="toolbar-actions">
+      @if (auth.currentUser(); as user) {
+        <a class="session-name" routerLink="/mi-cuenta" title="Ver mi cuenta" (click)="cerrarMenuMobile()">{{ user.name }}</a>
+        <button mat-button (click)="auth.logout(); cerrarMenuMobile()">Salir</button>
+      } @else {
+        <button mat-button class="secondary" (click)="auth.registerWithKeycloak(); cerrarMenuMobile()">Crear cuenta</button>
+        <button mat-button (click)="auth.loginWithKeycloak().subscribe(); cerrarMenuMobile()">Ingresar</button>
+      }
+    </div>
+
+    <button mat-icon-button class="menu-toggle" (click)="toggleMobile()" aria-label="Abrir menú de navegación">
+      <mat-icon>menu</mat-icon>
+    </button>
+  </div>
+</mat-toolbar>
+
+<div class="mobile-panel" [class.open]="mobileOpen" aria-label="Menú de navegación móvil">
+  <nav class="mobile-nav">
+    @if (auth.hasRole('ADMIN')) {
+      <a routerLink="/admin" routerLinkActive="active" (click)="cerrarMenuMobile()">Administración</a>
+    }
+
+    @if (auth.hasRole('CLIENTE')) {
+      <a routerLink="/solicitudes" routerLinkActive="active" (click)="cerrarMenuMobile()">Mis solicitudes</a>
+    }
+
+    @if (auth.hasRole('PROFESIONAL')) {
+      @if (!auth.isProfessionalActive()) {
+        <a routerLink="/activar-perfil" routerLinkActive="active" (click)="cerrarMenuMobile()">Activar perfil</a>
+      } @else {
+        <a routerLink="/solicitudes" routerLinkActive="active" (click)="cerrarMenuMobile()">Mis solicitudes</a>
+      }
+    }
+
+    <div class="mobile-actions">
+      @if (auth.currentUser(); as user) {
+        <a class="session-name" routerLink="/mi-cuenta" (click)="cerrarMenuMobile()">{{ user.name }}</a>
+        <button mat-button (click)="auth.logout(); cerrarMenuMobile()">Salir</button>
+      } @else {
+        <button mat-button class="secondary" (click)="auth.registerWithKeycloak(); cerrarMenuMobile()">Crear cuenta</button>
+        <button mat-button (click)="auth.loginWithKeycloak().subscribe(); cerrarMenuMobile()">Ingresar</button>
+      }
+    </div>
+  </nav>
+</div>

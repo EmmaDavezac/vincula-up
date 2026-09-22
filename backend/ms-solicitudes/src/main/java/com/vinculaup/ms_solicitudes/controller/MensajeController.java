@@ -33,7 +33,9 @@ public class MensajeController {
     }
 
     @GetMapping
-    public List<MensajeResponse> listar(@PathVariable UUID solicitudId, @RequestParam UUID usuarioId) {
-        return service.listar(solicitudId, usuarioId);
+    public List<MensajeResponse> listar(@PathVariable UUID solicitudId,
+            @RequestParam UUID usuarioId,
+            @RequestParam(required = false) UUID keycloakId) {
+        return service.listar(solicitudId, usuarioId, keycloakId);
     }
 }
