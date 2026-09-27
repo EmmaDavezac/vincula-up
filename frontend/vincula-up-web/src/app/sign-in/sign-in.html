@@ -1,12 +1,52 @@
-<section class="auth-page">
-  <div class="auth-copy">
-    <p class="eyebrow">Acceso Vincula-UP</p>
-    <h1>Entrando con Keycloak...</h1>
-    <p>Te estamos redirigiendo al inicio de sesión oficial para acceder a la red.</p>
-  </div>
-  <div class="role-list">
-    @if (loginError()) {
-      <p class="error-message">{{ loginError() }}</p>
-    }
-  </div>
-</section>
+<div class="vu-page signin">
+	<div class="signin__wrap">
+		<a class="vu-link-back" routerLink="/">
+			<vu-icon name="arrow-left" [size]="15" />
+			Volver a inicio
+		</a>
+
+		<section class="signin__card">
+			<div class="signin__brand">
+				<span class="vu-brand-mark" aria-hidden="true">V</span>
+				<span class="vu-brand-name">Vincula<em>-UP</em></span>
+			</div>
+
+			<p class="vu-eyebrow">Acceso a tu cuenta</p>
+			<h1 class="signin__title">Qué bueno verte de nuevo.</h1>
+			<p class="vu-body signin__lead">Ingresá para gestionar tus solicitudes y contactos de la red.</p>
+
+			@if (loginError()) {
+				<p class="vu-alert vu-alert--error" role="alert">{{ loginError() }}</p>
+			}
+
+			<button type="button" class="vu-btn vu-btn--coral vu-btn--block signin__submit" (click)="ingresar()">
+				Ingresar a Vincula-UP
+			</button>
+			<p class="signin__note">Te redirigimos al inicio de sesión seguro de la Universidad Popular.</p>
+
+			<div class="vu-divider">o continuá con</div>
+
+			<div class="signin__roles">
+				<a class="role-card" routerLink="/activar-perfil">
+					<span class="role-card__icon role-card__icon--coral" aria-hidden="true">
+						<vu-icon name="wrench" [size]="17" />
+					</span>
+					<span class="role-card__label">Ingresar como profesional</span>
+				</a>
+				<a class="role-card" routerLink="/admin">
+					<span class="role-card__icon role-card__icon--ink" aria-hidden="true">
+						<vu-icon name="user-round" [size]="17" />
+					</span>
+					<span class="role-card__label">Ingresar como administrador</span>
+				</a>
+			</div>
+
+			<p class="signin__secure">
+				<vu-icon name="lock" [size]="14" class="signin__secure-icon" />
+				Tus datos están protegidos
+			</p>
+		</section>
+
+		<p class="signin__footer">¿Todavía no tenés una cuenta? <a routerLink="/ingresar">Registrate</a></p>
+	</div>
+</div>

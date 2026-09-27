@@ -1,0 +1,26 @@
+:host {
+	display: block;
+}
+
+.admin-dashboard__alert {
+	margin-top: 1.5rem;
+}
+
+.admin-dashboard__panel-head {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+
+@media (min-width: 640px) {
+	.admin-dashboard__panel-head {
+		align-items: flex-start;
+		flex-direction: row;
+		justify-content: space-between;
+	}
+
+	/* El ícono del encabezado no lleva el margen inferior de las tarjetas. */
+	.admin-dashboard__panel-head .vu-admin-metric__icon {
+		margin-bottom: 0;
+	}
+}

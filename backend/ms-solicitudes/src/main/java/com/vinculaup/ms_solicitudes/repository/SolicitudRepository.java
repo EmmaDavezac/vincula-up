@@ -21,4 +21,7 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, UUID> {
     List<Solicitud> findByClienteIdInOrProfesionalIdIn(Collection<UUID> clienteIds, Collection<UUID> profesionalIds);
     List<Solicitud> findByProfesionalIdIn(Collection<UUID> profesionalIds);
     List<Solicitud> findByClienteIdIn(Collection<UUID> clienteIds);
+
+    /** Todas las solicitudes de la más reciente a la más antigua (panel de administración). */
+    List<Solicitud> findAllByOrderByFechaCreacionDesc();
 }

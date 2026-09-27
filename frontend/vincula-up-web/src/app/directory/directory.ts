@@ -8,13 +8,15 @@ import { ApiService } from '../core/services/api.service';
 import { Professional } from '../core/models/professional';
 
 import { CommonModule } from '@angular/common';
+import { VuAvatar } from '../shared/avatar/avatar';
+import { VuIcon } from '../shared/icon/icon';
 import { AuthService } from '../core/services/auth.service';
 
 @Component({
-  imports: [CommonModule, FormsModule, RouterLink],
-  selector: 'app-directory',
-  styleUrl: './directory.css',
-  templateUrl: './directory.html',
+	imports: [CommonModule, FormsModule, RouterLink, VuAvatar, VuIcon],
+	selector: 'app-directory',
+	styleUrl: './directory.css',
+	templateUrl: './directory.html',
 })
 export class Directory {
   private readonly directoryService = inject(DirectoryService);
@@ -27,6 +29,35 @@ export class Directory {
   readonly professionals = signal<Professional[]>([]);
   readonly loading = signal(true);
   readonly message = signal('');
+
+  /**
+   * Estrellas según el promedio real: las llenas redondean el puntaje y las
+   * vacías completan las cinco. Antes se pintaban cinco estrellas fijas aunque
+   * el profesional no tuviera ninguna calificación.
+   */
+  estrellas(rating: number): string {
+    const llenas = Math.max(0, Math.min(5, Math.round(rating || 0)));
+    return '★'.repeat(llenas) + '☆'.repeat(5 - llenas);
+  }
+
+  /** Texto del promedio con un decimal, como "4.5". */
+  promedioTexto(rating: number): string {
+    return (rating || 0).toFixed(1);
+  }
+
+  /** Color del badge de estado (mismos tonos que el prototipo). */
+  estadoClass(estado: string | undefined): string {
+    switch ((estado ?? 'ACTIVO').toUpperCase()) {
+      case 'ACTIVO':
+        return 'vu-badge--aceptada';
+      case 'SUSPENDIDO':
+        return 'vu-badge--rechazada';
+      case 'CARGADO':
+        return 'vu-badge--pendiente';
+      default:
+        return 'vu-badge--neutro';
+    }
+  }
 
   readonly filteredProfessionals = computed(() => {
     const query = this.search().trim().toLowerCase();

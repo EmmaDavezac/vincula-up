@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { AfterViewInit, Component, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -9,8 +9,15 @@ import { DirectoryService } from '../core/services/directory.service';
 import { RequestService } from '../core/services/request.service';
 import { Professional } from '../core/models/professional';
 import { emptyServiceRequest } from '../core/models/service-request';
+import { VuAvatar } from '../shared/avatar/avatar';
+import { VuIcon } from '../shared/icon/icon';
 
-type Step = 'location' | 'specialty' | 'professionals' | 'form';
+/**
+ * Flujo de pasos del prototipo: ubicación → especialidad → día y horario →
+ * elección del profesional (el envío cierra el flujo, sin formulario extra).
+ */
+type Step = 'location' | 'specialty' | 'schedule' | 'professionals';
+
 
 interface PlaceSuggestion {
   lat: number;
@@ -48,12 +55,12 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 }
 
 @Component({
-  imports: [CommonModule, FormsModule, RouterLink, DecimalPipe],
-  selector: 'app-request',
-  styleUrl: './request.css',
-  templateUrl: './request.html',
+	imports: [CommonModule, FormsModule, RouterLink, DecimalPipe, VuAvatar, VuIcon],
+	selector: 'app-request',
+	styleUrl: './request.css',
+	templateUrl: './request.html',
 })
-export class Request implements OnInit {
+export class Request implements OnInit, AfterViewInit {
   private readonly directoryService = inject(DirectoryService);
   private readonly requestService = inject(RequestService);
   private readonly api = inject(ApiService);
@@ -61,14 +68,25 @@ export class Request implements OnInit {
 
   // ── Pasos ──────────────────────────────────────────────
   readonly step = signal<Step>('location');
-  readonly steps: Array<{ key: Step; label: string }> = [
-    { key: 'location', label: 'Ubicación' },
-    { key: 'specialty', label: 'Categoría' },
-    { key: 'professionals', label: 'Profesional' },
-    { key: 'form', label: 'Confirmación' },
+  readonly steps: Array<{ key: Step; label: string; title: string }> = [
+    { key: 'location', label: 'Ubicación', title: '¿Dónde necesitás el servicio?' },
+    { key: 'specialty', label: 'Categoría', title: '¿Qué necesitás resolver?' },
+    { key: 'schedule', label: 'Día y horario', title: '¿Cuándo te viene bien?' },
+    { key: 'professionals', label: 'Profesional', title: 'Elegí un profesional' },
   ];
 
-  // ── Ubicación (paso 1: rápida para ordenar por cercanía) ────────────
+  /**
+   * Resumen del problema: obligatorio. Es lo primero que lee el profesional para
+   * saber a qué se va a dedicar, así que no se puede dejar vacío ni con un
+   * caracter suelto.
+   */
+  readonly problemSummary = signal('');
+  readonly MIN_SUMMARY_LENGTH = 10;
+
+  /** El resumen ya tiene contenido suficiente para avanzar. */
+  readonly resumenValido = computed(() => this.problemSummary().trim().length >= this.MIN_SUMMARY_LENGTH);
+
+  // ── Ubicación (paso 1: mapa embebido + GPS + dirección) ────────
   readonly location = signal<UserLocation>({ lat: null, lng: null, displayName: '', detecting: false, editing: false });
   readonly locationQuery = signal('');
   readonly locationSuggestions = signal<PlaceSuggestion[]>([]);
@@ -82,57 +100,7 @@ export class Request implements OnInit {
   readonly geolocationAvailable = signal<boolean | 'unknown'>('unknown');
   readonly geolocationPermission = signal<PermissionState | 'unknown'>('unknown');
 
-  readonly presetLocations: Array<{ label: string; hint: string; lat: number; lng: number; displayName: string }> = [
-    {
-      label: 'Centro, Concepción del Uruguay',
-      hint: 'Plaza 25 de Mayo',
-      lat: -32.4833,
-      lng: -58.2318,
-      displayName: 'Plaza 25 de Mayo, Concepción del Uruguay, Entre Ríos, Argentina',
-    },
-    {
-      label: 'Universidad (FCAD-UNER)',
-      hint: 'FCAD – UNER, Costanera',
-      lat: -32.479,
-      lng: -58.2332,
-      displayName: 'Facultad de Ciencias de la Administración, Costanera, Concepción del Uruguay, Entre Ríos, Argentina',
-    },
-    {
-      label: 'Hospital Samic',
-      hint: 'Urquiza 484',
-      lat: -32.4866,
-      lng: -58.238,
-      displayName: 'Hospital SAMIC, Urquiza 484, Concepción del Uruguay, Entre Ríos, Argentina',
-    },
-    {
-      label: 'Terminal de Ómnibus',
-      hint: 'J.M. de Rosas y Rivadavia',
-      lat: -32.4748,
-      lng: -58.2288,
-      displayName: 'Terminal de Ómnibus de Concepción del Uruguay, Rivadavia, Concepción del Uruguay, Entre Ríos, Argentina',
-    },
-    {
-      label: 'Barrio Jardín',
-      hint: 'Zona norte, cerca del lago',
-      lat: -32.473,
-      lng: -58.2432,
-      displayName: 'Barrio Jardín, Concepción del Uruguay, Entre Ríos, Argentina',
-    },
-    {
-      label: 'Parada 8 / Acceso Sur',
-      hint: 'Ruta 14, Acceso a la ciudad',
-      lat: -32.4995,
-      lng: -58.2258,
-      displayName: 'Parada 8 - Acceso Sur, Concepción del Uruguay, Entre Ríos, Argentina',
-    },
-  ];
-
   private suggestionTimer: ReturnType<typeof setTimeout> | null = null;
-
-  readonly showMapModal = signal(false);
-  readonly mapSearchQuery = signal('');
-  readonly mapSearching = signal(false);
-  readonly tempMapLocation = signal<TempMapLocation | null>(null);
 
   readonly address = signal('');
   readonly gpsPosition = signal<GpsPosition | null>(null);
@@ -143,20 +111,40 @@ export class Request implements OnInit {
   readonly allProfessionals = signal<ProfWithDistance[]>([]);
   readonly loadingProfessionals = signal(true);
   readonly professionalsError = signal('');
-  readonly failedPhotos = signal<Set<string>>(new Set());
 
-  markPhotoFailed(id: string): void {
-    this.failedPhotos.update((ids) => new Set([...ids, id]));
+  /**
+   * Catálogo completo de especialidades. Sin esto la lista del paso 2 salía de
+   * los profesionales cargados, así que faltaban todas las especialidades que
+   * todavía no tiene ningún técnico asignado.
+   */
+  readonly catalogoEspecialidades = signal<string[]>([]);
+
+  /** Especialidades de un profesional, con respaldo en su especialidad única. */
+  private especialidadesDe(p: ProfWithDistance): string[] {
+    const nombres = (p.especialidades ?? []).map((e) => e.nombre).filter((n): n is string => !!n && !!n.trim());
+    if (nombres.length) {
+      return nombres;
+    }
+    // Sin lista de especialidades se usa la única, si no es el texto genérico.
+    const unica = p.specialty?.trim();
+    return unica && unica !== 'Servicio técnico' ? [unica] : [];
   }
 
-  /** Especialidades únicas derivadas de los profesionales cargados */
+  /**
+   * Especialidades que se ofrecen en el paso 2: el catálogo completo, para que
+   * se vean todas aunque todavía no haya técnicos para alguna.
+   */
   readonly specialties = computed(() => {
+    const catalogo = this.catalogoEspecialidades();
+    if (catalogo.length) {
+      return catalogo;
+    }
+    // Sin catálogo disponible se arma con lo que traen los profesionales.
     const seen = new Set<string>();
     const result: string[] = [];
     for (const p of this.allProfessionals()) {
-      const specs = p.especialidades?.map((e) => e.nombre) ?? [p.specialty];
-      for (const s of specs) {
-        if (s && !seen.has(s)) {
+      for (const s of this.especialidadesDe(p)) {
+        if (!seen.has(s)) {
           seen.add(s);
           result.push(s);
         }
@@ -167,16 +155,43 @@ export class Request implements OnInit {
 
   readonly selectedSpecialty = signal<string | null>(null);
 
-  /** Profesionales filtrados por especialidad, ordenados por rating DESC y distancia ASC */
+  /** Especialidades que cuentan con al menos un técnico activo. */
+  private readonly especialidadesConTecnicos = computed(() => {
+    const conTecnicos = new Set<string>();
+    for (const p of this.allProfessionals()) {
+      for (const n of this.especialidadesDe(p)) {
+        conTecnicos.add(n);
+      }
+    }
+    return conTecnicos;
+  });
+
+  /**
+   * Si la especialidad todavía no tiene técnicos lo aclara en el paso 2, para no
+   * elegirla a ciegas y frenar en el paso 4 sin opciones.
+   */
+  tieneTecnicos(specialty: string): boolean {
+    return this.especialidadesConTecnicos().has(specialty);
+  }
+
+  /**
+   * Profesionales de la especialidad elegida, ordenados según el selector del
+   * prototipo: por proximidad o por reputación.
+   */
+  readonly sortBy = signal<'proximidad' | 'reputacion'>('proximidad');
+
   readonly filteredProfessionals = computed(() => {
     const spec = this.selectedSpecialty();
     if (!spec) return [];
+    const byDistance = this.sortBy() === 'proximidad';
     return [...this.allProfessionals()]
-      .filter((p) => {
-        const names = p.especialidades?.map((e) => e.nombre) ?? [p.specialty];
-        return names.some((n) => n === spec);
-      })
+      .filter((p) => this.especialidadesDe(p).some((n) => n === spec))
       .sort((a, b) => {
+        if (byDistance) {
+          const distance = (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity);
+          if (distance !== 0) return distance;
+          return b.rating - a.rating;
+        }
         if (b.rating !== a.rating) return b.rating - a.rating;
         return (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity);
       });
@@ -185,14 +200,95 @@ export class Request implements OnInit {
   readonly selectedProfessional = signal<ProfWithDistance | null>(null);
   readonly form = signal<ReturnType<typeof emptyServiceRequest>>(emptyServiceRequest());
 
-  // ── Formulario ─────────────────────────────────────────
+  // ── Turno (día y franja horaria, igual que el prototipo) ───────────────
   readonly date = signal('');
   readonly time = signal('');
   readonly submitted = signal(false);
   readonly errorMessage = signal('');
 
+  /** Días del prototipo (etiqueta corta y día de la semana real). */
+  readonly dayOptions: ReadonlyArray<{ id: string; label: string; weekday: number }> = [
+    { id: 'LUN', label: 'Lun', weekday: 1 },
+    { id: 'MAR', label: 'Mar', weekday: 2 },
+    { id: 'MIÉ', label: 'Mié', weekday: 3 },
+    { id: 'JUE', label: 'Jue', weekday: 4 },
+    { id: 'VIE', label: 'Vie', weekday: 5 },
+    { id: 'SÁB', label: 'Sáb', weekday: 6 },
+    { id: 'DOM', label: 'Dom', weekday: 0 },
+  ];
+
+  /** Franjas horarias del prototipo: el turno siempre es un rango. */
+  readonly slotOptions: ReadonlyArray<{ id: string; label: string; start: string; end: string }> = [
+    { id: 'MANANA', label: '08:00 a 12:00 hs', start: '08:00', end: '12:00' },
+    { id: 'MEDIODIA', label: '12:00 a 16:00 hs', start: '12:00', end: '16:00' },
+    { id: 'TARDE', label: '16:00 a 20:00 hs', start: '16:00', end: '20:00' },
+  ];
+
+  readonly selectedDay = signal('');
+  readonly selectedSlot = signal('');
+  /** Fin de la franja elegida: junto con `time` forma el rango del turno. */
+  readonly timeEnd = signal('');
+
+  elegirDia(id: string): void {
+    this.selectedDay.set(id);
+    this.date.set(this.proximaFecha(this.dayOptions.find((day) => day.id === id)?.weekday ?? 1));
+  }
+
+  elegirHorario(id: string): void {
+    const franja = this.slotOptions.find((slot) => slot.id === id);
+    this.selectedSlot.set(id);
+    this.time.set(franja?.start ?? '');
+    this.timeEnd.set(franja?.end ?? '');
+  }
+
+  /** Próxima fecha (YYYY-MM-DD) del día de la semana elegido, contando desde hoy. */
+  private proximaFecha(weekday: number): string {
+    const today = new Date();
+    const diff = (weekday - today.getDay() + 7) % 7;
+    const target = new Date(today);
+    target.setDate(today.getDate() + diff);
+    const month = `${target.getMonth() + 1}`.padStart(2, '0');
+    const day = `${target.getDate()}`.padStart(2, '0');
+    return `${target.getFullYear()}-${month}-${day}`;
+  }
+
+  /** Etiqueta de la franja elegida (para el resumen del turno). */
+  get selectedSlotLabel(): string {
+    return this.slotOptions.find((slot) => slot.id === this.selectedSlot())?.label ?? '';
+  }
+
+  /** Texto legible del turno elegido (ej. "jueves 2 de octubre"). */
+  get turnoLegible(): string {
+    if (!this.date()) {
+      return '';
+    }
+    const [year, month, day] = this.date().split('-').map(Number);
+    if (!year || !month || !day) {
+      return this.date();
+    }
+    const value = new Date(year, month - 1, day);
+    const texto = value.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+    return texto.charAt(0).toUpperCase() + texto.slice(1);
+  }
+
   constructor() {
     this.loadAllProfessionals();
+    this.loadCatalogoEspecialidades();
+
+    // El pin del mapa sigue siempre a la ubicación elegida, venga del GPS, de una
+    // sugerencia o de hacer clic en el mapa. Si el punto cae fuera de la vista,
+    // el mapa también se recentra para que el pin no quede invisible.
+    effect(() => {
+      const loc = this.location();
+      if (loc.lat == null || loc.lng == null || !this.mapaListo()) {
+        return;
+      }
+      this.marcador?.setLatLng([loc.lat, loc.lng]);
+      const mapa = this.mapaInstancia;
+      if (mapa && !mapa.getBounds().contains([loc.lat, loc.lng])) {
+        mapa.setView([loc.lat, loc.lng], mapa.getZoom() ?? 15);
+      }
+    });
   }
 
   ngOnInit(): void {
@@ -210,25 +306,6 @@ export class Request implements OnInit {
     } else if (!available) {
       this.geolocationPermission.set('denied');
     }
-  }
-
-  selectPresetLocation(preset: { label: string; hint: string; lat: number; lng: number; displayName: string }): void {
-    this.locationQuery.set(preset.displayName);
-    this.locationSuggestions.set([]);
-    this.locationSuggestionOpen.set(false);
-    this.locatorError.set('');
-    this.location.set({ lat: preset.lat, lng: preset.lng, displayName: preset.displayName, detecting: false, editing: false });
-    this.address.set(preset.displayName);
-    this.pendingLocation.set({ lat: preset.lat, lng: preset.lng, displayName: preset.displayName });
-    this.form.update((f) =>
-      emptyServiceRequest({
-        ...f,
-        address: preset.displayName,
-        latitude: preset.lat,
-        longitude: preset.lng,
-      })
-    );
-    this.updateDistances(preset.lat, preset.lng);
   }
 
   isStepDone(key: Step): boolean {
@@ -250,6 +327,11 @@ export class Request implements OnInit {
         clearTimeout(this.suggestionTimer);
         this.suggestionTimer = null;
       }
+      // Sin texto a la vista, el pin vuelve al punto realmente confirmado.
+      const loc = this.location();
+      if (loc.lat != null && loc.lng != null) {
+        this.previsualizarPunto(loc.lat, loc.lng);
+      }
       return;
     }
     this.locationSuggestionOpen.set(true);
@@ -269,18 +351,38 @@ export class Request implements OnInit {
         `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=6&accept-language=es`,
       );
       const data = (await res.json()) as Array<{ lat: string; lon: string; display_name: string }>;
-      this.locationSuggestions.set(
-        (Array.isArray(data) ? data : []).map((item) => ({
-          lat: parseFloat(item.lat),
-          lng: parseFloat(item.lon),
-          displayName: item.display_name,
-        })),
-      );
+      const sugerencias = (Array.isArray(data) ? data : []).map((item) => ({
+        lat: parseFloat(item.lat),
+        lng: parseFloat(item.lon),
+        displayName: item.display_name,
+      }));
+      this.locationSuggestions.set(sugerencias);
+
+      // El mapa acompaña lo que se está escribiendo: muestra el primer resultado
+      // como previsualización. La dirección se confirma al elegir una sugerencia
+      // o al presionar Enter, no mientras se tipea.
+      const primera = sugerencias[0];
+      if (primera) {
+        this.previsualizarPunto(primera.lat, primera.lng);
+      }
     } catch {
       this.locationSuggestions.set([]);
     } finally {
       this.locationSearching.set(false);
     }
+  }
+
+  /**
+   * Mueve el pin a un punto candidato sin darlo por confirmado: sirve para
+   * previsualizar lo que se está escribiendo y para volver al punto elegido
+   * cuando se borra el texto.
+   */
+  private previsualizarPunto(lat: number, lng: number): void {
+    if (!this.mapaListo() || this.step() !== 'location') {
+      return;
+    }
+    this.marcador?.setLatLng([lat, lng]);
+    this.mapaInstancia?.setView([lat, lng], this.mapaInstancia.getZoom() ?? 15);
   }
 
   hideSuggestionLater(): void {
@@ -367,9 +469,6 @@ export class Request implements OnInit {
         })
       );
       this.updateDistances(lat, lng);
-      if (this.step() === 'location') {
-        this.step.set('specialty');
-      }
     });
   }
 
@@ -462,7 +561,6 @@ export class Request implements OnInit {
         })
       );
       this.updateDistances(lat, lng);
-      this.step.set('specialty');
     });
   }
 
@@ -480,7 +578,6 @@ export class Request implements OnInit {
         })
       );
       this.updateDistances(chosen.lat, chosen.lng);
-      this.step.set('specialty');
       return;
     }
     const loc = this.location();
@@ -494,7 +591,6 @@ export class Request implements OnInit {
         })
       );
       this.updateDistances(loc.lat, loc.lng);
-      this.step.set('specialty');
     }
   }
 
@@ -509,165 +605,184 @@ export class Request implements OnInit {
       this.address.set(current.displayName);
     }
     this.step.set('location');
-    const existing = this.pendingLocation();
-    if (existing) {
-      setTimeout(() => this.initInteractiveMap(), 120);
-    }
+    // Vuelve al paso 1: el mapa se refresca para mostrar el punto actual.
+    this.onCambioDePaso();
   }
 
-  // ── Modal de mapa interactivo ──────────────────────────
+  /**
+   * Mapa del paso 1. Va embebido en la pantalla (no en un modal ni en un servicio
+   * externo): el cliente hace clic o arrastra el pin para ajustar el punto exacto,
+   * que es lo mismo que hacía antes el botón "Ajustar el punto en el mapa".
+   */
+  readonly mapaListo = signal(false);
+  private mapaInstancia: any = null;
+  private marcador: any = null;
+  private mapaIntentos = 0;
 
-  openMapPicker(): void {
-    const loc = this.location();
-    const addr = this.address();
-    const base = loc.lat != null && loc.lng != null
-      ? { lat: loc.lat, lng: loc.lng, displayName: loc.displayName || addr }
-      : { lat: null as number | null, lng: null as number | null, displayName: addr };
-    this.showMapModal.set(true);
-    this.mapSearchQuery.set(base.displayName || '');
-    this.tempMapLocation.set(
-      base.lat != null && base.lng != null
-        ? { lat: base.lat, lng: base.lng, displayName: base.displayName || '' }
-        : { lat: -32.4844, lng: -58.2328, displayName: '' }
-    );
-    setTimeout(() => this.initInteractiveMap(), 120);
+  /** Centro por defecto: Concepción del Uruguay, hasta que seija un punto. */
+  private readonly centroPorDefecto = { lat: -32.4844, lng: -58.2328 };
+
+  async ngAfterViewInit(): Promise<void> {
+    await this.inicializarMapa();
   }
 
-  closeMapPicker(): void {
-    this.showMapModal.set(false);
-    this.destroyInteractiveMap();
-  }
-
-  private interactiveMapInstance: any = null;
-  private interactiveMapMarker: any = null;
-
-  private initInteractiveMap(): void {
+  /** Crea (o refresca) el mapa embebido del paso 1. */
+  async inicializarMapa(): Promise<void> {
     const L = (window as any).L;
-    if (!L) return;
-    const container = document.getElementById('interactive-map');
-    if (!container) return;
-    const loc = this.tempMapLocation();
-    if (!loc) return;
-
-    if (this.interactiveMapInstance && !document.body.contains(this.interactiveMapInstance.getContainer())) {
-      this.interactiveMapInstance.remove();
-      this.interactiveMapInstance = null;
-      this.interactiveMapMarker = null;
+    const container = document.getElementById('mapa-paso');
+    if (!L || !container) {
+      // El script de Leaflet puede tardar: reintentamos un par de veces.
+      if (this.mapaIntentos++ < 20) {
+        setTimeout(() => void this.inicializarMapa(), 150);
+      }
+      return;
     }
 
-    if (!this.interactiveMapInstance) {
-      this.interactiveMapInstance = L.map('interactive-map').setView([loc.lat, loc.lng], 15);
+    const loc = this.location();
+    const lat = loc.lat ?? this.centroPorDefecto.lat;
+    const lng = loc.lng ?? this.centroPorDefecto.lng;
 
+    if (!this.mapaInstancia) {
+      this.mapaInstancia = L.map('mapa-paso', { scrollWheelZoom: false }).setView([lat, lng], 15);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '© OpenStreetMap contributors',
-      }).addTo(this.interactiveMapInstance);
+      }).addTo(this.mapaInstancia);
 
-      this.interactiveMapMarker = L.marker([loc.lat, loc.lng], { draggable: true }).addTo(this.interactiveMapInstance);
-
-      this.interactiveMapMarker.on('dragend', (event: any) => {
-        const position = event.target.getLatLng();
-        this.tempMapLocation.set({ lat: position.lat, lng: position.lng, displayName: '' });
+      this.marcador = L.marker([lat, lng], { draggable: true }).addTo(this.mapaInstancia);
+      this.marcador.on('dragend', (event: any) => {
+        const posicion = event.target.getLatLng();
+        void this.aplicarPunto(posicion.lat, posicion.lng);
       });
-
-      this.interactiveMapInstance.on('click', (e: any) => {
-        const { lat: clickLat, lng: clickLng } = e.latlng;
-        this.interactiveMapMarker?.setLatLng([clickLat, clickLng]);
-        this.tempMapLocation.set({ lat: clickLat, lng: clickLng, displayName: '' });
+      this.mapaInstancia.on('click', (event: any) => {
+        this.marcador?.setLatLng([event.latlng.lat, event.latlng.lng]);
+        void this.aplicarPunto(event.latlng.lat, event.latlng.lng);
       });
-
-      setTimeout(() => {
-        this.interactiveMapInstance?.invalidateSize();
-      }, 200);
+      this.mapaListo.set(true);
     } else {
-      this.interactiveMapInstance.setView([loc.lat, loc.lng], 15);
-      this.interactiveMapMarker?.setLatLng([loc.lat, loc.lng]);
+      this.mapaInstancia.setView([lat, lng], this.mapaInstancia.getZoom() ?? 15);
+      this.marcador?.setLatLng([lat, lng]);
     }
+    setTimeout(() => this.mapaInstancia?.invalidateSize(), 200);
   }
 
-  async searchAddressInMap(): Promise<void> {
-    const query = this.mapSearchQuery().trim();
-    if (!query || this.mapSearching()) return;
-    this.mapSearching.set(true);
-    try {
-      const encoded = encodeURIComponent(query);
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1&accept-language=es`,
-      );
-      const data = (await res.json()) as Array<{ lat: string; lon: string; display_name: string }>;
-      if (Array.isArray(data) && data.length > 0) {
-        this.tempMapLocation.set({
-          lat: parseFloat(data[0].lat),
-          lng: parseFloat(data[0].lon),
-          displayName: data[0].display_name,
-        });
-        this.mapSearchQuery.set(data[0].display_name);
-        setTimeout(() => this.initInteractiveMap(), 50);
-      }
-    } catch {
-      // ignore
-    } finally {
-      this.mapSearching.set(false);
-    }
-  }
-
-  async useBrowserGpsInMap(): Promise<void> {
-    if (!('geolocation' in navigator)) return;
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        const name = await this.reverseGeocode(latitude, longitude);
-        this.tempMapLocation.set({ lat: latitude, lng: longitude, displayName: name });
-        this.mapSearchQuery.set(name);
-        setTimeout(() => this.initInteractiveMap(), 50);
-      },
-      () => { /* ignore */ },
-      { timeout: 8000, maximumAge: 60000 },
-    );
-  }
-
-  async confirmMapLocation(): Promise<void> {
-    const temp = this.tempMapLocation();
-    if (!temp) return;
-    let displayName = temp.displayName || '';
-    if (!displayName.trim()) {
-      displayName = await this.reverseGeocode(temp.lat, temp.lng);
-      this.tempMapLocation.set({ ...temp, displayName });
-    }
-    this.location.set({ lat: temp.lat, lng: temp.lng, displayName, detecting: false, editing: false });
-    this.address.set(displayName);
-    this.locationQuery.set(displayName);
-    this.pendingLocation.set({ lat: temp.lat, lng: temp.lng, displayName });
+  /**
+   * Aplica el punto elegido en el mapa: resuelve la dirección, actualiza el
+   * formulario y recalcula la distancia a los profesionales.
+   */
+  async aplicarPunto(lat: number, lng: number, displayName = ''): Promise<void> {
+    const nombre = displayName.trim() || (await this.reverseGeocode(lat, lng));
+    this.location.set({ lat, lng, displayName: nombre, detecting: false, editing: false });
+    this.address.set(nombre);
+    this.locationQuery.set(nombre);
+    this.pendingLocation.set({ lat, lng, displayName: nombre });
     this.form.update((f) =>
-      emptyServiceRequest({
-        ...f,
-        address: displayName,
-        latitude: temp.lat,
-        longitude: temp.lng,
-      })
+      emptyServiceRequest({ ...f, address: nombre, latitude: lat, longitude: lng }),
     );
-    this.updateDistances(temp.lat, temp.lng);
+    this.updateDistances(lat, lng);
     this.gpsError.set('');
     this.locatorError.set('');
-    this.closeMapPicker();
+  }
+
+  /** El mapa del paso 1 acompaña a la pantalla mientras se está en él. */
+  onCambioDePaso(): void {
     if (this.step() === 'location') {
-      this.step.set('specialty');
+      setTimeout(() => void this.inicializarMapa(), 80);
     }
   }
 
-  private destroyInteractiveMap(): void {
-    if (this.interactiveMapInstance) {
-      this.interactiveMapInstance.remove();
-      this.interactiveMapInstance = null;
-      this.interactiveMapMarker = null;
-    }
-  }
 
   // ── Navegación entre pasos ─────────────────────────────
 
+  /** Número de paso (1 a 4) tal como lo muestra el prototipo. */
+  get pasoActual(): number {
+    return this.steps.findIndex((item) => item.key === this.step()) + 1;
+  }
+
+  get tituloPaso(): string {
+    return this.steps.find((item) => item.key === this.step())?.title ?? '';
+  }
+
+  /**
+   * Qué falta para poder avanzar en el paso actual. El botón de "Continuar"
+   * queda deshabilitado cuando falta algo, así que este aviso es lo que explica
+   * por qué: sin él no se sabe qué hay que completar.
+   */
+  readonly faltaEnElPaso = computed(() => {
+    switch (this.step()) {
+      case 'location': {
+        const faltan: string[] = [];
+        if (!this.location().lat || !this.location().lng) {
+          faltan.push('la dirección donde necesitás el servicio');
+        }
+        return faltan;
+      }
+      case 'specialty': {
+        const faltan: string[] = [];
+        if (!this.selectedSpecialty()) {
+          faltan.push('la especialidad');
+        }
+        if (!this.resumenValido()) {
+          faltan.push(`el resumen del problema (mínimo ${this.MIN_SUMMARY_LENGTH} caracteres)`);
+        }
+        return faltan;
+      }
+      case 'schedule': {
+        const faltan: string[] = [];
+        if (!this.selectedDay()) {
+          faltan.push('el día');
+        }
+        if (!this.selectedSlot()) {
+          faltan.push('el horario');
+        }
+        return faltan;
+      }
+      case 'professionals':
+        return this.selectedProfessional() ? [] : ['el profesional que te atienda'];
+      default:
+        return [];
+    }
+  });
+
+  /** Texto del aviso: "Falta elegir el día y el horario." */
+  get avisoPendiente(): string {
+    const faltan = this.faltaEnElPaso();
+    if (faltan.length === 0) {
+      return '';
+    }
+    const lista =
+      faltan.length === 1
+        ? faltan[0]
+        : `${faltan.slice(0, -1).join(', ')} y ${faltan[faltan.length - 1]}`;
+    return `Para continuar falta ${lista}.`;
+  }
+
+  /** Habilita "Continuar" según lo que el prototipo exige en cada paso. */
+  get canContinue(): boolean {
+    switch (this.step()) {
+      case 'location':
+        return Boolean(this.address().trim());
+      case 'specialty':
+        // La categoría sola no alcanza: hay que describir el problema.
+        return Boolean(this.selectedSpecialty()) && this.resumenValido();
+      case 'schedule':
+        return Boolean(this.selectedDay() && this.selectedSlot());
+      case 'professionals':
+        return Boolean(this.selectedProfessional());
+      default:
+        return false;
+    }
+  }
+
   selectSpecialty(specialty: string): void {
     this.selectedSpecialty.set(specialty);
-    this.step.set('professionals');
+    // Puede cambiar la lista de profesionales: se limpia la elección anterior.
+    this.selectedProfessional.set(null);
+  }
+
+  /** Vuelve al paso 2 para elegir otra especialidad. */
+  goToSpecialtyStep(): void {
+    this.step.set('specialty');
   }
 
   selectProfessional(prof: ProfWithDistance): void {
@@ -682,16 +797,24 @@ export class Request implements OnInit {
         longitude: this.location().lng,
       })
     );
-    this.step.set('form');
+  }
+
+  continuar(): void {
+    if (!this.canContinue) {
+      return;
+    }
+    const index = this.pasoActual - 1;
+    const next = this.steps[index + 1];
+    if (next) {
+      this.step.set(next.key);
+    }
   }
 
   goBack(): void {
-    if (this.step() === 'professionals') {
-      this.step.set('specialty');
-    } else if (this.step() === 'form') {
-      this.step.set('professionals');
-    } else if (this.step() === 'specialty') {
-      this.goToLocationStep();
+    const index = this.pasoActual - 1;
+    const previous = this.steps[index - 1];
+    if (previous) {
+      this.step.set(previous.key);
     }
   }
 
@@ -791,6 +914,13 @@ export class Request implements OnInit {
     const prof = this.selectedProfessional();
     if (!prof) return;
 
+    // Última barrera: aunque se llegara al envío sin resumen, no sale.
+    if (!this.resumenValido()) {
+      this.errorMessage.set('Contanos brevemente el problema para que el profesional pueda venir preparado.');
+      this.step.set('specialty');
+      return;
+    }
+
     const clienteId = this.auth.currentUser()?.id;
     if (!clienteId || !this.isValidUuid(clienteId)) {
       this.errorMessage.set('Necesitás iniciar sesión antes de enviar la solicitud.');
@@ -817,6 +947,8 @@ export class Request implements OnInit {
       latitud: lat,
       longitud: lng,
       fechaHoraPropuesta: `${this.date()}T${this.time()}:00`,
+      fechaHoraFinPropuesta: this.timeEnd() ? `${this.date()}T${this.timeEnd()}:00` : null,
+      descripcion: this.problemSummary().trim(),
     };
 
     this.api.createRequest(payload).pipe(
@@ -924,6 +1056,22 @@ export class Request implements OnInit {
             : null,
       })));
       this.loadingProfessionals.set(false);
+    });
+  }
+
+  /**
+   * Carga el catálogo de especialidades para que el paso 2 muestre todas, no solo
+   * las que ya tienen algún técnico asignado. Si el catálogo no está disponible
+   * se sigue con las especialidades derivadas de los profesionales.
+   */
+  private loadCatalogoEspecialidades(): void {
+    this.api.getSpecialtiesMap().pipe(
+      catchError(() => of({} as Record<string, string>)),
+    ).subscribe((mapa) => {
+      const nombres = Object.values(mapa ?? {})
+        .map((n) => (n ?? '').trim())
+        .filter((n) => n.length > 0);
+      this.catalogoEspecialidades.set([...new Set(nombres)].sort((a, b) => a.localeCompare(b, 'es')));
     });
   }
 

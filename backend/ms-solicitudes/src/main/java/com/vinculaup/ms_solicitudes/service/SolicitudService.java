@@ -8,6 +8,7 @@ import com.vinculaup.ms_solicitudes.dto.CrearSolicitudRequest;
 import com.vinculaup.ms_solicitudes.dto.CambiarEstadoRequest;
 import com.vinculaup.ms_solicitudes.dto.SolicitudResponse;
 import com.vinculaup.ms_solicitudes.entity.EstadoSolicitud;
+import com.vinculaup.ms_solicitudes.entity.RolCancelacion;
 import com.vinculaup.ms_solicitudes.entity.Solicitud;
 import com.vinculaup.ms_solicitudes.repository.SolicitudRepository;
 import java.time.DayOfWeek;
@@ -69,10 +70,19 @@ public class SolicitudService {
         LocalizacionUbicacion ubicacion = resolverUbicacion(
                 request.direccionServicio(), request.latitud(), request.longitud());
 
+        // El turno es un rango: la disponibilidad se valida contra el inicio y el fin
+        // se muestra en la tarjeta, así que no puede ser anterior al inicio.
+        if (request.fechaHoraFinPropuesta() != null
+                && !request.fechaHoraFinPropuesta().isAfter(request.fechaHoraPropuesta())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El fin del turno tiene que ser posterior al inicio");
+        }
+
         Solicitud solicitud = repository.save(new Solicitud(
                 request.clienteId(), profesional.id(), request.especialidadId(),
                 ubicacion.direccion(), ubicacion.latitud(), ubicacion.longitud(),
-                request.fechaHoraPropuesta()));
+                request.fechaHoraPropuesta(), request.descripcion().trim(),
+                request.fechaHoraFinPropuesta()));
         return toResponse(solicitud);
     }
 
@@ -159,19 +169,44 @@ public class SolicitudService {
         return toResponse(solicitud);
     }
 
+    /**
+     * El turno se da por terminado desde cualquiera de los dos lados: el profesional
+     * que terminó el trabajo o el cliente que confirmó que ya está hecho.
+     */
     public SolicitudResponse completar(UUID id, CambiarEstadoRequest request) {
         Solicitud solicitud = find(id);
-        ensureClienteActor(solicitud, request, "Solo el cliente puede completar la solicitud");
+        ensureParticipante(solicitud, request, "Solo el cliente o el profesional pueden completar la solicitud");
         ensureState(solicitud, EstadoSolicitud.ACEPTADA);
         solicitud.cambiarEstado(EstadoSolicitud.COMPLETADA);
         return toResponse(solicitud);
     }
 
+    /**
+     * Cancelación desde cualquiera de los dos lados. Se puede cancelar mientras el
+     * turno está pendiente de respuesta y también después de haberlo aceptado.
+     * <p>
+     * El motivo es obligatorio para las dos partes: la contraparte tiene que saber
+     * por qué se dio de baja el turno, así que no se acepta una cancelación sin
+     * explicación.
+     */
     public SolicitudResponse cancelar(UUID id, CambiarEstadoRequest request) {
         Solicitud solicitud = find(id);
-        ensureClienteActor(solicitud, request, "Solo el cliente puede cancelar la solicitud");
-        ensureState(solicitud, EstadoSolicitud.PENDIENTE);
-        solicitud.cancelar(request.motivo());
+        RolCancelacion rol = rolDeParticipante(solicitud, request,
+                "Solo el cliente o el profesional pueden cancelar la solicitud");
+        if (solicitud.getEstado() != EstadoSolicitud.PENDIENTE
+                && solicitud.getEstado() != EstadoSolicitud.ACEPTADA) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "La solicitud no permite esta transicion desde " + solicitud.getEstado());
+        }
+        String motivo = request.motivo() == null ? "" : request.motivo().trim();
+        if (motivo.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Indicá el motivo de la cancelación");
+        }
+        // Se guarda el id canónico de la parte que canceló (no el alias de Keycloak),
+        // así cada lado puede mostrar si la canceló él o la contraparte.
+        UUID actor = rol == RolCancelacion.CLIENTE ? solicitud.getClienteId() : solicitud.getProfesionalId();
+        solicitud.cancelar(motivo, actor);
         return toResponse(solicitud);
     }
 
@@ -206,12 +241,33 @@ public class SolicitudService {
     }
 
     /** El cliente también puede estar guardado con su id de ms-usuarios o con el keycloakId histórico. */
-    private void ensureClienteActor(Solicitud solicitud, CambiarEstadoRequest request, String mensaje) {
-        boolean esCliente = identidadesDe(request.actorId(), aliasIdsDe(request)).ids()
-                .contains(solicitud.getClienteId());
-        if (!esCliente) {
+    /** El actor tiene que ser el cliente o el profesional de esa solicitud. */
+    private void ensureParticipante(Solicitud solicitud, CambiarEstadoRequest request, String mensaje) {
+        rolDeParticipante(solicitud, request, mensaje);
+    }
+
+    /**
+     * Valida que quien actúa sea parte de la solicitud y devuelve con qué rol lo hace
+     * (cliente o profesional). La cancelación guarda ese rol para poder aclarar en la
+     * pantalla quién dio de baja el turno.
+     */
+    private RolCancelacion rolDeParticipante(Solicitud solicitud, CambiarEstadoRequest request, String mensaje) {
+        var ids = identidadesDe(request.actorId(), aliasIdsDe(request)).ids();
+        boolean esCliente = ids.contains(solicitud.getClienteId());
+        boolean esProfesional = ids.stream().anyMatch(identidad -> {
+            try {
+                return profesionalesClient.obtenerIdentidades(List.of(identidad)).stream()
+                        .anyMatch(perfil -> esIdentidadDe(perfil, identidad)
+                                || perfil.id().equals(solicitud.getProfesionalId())
+                                || perfil.id().equals(identidad));
+            } catch (RuntimeException ignored) {
+                return false;
+            }
+        });
+        if (!esCliente && !esProfesional) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, mensaje);
         }
+        return esCliente ? RolCancelacion.CLIENTE : RolCancelacion.PROFESIONAL;
     }
 
     private static List<UUID> aliasIdsDe(CambiarEstadoRequest request) {
@@ -288,10 +344,25 @@ public class SolicitudService {
     private SolicitudResponse toResponse(Solicitud solicitud) {
         return new SolicitudResponse(
                 solicitud.getId(), solicitud.getClienteId(), solicitud.getProfesionalId(),
-                solicitud.getEspecialidadId(), solicitud.getDireccionServicio(),
+                solicitud.getEspecialidadId(), solicitud.getDireccionServicio(), solicitud.getDescripcion(),
                 solicitud.getLatitud(), solicitud.getLongitud(),
-                solicitud.getFechaHoraPropuesta(), solicitud.getEstado(),
-                solicitud.getMotivoCancelacion(), solicitud.getFechaCreacion(),
+                solicitud.getFechaHoraPropuesta(), solicitud.getFechaHoraFinPropuesta(), solicitud.getEstado(),
+                solicitud.getMotivoCancelacion(), rolQueCancelo(solicitud), solicitud.getFechaCreacion(),
                 solicitud.getFechaCambioEstado());
+    }
+
+    /** Qué lado canceló el turno, o {@code null} en las solicitudes anteriores al registro. */
+    private static RolCancelacion rolQueCancelo(Solicitud solicitud) {
+        UUID actor = solicitud.getCanceladaPor();
+        if (actor == null || solicitud.getEstado() != EstadoSolicitud.CANCELADA) {
+            return null;
+        }
+        if (actor.equals(solicitud.getClienteId())) {
+            return RolCancelacion.CLIENTE;
+        }
+        if (actor.equals(solicitud.getProfesionalId())) {
+            return RolCancelacion.PROFESIONAL;
+        }
+        return null;
     }
 }

@@ -41,7 +41,7 @@ class CalificacionServiceTest {
 
         // Solicitud histórica completada, guardada con el keycloakId del cliente.
         Solicitud solicitud = new Solicitud(clienteKeycloakId, UUID.randomUUID(), UUID.randomUUID(),
-                "Calle 123", -34.60, -58.38, LocalDateTime.now().minusDays(1));
+                "Calle 123", -34.60, -58.38, LocalDateTime.now().minusDays(1), "Se corta la luz y no vuelve.", null);
         solicitud.cambiarEstado(EstadoSolicitud.COMPLETADA);
         when(solicitudRepository.findById(solicitudId)).thenReturn(Optional.of(solicitud));
         when(calificacionRepository.findBySolicitudId(solicitudId)).thenReturn(Optional.empty());

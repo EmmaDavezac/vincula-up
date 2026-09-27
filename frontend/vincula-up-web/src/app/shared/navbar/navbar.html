@@ -1,70 +1,116 @@
-<mat-toolbar color="none" class="vincula-toolbar">
-  <div class="toolbar-row">
-    <a class="brand" routerLink="/" aria-label="Vincula-UP, inicio" (click)="cerrarMenuMobile()">
-      <span class="brand-mark"><mat-icon>apps</mat-icon></span>
-      <span>Vincula<span>-UP</span></span>
-    </a>
+<header class="vu-header">
+	<div class="vu-header-inner">
+		<a class="vu-brand brand" routerLink="/" aria-label="Vincula-UP inicio">
+			<span class="vu-brand-mark" aria-hidden="true">V</span>
+			<span class="vu-brand-name">Vincula<em>-UP</em></span>
+		</a>
 
-    <nav class="nav-links" aria-label="Navegación principal">
-      @if (auth.hasRole('ADMIN')) {
-        <a routerLink="/admin" routerLinkActive="active" (click)="cerrarMenuMobile()">Administración</a>
-      }
+		<!--
+			Secciones de la barra superior. Dentro del panel el administrador recorre
+			sus cuatro secciones desde acá (antes vivían en una columna lateral); en
+			él se enlaza al panel como una sección más. En móvil esta barra no
+			se muestra: las secciones van en la barra inferior.
+		-->
+		<nav class="nav-links" aria-label="Navegación principal">
+			@if (auth.hasRole('ADMIN')) {
+				@if (enPanel()) {
+					<a
+						routerLink="/admin"
+						routerLinkActive="active"
+						[routerLinkActiveOptions]="{ exact: true }"
+						>Resumen</a
+					>
+					<a routerLink="/admin/profesionales" routerLinkActive="active">Profesionales</a>
+					<a routerLink="/admin/categorias" routerLinkActive="active">Categorías</a>
+					<a routerLink="/admin/clientes" routerLinkActive="active">Clientes</a>
+				} @else {
+					<a routerLink="/admin" routerLinkActive="active">Administración</a>
+				}
+			}
 
-      @if (auth.hasRole('CLIENTE')) {
-        <a routerLink="/solicitudes" routerLinkActive="active" (click)="cerrarMenuMobile()">Mis solicitudes</a>
-      }
+			@if (auth.hasRole('CLIENTE') && !enPanel()) {
+				<a routerLink="/solicitudes" routerLinkActive="active">Mis solicitudes</a>
+			}
 
-      @if (auth.hasRole('PROFESIONAL')) {
-        @if (!auth.isProfessionalActive()) {
-          <a routerLink="/activar-perfil" routerLinkActive="active" (click)="cerrarMenuMobile()">Activar perfil</a>
-        } @else {
-          <a routerLink="/solicitudes" routerLinkActive="active" (click)="cerrarMenuMobile()">Mis solicitudes</a>
-        }
-      }
-    </nav>
+			@if (auth.hasRole('PROFESIONAL') && !enPanel()) {
+				<a
+					routerLink="{{ auth.isProfessionalActive() ? '/solicitudes' : '/activar-perfil' }}"
+					routerLinkActive="active"
+					>{{ auth.isProfessionalActive() ? 'Mis solicitudes' : 'Activar perfil' }}</a
+				>
+			}
+		</nav>
 
-    <div class="toolbar-actions">
-      @if (auth.currentUser(); as user) {
-        <a class="session-name" routerLink="/mi-cuenta" title="Ver mi cuenta" (click)="cerrarMenuMobile()">{{ user.name }}</a>
-        <button mat-button (click)="auth.logout(); cerrarMenuMobile()">Salir</button>
-      } @else {
-        <button mat-button class="secondary" (click)="auth.registerWithKeycloak(); cerrarMenuMobile()">Crear cuenta</button>
-        <button mat-button (click)="auth.loginWithKeycloak().subscribe(); cerrarMenuMobile()">Ingresar</button>
-      }
-    </div>
+		<div class="toolbar-actions">
+			@if (auth.currentUser(); as user) {
+				<div class="user-menu">
+					<button
+						type="button"
+						class="user-menu__trigger session-name"
+						[attr.aria-expanded]="userMenuOpen"
+						aria-haspopup="menu"
+						(click)="userMenuOpen = !userMenuOpen"
+					>
+						<vu-avatar size="xs" [nombre]="user.name" [foto]="user.fotoUrl" />
+						<span class="user-menu__identity">
+							<span class="user-menu__name">{{ user.name }}</span>
+							<span class="user-menu__role">{{ user.roleLabel || roleTexto(user.role) }}</span>
+						</span>
+						<vu-icon
+							name="chevron-down"
+							[size]="16"
+							class="user-menu__chevron"
+							[class.is-open]="userMenuOpen"
+						/>
+					</button>
 
-    <button mat-icon-button class="menu-toggle" (click)="toggleMobile()" aria-label="Abrir menú de navegación">
-      <mat-icon>menu</mat-icon>
-    </button>
-  </div>
-</mat-toolbar>
+					@if (userMenuOpen) {
+						<div class="user-menu__panel" role="menu">
+							<a
+								role="menuitem"
+								routerLink="/mi-cuenta"
+								class="user-menu__item"
+								(click)="userMenuOpen = false"
+							>
+								<vu-icon name="user-round" [size]="17" />
+								Actualizar perfil
+							</a>
+							<button
+								type="button"
+								role="menuitem"
+								class="user-menu__item user-menu__item--danger"
+								(click)="salir()"
+							>
+								<vu-icon name="log-out" [size]="17" />
+								Cerrar sesión
+							</button>
+						</div>
+					}
+				</div>
+			} @else {
+				<a class="auth-action auth-action--link" routerLink="/ingresar">Ingresar</a>
+				<button
+					type="button"
+					class="vu-btn vu-btn--ink auth-action auth-action--cta"
+					(click)="crearCuenta()"
+				>
+					Crear cuenta
+				</button>
+			}
+		</div>
+	</div>
+</header>
 
-<div class="mobile-panel" [class.open]="mobileOpen" aria-label="Menú de navegación móvil">
-  <nav class="mobile-nav">
-    @if (auth.hasRole('ADMIN')) {
-      <a routerLink="/admin" routerLinkActive="active" (click)="cerrarMenuMobile()">Administración</a>
-    }
-
-    @if (auth.hasRole('CLIENTE')) {
-      <a routerLink="/solicitudes" routerLinkActive="active" (click)="cerrarMenuMobile()">Mis solicitudes</a>
-    }
-
-    @if (auth.hasRole('PROFESIONAL')) {
-      @if (!auth.isProfessionalActive()) {
-        <a routerLink="/activar-perfil" routerLinkActive="active" (click)="cerrarMenuMobile()">Activar perfil</a>
-      } @else {
-        <a routerLink="/solicitudes" routerLinkActive="active" (click)="cerrarMenuMobile()">Mis solicitudes</a>
-      }
-    }
-
-    <div class="mobile-actions">
-      @if (auth.currentUser(); as user) {
-        <a class="session-name" routerLink="/mi-cuenta" (click)="cerrarMenuMobile()">{{ user.name }}</a>
-        <button mat-button (click)="auth.logout(); cerrarMenuMobile()">Salir</button>
-      } @else {
-        <button mat-button class="secondary" (click)="auth.registerWithKeycloak(); cerrarMenuMobile()">Crear cuenta</button>
-        <button mat-button (click)="auth.loginWithKeycloak().subscribe(); cerrarMenuMobile()">Ingresar</button>
-      }
-    </div>
-  </nav>
-</div>
+<!-- Confirmación de cierre de sesión. -->
+@if (confirmarSalida()) {
+	<vu-confirm
+		titulo="Cerrar sesión"
+		mensaje="¿Querés cerrar sesión?"
+		detalle="Tu sesión queda cerrada en este dispositivo. Si estabas editando algo sin guardar, se pierde."
+		textoConfirmar="Cerrar sesión"
+		[peligro]="true"
+		icono="log-out"
+		(confirmado)="confirmarCierreDeSesion()"
+		(cancelado)="confirmarSalida.set(false)"
+	/>
+}

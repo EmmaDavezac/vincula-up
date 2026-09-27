@@ -1,361 +1,367 @@
-<section class="requests-page">
-  @if (isProfessional()) {
-    <p class="eyebrow">Panel profesional</p>
-    <h1>Solicitudes recibidas</h1>
-    <p class="intro">Gestioná los turnos y pedidos de trabajo que recibís de los clientes, coordiná por chat y mirá la ubicación del servicio.</p>
-  } @else {
-    <p class="eyebrow">Tu actividad</p>
-    <h1>Mis solicitudes</h1>
-    <p class="intro">Acá vas a encontrar el estado de cada pedido, la coordinación por chat y la calificación del servicio.</p>
-  }
+<div class="vu-page requests">
+	<section class="requests__section vu-container">
+		<div class="requests__head">
+			<div>
+				@if (isProfessional()) {
+					<h1 class="vu-display">Solicitudes recibidas</h1>
+					<p class="vu-lead">Revisá los pedidos de clientes de tu zona y gestioná cada turno desde un solo lugar.</p>
+				} @else {
+					<h1 class="vu-display">Mis solicitudes</h1>
+					<p class="vu-lead">Revisá tus pedidos, seguí cada servicio y contactá a tus profesionales.</p>
+				}
+			</div>
+			@if (isClient()) {
+				<a class="vu-btn vu-btn--coral requests__new" routerLink="/solicitar">
+					<vu-icon name="plus" [size]="17" />
+					Crear nueva solicitud
+				</a>
+			}
+		</div>
 
-  @if (errorMessage()) {
-    <p class="error-message">{{ errorMessage() }}</p>
-  }
+		@if (errorMessage()) {
+			<p class="vu-alert vu-alert--error requests__alert" role="alert">{{ errorMessage() }}</p>
+		}
+		@if (specialtiesError()) {
+			<p class="vu-alert vu-alert--error requests__alert" role="alert">
+				{{ specialtiesError() }}
+				<button type="button" class="vu-btn vu-btn--sm vu-btn--quiet" (click)="loadEspecialidades()">Reintentar</button>
+			</p>
+		}
+		@if (successMessage()) {
+			<p class="vu-alert vu-alert--success requests__alert" role="status">{{ successMessage() }}</p>
+		}
 
-  @if (specialtiesError()) {
-    <p class="error-message" role="alert">{{ specialtiesError() }}</p>
-    <button type="button" (click)="loadEspecialidades()">Reintentar cargar especialidades</button>
-  }
+		@if (requests().length) {
+			<div class="requests__bar">
+				<div>
+					<p class="vu-eyebrow-sm">{{ countPending() }} {{ pendingLabel }}</p>
+					<span class="requests__total">{{ requests().length }} en total</span>
+				</div>
 
-  @if (successMessage()) {
-    <p class="success-message">{{ successMessage() }}</p>
-  }
+				<div class="requests__filters">
+					<label class="requests__field">
+						<span>Filtrar por estado</span>
+						<select class="vu-select vu-select--sm" [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event)">
+							@for (option of statusOptions; track option.value) {
+								<option [value]="option.value">{{ option.label }}</option>
+							}
+						</select>
+					</label>
 
-  @if (requests().length) {
-    <div class="request-header-bar">
-      @if (!isProfessional()) {
-        <a class="btn-primary land-cta" routerLink="/solicitar">
-          <mat-icon>add</mat-icon>Nueva solicitud
-        </a>
-      }
-      <h2 class="request-count">
-        {{ filteredRequests().length }} de {{ requests().length }} solicitud{{ requests().length !== 1 ? 'es' : '' }}
-      </h2>
-    </div>
+					@if (specialtyOptions().length > 1) {
+						<label class="requests__field">
+							<span>Especialidad</span>
+							<select class="vu-select vu-select--sm" [ngModel]="specialtyFilter()" (ngModelChange)="specialtyFilter.set($event)">
+								<option value="TODAS">Todas</option>
+								@for (option of specialtyOptions(); track option.value) {
+									<option [value]="option.value">{{ option.label }}</option>
+								}
+							</select>
+						</label>
+					}
 
-    <div class="filters-panel">
-      <mat-chip-listbox class="status-chips" [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event)" aria-label="Filtrar por estado">
-        @for (option of statusOptions; track option.value) {
-          <mat-chip-option [value]="option.value">{{ option.label }}</mat-chip-option>
-        }
-      </mat-chip-listbox>
+					@if (hasActiveFilters()) {
+						<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="clearFilters()">Limpiar</button>
+					}
+				</div>
+			</div>
 
-      <div class="filters-row">
-        <mat-form-field class="filter-field search-field" appearance="outline" subscriptSizing="dynamic">
-          <mat-label>Buscar</mat-label>
-          <input matInput [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)" placeholder="Especialidad, persona, dirección…" />
-          @if (searchTerm()) {
-            <button matSuffix mat-icon-button type="button" aria-label="Limpiar búsqueda" (click)="searchTerm.set('')">
-              <mat-icon>close</mat-icon>
-            </button>
-          } @else {
-            <mat-icon matSuffix>search</mat-icon>
-          }
-        </mat-form-field>
+			<div class="requests__grid">
+				@for (request of filteredRequests(); track request.id) {
+					<article class="req-card request-card">
+						<div class="req-card__head">
+							@if (isProfessional()) {
+								@if (clienteDe(request); as cli) {
+									<vu-avatar size="md" [nombre]="clienteNombre(request)" [foto]="cli.fotoUrl" />
+								} @else {
+									<vu-avatar size="md" [nombre]="clienteNombre(request)" />
+								}
+								<div class="req-card__identity">
+									<h2 class="req-card__name vu-truncate">{{ clienteNombre(request) }}</h2>
+									<p class="req-card__sub vu-truncate">{{ especialidadNombre(request) }}</p>
+								</div>
+							} @else {
+								<vu-avatar size="md" [nombre]="profesionalNombre(request) || 'Sin asignar'" [foto]="fotoProfesional(request)" />
+								<div class="req-card__identity">
+									<h2 class="req-card__name">{{ profesionalNombre(request) || 'Sin asignar' }}</h2>
+									<p class="req-card__sub vu-truncate">{{ especialidadNombre(request) }}</p>
+								</div>
+							}
+							<span class="vu-badge req-card__badge" [class]="statusClass(request.status)">{{ statusText(request.status) }}</span>
+						</div>
 
-        @if (specialtyOptions().length > 1) {
-          <mat-form-field class="filter-field" appearance="outline" subscriptSizing="dynamic">
-            <mat-label>Especialidad</mat-label>
-            <mat-select [ngModel]="specialtyFilter()" (ngModelChange)="specialtyFilter.set($event)">
-              <mat-option value="TODAS">Todas</mat-option>
-              @for (option of specialtyOptions(); track option.value) {
-                <mat-option [value]="option.value">{{ option.label }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-        }
+						<div class="req-card__meta">
+							<span>
+								<vu-icon name="clock" [size]="15" />
+								{{ request.date }} · {{ horarioLabel(request) }}
+							</span>
+						</div>
 
-        <mat-form-field class="filter-field" appearance="outline" subscriptSizing="dynamic">
-          <mat-label>Ordenar</mat-label>
-          <mat-select [ngModel]="sortOrder()" (ngModelChange)="sortOrder.set($event)">
-            @for (option of sortOptions; track option.value) {
-              <mat-option [value]="option.value">{{ option.label }}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
+						@if (nextAction(request.status); as proximo) {
+						<p class="req-card__detail">{{ proximo }}</p>
+					}
 
-        @if (hasActiveFilters()) {
-          <button mat-stroked-button type="button" class="clear-filters" (click)="clearFilters()">
-            <mat-icon>filter_alt_off</mat-icon>Limpiar
-          </button>
-        }
-      </div>
-    </div>
+						<!-- Resumen del problema que escribió el cliente: es lo que explica el motivo de la visita. -->
+						@if (request.description) {
+							<div class="req-card__problem">
+								<p class="req-card__problem-label">{{ isProfessional() ? 'Qué hay que resolver' : 'Tu resumen' }}</p>
+								<p class="req-card__problem-text">{{ request.description }}</p>
+							</div>
+						}
 
-    @if (filteredRequests().length) {
-    <div class="request-list">
-      @for (request of filteredRequests(); track request.id) {
-        <article class="request-card">
-          <div class="request-header-info">
-            <div class="status-wrap">
-              <span class="status-badge" [class]="request.status.toLowerCase()">{{ statusText(request.status) }}</span>
-            </div>
-            <h2>{{ especialidadNombre(request) }}</h2>
-            <p class="counterpart">
-              @if (isProfessional()) {
-                <!-- Avatar del cliente: muestra su foto de perfil (si tiene) al
-                     revisar y aceptar la solicitud; iniciales como fallback. -->
-                <span class="client-avatar" aria-hidden="true">
-                  @if (clienteDe(request)?.fotoUrl) {
-                    <img [src]="clienteDe(request)!.fotoUrl" [alt]="'Foto de ' + clienteNombre(request)" />
-                  } @else {
-                    <span class="client-avatar-fallback">{{ clienteInitials(request) }}</span>
-                  }
-                </span>
-                Solicitado por <strong>{{ clienteNombre(request) }}</strong>
-                @if (clienteDe(request); as c) {
-                  <span class="client-contact">
-                    · {{ c.email }}
-                    @if (c.telefono) { · 📞 {{ c.telefono }} }
-                  </span>
-                }
-              } @else {
-                <!-- Avatar del profesional: muestra su foto de perfil (si tiene)
-                     junto al nombre real; iniciales como fallback. -->
-                <span class="client-avatar" aria-hidden="true">
-                  @if (fotoProfesional(request); as foto) {
-                    <img [src]="foto" [alt]="'Foto de ' + profesionalNombre(request)"
-                      loading="lazy" referrerpolicy="no-referrer" (error)="markPhotoFailed(profesionalDe(request)?.id || request.professionalId)" />
-                  } @else {
-                    <span class="client-avatar-fallback">{{ profesionalInitials(request) }}</span>
-                  }
-                </span>
-                Con profesional: <strong>{{ profesionalNombre(request) }}</strong>
-                @if (profesionalDe(request); as prof) {
-                  <span class="client-contact">· {{ prof.specialty }}</span>
-                }
-              }
-            </p>
-            <div class="request-meta">
-              <span>📅 {{ request.date }} · {{ request.time }}</span>
-              <span>📍 {{ request.address }}</span>
-            </div>
-            <p class="next-step-hint">{{ nextAction(request.status) }}</p>
+						<p class="req-card__address">
+							<vu-icon name="map-pin" [size]="15" />
+							{{request.address }}
+						</p>
 
-            @if (isProfessional()) {
-              <div class="detail-toggle-row">
-                <button type="button" class="btn-text-sm link" (click)="toggleDetail(request.id)">
-                  {{ isDetailOpen(request.id) ? '▲ Ocultar detalle' : '▼ Ver detalle de solicitud y cliente' }}
-                </button>
-              </div>
+						<!--
+							El mapa es para el profesional: es él quien tiene que llegar al
+							domicilio. En las solicitudes enviadas alcanza con la dirección.
+						-->
+						@if (isProfessional()) {
+							@if (embeddedMapUrl(request); as mapUrl) {
+								<div class="req-card__map">
+									<iframe class="embedded-map" title="Mapa de la ubicación: {{ request.address }}" [src]="mapUrl" loading="lazy"></iframe>
+								</div>
+							} @else {
+								<div class="vu-map req-card__map" role="img" [attr.aria-label]="'Ubicación aproximada de ' + request.address">
+									<span class="vu-map-pin"></span>
+									<span class="vu-map-label">Ubicación aproximada · {{ request.address }}</span>
+								</div>
+							}
+						}
 
-              @if (isDetailOpen(request.id)) {
-                <div class="detail-panel">
-                  <div class="detail-grid">
-                    <div>
-                      <h4>🧾 Solicitud</h4>
-                      <ul>
-                        <li><strong>ID:</strong> {{ request.id }}</li>
-                        <li><strong>Especialidad:</strong> {{ especialidadNombre(request) }}</li>
-                        <li><strong>Fecha propuesta:</strong> {{ request.date }} · {{ request.time }}</li>
-                        @if (request.fechaCreacion) {
-                          <li><strong>Creada:</strong> {{ request.fechaCreacion | slice:0:16 }}</li>
-                        }
-                        @if (request.fechaCambioEstado) {
-                          <li><strong>Último cambio:</strong> {{ request.fechaCambioEstado | slice:0:16 }}</li>
-                        }
-                        <li><strong>Estado:</strong> {{ statusText(request.status) }}</li>
-                      </ul>
-                    </div>
-                    <div>
-                      <h4>👤 Cliente</h4>
-                      @if (clienteDe(request); as cli) {
-                        <div class="client-card">
-                          <span class="client-avatar large" aria-hidden="true">
-                            @if (cli.fotoUrl) {
-                              <img [src]="cli.fotoUrl" [alt]="'Foto de ' + clienteNombre(request)" />
-                            } @else {
-                              <span class="client-avatar-fallback">{{ clienteInitials(request) }}</span>
-                            }
-                          </span>
-                          <ul>
-                            <li><strong>Nombre:</strong> {{ cli.nombre }} {{ cli.apellido }}</li>
-                            <li><strong>Email:</strong> {{ cli.email }}</li>
-                            @if (cli.telefono) {
-                              <li><strong>Teléfono:</strong> {{ cli.telefono }}</li>
-                            }
-                            @if (cli.fechaAlta) {
-                              <li><strong>Cliente desde:</strong> {{ cli.fechaAlta | slice:0:10 }}</li>
-                            }
-                          </ul>
-                        </div>
-                      } @else {
-                        <p class="muted-sm">Cargando ficha del cliente… (ID {{ request.clienteId }})</p>
-                      }
-                    </div>
-                  </div>
-                </div>
-              } @else {
-                <!-- Resumen compacto de ubicación para el profesional -->
-                <div class="location-summary">
-                  <span class="muted-sm">📍 {{ request.address }}</span>
-                </div>
-              }
-            }
+					<!--
+							Las solicitudes cerradas aclaran quién lo hizo: el que canceló lo ve como
+							"vos" y la contraparte por su nombre. El motivo solo se muestra si lo
+							escribió esa persona.
+						-->
+						@if (cierreLabel(request)) {
+							<p class="req-card__reason">
+								{{ cierreLabel(request) }}
+								@if (motivoLegible(request)) {
+									<span class="req-card__reason-detail">Motivo: {{ motivoLegible(request) }}</span>
+								}
+							</p>
+						}
 
-            <!-- Ubicación del servicio: visible para profesional y cliente -->
-            <div class="location-box">
-              <h4>📍 {{ isProfessional() ? 'Dirección donde tenés que ir' : 'Dirección donde se realizará el servicio' }}</h4>
-              <p class="location-address">{{ request.address }}</p>
-              @if (embeddedMapUrl(request); as mapUrl) {
-                <iframe class="embedded-map" title="Mapa de la ubicación: {{ request.address }}" [src]="mapUrl" loading="lazy"></iframe>
-              } @else {
-                <p class="muted-sm">Usá la dirección para ubicar el servicio.</p>
-              }
-              <div class="location-actions">
-                <a class="btn-secondary link-btn" [href]="googleMapsUrl(request)" target="_blank" rel="noopener">Ver en Google Maps ↗</a>
-              </div>
-            </div>
+					<div class="req-card__actions">
+						<!--
+							Un único botón para cualquier cambio de estado: el profesional
+							acepta, rechaza, completa o cancela; el cliente completa o cancela.
+						-->
+						@if (estadosDisponibles(request).length) {
+							<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="abrirActualizarEstado(request)">
+								<vu-icon name="pencil" [size]="15" />
+								Actualizar estado
+							</button>
+						}
 
-            @if (request.motivoCancelacion) {
-              <div class="motivo-box">
-                <strong>Detalle:</strong> {{ request.motivoCancelacion }}
-              </div>
-            }
-          </div>
+						<!-- El chat queda disponible para los dos lados una vez aceptada. -->
+						@if (request.status === 'ACEPTADA') {
+							<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="toggleChat(request.id)">
+								<vu-icon name="message-circle" [size]="16" />
+								{{ activeChatId() === '' + request.id ? 'Cerrar chat' : 'Ir al chat' }}
+							</button>
+						}
 
-          <div class="request-actions-col">
-            <!-- Actions for PENDIENTE -->
-            @if (request.status === 'PENDIENTE') {
-              <div class="actions">
-                @if (isProfessional()) {
-                  <button type="button" class="btn-primary" (click)="accept(request)">Aceptar turno</button>
-                  <button type="button" class="btn-secondary" (click)="promptReject(request)">Rechazar</button>
-                }
-                @if (isClient()) {
-                  <button type="button" class="btn-danger" (click)="cancel(request)">Cancelar solicitud</button>
-                }
-              </div>
+						@if (!isProfessional() && request.status === 'RECHAZADA') {
+							<a class="vu-btn vu-btn--outline vu-btn--sm vu-btn--coral-text" routerLink="/solicitar">Buscar otro profesional</a>
+						}
+					</div>
 
-              <!-- Prompt box for rejecting request -->
-              @if (isProfessional() && rejectingRequestId() === '' + request.id) {
-                <div class="prompt-box">
-                  <label>
-                    <span>Motivo del rechazo:</span>
-                    <input type="text" [ngModel]="rejectReason()" (ngModelChange)="rejectReason.set($event)" placeholder="Ej. Fuera de horario o zona" />
-                  </label>
-                  <div class="prompt-actions">
-                    <button type="button" class="btn-danger-sm" (click)="confirmReject()">Confirmar rechazo</button>
-                    <button type="button" class="btn-text-sm" (click)="cancelReject()">Volver</button>
-                  </div>
-                </div>
-              }
-            }
+					<!-- Calificación del servicio -->
+					@if (request.status === 'COMPLETADA') {
+						<div class="rating">
+							@if (ratings()[request.id]; as rating) {
+								<!-- Calificación final, tal como la muestra el prototipo en ámbar -->
+								<p class="rating__final">
+									Calificación del profesional: {{ '★'.repeat(rating.puntaje) }}
+									<span class="rating__muted"> ({{ rating.puntaje }}/5)</span>
+								</p>
+								@if (rating.comentario) {
+									<p class="rating__comment">"{{ rating.comentario }}"</p>
+								}
+							} @else if (isProfessional()) {
+								<p class="rating__muted">Esperando que el cliente registre su calificación.</p>
+							} @else {
+								<p class="rating__question">¿Cómo fue el servicio? Calificá al profesional</p>
+								<div class="stars">
+									@for (star of [1, 2, 3, 4, 5]; track star) {
+										<button
+											type="button"
+											class="star"
+											[class.is-on]="star <= getScore(request.id)"
+											(click)="setRating(request.id, star)"
+											[attr.aria-label]="star + ' estrellas'"
+										>
+											<vu-icon name="star" [size]="22" [filled]="true" />
+										</button>
+									}
+									<span class="rating__score">{{ getScore(request.id) }} de 5 estrellas</span>
+								</div>
+								<textarea
+									class="vu-textarea rating__input"
+									rows="3"
+									placeholder="Comentario (opcional)"
+									[ngModel]="ratingComment()[request.id] ?? ''"
+									(ngModelChange)="setRatingComment(request.id, $event)"
+								></textarea>
+								<button
+									type="button"
+									class="vu-btn vu-btn--coral vu-btn--pill vu-btn--block"
+									(click)="submitRating(request)"
+									[disabled]="submittingRating() || !getScore(request.id)"
+								>
+									{{ submittingRating() ? 'Guardando...' : 'Calificar servicio' }}
+								</button>
+							}
+						</div>
+					}
+				</article>
+			}
+			</div>
+		<!-- ── Chat de coordinación (modal) ── -->
+		@if (activeRequest(); as chat) {
+			<div class="modal-overlay" (click)="toggleChat(chat.id)">
+				<section class="chat-modal" role="dialog" aria-modal="true" aria-label="Chat de la solicitud" (click)="$event.stopPropagation()">
+					<header class="chat-modal__head">
+						<div>
+							<p class="vu-eyebrow-sm">{{ chat.date }} · {{ horarioLabel(chat) }}</p>
+							<h2 class="chat-modal__title">Chat con {{ isProfessional() ? clienteNombre(chat) : profesionalNombre(chat) }}</h2>
+						</div>
+						<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="toggleChat(chat.id)">Cerrar</button>
+					</header>
+					<div class="chat-modal__messages">
+						@for (message of chatMessages()[chat.id] ?? []; track message.id) {
+							<div class="bubble-row" [class.is-mine]="message.emisorId === auth.currentUser()?.id">
+								<div class="bubble">
+									<p class="bubble__text">{{ message.texto }}</p>
+									<span class="bubble__time">{{ message.fechaEnvio | slice: 0:16 }}</span>
+								</div>
+							</div>
+						} @empty {
+							<p class="chat-modal__empty">Todavía no hay mensajes. Escribí la primera mensaje.</p>
+						}
+					</div>
+					@if (chat.status === 'ACEPTADA') {
+						<div class="chat-modal__composer">
+							<input class="vu-input chat-modal__input" [ngModel]="chatInput()" (ngModelChange)="chatInput.set($event)"
+								placeholder="Escribí un mensaje..." (keyup.enter)="sendMessage(chat.id)" />
+							<button type="button" class="vu-btn vu-btn--ink vu-btn--icon" (click)="sendMessage(chat.id)"
+								[disabled]="sendingChat() || !chatInput().trim()" aria-label="Enviar mensaje">
+								<vu-icon name="send" [size]="16" />
+							</button>
+						</div>
+					}
+				</section>
+			</div>
+		}
+	}
 
-            <!-- Actions for ACEPTADA -->
-            @if (request.status === 'ACEPTADA') {
-              <div class="actions">
-                @if (isClient()) {
-                  <button type="button" class="btn-primary" (click)="complete(request)">Marcar completado</button>
-                }
-                <button type="button" class="btn-chat-toggle" (click)="toggleChat(request.id)">
-                  💬 {{ activeChatId() === '' + request.id ? 'Cerrar chat' : 'Abrir chat' }}
-                </button>
-              </div>
-            }
+		<!-- ── Actualizar estado (modal único para cliente y profesional) ── -->
+	@if (solicitudDelModal(); as solicitud) {
+		<div class="modal-overlay" (click)="cerrarActualizarEstado()">
+			<section
+				class="status-modal"
+				role="dialog"
+				aria-modal="true"
+				aria-label="Actualizar estado de la solicitud"
+				(click)="$event.stopPropagation()"
+			>
+				<header class="status-modal__head">
+					<h2 class="status-modal__title">Actualizar estado</h2>
+					<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="cerrarActualizarEstado()" aria-label="Cerrar">
+						<vu-icon name="x" [size]="18" />
+					</button>
+				</header>
 
-            <!-- Actions for COMPLETADA -->
-            @if (request.status === 'COMPLETADA') {
-              <div class="actions">
-                <button type="button" class="btn-chat-toggle" (click)="toggleChat(request.id)">
-                  💬 {{ activeChatId() === '' + request.id ? 'Cerrar historial' : 'Ver historial de chat' }}
-                </button>
-              </div>
-            }
-          </div>
+				<p class="status-modal__lead">
+					{{ nombreContraparte(solicitud) }} · {{ solicitud.date }} · {{ horarioLabel(solicitud) }}
+				</p>
 
-          <!-- Embedded Chat Container (for ACEPTADA or COMPLETADA) -->
-          @if (activeChatId() === '' + request.id) {
-            <div class="chat-container">
-              <div class="chat-header">
-                <h3>Coordinación directa del turno</h3>
-                <span class="chat-sub">Mensajería en tiempo real vinculada a esta solicitud</span>
-              </div>
+				<div class="status-modal__options">
+					@for (opcion of estadosDisponibles(solicitud); track opcion) {
+						<button
+							type="button"
+							class="status-option"
+							[class.is-cancel]="opcion === 'CANCELADA'"
+							[class.is-reject]="opcion === 'RECHAZADA'"
+							(click)="elegirEstado(solicitud, opcion)"
+						>
+							<vu-icon [name]="iconoEstado(opcion)" [size]="16" />
+							{{ etiquetaEstado(opcion) }}
+						</button>
+					}
+				</div>
 
-              <div class="chat-messages">
-                @for (msg of (chatMessages()['' + request.id] || []); track msg.id) {
-                  <div class="chat-bubble" [class.own]="isOwnMessage(msg)">
-                    <span class="sender-tag">{{ isOwnMessage(msg) ? 'Vos' : 'Contraparte' }} · {{ msg.fechaEnvio | slice:11:16 }}</span>
-                    <p>{{ msg.texto }}</p>
-                  </div>
-                } @empty {
-                  <p class="chat-empty">No hay mensajes todavía. ¡Comenzá la conversación para coordinar los detalles!</p>
-                }
-              </div>
+				<button type="button" class="vu-btn vu-btn--quiet vu-btn--block" (click)="cerrarActualizarEstado()">Volver</button>
+			</section>
+		</div>
+	}
 
-              @if (request.status === 'ACEPTADA') {
-                <div class="chat-input-row">
-                  <input type="text" [ngModel]="chatInput()" (ngModelChange)="chatInput.set($event)" placeholder="Escribí un mensaje..." (keyup.enter)="sendMessage(request.id)" />
-                  <button type="button" class="btn-send" (click)="sendMessage(request.id)" [disabled]="sendingChat() || !chatInput().trim()">
-                    {{ sendingChat() ? '...' : 'Enviar' }}
-                  </button>
-                </div>
-              }
-            </div>
-          }
+	<!-- Cancelación: única transición que pide un mensaje, y es obligatorio. -->
+	@if (estadoAConfirmar() && solicitudDelModal(); as solicitud) {
+		<div class="modal-overlay" (click)="volverAEstadoOpciones()">
+			<section
+				class="status-modal"
+				role="dialog"
+				aria-modal="true"
+				aria-label="Motivo de la cancelación"
+				(click)="$event.stopPropagation()"
+			>
+				<header class="status-modal__head">
+					<h2 class="status-modal__title">Cancelar la solicitud</h2>
+					<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="volverAEstadoOpciones()" aria-label="Cerrar">
+						<vu-icon name="x" [size]="18" />
+					</button>
+				</header>
 
-          <!-- Rating Container (for COMPLETADA) -->
-          @if (request.status === 'COMPLETADA') {
-            <div class="rating-container">
-              @if (ratings()['' + request.id]; as rating) {
-                <div class="rating-display">
-                  <h4>Calificación registrada</h4>
-                  <div class="stars-row">
-                    @for (star of [1, 2, 3, 4, 5]; track star) {
-                      <span class="star" [class.filled]="star <= rating.puntaje">★</span>
-                    }
-                    <span class="rating-score-badge">{{ rating.puntaje }}/5</span>
-                  </div>
-                  @if (rating.comentario) {
-                    <p class="rating-comment">"{{ rating.comentario }}"</p>
-                  }
-                </div>
-              } @else if (isClient()) {
-                <div class="rating-form">
-                  <h4>¿Cómo fue el servicio? Calificá al profesional</h4>
-                  <div class="stars-picker">
-                    @for (star of [1, 2, 3, 4, 5]; track star) {
-                      <button type="button" class="star-btn" [class.selected]="star <= getScore(request.id)" (click)="setRating(request.id, star)">★</button>
-                    }
-                    <span class="score-label">{{ getScore(request.id) }} de 5 estrellas</span>
-                  </div>
-                  <textarea [ngModel]="getRatingComment(request.id)" (ngModelChange)="setRatingComment(request.id, $event)" placeholder="Dejá un comentario sobre la atención recibida (opcional)..." rows="2"></textarea>
-                  <button type="button" class="btn-primary" (click)="submitRating(request)" [disabled]="submittingRating()">
-                    {{ submittingRating() ? 'Guardando...' : 'Calificar servicio' }}
-                  </button>
-                </div>
-              } @else {
-                <p class="rating-pending">Esperando que el cliente registre su calificación.</p>
-              }
-            </div>
-          }
-        </article>
-      }
-    </div>
-    } @else {
-      <div class="empty-state empty-filtered">
-        <h2>No hay solicitudes con esos filtros.</h2>
-        <p>Probá cambiar el estado, la búsqueda o el orden, o limpiá los filtros para ver todo de nuevo.</p>
-        <button mat-stroked-button type="button" (click)="clearFilters()">
-          <mat-icon>filter_alt_off</mat-icon>Limpiar filtros
-        </button>
-      </div>
-    }
-  } @else {
-    @if (isProfessional()) {
-      <div class="empty-state">
-        <h2>Todavía no recibiste solicitudes.</h2>
-        <p>Cuando los clientes soliciten tus servicios técnicos o turnos de visita, acá vas a ver los pedidos para aceptar o coordinar.</p>
-      </div>
-    } @else {
-      <div class="empty-state">
-        <h2>Todavía no tenés solicitudes.</h2>
-        <p>Creá tu primera solicitud para pedir un turno a un profesional.</p>
-        <a routerLink="/solicitar">Nueva solicitud <span aria-hidden="true">→</span></a>
-      </div>
-    }
-  }
+				<p class="status-modal__lead">
+					{{ nombreContraparte(solicitud) }} · {{ solicitud.date }} · {{ horarioLabel(solicitud) }}
+				</p>
 
+				<label class="vu-label status-modal__motivo">
+					Motivo de la cancelación <span class="vu-required">obligatorio</span>
+					<textarea
+						class="vu-textarea"
+						rows="3"
+						maxlength="300"
+						[ngModel]="motivoEstado()"
+						(ngModelChange)="motivoEstado.set($event); motivoError.set('')"
+						placeholder="Contale a la contraparte por qué se cancela el turno."
+					></textarea>
+				</label>
+
+				@if (motivoError()) {
+					<p class="status-modal__error" role="alert">{{ motivoError() }}</p>
+				}
+
+				<div class="status-modal__actions">
+					<button type="button" class="vu-btn vu-btn--quiet" (click)="volverAEstadoOpciones()">Volver</button>
+					<button type="button" class="vu-btn vu-btn--danger" (click)="confirmarCancelacion()">
+						Confirmar cancelación
+					</button>
+				</div>
+			</section>
+		</div>
+	}
 </section>
+</div>
 
+<!--
+	Confirmación de las transiciones que no son cancelación (aceptar, rechazar o
+	completar): la cancelación tiene su propio paso porque además pide el motivo.
+-->
+@if (confirmacionTransicion()) {
+	<vu-confirm
+		[titulo]="transicionTitulo()"
+		[mensaje]="transicionMensaje()"
+		[detalle]="transicionDetalle()"
+		[textoConfirmar]="etiquetaEstado(confirmacionTransicion()!.nuevo)"
+		[peligro]="transicionPeligrosa()"
+		[icono]="transicionIcono()"
+		(confirmado)="confirmarTransicion()"
+		(cancelado)="confirmacionTransicion.set(null)"
+	/>
+}

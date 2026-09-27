@@ -1,10 +1,14 @@
 import { Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { catchError, of } from 'rxjs';
-import { ApiService, UserAccount, UserAccountUpdate } from '../core/services/api.service';
+import { ApiService, MyReputation, UserAccount, UserAccountUpdate } from '../core/services/api.service';
 import { AuthService } from '../core/services/auth.service';
 import { environment } from '../../environments/environment';
+import { VuAvatar } from '../shared/avatar/avatar';
+import { VuConfirm } from '../shared/confirm/confirm';
+import { VuIcon } from '../shared/icon/icon';
 
 type CardKey = 'personal' | 'contact' | 'photo';
 
@@ -17,7 +21,7 @@ type CardKey = 'personal' | 'contact' | 'photo';
 @Component({
   selector: 'app-account',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [DecimalPipe, FormsModule, RouterLink, VuAvatar, VuConfirm, VuIcon],
   templateUrl: './account.html',
   styleUrl: './account.css',
 })
@@ -35,6 +39,9 @@ export class Account {
   /** Qué tarjeta está en modo edición (solo una a la vez para no solapar guardados). */
   readonly editing = signal<CardKey | null>(null);
   readonly saving = signal(false);
+
+  /** Guardado pendiente de confirmación (se arma con lo que se va a enviar). */
+  readonly confirmacion = signal<{ titulo: string; mensaje: string; detalle: string; peligro?: boolean; request: UserAccountUpdate } | null>(null);
 
   readonly personalDraft = signal({ nombre: '', apellido: '' });
   readonly contactDraft = signal({ telefono: '' });
@@ -68,6 +75,43 @@ export class Account {
     return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
   });
 
+  /**
+   * Reputación del profesional. Sólo tiene sentido para ese rol: los clientes
+   * califican, no reciben calificaciones.
+   */
+  readonly reputacion = signal<MyReputation | null>(null);
+  readonly reputacionError = signal('');
+
+  readonly esProfesional = computed(() => this.account()?.rolNegocio === 'PROFESIONAL');
+
+  /** Estrellas de la tarjeta, según el promedio real. */
+  estrellas(promedio: number): string {
+    const llenas = Math.max(0, Math.min(5, Math.round(promedio || 0)));
+    return '★'.repeat(llenas) + '☆'.repeat(5 - llenas);
+  }
+
+  private cargarReputacion(): void {
+    this.reputacionError.set('');
+    this.api.getMyReputation().pipe(
+      catchError((error) => {
+        this.reputacionError.set(this.api.describeError(error, 'No se pudo cargar tu reputación.'));
+        return of(null);
+      }),
+    ).subscribe((data) => {
+      if (data) {
+        this.reputacion.set(data);
+      }
+    });
+  }
+
+  /** Fecha de la reseña en formato largo (ej: "12 de marzo de 2026"). */
+  fechaResena(fecha: string | undefined): string {
+    if (!fecha) return '';
+    const d = new Date(fecha);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
   readonly roleLabel = computed(() => {
     const role = this.account()?.rolNegocio;
     if (role === 'PROFESIONAL') return 'Profesional';
@@ -93,6 +137,10 @@ export class Account {
         this.account.set(user);
         this.photoPreview.set(user.fotoUrl ?? '');
         this.syncSession(user);
+        // La reputación sólo existe para el rol profesional.
+        if (user.rolNegocio === 'PROFESIONAL') {
+          this.cargarReputacion();
+        }
       }
       this.loading.set(false);
     });
@@ -141,7 +189,13 @@ export class Account {
       this.cardError.set('No hay cambios para guardar: modificá tu nombre o tu apellido.');
       return;
     }
-    this.persist(request);
+    this.pedirGuardado(
+      'Actualizar tus datos',
+      `¿Guardás los cambios de ${nombre} ${apellido}?`,
+      'Tu nombre es el que ven los profesionales cuando les llega una solicitud.',
+      false,
+      request,
+    );
   }
 
   saveContact(): void {
@@ -156,9 +210,13 @@ export class Account {
       return;
     }
     // Solo se envía el teléfono: nombre/apellido/foto quedan intactos.
-    this.persist({
-      telefono,
-    });
+    this.pedirGuardado(
+      'Actualizar tu teléfono',
+      `¿Guardás el teléfono ${telefono}?`,
+      'Es el número que ven los profesionales cuando coordinan una visita.',
+      false,
+      { telefono },
+    );
   }
 
   savePhoto(): void {
@@ -175,9 +233,41 @@ export class Account {
     }
     // Solo se envía la foto. Vacío ('') = quitar la foto guardada;
     // el resto del perfil queda intacto.
-    this.persist({
-      fotoUrl: preview,
-    });
+    const quita = !preview;
+    this.pedirGuardado(
+      quita ? 'Quitar tu foto' : 'Actualizar tu foto',
+      quita ? '¿Querés quitar tu foto de perfil?' : '¿Querés guardar esta foto?',
+      quita
+        ? 'Vuelven tus iniciales. Podés cargar una foto cuando quieras.'
+        : 'Es la foto que te ven los profesionales y el resto de la comunidad.',
+      quita,
+      { fotoUrl: preview },
+    );
+  }
+
+  /**
+   * Ningún cambio se guarda sin que la persona lo confirme: se muestra qué se
+   * va a enviar y recién ahí se llama a la API.
+   */
+  private pedirGuardado(
+    titulo: string,
+    mensaje: string,
+    detalle: string,
+    peligro: boolean,
+    request: UserAccountUpdate,
+  ): void {
+    this.confirmacion.set({ titulo, mensaje, detalle, peligro, request });
+  }
+
+  confirmarGuardado(): void {
+    const pendiente = this.confirmacion();
+    if (!pendiente) return;
+    this.confirmacion.set(null);
+    this.persist(pendiente.request);
+  }
+
+  cancelarGuardado(): void {
+    this.confirmacion.set(null);
   }
 
   private persist(request: UserAccountUpdate): void {

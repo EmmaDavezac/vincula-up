@@ -29,7 +29,7 @@ describe('Received request specialties', () => {
   it('renders the specialty name in the received request card instead of the code', () => {
     const fixture = TestBed.createComponent(MyRequests);
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.request-card h2').textContent).toBe('Electricidad domiciliaria');
+    expect(fixture.nativeElement.querySelector('.req-card__sub').textContent).toBe('Electricidad domiciliaria');
   });
 
   it('updates from loading to the name when the catalog arrives later', () => {
@@ -37,17 +37,17 @@ describe('Received request specialties', () => {
     api.getSpecialtiesMap.mockReturnValue(catalog);
     const fixture = TestBed.createComponent(MyRequests);
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.request-card h2').textContent).toBe('Cargando especialidad...');
+    expect(fixture.nativeElement.querySelector('.req-card__sub').textContent).toBe('Cargando especialidad...');
     catalog.next({ [specialtyId]: 'Electricidad domiciliaria' });
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.request-card h2').textContent).toBe('Electricidad domiciliaria');
+    expect(fixture.nativeElement.querySelector('.req-card__sub').textContent).toBe('Electricidad domiciliaria');
   });
 
   it('shows a recoverable error without exposing the code on catalog failure', () => {
     api.getSpecialtiesMap.mockReturnValue(throwError(() => new Error('Unavailable')));
     const fixture = TestBed.createComponent(MyRequests);
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.request-card h2').textContent).toBe('Especialidad no disponible');
+    expect(fixture.nativeElement.querySelector('.req-card__sub').textContent).toBe('Especialidad no disponible');
     expect(fixture.nativeElement.querySelector('[role="alert"]')).not.toBeNull();
   });
 });
@@ -61,6 +61,7 @@ describe('Request filters', () => {
       emptyServiceRequest({
         id: 1, status: 'PENDIENTE', especialidadId: specialtyA, specialty: specialtyA,
         professionalName: 'Ana Fontanera', address: 'Calle Uno 1',
+        description: 'Se corta la luz en la cocina y no vuelve.',
         date: '2026-09-01', time: '10:00', fechaCreacion: '2026-09-01T10:00:00',
       }),
       emptyServiceRequest({
@@ -88,10 +89,11 @@ describe('Request filters', () => {
 
   const ids = (cmp: MyRequests) => cmp.filteredRequests().map((r) => r.id);
 
-  it('shows every request by default, newest first', () => {
+  it('shows every request by default in the order they arrive', () => {
     const fixture = TestBed.createComponent(MyRequests);
     const cmp = fixture.componentInstance as MyRequests;
-    expect(ids(cmp)).toEqual([2, 1, 3]);
+    // Sin selector de orden la lista conserva el orden en que llegan las solicitudes.
+    expect(ids(cmp)).toEqual([1, 2, 3]);
   });
 
   it('filters by status', () => {
@@ -101,37 +103,56 @@ describe('Request filters', () => {
     expect(ids(cmp)).toEqual([2]);
   });
 
-  it('filters by search term and clears back to all', () => {
-    const fixture = TestBed.createComponent(MyRequests);
-    const cmp = fixture.componentInstance as MyRequests;
-    cmp.searchTerm.set('carla');
-    expect(ids(cmp)).toEqual([3]);
-    cmp.clearFilters();
-    expect(ids(cmp)).toEqual([2, 1, 3]);
-  });
-
-  it('filters by specialty', () => {
+  it('filtra por especialidad', () => {
     const fixture = TestBed.createComponent(MyRequests);
     const cmp = fixture.componentInstance as MyRequests;
     expect(cmp.specialtyOptions().map((o) => o.label)).toEqual(['Electricidad', 'Plomería']);
     cmp.specialtyFilter.set(specialtyB);
     expect(ids(cmp)).toEqual([2]);
+    cmp.clearFilters();
+    expect(ids(cmp)).toEqual([1, 2, 3]);
   });
 
-  it('sorts by upcoming appointment when selected', () => {
+  it('no ofrece búsqueda ni ordenamiento: sólo filtros de estado y especialidad', () => {
     const fixture = TestBed.createComponent(MyRequests);
     const cmp = fixture.componentInstance as MyRequests;
-    cmp.sortOrder.set('PROXIMAS');
-    expect(ids(cmp)).toEqual([3, 1, 2]);
+    expect('searchTerm' in cmp).toBe(false);
+    expect('sortOrder' in cmp).toBe(false);
+    expect('sortOptions' in cmp).toBe(false);
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).not.toContain('Ordenar');
+    expect(compiled.querySelector('input[type="text"]')).toBeNull();
   });
 
-  it('returns empty when nothing matches', () => {
+  it('muestra el horario como rango, no como una hora puntual', () => {
     const fixture = TestBed.createComponent(MyRequests);
     const cmp = fixture.componentInstance as MyRequests;
-    cmp.searchTerm.set('inexistente-xyz');
-    expect(cmp.filteredRequests()).toEqual([]);
-    expect(cmp.hasActiveFilters()).toBe(true);
+    const conRango = emptyServiceRequest({ id: 9, time: '08:00', timeEnd: '12:00' });
+    const sinFin = emptyServiceRequest({ id: 10, time: '16:00', timeEnd: '' });
+
+    expect(cmp.horarioLabel(conRango)).toBe('08:00 a 12:00 hs');
+    // Las solicitudes anteriores a guardar el fin se reconstruyen con las franjas.
+    expect(cmp.horarioLabel(sinFin)).toBe('16:00 a 20:00 hs');
+    // Si no se reconoce la franja, se muestra el inicio tal cual.
+    expect(cmp.horarioLabel(emptyServiceRequest({ time: '09:30' }))).toBe('09:30');
   });
+
+  it('no repite el estado ya mostrado en la etiqueta', () => {
+    const fixture = TestBed.createComponent(MyRequests);
+    const cmp = fixture.componentInstance as MyRequests;
+    expect(cmp.nextAction('ACEPTADA')).toBe('');
+    expect(cmp.nextAction('ACEPTADA')).not.toContain('confirmado');
+  });
+
+  it('muestra el resumen del problema que escribió el cliente', () => {
+    const fixture = TestBed.createComponent(MyRequests);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('Se corta la luz en la cocina');
+    expect(compiled.textContent).toContain('Tu resumen');
+  });
+
 });
 
 describe('Request location map', () => {
@@ -153,11 +174,11 @@ describe('Request location map', () => {
     });
   });
 
-  it('shows the address, an embedded map and a Google Maps button without raw coordinates', () => {
+  it('shows the address and an embedded map, without raw coordinates or external links', () => {
     const fixture = TestBed.createComponent(MyRequests);
     fixture.detectChanges();
     const root = fixture.nativeElement as HTMLElement;
-    const visibleText = [...root.querySelectorAll('.location-box p, .location-box h4')]
+    const visibleText = [...root.querySelectorAll('.req-card__address, .req-card__map .vu-map-label')]
       .map((el) => el.textContent ?? '')
       .join(' ');
     expect(visibleText).toContain('Calle Falsa 123');
@@ -167,8 +188,8 @@ describe('Request location map', () => {
     const frame: HTMLIFrameElement | null = fixture.nativeElement.querySelector('iframe.embedded-map');
     expect(frame).not.toBeNull();
     expect(frame?.src ?? '').toContain('openstreetmap.org/export/embed.html');
-    const mapsLink: HTMLAnchorElement | null = fixture.nativeElement.querySelector('a.link-btn');
-    expect(mapsLink?.href ?? '').toContain('google.com/maps/search');
+    // Todo el mapa se ve embebido: no se sale a un servicio externo.
+    expect(fixture.nativeElement.querySelector('.req-card__links a')).toBeNull();
   });
 
   it('returns no embedded map when there are no coordinates', () => {
@@ -177,6 +198,5 @@ describe('Request location map', () => {
     const withCoords = cmp.requests().find((r) => r.id === 10)!;
     expect(String(cmp.embeddedMapUrl(withCoords))).toContain('openstreetmap.org/export/embed.html');
     expect(cmp.embeddedMapUrl(cmp.requests().find((r) => r.id === 11)!)).toBeNull();
-    expect(cmp.googleMapsUrl(cmp.requests().find((r) => r.id === 11)!)).toContain(encodeURIComponent('Sin coords 456'));
   });
 });

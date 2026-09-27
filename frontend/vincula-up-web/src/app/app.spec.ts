@@ -1,6 +1,6 @@
-import { signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
 import { App } from './app';
 import { NavbarComponent } from './shared/navbar/navbar';
@@ -26,6 +26,7 @@ describe('App', () => {
         isProfessionalActive: professionalActive,
         loginWithKeycloak: () => of(true),
         registerWithKeycloak: registerWithKeycloakMock,
+        loadOwnPhoto: () => {},
       } }],
     }).compileComponents();
   });
@@ -71,7 +72,7 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    const pageLinks = Array.from(compiled.querySelectorAll('a[routerLink]'))
+    const pageLinks = Array.from(compiled.querySelectorAll('header a[routerLink]'))
       .map((link) => link.getAttribute('routerLink'));
     expect(pageLinks).toContain('/');
     expect(pageLinks).not.toContain('/solicitar');
@@ -80,7 +81,7 @@ describe('App', () => {
 
     // Los clientes se auto-registran ("Crear cuenta") y el profesional invitado
     // crea su cuenta con el email que cargó el administrador.
-    const actions = Array.from(compiled.querySelectorAll('button[mat-button]'))
+    const actions = Array.from(compiled.querySelectorAll('.auth-action'))
       .map((action) => action.textContent?.trim());
     expect(actions).toContain('Crear cuenta');
     expect(actions).toContain('Ingresar');
@@ -90,7 +91,7 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    const button = Array.from(compiled.querySelectorAll('button[mat-button]'))
+    const button = Array.from(compiled.querySelectorAll('.auth-action'))
       .find((action) => action.textContent?.trim() === 'Crear cuenta') as HTMLButtonElement;
 
     button.click();
@@ -103,7 +104,11 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('a[routerLink="/mi-cuenta"]')?.textContent).toContain('Test user');
+    expect(compiled.querySelector('.user-menu__trigger')?.textContent).toContain('Test user');
+
+    (compiled.querySelector('.user-menu__trigger') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(compiled.querySelector('a[routerLink="/mi-cuenta"]')?.textContent).toContain('Actualizar perfil');
   });
 
   it('should support request lifecycle updates from pending through accepted and completed', () => {
@@ -124,5 +129,66 @@ describe('App', () => {
 
     service.updateStatus(created.id, 'COMPLETADA');
     expect(service.myRequests()[0].status).toBe('COMPLETADA');
+  });
+});
+
+/**
+ * El panel de administración ya no tiene shell propio: usa la navbar del sitio
+ * en escritorio y la barra inferior compartida en móvil. Lo único que se
+ * oculta dentro del panel es el footer del sitio.
+ */
+describe('shell del panel de administración', () => {
+  @Component({ template: 'panel' })
+  class PanelStub {}
+
+  @Component({ template: 'pagina' })
+  class PaginaStub {}
+
+  async function renderApp() {
+    await TestBed.configureTestingModule({
+      imports: [App],
+      providers: [
+        provideRouter([
+          { path: 'admin', children: [{ path: '', component: PanelStub }] },
+          { path: 'como-funciona', component: PaginaStub },
+        ]),
+        { provide: AuthService, useValue: {
+          currentUser: () => null,
+          hasRole: () => false,
+          isProfessionalActive: signal(false),
+          loginWithKeycloak: () => of(true),
+          registerWithKeycloak: () => {},
+          logout: () => {},
+          loadOwnPhoto: () => {},
+        } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(App);
+    const router = TestBed.inject(Router);
+    fixture.detectChanges();
+    return { fixture, router };
+  }
+
+  it('mantiene la navbar dentro del panel y oculta sólo el footer', async () => {
+    const { fixture, router } = await renderApp();
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('app-navbar')).not.toBeNull();
+    expect(compiled.querySelector('app-footer')).not.toBeNull();
+    // La barra inferior es comúnn: se ve en el panel y afuera.
+    expect(compiled.querySelector('vu-tabbar')).not.toBeNull();
+
+    await router.navigateByUrl('/admin');
+    fixture.detectChanges();
+    // El panel usa la navbar del sitio: no se oculta.
+    expect(compiled.querySelector('app-navbar')).not.toBeNull();
+    expect(compiled.querySelector('app-footer')).toBeNull();
+    expect(compiled.querySelector('vu-tabbar')).not.toBeNull();
+    expect(compiled.textContent).toContain('panel');
+
+    await router.navigateByUrl('/como-funciona');
+    fixture.detectChanges();
+    expect(compiled.querySelector('app-navbar')).not.toBeNull();
+    expect(compiled.querySelector('app-footer')).not.toBeNull();
   });
 });

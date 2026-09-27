@@ -34,8 +34,9 @@ export class DirectoryService {
           zone: professional.zonaCoberturaLat != null && professional.zonaCoberturaLng != null
             ? 'Zona de cobertura activa'
             : 'Zona no informada',
-          rating: 0,
-          reviews: 0,
+          // Reputación real que calcula el backend (promedio y cantidad de reseñas).
+          rating: professional.rating,
+          reviews: professional.reviews,
           availability: 'Consultar disponibilidad',
           initials,
           accent: ['mint', 'sun', 'sky', 'rose'][index % 4],

@@ -1,0 +1,79 @@
+<a class="vu-admin-back" routerLink="/admin">← Resumen</a>
+
+<div class="admin-categories__head">
+	<div>
+		<h1 class="vu-admin-title">Categorías</h1>
+		<p class="vu-admin-lead admin-categories__lead">Administrá las especialidades disponibles para los profesionales.</p>
+	</div>
+	<span class="vu-state vu-state--activo admin-categories__count">{{ categories().length }} categorías</span>
+</div>
+
+@if (aviso().texto) {
+	<p class="vu-alert admin-categories__alert" [class]="avisoClase(aviso().tipo)" role="status">{{ aviso().texto }}</p>
+}
+
+<form class="vu-admin-panel admin-categories__create" (submit)="createCategory(); $event.preventDefault()">
+	<label class="vu-label" for="admin-category-name">Nombre de la categoría <span class="vu-required">obligatorio</span></label>
+	<input
+		id="admin-category-name"
+		class="vu-input"
+		type="text"
+		name="nuevaCategoria"
+		[(ngModel)]="nuevaCategoria"
+		placeholder="Nombre de la nueva categoría"
+	/>
+	<button type="submit" class="vu-btn vu-btn--ink admin-categories__submit" [disabled]="busy()">
+		{{ busy() ? 'Guardando...' : 'Crear categoría' }}
+	</button>
+</form>
+
+@if (loading()) {
+	<p class="vu-admin-panel__hint">Cargando categorías...</p>
+} @else if (categories().length) {
+	<div class="admin-categories__grid">
+		@for (category of categories(); track category.id) {
+			<article class="vu-admin-panel admin-categories__card">
+				<div class="admin-categories__card-info">
+					@if (renamingId() === category.id) {
+						<input class="vu-input" type="text" name="renameValue" [(ngModel)]="renameValue" (keyup.enter)="saveRename(category)" />
+					} @else {
+						<p class="admin-categories__name">{{ category.nombre }}</p>
+					}
+					<span class="vu-state vu-state--sm vu-state--activo">Activa</span>
+				</div>
+
+				@if (renamingId() === category.id) {
+					<div class="admin-categories__actions">
+						<button type="button" class="vu-btn vu-btn--ink vu-btn--sm" (click)="saveRename(category)" [disabled]="busy()">
+							{{ busy() ? 'Guardando...' : 'Guardar' }}
+						</button>
+						<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="cancelRename()">Cancelar</button>
+					</div>
+				} @else {
+					<button type="button" class="vu-btn vu-btn--danger vu-btn--sm" (click)="deleteCategory(category)" [disabled]="busy()">
+						Eliminar
+					</button>
+					<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="startRename(category)" [disabled]="busy()">
+						Renombrar
+					</button>
+				}
+			</article>
+		}
+	</div>
+} @else {
+	<p class="vu-admin-panel__hint">Todavía no hay categorías en el catálogo.</p>
+}
+
+<!-- Confirmación única de toda acción que modifica o borra el catálogo. -->
+@if (confirmacion(); as pendiente) {
+	<vu-confirm
+		[titulo]="pendiente.titulo"
+		[mensaje]="pendiente.mensaje"
+		[detalle]="pendiente.detalle ?? ''"
+		[textoConfirmar]="pendiente.confirmar ?? 'Confirmar'"
+		[peligro]="pendiente.peligro ?? false"
+		[icono]="pendiente.icono ?? 'pencil'"
+		(confirmado)="confirmarAccion()"
+		(cancelado)="cancelarAccion()"
+	/>
+}

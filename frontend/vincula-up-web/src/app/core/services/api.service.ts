@@ -3,6 +3,7 @@ import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable, catchError, of } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
+import { AdminRequest } from '../models/admin';
 import { Professional } from '../models/professional';
 import { RequestStatus, ServiceRequest } from '../models/service-request';
 import { AuthService } from './auth.service';
@@ -16,10 +17,16 @@ interface BackendRequest {
   fechaHoraPropuesta: string;
   estado: RequestStatus | string;
   motivoCancelacion?: string;
+  /** Qué lado canceló el turno: "CLIENTE" o "PROFESIONAL". */
+  canceladaPorRol?: 'CLIENTE' | 'PROFESIONAL' | null;
   fechaCreacion: string;
   fechaCambioEstado: string;
   latitud?: number | null;
   longitud?: number | null;
+  /** Fin del turno: el horario de una solicitud es un rango. */
+  fechaHoraFinPropuesta?: string | null;
+  /** Resumen del problema que escribe el cliente. */
+  descripcion?: string | null;
 }
 
 export interface ClienteInfo {
@@ -76,6 +83,19 @@ export interface GpsPosition {
   error?: string;
 }
 
+export interface ReputationReview {
+  puntaje: number;
+  comentario?: string | null;
+  fecha?: string;
+  clienteNombre?: string;
+}
+
+export interface MyReputation {
+  promedio: number;
+  cantidad: number;
+  resenas: ReputationReview[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private readonly http = inject(HttpClient);
@@ -94,7 +114,9 @@ export class ApiService {
     } else if (status) {
       params = params.set('estado', status);
     }
-    return this.http.get<Professional[]>(`${this.baseUrl}/profesionales`, { params, headers: this.authHeaders() });
+    return this.http.get<Array<Record<string, unknown>>>(`${this.baseUrl}/profesionales`, { params, headers: this.authHeaders() }).pipe(
+      map((items) => (items ?? []).map((raw) => this.mapProfessionalProfile(raw))),
+    );
   }
 
   /**
@@ -108,6 +130,12 @@ export class ApiService {
       map((raw) => this.mapProfessionalProfile(raw)),
       catchError(() => of(null)),
     );
+  }
+
+  /** Número del backend, tolerante a null o a un valor que no sea número. */
+  private numero(valor: unknown): number {
+    const n = typeof valor === 'number' ? valor : Number(valor);
+    return Number.isFinite(n) ? n : 0;
   }
 
   /** Normaliza la ficha del profesional al modelo que usa la UI. */
@@ -132,8 +160,10 @@ export class ApiService {
       zone: raw['zonaCoberturaLat'] != null && raw['zonaCoberturaLng'] != null
         ? 'Zona de cobertura activa'
         : 'Zona no informada',
-      rating: 0,
-      reviews: 0,
+      // La reputación llega calculada desde el backend (promedio y cantidad de
+      // reseñas). Antes venía fija en 0 y ninguna tarjeta mostraba estrellas.
+      rating: this.numero(raw['promedio']),
+      reviews: this.numero(raw['cantidadCalificaciones']),
       availability: 'Consultar disponibilidad',
       initials,
       accent: 'sky',
@@ -144,7 +174,19 @@ export class ApiService {
       especialidades,
       fotoUrl: typeof raw['fotoUrl'] === 'string' ? (raw['fotoUrl'] as string) : null,
       estado: typeof raw['estado'] === 'string' ? (raw['estado'] as string) : 'ACTIVO',
+      // Zona de cobertura: sin estos datos el directorio no puede calcular la
+      // distancia ni el asistente ordenar por proximidad.
+      zonaCoberturaLat: this.numeroONull(raw['zonaCoberturaLat']),
+      zonaCoberturaLng: this.numeroONull(raw['zonaCoberturaLng']),
+      radioKm: this.numeroONull(raw['radioKm']),
     };
+  }
+
+  /** Número o null si el backend no lo mandó (para no perder "no informado"). */
+  private numeroONull(valor: unknown): number | null {
+    if (valor == null) return null;
+    const n = typeof valor === 'number' ? valor : Number(valor);
+    return Number.isFinite(n) ? n : null;
   }
 
   saveSpecialty(id: string | null, nombre: string): Observable<unknown> {
@@ -174,9 +216,10 @@ export class ApiService {
     return this.http.put(`${this.baseUrl}/profesionales/${id}`, request, { headers: this.authHeaders() });
   }
 
-  deleteProfessional(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.baseUrl}/profesionales/${id}`, { headers: this.authHeaders() });
-  }
+  /**
+   * El padrón de profesionales no se borra: la baja es lógica (suspender). Para darlo de baja
+   * se usa `suspendProfessional`; no existe borrado físico ni en el microservicio ni acá.
+   */
 
   saveUser(id: string | null, request: { keycloakId: string; nombre: string; apellido: string; email: string; telefono: string; rolNegocio: string }): Observable<unknown> {
     const options = { headers: this.authHeaders() };
@@ -282,6 +325,15 @@ export class ApiService {
    * Perfil propio ("Mi cuenta"). El BFF resuelve el id desde el token: el
    * email se ignora siempre (no se cambia desde el perfil).
    */
+  /**
+   * Reputación del profesional autenticado: promedio y las reseñas recibidas con
+   * el nombre de quien las dejó. El backend la resuelve desde la sesión, así que
+   * no se puede pedir la de otro profesional.
+   */
+  getMyReputation(): Observable<MyReputation> {
+    return this.http.get<MyReputation>(`${this.baseUrl}/mi-reputacion`, { headers: this.authHeaders() });
+  }
+
   getMyAccount(): Observable<UserAccount> {
     return this.http.get<UserAccount>(`${this.baseUrl}/usuarios/yo`, { headers: this.authHeaders() });
   }
@@ -314,6 +366,10 @@ export class ApiService {
     latitud: number;
     longitud: number;
     fechaHoraPropuesta: string;
+    /** Fin del turno: el horario que se muestra es un rango. */
+    fechaHoraFinPropuesta?: string | null;
+    /** Obligatorio: es lo que le dice al profesional qué tiene que resolver. */
+    descripcion: string;
   }): Observable<ServiceRequest> {
     return this.http.post<ServiceRequest>(`${this.baseUrl}/solicitudes`, request, { headers: this.authHeaders() });
   }
@@ -339,6 +395,14 @@ export class ApiService {
     return this.http.get<BackendRequest[]>(`${this.baseUrl}/solicitudes/mias`, { params, headers: this.authHeaders() }).pipe(
       map((items) => items.map((item) => this.toServiceRequest(item))),
     );
+  }
+
+  /**
+   * Solicitudes de toda la plataforma para los indicadores del panel de administración
+   * (`/solicitudes/panel`, restringido al rol ADMIN en el BFF).
+   */
+  getAdminRequests(): Observable<AdminRequest[]> {
+    return this.http.get<AdminRequest[]>(`${this.baseUrl}/solicitudes/panel`, { headers: this.authHeaders() });
   }
 
   acceptRequest(requestId: string, actorId: string, motivo = ''): Observable<ServiceRequest> {
@@ -462,11 +526,14 @@ export class ApiService {
       specialty: prev.specialty ?? 'Servicio técnico',
       date: backend.fechaHoraPropuesta ? this.parseDate(backend.fechaHoraPropuesta) : prev.date ?? '',
       time: backend.fechaHoraPropuesta ? this.parseTime(backend.fechaHoraPropuesta) : prev.time ?? '',
+      timeEnd: backend.fechaHoraFinPropuesta ? this.parseTime(backend.fechaHoraFinPropuesta) : prev.timeEnd ?? '',
       address: backend.direccionServicio ?? prev.address ?? '',
       latitude: backend.latitud != null ? Number(backend.latitud) : prev.latitude ?? null,
       longitude: backend.longitud != null ? Number(backend.longitud) : prev.longitude ?? null,
       status: this.normalizeStatus(backend.estado ?? prev.status ?? 'PENDIENTE'),
       motivoCancelacion: backend.motivoCancelacion ?? prev.motivoCancelacion,
+      canceladaPorRol: backend.canceladaPorRol ?? prev.canceladaPorRol,
+      description: backend.descripcion ?? prev.description ?? '',
       especialidadId: backend.especialidadId ?? prev.especialidadId,
       fechaCreacion: backend.fechaCreacion ?? prev.fechaCreacion,
       fechaCambioEstado: backend.fechaCambioEstado ?? prev.fechaCambioEstado,

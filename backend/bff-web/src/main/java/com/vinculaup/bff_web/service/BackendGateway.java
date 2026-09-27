@@ -49,7 +49,6 @@ public class BackendGateway {
     public JsonNode actualizarEspecialidad(UUID id, JsonNode body) { return put(profesionales, "/especialidades/{id}", body, id); }
     public void eliminarEspecialidad(UUID id) { delete(profesionales, "/especialidades/{id}", id); }
     public JsonNode actualizarProfesional(UUID id, JsonNode body) { return put(profesionales, "/profesionales/{id}", body, id); }
-    public void eliminarProfesional(UUID id) { delete(profesionales, "/profesionales/{id}", id); }
     public JsonNode crearUsuario(JsonNode body) { return post(usuarios, "/usuarios", body); }
     public JsonNode actualizarUsuario(UUID id, JsonNode body) { return patch(usuarios, "/usuarios/{id}", body, id); }
     public void eliminarUsuario(UUID id) { delete(usuarios, "/usuarios/{id}", id); }
@@ -229,6 +228,27 @@ public class BackendGateway {
 
     public JsonNode listarSolicitudes(UUID usuarioId) {
         return listarSolicitudes(usuarioId, List.of(), null, null);
+    }
+
+    /**
+     * Solicitudes de toda la plataforma para los indicadores del panel de administración.
+     * Sólo la usa el endpoint de administración del BFF, que exige rol ADMIN.
+     */
+    public JsonNode listarSolicitudesParaPanel() {
+        return get(solicitudes, "/solicitudes/panel", null, null);
+    }
+
+    /**
+     * Reputación de los profesionales (promedio y cantidad de reseñas). La
+     * calcula vive en ms-solicitudes, que es donde están las calificaciones.
+     */
+    public JsonNode listarResumenCalificaciones() {
+        return get(solicitudes, "/calificaciones", null, null);
+    }
+
+    /** Reseñas recibidas por un profesional, con el detalle. */
+    public JsonNode reputacionDe(UUID profesionalId) {
+        return get(solicitudes, "/calificaciones/profesional/{profesionalId}", null, null, profesionalId);
     }
 
     public JsonNode aceptarSolicitud(UUID id, JsonNode body) {

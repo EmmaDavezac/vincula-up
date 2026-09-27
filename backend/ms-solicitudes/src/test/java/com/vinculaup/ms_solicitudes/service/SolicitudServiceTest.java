@@ -17,6 +17,7 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import jakarta.validation.Validation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -41,7 +42,7 @@ class SolicitudServiceTest {
 
     private Solicitud solicitud(UUID clienteId, UUID profesionalId) {
         return new Solicitud(clienteId, profesionalId, UUID.randomUUID(),
-                "Calle 123", -34.60, -58.38, LocalDateTime.now().plusDays(1));
+                "Calle 123", -34.60, -58.38, LocalDateTime.now().plusDays(1), "Se pierde el agua en la cocina.", null);
     }
 
     @ParameterizedTest
@@ -127,7 +128,7 @@ class SolicitudServiceTest {
 
         CrearSolicitudRequest request = new CrearSolicitudRequest(
                 UUID.randomUUID(), profId, UUID.randomUUID(),
-                "Calle Falsa 123", -34.60, -58.38, LocalDateTime.now());
+                "Calle Falsa 123", -34.60, -58.38, LocalDateTime.now(), null, "Se corta la luz.");
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.crear(request));
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
@@ -142,7 +143,7 @@ class SolicitudServiceTest {
 
         CrearSolicitudRequest request = new CrearSolicitudRequest(
                 UUID.randomUUID(), profId, UUID.randomUUID(),
-                "Calle Falsa 123", -34.60, -58.38, LocalDateTime.now());
+                "Calle Falsa 123", -34.60, -58.38, LocalDateTime.now(), null, "Se corta la luz.");
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.crear(request));
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
@@ -167,12 +168,71 @@ class SolicitudServiceTest {
 
         CrearSolicitudRequest request = new CrearSolicitudRequest(
                 clienteId, profId, espId,
-                "Calle Falsa 123", -34.60, -58.38, fecha);
+                "Calle Falsa 123", -34.60, -58.38, fecha, fecha.plusHours(4), "Se corta la luz y no vuelve.");
 
         var response = service.crear(request);
         assertNotNull(response);
         assertEquals(clienteId, response.clienteId());
         assertEquals(profId, response.profesionalId());
+    }
+
+    /** El resumen del problema es obligatorio: sin él el profesional no sabe qué resolver. */
+    @Test
+    void guardaElResumenDelProblemaYLoExponeEnLaRespuesta() {
+        UUID profId = UUID.randomUUID();
+        UUID clienteId = UUID.randomUUID();
+        UUID espId = UUID.randomUUID();
+        LocalDateTime fecha = LocalDateTime.of(2026, 9, 21, 10, 0);
+
+        when(profesionalesClient.obtenerPorIdentidad(profId))
+                .thenReturn(Optional.of(new ProfesionalIdentidad(profId, UUID.randomUUID(), "ACTIVO")));
+        when(repository.existsByClienteIdAndEspecialidadIdAndEstadoIn(eq(clienteId), eq(espId), any()))
+                .thenReturn(false);
+        when(repository.save(any(Solicitud.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = service.crear(new CrearSolicitudRequest(clienteId, profId, espId,
+                "Calle Falsa 123", -34.60, -58.38, fecha, fecha.plusHours(4), "  Se corta la luz y no vuelve.  "));
+
+        assertEquals("Se corta la luz y no vuelve.", response.descripcion());
+        // El horario es un rango: se guardan inicio y fin.
+        assertEquals(fecha, response.fechaHoraPropuesta());
+        assertEquals(fecha.plusHours(4), response.fechaHoraFinPropuesta());
+    }
+
+    /** El fin del turno no puede ser anterior al inicio. */
+    @Test
+    void rechazaUnHorarioQueTerminaAntesDeEmpezar() {
+        UUID profId = UUID.randomUUID();
+        LocalDateTime fecha = LocalDateTime.now().plusDays(2).withSecond(0).withNano(0);
+
+        when(profesionalesClient.obtenerPorIdentidad(profId))
+                .thenReturn(Optional.of(new ProfesionalIdentidad(profId, UUID.randomUUID(), "ACTIVO")));
+
+        var request = new CrearSolicitudRequest(UUID.randomUUID(), profId, UUID.randomUUID(),
+                "Calle Falsa 123", -34.60, -58.38, fecha, fecha.minusHours(1), "Se corta la luz.");
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.crear(request));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("posterior al inicio"));
+    }
+
+    /** Sin resumen la validación falla: la capa web responde 400 antes de tocar la base. */
+    @Test
+    void elResumenEsObligatorioEnElContrato() {
+        var validator = Validation.buildDefaultValidatorFactory().getValidator();
+        UUID profId = UUID.randomUUID();
+        // El turno también tiene que estar en el futuro: si no, falsea el @Future y la prueba
+        // no estaría midiendo lo del resumen.
+        LocalDateTime futuro = LocalDateTime.now().plusDays(2).withSecond(0).withNano(0);
+
+        var sinResumen = new CrearSolicitudRequest(UUID.randomUUID(), profId, UUID.randomUUID(),
+                "Calle Falsa 123", -34.60, -58.38, futuro, futuro.plusHours(4), "   ");
+        assertFalse(validator.validate(sinResumen).isEmpty(),
+                "una solicitud sin resumen del problema no debería validar");
+
+        var conResumen = new CrearSolicitudRequest(UUID.randomUUID(), profId, UUID.randomUUID(),
+                "Calle Falsa 123", -34.60, -58.38, futuro, futuro.plusHours(4), "Se corta la luz y no vuelve.");
+        assertTrue(validator.validate(conResumen).isEmpty());
     }
 
     /**
@@ -197,7 +257,7 @@ class SolicitudServiceTest {
         when(repository.save(any(Solicitud.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         var response = service.crear(new CrearSolicitudRequest(clienteId, usuarioId, espId,
-                "Calle Falsa 123", -34.60, -58.38, fecha));
+                "Calle Falsa 123", -34.60, -58.38, fecha, fecha.plusHours(4), "Se corta la luz y no vuelve."));
 
         assertEquals(perfilId, response.profesionalId());
         verify(profesionalesClient).obtenerDisponibilidad(perfilId);

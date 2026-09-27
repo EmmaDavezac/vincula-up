@@ -42,12 +42,6 @@ public class ProfesionalController {
         return service.actualizar(id, request);
     }
 
-    @org.springframework.web.bind.annotation.DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void eliminar(@PathVariable UUID id) {
-        service.eliminar(id);
-    }
-
     @GetMapping("/{id}")
     public ProfesionalResponse buscarPorId(@PathVariable UUID id) {
         return service.buscarPorId(id);

@@ -193,12 +193,10 @@ public class ProfesionalService {
         return toResponse(profesional);
     }
 
-    public void eliminar(UUID id) {
-        Profesional profesional = findProfesional(id);
-        disponibilidadRepository.deleteByProfesionalId(id);
-        profesionalRepository.delete(profesional);
-        profesionalRepository.flush();
-    }
+    /**
+     * El padrón no se borra: la baja es lógica (suspender). Un profesional dado de alta queda
+     * siempre en el padrón para conservar el historial de sus solicitudes y calificaciones.
+     */
 
     private Profesional findProfesional(UUID id) {
         return profesionalRepository.findById(id).orElseThrow(() ->

@@ -1,8 +1,10 @@
-import { inject, Injectable, computed, signal } from '@angular/core';
+import { inject, Injectable, computed, effect, signal } from '@angular/core';
 import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { catchError, map, of, Observable, switchMap, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { UserProfile, UserRole } from '../models/user-profile';
+import { inicioDeSesion } from '../guards/role.guard';
 
 interface UsuarioLookupResponse {
   id: string;
@@ -38,15 +40,32 @@ const PROF_ACTIVE_KEY = 'vincula-up-prof-active';
 export class AuthService {
   private readonly user = signal<UserProfile | null>(this.restoreSession());
   private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
   readonly currentUser = this.user.asReadonly();
   readonly isAuthenticated = computed(() => this.user() !== null);
   readonly isProfessionalActive = signal<boolean>(this.restoreProfActive());
   readonly loginError = signal('');
   /** Evita reintentos en loop al refrescar el token tras una promoción de rol. */
   private roleRefreshRequested = false;
+  /** La foto propia se pide una sola vez por sesión (ver `loadOwnPhoto`). */
+  private photoRequested = false;
 
   constructor() {
     this.handleCodeCallback();
+
+    // La foto de perfil se pide sola cuando hay sesión con token: así el avatar
+    // aparece con la foto real sin importar si la navbar estaba en pantalla antes
+    // del login o después (login por callback de Keycloak).
+    if (this.user()) {
+      this.loadOwnPhoto();
+    }
+    effect(() => {
+      const user = this.user();
+      if (user) {
+        this.loadOwnPhoto();
+      }
+    });
+
     if (this.user()?.role === 'PROFESIONAL') {
       this.checkProfessionalStatus();
     }
@@ -132,6 +151,12 @@ export class AuthService {
 
     return this.http.post<KeycloakTokenResponse>(tokenUrl, body.toString(), { headers }).pipe(
       switchMap((token) => this.maybeUseToken(token)),
+      // Igual que en el callback de Keycloak: al entrar se va a la sección del rol.
+      tap((ok) => {
+        if (ok) {
+          void this.irASeccionDelRol();
+        }
+      }),
       catchError((error: HttpErrorResponse) => {
         this.loginError.set(this.describeError(error, 'No se pudo iniciar sesión con las credenciales indicadas.'));
         return of(false);
@@ -148,6 +173,8 @@ export class AuthService {
     localStorage.removeItem(PROF_ACTIVE_KEY);
     this.user.set(null);
     this.isProfessionalActive.set(false);
+    // La próxima sesión vuelve a pedir la foto de la cuenta nueva.
+    this.photoRequested = false;
 
     // Cerrar la sesión en Keycloak (RP-Initiated Logout)
     // Sin esto, Keycloak recuerda la sesión SSO y loguea automáticamente
@@ -233,7 +260,19 @@ export class AuthService {
           return of(false);
         }),
       )
-      .subscribe();
+      .subscribe((ok) => {
+        // El login se completa de forma asíncrona: cuando vuelve del proveedor el
+        // router ya pasó por la landing (aún sin token), así que acá se entra
+        // derecho a la sección del rol y la portada queda inaccesible.
+        if (ok) {
+          void this.irASeccionDelRol();
+        }
+      });
+  }
+
+  /** Lleva a la sección que corresponde al rol con sesión (ver `inicioDeSesion`). */
+  private irASeccionDelRol(): Promise<boolean> {
+    return this.router.navigateByUrl(inicioDeSesion(this.user()?.role), { replaceUrl: true });
   }
 
   private maybeUseToken(token: KeycloakTokenResponse): Observable<boolean> {
@@ -297,6 +336,9 @@ export class AuthService {
     }
     this.loginError.set('');
     this.sincronizarRolConKeycloak(token.access_token, profile);
+    // La foto se pide apenas hay token: al terminar el login el avatar ya muestra
+    // la imagen real (o iniciales, si la cuenta todavía no tiene foto).
+    this.loadOwnPhoto();
   }
 
   /**
@@ -390,16 +432,50 @@ export class AuthService {
   }
 
   /**
-   * Refresca los datos visibles de la sesión (nombre/email) tras editar el
+   * Foto de la persona con sesión, para mostrarla en la navbar y en el panel.
+   * <p>
+   * La foto no viaja en el token de Keycloak, así que se pide a
+   * {@code /api/usuarios/yo} una única vez por sesión. Si falla (servidor caído,
+   * cuenta suspendida) el avatar cae a iniciales sin romper la navegación.
+   */
+  loadOwnPhoto(force = false): void {
+    const current = this.user();
+    if (!current) {
+      return;
+    }
+    // Sin token todavía (p. ej. la navbar se montó antes de completar el login):
+    // no se marca como pedida para reintentar cuando la sesión esté lista.
+    const token = this.getToken();
+    if (!token) {
+      return;
+    }
+    if (!force && this.photoRequested) {
+      return;
+    }
+    this.photoRequested = true;
+
+    const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
+    this.http
+      .get<{ fotoUrl?: string | null }>(`${environment.apiUrl}/usuarios/yo`, { headers })
+      .pipe(
+        map((cuenta) => this.refreshProfile({ fotoUrl: cuenta?.fotoUrl ?? null })),
+        catchError(() => of(null)),
+      )
+      .subscribe();
+  }
+
+  /**
+   * Refresca los datos visibles de la sesión (nombre/email/foto) tras editar el
    * perfil en "Mi cuenta", sin obligar a un re-login.
    */
-  refreshProfile(patch: { id?: string; name?: string }): void {
+  refreshProfile(patch: { id?: string; name?: string; fotoUrl?: string | null }): void {
     const current = this.user();
     if (!current) return;
     const updated: UserProfile = {
       ...current,
       id: patch.id ?? current.id,
       name: patch.name ?? current.name,
+      fotoUrl: patch.fotoUrl !== undefined ? patch.fotoUrl : current.fotoUrl,
     };
     this.user.set(updated);
     try {

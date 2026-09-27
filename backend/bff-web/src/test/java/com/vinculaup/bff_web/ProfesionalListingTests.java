@@ -71,7 +71,7 @@ class ProfesionalListingTests {
     }
 
     @Test
-    void listingKeepsPadronPhotoOverUsuarioPhoto() throws Exception {
+    void listingUsesLaFotoDeLaCuentaAunqueElPadronTengaOtra() throws Exception {
         UUID usuarioId = UUID.randomUUID();
         when(gateway.listarProfesionales(null, true)).thenReturn(mapper.createArrayNode().add(
                 profesional(usuarioId, "P-2002").put("fotoUrl", "data:image/jpeg;base64,PADRON")));
@@ -82,8 +82,57 @@ class ProfesionalListingTests {
                 .put("fotoUrl", "data:image/jpeg;base64,USUARIO"));
         mvc.perform(get("/api/profesionales").param("todos", "true"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].fotoUrl").value("data:image/jpeg;base64,PADRON"))
+                .andExpect(jsonPath("$[0].fotoUrl").value("data:image/jpeg;base64,USUARIO"))
                 .andExpect(jsonPath("$[0].nombre").value("Luciano"));
+    }
+
+    /**
+     * El padrón guarda la foto como cadena vacía cuando el profesional no sube
+     * ninguna al activar el perfil. Esa vacía no debe tapar la foto de la cuenta.
+     */
+    @Test
+    void listingIgnoraLaFotoVaciaDelPadron() throws Exception {
+        UUID usuarioId = UUID.randomUUID();
+        when(gateway.listarProfesionales(null, true)).thenReturn(mapper.createArrayNode().add(
+                profesional(usuarioId, "P-2005").put("fotoUrl", "")));
+        when(gateway.buscarUsuarioPorId(usuarioId)).thenReturn(mapper.createObjectNode()
+                .put("id", usuarioId.toString())
+                .put("nombre", "Ana")
+                .put("apellido", "Díaz")
+                .put("fotoUrl", "data:image/png;base64,REAL"));
+        mvc.perform(get("/api/profesionales").param("todos", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].fotoUrl").value("data:image/png;base64,REAL"));
+    }
+
+    @Test
+    void listingUsaLaFotoDelPadronComoRespaldo() throws Exception {
+        UUID usuarioId = UUID.randomUUID();
+        when(gateway.listarProfesionales(null, true)).thenReturn(mapper.createArrayNode().add(
+                profesional(usuarioId, "P-2006").put("fotoUrl", "data:image/jpeg;base64,PADRON")));
+        when(gateway.buscarUsuarioPorId(usuarioId)).thenReturn(mapper.createObjectNode()
+                .put("id", usuarioId.toString())
+                .put("nombre", "Jorge")
+                .put("apellido", "Sosa")
+                .put("fotoUrl", ""));
+        mvc.perform(get("/api/profesionales").param("todos", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].fotoUrl").value("data:image/jpeg;base64,PADRON"));
+    }
+
+    /** Sin foto en ninguna de las dos fuentes, el frontend muestra iniciales. */
+    @Test
+    void listingOmiteLaFotoVaciaParaQueElFrontendUseIniciales() throws Exception {
+        UUID usuarioId = UUID.randomUUID();
+        when(gateway.listarProfesionales(null, true)).thenReturn(mapper.createArrayNode().add(
+                profesional(usuarioId, "P-2007").put("fotoUrl", "")));
+        when(gateway.buscarUsuarioPorId(usuarioId)).thenReturn(mapper.createObjectNode()
+                .put("id", usuarioId.toString())
+                .put("nombre", "Mariana")
+                .put("apellido", "Acosta"));
+        mvc.perform(get("/api/profesionales").param("todos", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].fotoUrl").doesNotExist());
     }
 
     @Test

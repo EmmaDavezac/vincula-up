@@ -41,11 +41,35 @@ export const redirectToKeycloak: CanActivateFn = () => {
   auth.refreshSession();
 
   if (auth.isAuthenticated()) {
-    return router.createUrlTree(['/']);
+    return router.createUrlTree([inicioDeSesion(auth.currentUser()?.role)]);
   }
 
   auth.loginWithKeycloak().subscribe();
   return false;
+};
+
+/** Primer destino de cada rol al entrar con sesión. */
+export function inicioDeSesion(role: UserRole | undefined): string {
+  return role === 'ADMIN' ? '/admin' : '/solicitudes';
+}
+
+/**
+ * La landing es sólo para visitantes: en cuanto hay sesión se entra derecho a la
+ * app. Va como guard (y no dentro del componente) para que la portada no llegue a
+ * pintarse al volver atrás del navegador ni al restaurar la sesión.
+ */
+export const redirectIfAuthenticated: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+
+  auth.refreshSession();
+
+  const user = auth.currentUser();
+  if (!user) {
+    return true;
+  }
+
+  return router.createUrlTree([inicioDeSesion(user.role)]);
 };
 
 export const requireRequestsAccess: CanActivateFn = () => {

@@ -1,35 +1,26 @@
 :host {
-  display: flex;
-  flex-direction: column;
-  min-height: 100dvh;
+	display: flex;
+	flex-direction: column;
+	min-height: 100dvh;
 }
 
 main {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: visible;
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	min-height: 0;
 }
 
-/* Footer: espacio arriba para que no tape contenido en móvil */
-@media (max-width: 720px) {
-  :host {
-    display: flex;
-    flex-direction: column;
-    min-height: 100dvh;
-  }
-
-  main {
-    overflow: visible;
-  }
+/*
+En móvil la barra inferior queda fija abajo: se le deja aire al contenido
+para que la última tarjeta no quede tapada.
+*/
+@media (max-width: 1023px) {
+	main {
+		padding-bottom: 4.5rem;
+	}
 }
 
 app-footer {
-  margin-top: 1.5rem;
-}
-
-@media (min-width: 721px) {
-  /* En desktop mantenemos pie pegado al fondo sin tape */
-  app-footer {
-    margin-top: 1.5rem;
-  }
+	margin-top: 1.5rem;
 }

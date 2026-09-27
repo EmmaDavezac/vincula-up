@@ -1,15 +1,13 @@
 import { Component } from '@angular/core';
-import { MatToolbarModule } from '@angular/material/toolbar';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
+import { RouterLink } from '@angular/router';
 
 @Component({
-  selector: 'app-footer',
-  standalone: true,
-  imports: [MatToolbarModule, MatButtonModule, MatIconModule],
-  templateUrl: './footer.html',
-  styleUrl: './footer.css',
+	selector: 'app-footer',
+	standalone: true,
+	imports: [RouterLink],
+	templateUrl: './footer.html',
+	styleUrl: './footer.css',
 })
 export class FooterComponent {
-  readonly currentYear = new Date().getFullYear();
+	readonly currentYear = new Date().getFullYear();
 }

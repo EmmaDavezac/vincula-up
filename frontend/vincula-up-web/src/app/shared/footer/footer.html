@@ -1,27 +1,35 @@
-<mat-toolbar color="none" class="vincula-footer">
-  <div class="footer-grid">
-    <div class="footer-col">
-      <span class="footer-label">Contacto</span>
-      <a href="mailto:contacto@vinculaup.edu.ar" class="footer-link">contacto@vinculaup.edu.ar</a>
-    </div>
+<footer class="vu-footer" aria-label="Información y enlaces del sitio">
+	<div class="footer-inner">
+		<div class="footer-grid">
+			<div>
+				<div class="footer-brand">
+					<span class="footer-brand__mark" aria-hidden="true">V</span>
+					<span class="footer-brand__name">Vincula-UP</span>
+				</div>
+				<p class="footer-lead">Una red técnica con respaldo universitario para conectar necesidades reales con oficios confiables.</p>
+			</div>
 
-    <div class="footer-col">
-      <span class="footer-label">Redes sociales</span>
-      <div class="social-links">
-        <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" class="social-link" aria-label="Twitter">
-          <mat-icon>tag</mat-icon>
-        </a>
-        <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" class="social-link" aria-label="Instagram">
-          <mat-icon>photo_camera</mat-icon>
-        </a>
-        <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" class="social-link" aria-label="LinkedIn">
-          <mat-icon>work</mat-icon>
-        </a>
-      </div>
-    </div>
+			<div>
+				<h2 class="footer-title">Ayuda</h2>
+				<nav class="footer-links" aria-label="Ayuda y contacto">
+					<a class="footer-link" href="mailto:contacto@vinculaup.edu.ar">Contacto</a>
+					<a class="footer-link" href="mailto:contacto@vinculaup.edu.ar">Preguntas frecuentes</a>
+					<a class="footer-link" routerLink="/ingresar">Ingresar</a>
+				</nav>
+			</div>
 
-    <div class="footer-col footer-copy-col">
-      <span class="footer-copy">© {{ currentYear }} — Vincula-UP · Universidad Popular</span>
-    </div>
-  </div>
-</mat-toolbar>
+			<div>
+				<h2 class="footer-title">Información</h2>
+				<nav class="footer-links" aria-label="Información institucional">
+					<a class="footer-link" href="mailto:contacto@vinculaup.edu.ar">Reportar un problema</a>
+					<a class="footer-link" routerLink="/como-funciona">Cómo funciona</a>
+				</nav>
+			</div>
+		</div>
+
+		<div class="footer-bottom">
+			<span>Vincula-UP · Universidad Popular de Concepción del Uruguay</span>
+			<span>© {{ currentYear }} Todos los derechos reservados</span>
+		</div>
+	</div>
+</footer>

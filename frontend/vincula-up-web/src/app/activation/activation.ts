@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { catchError, of } from 'rxjs';
 import { ApiService } from '../core/services/api.service';
 import { AuthService } from '../core/services/auth.service';
+import { VuIcon } from '../shared/icon/icon';
 
 interface ValidatedLocation {
   lat: number;
@@ -13,16 +14,31 @@ interface ValidatedLocation {
 }
 
 @Component({
-  imports: [CommonModule, FormsModule, RouterLink, DecimalPipe],
-  selector: 'app-activation',
-  styleUrl: './activation.css',
-  templateUrl: './activation.html',
+	imports: [CommonModule, FormsModule, RouterLink, DecimalPipe, VuIcon],
+	selector: 'app-activation',
+	styleUrl: './activation.css',
+	templateUrl: './activation.html',
 })
 export class Activation {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
 
   readonly step = signal(1);
+
+  /** Stepper del prototipo. */
+  readonly stepLabels: ReadonlyArray<string> = ['Foto', 'Zona y GPS', 'Disponibilidad'];
+
+  stepTitle(): string {
+    return { 1: 'Tu imagen profesional', 2: 'Tu zona de cobertura', 3: 'Tu disponibilidad semanal' }[this.step()] ?? '';
+  }
+
+  stepLead(): string {
+    return {
+      1: 'Una foto clara ayuda a que los clientes reconozcan tu perfil en la comunidad.',
+      2: 'Indicá dónde trabajás para que podamos acercarte oportunidades de tu zona.',
+      3: 'Contanos en qué momentos de la semana estás disponible para trabajar.',
+    }[this.step()] ?? '';
+  }
 
   // ── Paso 1: Foto y previsualización ──
   readonly photoName = signal('');

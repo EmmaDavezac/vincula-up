@@ -1,0 +1,70 @@
+<p class="vu-admin-eyebrow">Dashboard de administración</p>
+<h1 class="vu-admin-title">Resumen</h1>
+<p class="vu-admin-lead">
+	Indicadores para planificar la oferta académica, acompañar a la red profesional y medir el impacto del proyecto.
+</p>
+
+@if (aviso().texto) {
+	<p class="vu-alert admin-dashboard__alert" [class]="avisoClase(aviso().tipo)" role="status">{{ aviso().texto }}</p>
+}
+
+@if (loading()) {
+	<p class="vu-admin-panel__hint">Calculando indicadores...</p>
+} @else {
+	<section class="vu-admin-metrics" aria-label="Indicadores de éxito">
+		@for (metrica of metricas(); track metrica.label) {
+			<article class="vu-admin-metric">
+				<vu-icon name="bar-chart" [size]="19" class="vu-admin-metric__icon" />
+				<p class="vu-admin-metric__label">{{ metrica.label }}</p>
+				<div class="vu-admin-metric__row">
+					<strong class="vu-admin-metric__value">{{ metrica.value }}</strong>
+					<span class="vu-admin-metric__note">{{ metrica.nota }}</span>
+				</div>
+			</article>
+		}
+	</section>
+
+	<section class="vu-admin-split">
+		<article class="vu-admin-panel">
+			<div class="admin-dashboard__panel-head">
+				<div>
+					<p class="vu-admin-eyebrow">Planificación académica</p>
+					<h2 class="vu-admin-panel__title">Demanda por especialidad</h2>
+					<p class="vu-admin-panel__hint">Áreas con mayor demanda para priorizar cursos y nuevas cohortes.</p>
+				</div>
+				<vu-icon name="bar-chart" [size]="22" class="vu-admin-metric__icon" />
+			</div>
+
+			@if (demandaPorEspecialidad().length) {
+				<div class="vu-admin-bars">
+					@for (item of demandaPorEspecialidad(); track item.nombre) {
+						<div>
+							<div class="vu-admin-bar__row">
+								<span class="vu-admin-bar__name">{{ item.nombre }}</span>
+								<span class="vu-admin-bar__meta">{{ item.solicitudes }} solicitudes · {{ item.nivel }}</span>
+							</div>
+							<div class="vu-admin-bar">
+								<div class="vu-admin-bar__fill" [style.width.%]="item.porcentaje"></div>
+							</div>
+						</div>
+					}
+				</div>
+			} @else {
+				<p class="vu-admin-panel__hint">Todavía no hay solicitudes registradas para medir la demanda.</p>
+			}
+		</article>
+
+		<article class="vu-admin-panel">
+			<p class="vu-admin-eyebrow">Embudo del servicio</p>
+			<h2 class="vu-admin-panel__title">Del pedido al impacto</h2>
+			<div class="vu-admin-funnel">
+				@for (etapa of embudo(); track etapa.label) {
+					<div class="vu-admin-funnel__row">
+						<span class="vu-admin-funnel__label">{{ $index + 1 }}. {{ etapa.label }}</span>
+						<strong class="vu-admin-funnel__value">{{ etapa.value }}</strong>
+					</div>
+				}
+			</div>
+		</article>
+	</section>
+}

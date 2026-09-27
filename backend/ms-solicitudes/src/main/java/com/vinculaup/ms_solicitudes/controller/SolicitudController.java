@@ -2,7 +2,9 @@ package com.vinculaup.ms_solicitudes.controller;
 
 import com.vinculaup.ms_solicitudes.dto.CrearSolicitudRequest;
 import com.vinculaup.ms_solicitudes.dto.CambiarEstadoRequest;
+import com.vinculaup.ms_solicitudes.dto.SolicitudPanelResponse;
 import com.vinculaup.ms_solicitudes.dto.SolicitudResponse;
+import com.vinculaup.ms_solicitudes.service.SolicitudPanelService;
 import com.vinculaup.ms_solicitudes.service.SolicitudService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -23,15 +25,26 @@ import org.springframework.web.bind.annotation.RestController;
 public class SolicitudController {
 
     private final SolicitudService service;
+    private final SolicitudPanelService panelService;
 
-    public SolicitudController(SolicitudService service) {
+    public SolicitudController(SolicitudService service, SolicitudPanelService panelService) {
         this.service = service;
+        this.panelService = panelService;
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public SolicitudResponse crear(@Valid @RequestBody CrearSolicitudRequest request) {
         return service.crear(request);
+    }
+
+    /**
+     * Solicitudes de toda la plataforma para los indicadores del panel de administración.
+     * El BFF sólo lo expone al rol ADMIN: acota el uso, no lo restringe por sí mismo.
+     */
+    @GetMapping("/panel")
+    public List<SolicitudPanelResponse> listarParaPanel() {
+        return panelService.listar();
     }
 
     /**

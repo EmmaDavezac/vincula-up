@@ -4,7 +4,7 @@ import { firstValueFrom, isObservable, Subject } from 'rxjs';
 import { AuthService } from '../services/auth.service';
 import { UserRole } from '../models/user-profile';
 import { routes } from '../../app.routes';
-import { requireActivationAccess, requireRequestsAccess, requireRole } from './role.guard';
+import { requireActivationAccess, redirectIfAuthenticated, redirectToKeycloak, requireRequestsAccess, requireRole } from './role.guard';
 
 describe('Role guards', () => {
   let role: UserRole | null;
@@ -12,13 +12,16 @@ describe('Role guards', () => {
   const auth = {
     refreshSession: vi.fn(),
     isAuthenticated: () => role !== null,
+    currentUser: () => (role ? { id: 'u1', name: 'Test user', role, roleLabel: role } : null),
     hasRole: (expected: UserRole) => role === expected,
     loadProfessionalStatus: () => status.asObservable(),
+    loginWithKeycloak: vi.fn(),
   };
 
   beforeEach(() => {
     role = null;
     status = new Subject<boolean>();
+    auth.loginWithKeycloak.mockReset();
     TestBed.configureTestingModule({
       providers: [provideRouter([]), { provide: AuthService, useValue: auth }],
     });
@@ -51,10 +54,40 @@ describe('Role guards', () => {
     },
   );
 
-  it.each(['', 'como-funciona'])('keeps the public page accessible: %s', (path) => {
-    const route = routes.find((entry) => entry.path === path);
+  it('keeps the public information page accessible for every role', () => {
+    const route = routes.find((entry) => entry.path === 'como-funciona');
     expect(route).toBeDefined();
     expect(route?.canActivate).toBeUndefined();
+  });
+
+  it('guards the landing so it stays unreachable once logged in', () => {
+    const guards = routes.find((route) => route.path === '')?.canActivate;
+    expect(guards).toHaveLength(1);
+  });
+
+  it.each<UserRole | null>([null, 'CLIENTE', 'PROFESIONAL', 'ADMIN'])(
+    'keeps the landing only for visitors: role=%s', async (currentRole) => {
+      role = currentRole;
+      const guard = routes.find((route) => route.path === '')?.canActivate![0] as CanActivateFn;
+      expect(await run(guard)).toBe(role === null ? true : role === 'ADMIN' ? '/admin' : '/solicitudes');
+    },
+  );
+
+  it('sends an already logged in user straight to the app instead of login', async () => {
+    role = 'ADMIN';
+    expect(await run(redirectToKeycloak)).toBe('/admin');
+    expect(auth.loginWithKeycloak).not.toHaveBeenCalled();
+
+    role = 'CLIENTE';
+    expect(await run(redirectToKeycloak)).toBe('/solicitudes');
+    expect(auth.loginWithKeycloak).not.toHaveBeenCalled();
+  });
+
+  it('reads the landing guard from the router configuration', async () => {
+    role = 'PROFESIONAL';
+    const guard = routes.find((route) => route.path === '')?.canActivate![0] as CanActivateFn;
+    expect(guard).toBe(redirectIfAuthenticated);
+    expect(await run(guard)).toBe('/solicitudes');
   });
 
   it('redirects anonymous visitors to login', async () => {

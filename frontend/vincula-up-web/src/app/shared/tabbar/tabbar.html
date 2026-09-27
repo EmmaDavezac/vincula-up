@@ -1,0 +1,18 @@
+<!--
+Barra inferior de navegación: en móvil es la forma de pasar entre secciones,
+en el sitio público y en el panel de administración por igual. En escritorio
+la navegación vive en la barra superior, así que no se muestra.
+-->
+<nav class="vu-tabbar" aria-label="Navegación principal (móvil)">
+	@for (seccion of secciones(); track seccion.path) {
+		<a
+			class="vu-tabbar__item"
+			[routerLink]="seccion.path"
+			routerLinkActive="is-active"
+			[routerLinkActiveOptions]="{ exact: seccion.exact }"
+		>
+			<vu-icon [name]="seccion.icon" [size]="19" />
+			<span class="vu-truncate">{{ seccion.label }}</span>
+		</a>
+	}
+</nav>

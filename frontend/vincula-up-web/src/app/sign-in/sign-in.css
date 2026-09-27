@@ -1,15 +1,149 @@
-:host { display: block; }
-.auth-page { display: grid; gap: 4rem; grid-template-columns: minmax(0, 1fr) 22rem; margin: 0 auto; max-width: 900px; padding: 6rem 1.5rem; }
-.eyebrow, .role-label { color: var(--coral); font-size: .75rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
-h1 { color: var(--ink); font-family: Georgia, 'Times New Roman', serif; font-size: clamp(3rem, 6vw, 5.5rem); font-weight: 400; line-height: .98; margin: 1rem 0; max-width: 9ch; }
-.auth-copy > p:last-child { color: var(--muted); line-height: 1.7; max-width: 28rem; }
-.role-list { display: flex; flex-direction: column; gap: .75rem; }
-.role-label { color: var(--muted); letter-spacing: 0; margin: 0 0 .5rem; text-transform: none; }
-.role-list button { background: #fffdf8; border: 1px solid var(--line); color: var(--ink); cursor: pointer; display: flex; flex-direction: column; font: inherit; gap: .3rem; padding: 1rem; text-align: left; }
-.role-list button:hover { border-color: var(--coral); transform: translateX(3px); }
-.role-list span { color: var(--muted); font-size: .8rem; }
-.credentials-hint { background: #f6f8fa; border: 1px solid var(--line); border-radius: 6px; padding: 1rem; margin-top: 1rem; font-size: 0.85rem; color: var(--ink); }
-.credentials-hint .hint-title { font-weight: 600; margin-bottom: 0.5rem; color: var(--ink); }
-.credentials-hint ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.4rem; }
-.credentials-hint code { background: #e2e8f0; padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.8rem; }
-@media (max-width: 700px) { .auth-page { display: block; padding-top: 3.5rem; } .role-list { margin-top: 3rem; } }
+:host {
+	display: block;
+}
+
+.signin {
+	padding: 1.5rem 1.25rem 2.5rem;
+}
+
+@media (min-width: 640px) {
+	.signin {
+		padding: 2.5rem 2rem;
+	}
+}
+
+.signin__wrap {
+	margin: 0 auto;
+	max-width: 460px;
+}
+
+.signin__card {
+	background: var(--surface-card);
+	border: 1px solid var(--line);
+	border-radius: 16px;
+	box-shadow: var(--shadow-md);
+	margin-top: 2rem;
+	padding: 1.5rem;
+}
+
+@media (min-width: 640px) {
+	.signin__card {
+		padding: 2.25rem;
+	}
+}
+
+.signin__brand {
+	align-items: center;
+	display: flex;
+	gap: 0.75rem;
+	margin-bottom: 2rem;
+}
+
+.signin__title {
+	font-family: var(--font-serif);
+	font-size: clamp(2.25rem, 8vw, 3.2rem);
+	letter-spacing: -0.055em;
+	line-height: 1;
+	margin: 0.75rem 0 0;
+}
+
+.signin__lead {
+	margin-top: 1rem;
+	max-width: 30rem;
+}
+
+.signin__submit {
+	margin-top: 2rem;
+	min-height: 3rem;
+}
+
+.signin__note {
+	color: var(--muted);
+	font-size: 0.75rem;
+	line-height: 1.5;
+	margin: 0.75rem 0 0;
+	text-align: center;
+}
+
+.signin__roles {
+	display: grid;
+	gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+	.signin__roles {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+.role-card {
+	align-items: center;
+	background: #fff;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	display: flex;
+	gap: 0.75rem;
+	min-height: 3.5rem;
+	padding: 0.75rem 1rem;
+	text-decoration: none;
+}
+
+.role-card:hover {
+	border-color: var(--coral);
+	background: var(--paper);
+}
+
+.role-card__icon {
+	align-items: center;
+	border-radius: 999px;
+	display: flex;
+	flex-shrink: 0;
+	height: 2.25rem;
+	justify-content: center;
+	width: 2.25rem;
+}
+
+.role-card__icon--coral {
+	background: rgb(227 95 67 / 0.1);
+	color: var(--coral);
+}
+
+.role-card__icon--ink {
+	background: rgb(30 41 38 / 0.1);
+	color: var(--ink);
+}
+
+.role-card__label {
+	font-size: 0.875rem;
+	font-weight: 700;
+	line-height: 1.25;
+}
+
+.signin__secure {
+	align-items: center;
+	border-top: 1px solid var(--line);
+	color: var(--muted);
+	display: flex;
+	font-size: 0.75rem;
+	font-weight: 700;
+	gap: 0.5rem;
+	justify-content: center;
+	margin: 1.75rem 0 0;
+	padding-top: 1.5rem;
+}
+
+.signin__secure-icon {
+	color: var(--emerald);
+}
+
+.signin__footer {
+	color: var(--muted);
+	font-size: 0.875rem;
+	margin: 1.5rem 0 0;
+	text-align: center;
+}
+
+.signin__footer a {
+	color: var(--coral);
+	font-weight: 700;
+}

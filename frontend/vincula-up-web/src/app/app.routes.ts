@@ -1,9 +1,18 @@
 import { Routes } from '@angular/router';
-import { redirectToKeycloak, requireActivationAccess, requireAnyRole, requireRequestsAccess, requireRole } from './core/guards/role.guard';
+import { adminRoutes } from './admin/admin.routes';
+import {
+	redirectIfAuthenticated,
+	redirectToKeycloak,
+	requireActivationAccess,
+	requireAnyRole,
+	requireRequestsAccess,
+	requireRole,
+} from './core/guards/role.guard';
 
 export const routes: Routes = [
 	{
 		path: '',
+		canActivate: [redirectIfAuthenticated],
 		loadComponent: () => import('./home/home').then((module) => module.Home),
 		title: 'Vincula-UP | Inicio',
 	},
@@ -43,7 +52,8 @@ export const routes: Routes = [
 	{
 		path: 'admin',
 		canActivate: [requireRole('ADMIN')],
-		loadComponent: () => import('./admin/admin').then((module) => module.Admin),
+		loadComponent: () => import('./admin/admin-layout/admin-layout').then((module) => module.AdminLayout),
+		children: adminRoutes,
 		title: 'Vincula-UP | Administracion',
 	},
 	{

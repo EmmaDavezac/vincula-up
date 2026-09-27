@@ -1,5 +1,13 @@
+<!--
+Una sola navegación para todo el sitio: la barra superior va siempre (también
+dentro del panel de administración) y en móvil se suma la barra inferior
+para pasar entre secciones. El footer del sitio no se muestra en el panel.
+-->
 <app-navbar />
 <main>
-  <router-outlet />
+	<router-outlet />
 </main>
-<app-footer />
+@if (!enPanelAdmin()) {
+	<app-footer />
+}
+<vu-tabbar />

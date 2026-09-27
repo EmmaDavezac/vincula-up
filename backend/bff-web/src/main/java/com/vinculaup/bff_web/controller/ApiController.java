@@ -176,9 +176,7 @@ public class ApiController {
                 // UUID inválido o usuario inexistente: se deja el profesional sin datos personales.
             }
         }
-        if (usuarios.isEmpty()) {
-            return profesionales;
-        }
+        Map<String, JsonNode> reputaciones = reputaciones();
         var enriquecidos = tools.jackson.databind.json.JsonMapper.builder().build().createArrayNode();
         for (JsonNode profesional : profesionales) {
             JsonNode usuario = null;
@@ -187,9 +185,51 @@ public class ApiController {
             } catch (RuntimeException ignored) {
                 // usuarioId inválido: se conserva el nodo original.
             }
-            enriquecidos.add(enriquecerConUsuario(profesional, usuario));
+            enriquecidos.add(conReputacion(enriquecerConUsuario(profesional, usuario), reputaciones));
         }
         return enriquecidos;
+    }
+
+    /**
+     * Reputación de cada profesional (promedio y cantidad de reseñas), indexada
+     * por id de perfil. Se pide una sola vez para todo el listado: consultar
+     * profesional por profesional sería una llamada por tarjeta.
+     * <p>
+     * Si ms-solicitudes no responde, el listado se entrega igual sin estrellas:
+     * la reputación es un dato adicional, no una condición para ver el padrón.
+     */
+    private Map<String, JsonNode> reputaciones() {
+        Map<String, JsonNode> porProfesional = new HashMap<>();
+        try {
+            JsonNode resumen = gateway.listarResumenCalificaciones();
+            if (resumen != null && resumen.isArray()) {
+                for (JsonNode item : resumen) {
+                    if (item.hasNonNull("profesionalId")) {
+                        porProfesional.put(item.get("profesionalId").asText(), item);
+                    }
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // ms-solicitudes caído o lento: el padrón se muestra sin reputación.
+        }
+        return porProfesional;
+    }
+
+    /** Agrega promedio y cantidad de reseñas al nodo del profesional. */
+    private JsonNode conReputacion(JsonNode profesional, Map<String, JsonNode> reputaciones) {
+        if (profesional == null || !profesional.isObject() || reputaciones.isEmpty()) {
+            return profesional;
+        }
+        JsonNode reputacion = reputaciones.get(profesional.path("id").asText(null));
+        if (reputacion == null) {
+            return profesional;
+        }
+        var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
+        var copia = mapper.createObjectNode();
+        copia.setAll((tools.jackson.databind.node.ObjectNode) profesional);
+        copia.put("promedio", reputacion.path("promedio").asDouble(0d));
+        copia.put("cantidadCalificaciones", reputacion.path("cantidad").asLong(0));
+        return copia;
     }
 
     /**
@@ -212,7 +252,7 @@ public class ApiController {
         } catch (RuntimeException ignored) {
             // UUID inválido o usuario inexistente: se dejan los datos del padrón.
         }
-        return enriquecerConUsuario(profesional, usuario);
+        return conReputacion(enriquecerConUsuario(profesional, usuario), reputaciones());
     }
 
     private JsonNode enriquecerConUsuario(JsonNode profesional, JsonNode usuario) {
@@ -222,9 +262,15 @@ public class ApiController {
         if (usuario != null) {
             if (usuario.hasNonNull("nombre")) copia.put("nombre", usuario.get("nombre").asText());
             if (usuario.hasNonNull("apellido")) copia.put("apellido", usuario.get("apellido").asText());
-            // La foto del padrón manda; la del usuario se usa solo si el profesional no cargó una.
-            if (!copia.hasNonNull("fotoUrl") && usuario.hasNonNull("fotoUrl")) {
+            // La foto que se muestra es la de la cuenta (ms-usuarios), que es la que
+            // la persona sube y actualiza desde "Mi cuenta". La del padrón queda como
+            // respaldo para los perfiles cargados antes de que existiera la cuenta.
+            // Ojo con la cadena vacía: un perfil sin foto la guarda como "" y, si se
+            // tomara como "tiene foto", taparía la imagen real de la cuenta.
+            if (usuario.hasNonNull("fotoUrl") && !usuario.get("fotoUrl").asText("").isBlank()) {
                 copia.put("fotoUrl", usuario.get("fotoUrl").asText());
+            } else if (!copia.hasNonNull("fotoUrl") || copia.get("fotoUrl").asText("").isBlank()) {
+                copia.remove("fotoUrl");
             }
         }
         return copia;
@@ -262,6 +308,78 @@ public class ApiController {
         return profile == null ? ResponseEntity.noContent().build() : ResponseEntity.ok(profile);
     }
 
+    /**
+     * Reputación del profesional autenticado: promedio y las reseñas que recibió,
+     * con el nombre de quien las dejó (ese nombre vive en ms-usuarios).
+     * <p>
+     * El id del profesional sale de la sesión, nunca de un parámetro: un
+     * profesional no puede consultar la reputación de otro.
+     */
+    @GetMapping("/mi-reputacion")
+    public JsonNode miReputacion() {
+        var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
+        var vacio = mapper.createObjectNode();
+        vacio.put("promedio", 0d);
+        vacio.put("cantidad", 0);
+        vacio.set("resenas", mapper.createArrayNode());
+
+        JsonNode profile = professionalProfile(authenticatedUser(), false);
+        if (profile == null || !profile.hasNonNull("id")) {
+            // Todavía no completó el alta en el padrón: no tiene reputación.
+            return vacio;
+        }
+        JsonNode reputacion;
+        try {
+            reputacion = gateway.reputacionDe(UUID.fromString(profile.get("id").asText()));
+        } catch (RuntimeException exception) {
+            // ms-solicitudes no responde: se devuelve vacío y la tarjeta avisa.
+            return vacio;
+        }
+        if (reputacion == null || !reputacion.isObject()) {
+            return vacio;
+        }
+
+        Map<UUID, String> nombres = new HashMap<>();
+        var resenas = mapper.createArrayNode();
+        for (JsonNode resena : reputacion.path("resenas")) {
+            UUID clienteId = null;
+            JsonNode nodoCliente = resena.get("clienteId");
+            if (nodoCliente != null && !nodoCliente.isNull()) {
+                try {
+                    clienteId = UUID.fromString(nodoCliente.asText());
+                } catch (RuntimeException ignored) {
+                    // Id de cliente con formato inesperado: la reseña va sin nombre.
+                }
+            }
+            if (clienteId != null) {
+                nombres.computeIfAbsent(clienteId, key -> {
+                    JsonNode usuario = gateway.buscarUsuarioPorId(key);
+                    if (usuario == null || !usuario.isObject()) {
+                        return null;
+                    }
+                    String nombre = List.of(
+                            usuario.path("nombre").asText(""),
+                            usuario.path("apellido").asText("")).stream()
+                            .filter(part -> !part.isBlank())
+                            .reduce((a, b) -> a + " " + b)
+                            .orElse("");
+                    return nombre.isBlank() ? null : nombre;
+                });
+            }
+            var copia = mapper.createObjectNode();
+            copia.setAll((tools.jackson.databind.node.ObjectNode) resena);
+            String nombre = clienteId == null ? null : nombres.get(clienteId);
+            copia.put("clienteNombre", nombre != null ? nombre : "Cliente de Vincula-UP");
+            resenas.add(copia);
+        }
+
+        var respuesta = mapper.createObjectNode();
+        respuesta.put("promedio", reputacion.path("promedio").asDouble(0d));
+        respuesta.put("cantidad", reputacion.path("cantidad").asLong(0));
+        respuesta.set("resenas", resenas);
+        return respuesta;
+    }
+
     @PostMapping("/especialidades")
     @ResponseStatus(HttpStatus.CREATED)
     public JsonNode crearEspecialidad(@RequestBody JsonNode body) { return gateway.crearEspecialidad(body); }
@@ -276,9 +394,8 @@ public class ApiController {
     @PutMapping("/profesionales/{id}")
     public JsonNode actualizarProfesional(@PathVariable UUID id, @RequestBody JsonNode body) { return gateway.actualizarProfesional(id, body); }
 
-    @org.springframework.web.bind.annotation.DeleteMapping("/profesionales/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void eliminarProfesional(@PathVariable UUID id) { gateway.eliminarProfesional(id); }
+    // El padrón de profesionales no se borra: la baja es lógica (PATCH /suspender).
+    // Un profesional dado de alta conserva su historial de solicitudes y calificaciones.
 
     @PostMapping("/usuarios")
     @ResponseStatus(HttpStatus.CREATED)
@@ -478,6 +595,19 @@ public class ApiController {
                 "PROFESIONAL".equals(role) ? "RECIBIDAS" : "ENVIADAS", role);
     }
 
+    /**
+     * Solicitudes de toda la plataforma para el dashboard de administración (embudo del
+     * servicio, demanda por especialidad y satisfacción). Reservado al rol ADMIN.
+     */
+    @GetMapping("/solicitudes/panel")
+    public JsonNode listarSolicitudesPanel() {
+        authenticatedUser();
+        if (!"ADMIN".equals(authenticatedRole())) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "Rol no autorizado");
+        }
+        return gateway.listarSolicitudesParaPanel();
+    }
+
     @PatchMapping("/solicitudes/{id}/aceptar")
     public JsonNode aceptar(@PathVariable UUID id, @RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
@@ -492,12 +622,14 @@ public class ApiController {
         return gateway.rechazarSolicitud(id, actorIdentityBody(body, user));
     }
 
+    /** Cualquiera de los dos lados puede dar el turno por terminado. */
     @PatchMapping("/solicitudes/{id}/completar")
     public JsonNode completar(@PathVariable UUID id, @RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
         return gateway.completarSolicitud(id, actorIdentityBody(body, user));
     }
 
+    /** Lo mismo para cancelar: disponible para cliente y profesional. */
     @PatchMapping("/solicitudes/{id}/cancelar")
     public JsonNode cancelar(@PathVariable UUID id, @RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();

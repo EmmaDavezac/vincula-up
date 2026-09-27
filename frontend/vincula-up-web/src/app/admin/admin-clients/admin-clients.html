@@ -1,0 +1,109 @@
+<a class="vu-admin-back" routerLink="/admin">← Resumen</a>
+
+<div class="admin-clients__head">
+	<div>
+		<h1 class="vu-admin-title">Clientes</h1>
+		<p class="vu-admin-lead admin-clients__lead">Consultá y administrá el acceso de cada cliente.</p>
+	</div>
+	<span class="vu-state vu-state--activo admin-clients__count">
+		@if (hayBusqueda()) {
+			{{ clientesOrdenados().length }} de {{ clients().length }} clientes
+		} @else {
+			{{ clients().length }} clientes
+		}
+	</span>
+</div>
+
+@if (aviso().texto) {
+	<p class="vu-alert admin-clients__alert" [class]="avisoClase(aviso().tipo)" role="status">{{ aviso().texto }}</p>
+}
+
+@if (loading()) {
+	<p class="vu-admin-panel__hint">Cargando clientes...</p>
+} @else if (clients().length) {
+	<div class="admin-clients__search">
+		<label class="vu-sr-only" for="admin-search-clients">Buscar clientes</label>
+		<div class="vu-field-with-icon">
+			<vu-icon name="search" [size]="17" class="vu-field-icon" />
+			<input
+				id="admin-search-clients"
+				class="vu-input vu-input--search"
+				type="search"
+				[ngModel]="busqueda()"
+				(ngModelChange)="busqueda.set($event)"
+				placeholder="Buscar por nombre, email o teléfono"
+				autocomplete="off"
+			/>
+		</div>
+		@if (hayBusqueda()) {
+			<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="limpiarBusqueda()">Limpiar</button>
+		}
+	</div>
+
+	@if (clientesOrdenados().length) {
+	<div class="vu-admin-panel admin-clients__table">
+		<div class="admin-clients__row admin-clients__row--head" aria-hidden="true">
+			<span>Cliente</span>
+			<span>Actividad</span>
+			<span>Estado</span>
+			<span>Acciones</span>
+		</div>
+
+		@for (item of clientesOrdenados(); track item.client.id) {
+			<div class="admin-clients__row">
+				<div class="admin-clients__person">
+					<vu-avatar size="md" [nombre]="nombre(item.client)" [foto]="item.client.fotoUrl" />
+					<div class="admin-clients__person-info">
+						<h2 class="admin-clients__name">{{ nombre(item.client) }}</h2>
+						<p class="admin-clients__email">{{ item.client.email }}</p>
+					</div>
+				</div>
+
+				<p class="admin-clients__activity">
+					<span class="admin-clients__count-strong">{{ item.solicitudes }}</span> solicitudes realizadas
+				</p>
+
+				<span class="vu-state" [class]="estadoClase(item.client.estado)">{{ estadoLabel(item.client.estado) }}</span>
+
+				<button
+					type="button"
+					class="vu-btn vu-btn--pill admin-clients__action"
+					[class.vu-btn--danger]="estaActivo(item.client)"
+					[class.vu-btn--outline]="!estaActivo(item.client)"
+					(click)="toggleAccess(item.client)"
+					[disabled]="busyId() === item.client.id"
+				>
+					@if (busyId() === item.client.id) {
+						{{ estaActivo(item.client) ? 'Desactivando...' : 'Activando...' }}
+					} @else {
+						{{ estaActivo(item.client) ? 'Desactivar' : 'Activar' }}
+					}
+				</button>
+			</div>
+		}
+	</div>
+	} @else {
+		<div class="admin-clients__empty">
+			<p class="vu-admin-panel__hint">Ningún cliente coincide con «{{ consulta() }}».</p>
+			<button type="button" class="vu-btn vu-btn--outline vu-btn--pill vu-btn--sm" (click)="limpiarBusqueda()">
+				Limpiar búsqueda
+			</button>
+		</div>
+	}
+} @else {
+	<p class="vu-admin-panel__hint">Todavía no hay clientes registrados.</p>
+}
+
+<!-- Confirmación única de toda acción que modifica o da de baja. -->
+@if (confirmacion(); as pendiente) {
+	<vu-confirm
+		[titulo]="pendiente.titulo"
+		[mensaje]="pendiente.mensaje"
+		[detalle]="pendiente.detalle ?? ''"
+		[textoConfirmar]="pendiente.confirmar ?? 'Confirmar'"
+		[peligro]="pendiente.peligro ?? false"
+		[icono]="pendiente.icono ?? 'pencil'"
+		(confirmado)="confirmarAccion()"
+		(cancelado)="cancelarAccion()"
+	/>
+}

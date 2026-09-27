@@ -83,7 +83,7 @@ describe('Activation interactions', () => {
     saved.next([]);
     saved.complete();
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.complete-state')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.done')).not.toBeNull();
   });
 
   it('preserves selected days after a save failure and retries without reactivating', () => {
@@ -111,7 +111,7 @@ describe('Activation interactions', () => {
     component.photoPreview.set(image);
     fixture.detectChanges();
     expect(nextButton().disabled).toBe(false);
-    click('.btn-remove-photo');
+    click('.dropzone__actions .vu-btn--quiet');
     expect(component.photoPreview()).toBe('');
     expect(nextButton().disabled).toBe(true);
     click('.next');

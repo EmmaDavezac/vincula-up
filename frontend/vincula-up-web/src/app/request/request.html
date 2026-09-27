@@ -1,349 +1,298 @@
-<!-- ── Modal de Selección en Mapa Interactivo (OpenStreetMap / Leaflet) ── -->
-@if (showMapModal()) {
-  <div class="map-modal-overlay" (click)="closeMapPicker()">
-    <div class="map-modal-content" (click)="$event.stopPropagation()">
-      <div class="map-modal-header">
-        <div>
-          <h3>Elegí tu ubicación en el mapa</h3>
-          <p class="map-modal-sub">Hacé clic o arrastrá el marcador para fijar tu posición exacta y calcular distancias reales.</p>
-        </div>
-        <button type="button" class="map-modal-close" (click)="closeMapPicker()" aria-label="Cerrar">✕</button>
-      </div>
+@if (submitted()) {
+	<div class="vu-page request">
+		<div class="sent vu-container-sm sent--centered">
+			<div class="sent__card">
+				<vu-icon name="check" [size]="34" class="sent__check" />
+				<h1 class="sent__title">Solicitud enviada</h1>
+				<p class="sent__lead">Tu solicitud fue enviada a {{ selectedProfessional()?.name }}.</p>
+				<a class="vu-btn vu-btn--ink vu-btn--pill" routerLink="/solicitudes">Volver a mis solicitudes</a>
+			</div>
+		</div>
+	</div>
+} @else {
+	<div class="vu-page request">
+		<section class="request__section vu-container-sm">
+			<a class="vu-link-back request__back" routerLink="/solicitudes">
+				<vu-icon name="arrow-left" [size]="15" />
+				Volver al listado
+			</a>
 
-      <div class="map-search-bar">
-        <input
-          type="text"
-          [ngModel]="mapSearchQuery()"
-          (ngModelChange)="mapSearchQuery.set($event)"
-          placeholder="Buscar dirección, calle o ciudad en el mapa..."
-          (keydown.enter)="searchAddressInMap()"
-        />
-        <button type="button" class="btn-search-map" (click)="searchAddressInMap()" [disabled]="mapSearching()">
-          {{ mapSearching() ? 'Buscando...' : 'Buscar' }}
-        </button>
-        <button type="button" class="btn-gps-map" (click)="useBrowserGpsInMap()" title="Usar mi ubicación GPS actual">
-          🎯 Mi GPS
-        </button>
-      </div>
+			<p class="vu-eyebrow-inline">Nueva solicitud</p>
 
-      <div id="interactive-map" class="interactive-map-container"></div>
+			@if (errorMessage()) {
+				<p class="vu-alert vu-alert--error request__alert" role="alert">{{ errorMessage() }}</p>
+			}
+			@if (professionalsError()) {
+				<p class="vu-alert vu-alert--error" role="alert">{{ professionalsError() }}</p>
+			}
 
-      <div class="map-selected-info">
-        <span class="pin-icon" aria-hidden="true">📍</span>
-        <div class="info-text">
-          <strong>{{ tempMapLocation()?.displayName || 'Ubicación marcada' }}</strong>
-          <span class="coords-display">
-            Latitud: {{ tempMapLocation()?.lat | number:'1.5-5' }} · Longitud: {{ tempMapLocation()?.lng | number:'1.5-5' }}
-          </span>
-        </div>
-      </div>
+			<div class="vu-panel wizard">
+				<div class="wizard__head">
+					<div>
+						<p class="vu-eyebrow-inline">Paso {{ pasoActual }} de 4</p>
+						<h2 class="wizard__title">{{ tituloPaso }}</h2>
+					</div>
+					<a class="wizard__cancel" routerLink="/solicitudes">Cancelar</a>
+				</div>
 
-      <div class="map-modal-actions">
-        <button type="button" class="btn-cancel" (click)="closeMapPicker()">Cancelar</button>
-        <button type="button" class="btn-confirm-map" (click)="confirmMapLocation()">
-          Confirmar esta ubicación
-        </button>
-      </div>
-    </div>
-  </div>
-}
+				<!-- ── Paso 1: ¿Dónde necesitás el servicio? ── -->
+						@if (step() === 'location') {
+							<div class="wizard__body">
+								@if (locatorError()) {
+									<p class="vu-alert vu-alert--error" role="alert">{{ locatorError() }}</p>
+								}
+								@if (gpsError()) {
+									<p class="vu-alert vu-alert--error" role="alert">{{ gpsError() }}</p>
+								}
 
-<!-- ── Paso 1: Elegir ubicación ─────────────────────────────────────── -->
-@if (step() === 'location') {
-  <section class="request-page">
-    <div class="request-heading">
-      <p class="eyebrow">Nueva solicitud</p>
-      <h1>¿Dónde necesitás el servicio?</h1>
-      <p class="heading-sub">
-        Definí tu ubicación para calcular distancias reales con los profesionales y coordinar la visita.
-        Escribí una dirección, usá una de las ubicaciones rápidas o tu GPS. Luego podés ajustarla visualmente en el mapa si querés.
-      </p>
-    </div>
+							<!-- 1) Dirección: el campo va primero, con el GPS como botón compacto al lado. -->
+					<p class="location-field__label">
+						<span>¿Dónde necesitás el servicio? <span class="vu-required">obligatorio</span></span>
+					</p>
+							<div class="location-field">
+								<div class="location-field__row">
+									<div class="vu-field-with-icon location-field__input">
+										<vu-icon name="search" [size]="17" class="vu-field-icon" />
+										<span class="vu-sr-only">Buscar dirección</span>
+										<input
+											id="loc-input"
+											class="vu-input vu-input--search"
+											[ngModel]="locationQuery()"
+											(ngModelChange)="onLocationQueryChange($event)"
+											(keydown.enter)="confirmLocationFromQuery()"
+											(blur)="hideSuggestionLater()"
+											type="text"
+											placeholder="Ingresá una calle, altura y ciudad"
+											autocomplete="off"
+										/>
+									</div>
+									<button
+										type="button"
+										class="location-gps"
+										[class.is-active]="address()"
+										(click)="retryDetectLocation()"
+										[attr.aria-label]="address() ? 'Mi ubicación: ' + address() : 'Usar mi ubicación'"
+										[title]="address() || 'Usar mi ubicación'"
+									>
+										<vu-icon name="navigation" [size]="18" class="location-gps__icon" />
+										<span class="location-gps__label">Mi ubicación</span>
+									</button>
+								</div>
 
-    @if (locatorError()) {
-      <p class="error-message" role="alert">{{ locatorError() }}</p>
-    }
+								@if (locationSuggestionOpen() && locationSuggestions().length) {
+									<ul class="suggestions">
+										@for (suggestion of locationSuggestions(); track suggestion.displayName) {
+											<li>
+												<button type="button" (click)="selectSuggestion(suggestion)">{{ suggestion.displayName }}</button>
+											</li>
+										}
+									</ul>
+								}
+							</div>
 
-    <div class="location-step-card">
-      <div class="loc-search-row">
-        <span class="loc-icon" aria-hidden="true">🔎</span>
-        <input
-          class="loc-search-input"
-          id="loc-input"
-          [ngModel]="locationQuery()"
-          (ngModelChange)="onLocationQueryChange($event)"
-          (keydown.enter)="confirmLocationFromQuery()"
-          (blur)="hideSuggestionLater()"
-          type="text"
-          placeholder="Calle, altura, ciudad o barrio (ej: San Martín 123, Concepción del Uruguay)"
-          autocomplete="off"
-        />
-        @if (locationSearching()) {
-          <span class="loc-spinner" aria-hidden="true"></span>
-        }
-      </div>
+							<!-- 2) Mapa: clic o arrastrar el pin para ajustar el punto exacto. -->
+							<div class="step-map">
+								<div id="mapa-paso" class="step-map__canvas"></div>
+								@if (!mapaListo()) {
+									<p class="step-map__hint">Cargando el mapa...</p>
+								}
+								<p class="step-map__caption">
+									<vu-icon name="map-pin" [size]="14" />
+									Hacé clic en el mapa o arrastrá el marcador para fijar el punto exacto.
+								</p>
+							</div>
 
-      @if (locationSuggestionOpen() && locationSuggestions().length > 0) {
-        <ul class="loc-suggestions">
-          @for (suggestion of locationSuggestions(); track suggestion.displayName) {
-            <li>
-              <button type="button" class="loc-suggestion-btn" (click)="selectSuggestion(suggestion)">
-                <span class="loc-sug-pin" aria-hidden="true">📍</span>
-                <span class="loc-sug-text">{{ suggestion.displayName }}</span>
-              </button>
-            </li>
-          }
-        </ul>
-      }
 
-      <div class="loc-actions-row">
-        @if (geolocationAvailable() === true && geolocationPermission() !== 'denied') {
-          <button type="button" class="loc-action-btn gps" (click)="retryDetectLocation()" [disabled]="location().detecting">
-            @if (location().detecting) {
-              <span class="loc-spinner" aria-hidden="true"></span>
-              Detectando...
-            } @else {
-              🎯 Usar mi ubicación GPS
-            }
-          </button>
-        } @else {
-          <button type="button" class="loc-action-btn gps disabled-hint" disabled title="Este navegador no cuenta con GPS ni fuentes de ubicación">
-            🖥️ Sin GPS disponible
-          </button>
-        }
-      </div>
+								<p class="privacy-note">La dirección exacta se comparte con el profesional solo cuando acepta la solicitud.</p>
+							</div>
+						}
 
-      <div class="loc-presets-section">
-        <p class="loc-presets-title">O usá una ubicación rápida (sugeridas):</p>
-        <div class="loc-presets-grid">
-          @for (preset of presetLocations; track preset.label) {
-            <button type="button" class="loc-preset-chip" (click)="selectPresetLocation(preset)">
-              <span class="loc-preset-icon" aria-hidden="true">📍</span>
-              <span class="loc-preset-text">
-                <span class="loc-preset-label">{{ preset.label }}</span>
-                <span class="loc-preset-hint">{{ preset.hint }}</span>
-              </span>
-            </button>
-          }
-        </div>
-      </div>
+				<!-- ── Paso 2: ¿Qué necesitás resolver? ── -->
+				@if (step() === 'specialty') {
+					<div class="wizard__body">
+						@if (loadingProfessionals()) {
+							<p class="vu-body">Cargando especialidades...</p>
+					<p class="field-title">
+						<span>¿Qué necesitás resolver? <span class="vu-required">obligatorio</span></span>
+					</p>
+						} @else if (!specialties().length) {
+							<p class="vu-body">Todavía no hay especialidades publicadas.</p>
+						} @else {
+							<div class="category-grid">
+								@for (specialty of specialties(); track specialty) {
+									<button
+										type="button"
+										class="category"
+										[class.is-active]="selectedSpecialty() === specialty"
+										[class.category--sin-tecnicos]="!tieneTecnicos(specialty)"
+										(click)="selectSpecialty(specialty)"
+									>
+										{{ specialty }}
+										@if (!tieneTecnicos(specialty)) {
+											<span class="category__flag">Sin técnicos</span>
+										}
+									</button>
+								}
+							</div>
+							<p class="specialties__hint">
+								Mostramos todas las especialidades publicadas. Las marcadas como
+								<em>sin técnicos</em> todavía no tienen profesionales disponibles.
+							</p>
+						}
 
-      @if (location().displayName && !location().editing) {
-        <div class="loc-selected-card">
-          <div class="loc-selected-icon" aria-hidden="true">✅</div>
-          <div class="loc-selected-info">
-            <div class="loc-selected-label">Ubicación confirmada</div>
-            <div class="loc-selected-address"><strong>{{ location().displayName }}</strong></div>
-            @if (location().lat && location().lng) {
-              <div class="loc-selected-coords">
-                Coordenadas: {{ location().lat | number:'1.4-4' }}, {{ location().lng | number:'1.4-4' }}
-              </div>
-            }
-          </div>
-          <div class="loc-selected-actions">
-            <button type="button" class="loc-selected-map" (click)="openMapPicker()">
-              🗺️ Ajustar en mapa
-            </button>
-            <button type="button" class="loc-selected-change" (click)="startEditLocation()">Editar texto</button>
-          </div>
-        </div>
-      }
+						<!--
+							Resumen del problema: obligatorio. Es lo primero que lee el
+							profesional para saber a qué se va a dedicar.
+						-->
+						<div class="problem">
+							<label class="problem__label" for="problem-summary">
+								Contanos brevemente el problema
+								<span class="vu-required">obligatorio</span>
+							</label>
+							<textarea
+								id="problem-summary"
+								class="vu-textarea problem__textarea"
+								rows="4"
+								maxlength="1000"
+								[ngModel]="problemSummary()"
+								(ngModelChange)="problemSummary.set($event)"
+								placeholder="Ej: se corta la luz en la cocina desde anoche y no vuelve."
+							></textarea>
+							<div class="problem__foot">
+								@if (problemSummary().trim() && !resumenValido()) {
+									<p class="problem__hint problem__hint--error" role="alert">
+										Contá un poco más para que el profesional sepa qué necesita (mínimo {{ MIN_SUMMARY_LENGTH }} caracteres).
+									</p>
+								} @else {
+									<p class="problem__hint">Por ejemplo: qué falla, desde cuándo y si ya intentaste algo.</p>
+								}
+								<span class="problem__counter">{{ problemSummary().trim().length }}/1000</span>
+							</div>
+						</div>
+					</div>
+				}
 
-      @if (location().editing) {
-        <div class="loc-edit-card">
-          <input
-            id="loc-input"
-            type="text"
-            [ngModel]="locationEditValue()"
-            (ngModelChange)="locationEditValue.set($event)"
-            placeholder="Escribí la dirección..."
-          />
-          <div class="loc-edit-actions">
-            <button type="button" class="btn-cancel" (click)="cancelEditLocation()">Cancelar</button>
-            <button type="button" class="btn-confirm" (click)="confirmEditLocation()" [disabled]="gpsLoading()">
-              {{ gpsLoading() ? 'Verificando...' : 'Confirmar dirección' }}
-            </button>
-          </div>
-        </div>
-      }
-    </div>
+				<!-- ── Paso 3: ¿Cuándo te viene bien? ── -->
+				@if (step() === 'schedule') {
+					<div class="wizard__body wizard__body--column">
+						<div>
+						<p class="field-title">Día <span class="vu-required">obligatorio</span></p>
+							<div class="day-grid">
+								@for (day of dayOptions; track day.id) {
+									<button
+										type="button"
+										class="day"
+										[class.is-active]="selectedDay() === day.id"
+										(click)="elegirDia(day.id)"
+									>
+										{{ day.label }}
+									</button>
+								}
+							</div>
+						</div>
 
-    <div class="location-step-footer">
-      <button
-        type="button"
-        class="loc-continue-btn"
-        (click)="confirmLocation()"
-        [disabled]="!canConfirmLocation()"
-      >
-        Continuar con esta ubicación →
-      </button>
-      @if (!canConfirmLocation()) {
-        <p class="loc-hint">
-          Primero seleccioná tu ubicación: escribí una dirección y presioná Enter, seleccioná una sugerencia, o usá una de las ubicaciones rápidas.
-        </p>
-      }
-    </div>
-  </section>
-}
+						<label class="vu-label">
+							Horario
+							<select class="vu-select schedule__select" [ngModel]="selectedSlot()" (ngModelChange)="elegirHorario($event)">
+							Horario <span class="vu-required">obligatorio</span>
+								@for (slot of slotOptions; track slot.id) {
+									<option [value]="slot.id">{{ slot.label }}</option>
+								}
+							</select>
+						</label>
 
-<!-- ── Paso 2: Elegir especialidad ─────────────────────────────────── -->
-@if (step() === 'specialty') {
-  <section class="request-page">
-    <div class="request-heading">
-      <button type="button" class="back-btn" (click)="goBack()">
-        <span aria-hidden="true">←</span> Volver
-      </button>
-      <p class="eyebrow">Nueva solicitud</p>
-      <h1>¿Qué servicio necesitás?</h1>
-      <p class="heading-sub">Seleccioná la categoría y te mostramos los profesionales disponibles.</p>
-    </div>
+						@if (turnoLegible) {
+							<p class="turno-resumen">Turno propuesto: {{ turnoLegible }}, {{ selectedSlotLabel }}.</p>
+						}
+					</div>
+				}
 
-    @if (loadingProfessionals()) {
-      <div class="specialty-grid">
-        @for (i of [1, 2, 3, 4]; track i) {
-          <div class="specialty-skeleton" aria-hidden="true"></div>
-        }
-      </div>
-    } @else if (professionalsError()) {
-      <p class="error-message" role="alert">{{ professionalsError() }}</p>
-    } @else if (specialties().length === 0) {
-      <div class="empty-state">
-        <p>No hay especialidades disponibles en este momento.</p>
-      </div>
-    } @else {
-      <div class="specialty-grid">
-        @for (specialty of specialties(); track specialty) {
-          <button type="button" class="specialty-card" (click)="selectSpecialty(specialty)">
-            <span class="spec-icon" aria-hidden="true">{{ specialtyIcon(specialty) }}</span>
-            <span class="spec-name">{{ specialty }}</span>
-            <span class="spec-arrow" aria-hidden="true">→</span>
-          </button>
-        }
-      </div>
-    }
-  </section>
-}
+				<!-- ── Paso 4: Elegí un profesional ── -->
+				@if (step() === 'professionals') {
+					<div class="wizard__body">
+						<div class="professionals__bar">
+							<p class="vu-body">Profesionales disponibles para ese día y horario.</p>
+							<div class="sorts">
+								<button type="button" class="sort" [class.is-active]="sortBy() === 'proximidad'" (click)="sortBy.set('proximidad')">
+									Proximidad
+								</button>
+								<button type="button" class="sort" [class.is-active]="sortBy() === 'reputacion'" (click)="sortBy.set('reputacion')">
+									Reputación
+								</button>
+							</div>
+						</div>
 
-<!-- ── Paso 3: Elegir profesional ──────────────────────────────────── -->
-@if (step() === 'professionals') {
-  <section class="request-page">
-    <div class="request-heading">
-      <button type="button" class="back-btn" (click)="goBack()">
-        <span aria-hidden="true">←</span> Volver
-      </button>
-      <p class="eyebrow">{{ selectedSpecialty() }}</p>
-      <h1>Elegí tu profesional</h1>
-      <p class="heading-sub">
-        {{ filteredProfessionals().length }}
-        {{ filteredProfessionals().length === 1 ? 'disponible' : 'disponibles' }}
-        · Ordenados por reputación
-        @if (location().displayName) {
-          y distancia
-        }
-      </p>
-    </div>
+						@if (loadingProfessionals()) {
+							<p class="vu-body">Cargando profesionales...</p>
+						} @else if (!filteredProfessionals().length) {
+							<div class="empty-profs">
+								<p class="vu-body">
+									No hay técnicos disponibles para <b>{{ selectedSpecialty() }}</b> en este momento.
+									Elegí otra especialidad para continuar.
+								</p>
+								<button type="button" class="vu-btn vu-btn--outline" (click)="goToSpecialtyStep()">
+									Elegir otra especialidad
+								</button>
+							</div>
+						} @else {
+							<div class="professionals__list">
+								@for (prof of filteredProfessionals(); track prof.id) {
+									<button
+										type="button"
+										class="professional-pick"
+										[class.is-active]="selectedProfessional()?.id === prof.id"
+										(click)="selectProfessional(prof)"
+									>
+									<vu-avatar size="lg" [nombre]="prof.name" [foto]="prof.fotoUrl" />
+									<span class="professional-pick__info">
+											<b class="vu-truncate">{{ prof.name }}</b>
+											<span class="professional-pick__meta">
+												{{ prof.specialty }}
+												@if (prof.distanceKm != null) {
+													· {{ prof.distanceKm | number: '1.1-1' }} km
+												}
+											</span>
+											@if (prof.rating > 0) {
+												<span class="professional-pick__rating">
+													<vu-icon name="star" [size]="13" [filled]="true" />
+													{{ prof.rating | number: '1.1-1' }}
+													<span class="professional-pick__reviews">({{ prof.reviews }})</span>
+												</span>
+											} @else {
+												<span class="professional-pick__rating professional-pick__rating--empty">Sin calificaciones</span>
+											}
+										</span>
+										<span class="professional-pick__cta">
+											{{ selectedProfessional()?.id === prof.id ? 'Elegido' : 'Elegir' }}
+										</span>
+									</button>
+								}
+							</div>
+						}
+					</div>
+				}
 
-    @if (filteredProfessionals().length === 0) {
-      <div class="empty-state">
-        <p>No hay profesionales activos para esta especialidad.</p>
-        <button type="button" class="back-btn" style="margin-top:1rem" (click)="goBack()">← Elegir otra categoría</button>
-      </div>
-    } @else {
-      <div class="professional-grid">
-        @for (prof of filteredProfessionals(); track prof.id) {
-          <article class="professional-card">
-            <div class="card-topline">
-              @if (prof.fotoUrl && !failedPhotos().has(prof.id)) {
-                <img class="avatar avatar-photo" [src]="prof.fotoUrl" [alt]="'Foto de ' + prof.name"
-                  loading="lazy" referrerpolicy="no-referrer" (error)="markPhotoFailed(prof.id)" />
-              } @else {
-                <span class="avatar" [class]="prof.accent" aria-label="Sin foto disponible">{{ prof.initials }}</span>
-              }
-              <span class="verified-badge">Validado ✓</span>
-            </div>
-            <h2 class="prof-name">{{ prof.name }}</h2>
-            <p class="prof-spec">{{ prof.specialty }}</p>
-            <div class="prof-meta">
-              @if (prof.rating > 0) {
-                <span class="prof-rating">★ {{ prof.rating }}</span>
-                <span class="prof-reviews">({{ prof.reviews }})</span>
-              } @else {
-                <span class="prof-rating no-rating">Sin calificaciones aún</span>
-              }
-              @if (prof.distanceKm != null) {
-                <span class="prof-distance">· {{ prof.distanceKm | number:'1.1-1' }} km</span>
-              }
-            </div>
-            <button type="button" class="request-btn" (click)="selectProfessional(prof)">
-              Solicitar turno <span aria-hidden="true">→</span>
-            </button>
-          </article>
-        }
-      </div>
-    }
-  </section>
-}
+				@if (avisoPendiente) {
+					<p class="vu-pending">{{ avisoPendiente }}</p>
+				}
 
-<!-- ── Paso 4: Formulario de solicitud ─────────────────────────────── -->
-@if (step() === 'form') {
-  <section class="request-page">
-    @if (submitted()) {
-      <div class="confirmation">
-        <span class="confirm-check" aria-hidden="true">✓</span>
-        <p class="eyebrow">Solicitud enviada</p>
-        <h1>Tu pedido quedó pendiente de respuesta.</h1>
-        <p>
-          <strong>{{ selectedProfessional()?.name }}</strong> va a revisar el horario propuesto.
-          Te avisaremos cuando responda.
-        </p>
-        <a routerLink="/solicitudes">Ver mis solicitudes →</a>
-      </div>
-    } @else {
-      <div class="request-heading">
-        <button type="button" class="back-btn" (click)="goBack()">
-          <span aria-hidden="true">←</span> Volver
-        </button>
-        <p class="eyebrow">Solicitar turno</p>
-        <h1>Coordiná tu visita con {{ selectedProfessional()?.name }}.</h1>
-        <p class="heading-sub">{{ selectedProfessional()?.specialty }}</p>
-      </div>
+				<div class="wizard__actions">
+					<button type="button" class="wizard__back-btn" [class.is-hidden]="pasoActual === 1" (click)="goBack()">
+						<vu-icon name="arrow-left" [size]="16" />
+						Atrás
+					</button>
 
-      @if (errorMessage()) {
-        <p class="error-message" role="alert">{{ errorMessage() }}</p>
-      }
-
-      <form class="request-form" (ngSubmit)="submit()">
-        <label for="req-date">
-          Fecha propuesta
-          <input id="req-date" [ngModel]="date()" (ngModelChange)="date.set($event)" name="date" type="date" required />
-        </label>
-        <label for="req-time">
-          Horario aproximado
-          <input id="req-time" [ngModel]="time()" (ngModelChange)="time.set($event)" name="time" type="time" required />
-        </label>
-        <div class="address-readonly">
-          <p class="address-label">Dirección del servicio</p>
-          <p class="address-value">
-            📍 <strong>{{ address() }}</strong>
-          </p>
-        </div>
-        <div class="gps-actions">
-          <button type="button" class="gps-button" (click)="openMapPicker()">
-            🗺️ Ajustar punto en el mapa
-          </button>
-          <button type="button" class="gps-button secondary" (click)="lookupGps()" [disabled]="gpsLoading()">
-            {{ gpsLoading() ? 'Calculando...' : 'Verificar coordenadas' }}
-          </button>
-          @if (gpsError()) {
-            <span class="gps-error">{{ gpsError() }}</span>
-          }
-          @if (gpsPosition(); as pos) {
-            <span class="gps-readout">GPS {{ pos.latitude | number:'1.4-4' }}, {{ pos.longitude | number:'1.4-4' }}</span>
-          }
-        </div>
-        <p class="privacy-note">La dirección exacta se comparte con el profesional solo cuando acepta la solicitud.</p>
-        <button type="submit">Enviar solicitud <span aria-hidden="true">→</span></button>
-      </form>
-    }
-  </section>
+					@if (pasoActual < 4) {
+						<button type="button" class="vu-btn vu-btn--ink vu-btn--pill" [disabled]="!canContinue" (click)="continuar()">
+							Continuar
+						</button>
+					} @else {
+						<button type="button" class="vu-btn vu-btn--coral vu-btn--pill" [disabled]="!canContinue" (click)="submit()">
+							Enviar solicitud
+						</button>
+					}
+				</div>
+			</div>
+		</section>
+	</div>
 }

@@ -1,14 +1,56 @@
+/*
+ * Sistema de diseño de Vincula-UP.
+ * Réplica 1:1 de los tokens y estilos compartidos del prototipo (Next.js + Tailwind).
+ * Los componentes consumen estas clases (prefijo `vu-`) para mantener la misma
+ * apariencia sin duplicar CSS por pantalla.
+ */
+
 :root {
+	/* Tokens de color (idénticos al prototipo) */
 	--paper: #f6f3ec;
+	--surface-card: #fffdf8;
 	--ink: #1e2926;
 	--muted: #67716c;
-	--coral: #e35f43;
 	--line: #d8d8ce;
+	--coral: #e35f43;
+	--coral-dark: #c34f3d;
+	--emerald: #448064;
+	--amber: #a56c19;
+	--navy: #1e4b7a;
+	--surface-highlight: #f3f5f1;
+
+	/*
+	 * Margen lateral de los bloques centrados (secciones, navbar y footer). Vive acá
+	 * para que los tres compartan exactamente el mismo eje: si cada uno define su
+	 * padding por separado, en desktop el navbar y el footer se quedan más angostos
+	 * que el contenido y se ven desalineados.
+	 */
+	--vu-gutter: 1.5rem;
+
+	/*
+	 * Margen lateral del panel de administración. El header y el contenido usan el
+	 * mismo token y el mismo ancho máximo, así el logo, la navegación lateral y las
+	 * tarjetas arrancan todos en la misma línea.
+	 */
+	--vu-admin-gutter: 1rem;
+
+	/* Tipografías (mismas pilas que las del prototipo) */
+	--font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	--font-serif: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
+
+	/* Sombras del prototipo */
+	--shadow-xs: 0 2px 8px rgb(30 41 38 / 0.035);
+	--shadow-sm: 0 2px 10px rgb(30 41 38 / 0.04);
+	--shadow-md: 0 8px 30px rgb(30 41 38 / 0.06);
+	--shadow-lg: 0 10px 40px rgb(30 41 38 / 0.12);
+
+	color-scheme: light;
 	background: var(--paper);
 	color: var(--ink);
-	font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+	font-family: var(--font-sans);
 	font-synthesis: none;
 	text-rendering: optimizeLegibility;
+	-webkit-font-smoothing: antialiased;
 }
 
 * {
@@ -17,14 +59,1272 @@
 
 body {
 	background: var(--paper);
+	color: var(--ink);
+	font-family: var(--font-sans);
+	margin: 0;
+	min-height: 100dvh;
+	overflow-x: hidden;
+}
+
+h1,
+h2,
+h3,
+h4 {
+	font-weight: 400;
 	margin: 0;
 }
 
-/* Ajustes del tema Material a la paleta de Vincula-UP (filtros de actividad) */
-.filters-panel .mdc-evolution-chip--selected{background:#e35f43}
-.filters-panel .mdc-evolution-chip--selected .mdc-evolution-chip__text-label{color:#fff}
+img {
+	max-width: 100%;
+}
+
+a {
+	color: inherit;
+}
 
 button,
 a {
 	-webkit-tap-highlight-color: transparent;
+}
+
+@media (min-width: 640px) {
+	:root {
+		--vu-admin-gutter: 1.5rem;
+	}
+}
+
+@media (min-width: 1024px) {
+	:root {
+		--vu-admin-gutter: 2.5rem;
+	}
+}
+
+/* ── Layout ───────────────────────────────────────────────────────────── */
+
+.vu-page {
+	background: var(--paper);
+	color: var(--ink);
+	min-height: 100dvh;
+}
+
+.vu-container {
+	margin: 0 auto;
+	max-width: 1240px;
+	padding-left: var(--vu-gutter);
+	padding-right: var(--vu-gutter);
+	width: 100%;
+}
+
+/* Columna angosta: contenido de lectura (wizard, formularios, cuentas). */
+.vu-container-sm {
+	margin: 0 auto;
+	max-width: 768px;
+	padding-left: 1rem;
+	padding-right: 1rem;
+	width: 100%;
+}
+
+@media (min-width: 640px) {
+	.vu-container-sm {
+		padding-left: 1.5rem;
+		padding-right: 1.5rem;
+	}
+}
+
+.vu-header {
+	background: var(--paper);
+	border-bottom: 1px solid var(--line);
+}
+
+.vu-header-inner {
+	align-items: center;
+	display: flex;
+	gap: 0.75rem;
+	justify-content: space-between;
+	margin: 0 auto;
+	max-width: 1240px;
+	padding: 1.25rem var(--vu-gutter);
+}
+
+/* ── Marca ─────────────────────────────────────────────────────────────── */
+
+.vu-brand {
+	align-items: center;
+	color: inherit;
+	display: flex;
+	gap: 0.75rem;
+	text-decoration: none;
+}
+
+.vu-brand-mark {
+	align-items: center;
+	background: var(--coral);
+	border-radius: 10px;
+	color: #fff;
+	display: flex;
+	font-family: var(--font-serif);
+	font-size: 1.5rem;
+	height: 2.5rem;
+	justify-content: center;
+	width: 2.5rem;
+}
+
+.vu-brand-name {
+	font-family: var(--font-serif);
+	font-size: 1.4375rem;
+	letter-spacing: -0.03em;
+	line-height: 1.2;
+}
+
+.vu-brand-name em {
+	color: var(--coral);
+	font-style: normal;
+}
+
+/* ── Tipografía ────────────────────────────────────────────────────────── */
+
+.vu-eyebrow {
+	color: var(--coral);
+	font-size: 0.6875rem;
+	font-weight: 800;
+	letter-spacing: 0.18em;
+	line-height: 1.2;
+	margin: 0 0 1.75rem;
+	text-transform: uppercase;
+}
+
+.vu-eyebrow-inline {
+	color: var(--coral);
+	font-size: 0.75rem;
+	font-weight: 700;
+	letter-spacing: 0.16em;
+	margin: 0;
+	text-transform: uppercase;
+}
+
+.vu-eyebrow-sm {
+	color: var(--muted);
+	font-size: 0.75rem;
+	font-weight: 800;
+	letter-spacing: 0.14em;
+	margin: 0;
+	text-transform: uppercase;
+}
+
+.vu-display {
+	font-family: var(--font-serif);
+	font-size: clamp(2.5rem, 5vw, 4.4rem);
+	letter-spacing: -0.05em;
+	line-height: 0.98;
+	margin: 0;
+}
+
+.vu-display-sm {
+	font-family: var(--font-serif);
+	font-size: clamp(2.35rem, 7vw, 4.25rem);
+	letter-spacing: -0.055em;
+	line-height: 0.98;
+	margin: 0;
+}
+
+.vu-h1 {
+	font-family: var(--font-serif);
+	font-size: 2.25rem;
+	letter-spacing: -0.04em;
+	line-height: 1.05;
+	margin: 0;
+}
+
+.vu-h2 {
+	font-family: var(--font-serif);
+	font-size: 1.5rem;
+	letter-spacing: -0.03em;
+	line-height: 1.2;
+	margin: 0;
+}
+
+.vu-h3 {
+	font-family: var(--font-sans);
+	font-size: 1.0625rem;
+	font-weight: 700;
+	line-height: 1.3;
+	margin: 0;
+}
+
+.vu-lead {
+	color: var(--muted);
+	font-size: 1rem;
+	line-height: 1.65;
+	margin: 1.75rem 0 0;
+	max-width: 570px;
+}
+
+.vu-body {
+	color: var(--muted);
+	font-size: 0.9375rem;
+	line-height: 1.6;
+	margin: 0;
+}
+
+.vu-muted {
+	color: var(--muted);
+}
+
+.vu-serif {
+	font-family: var(--font-serif);
+}
+
+/* ── Botones ───────────────────────────────────────────────────────────── */
+
+.vu-btn {
+	align-items: center;
+	border: 1px solid transparent;
+	border-radius: 8px;
+	cursor: pointer;
+	display: inline-flex;
+	font-family: var(--font-sans);
+	font-size: 0.875rem;
+	font-weight: 700;
+	gap: 0.5rem;
+	justify-content: center;
+	line-height: 1.2;
+	padding: 0.875rem 1.25rem;
+	text-align: center;
+	text-decoration: none;
+	transition:
+		background-color 0.18s ease,
+		border-color 0.18s ease,
+		color 0.18s ease,
+		transform 0.18s ease;
+	white-space: nowrap;
+}
+
+.vu-btn:focus-visible {
+	outline: 2px solid var(--coral);
+	outline-offset: 2px;
+}
+
+.vu-btn:disabled {
+	cursor: not-allowed;
+	opacity: 0.4;
+}
+
+.vu-btn--ink {
+	background: var(--ink);
+	color: #fff;
+}
+
+.vu-btn--ink:hover:not(:disabled) {
+	background: #263834;
+	transform: translateY(-2px);
+}
+
+.vu-btn--coral {
+	background: var(--coral);
+	color: #fff;
+}
+
+.vu-btn--coral:hover:not(:disabled) {
+	background: var(--coral-dark);
+	transform: translateY(-2px);
+}
+
+.vu-btn--outline {
+	background: transparent;
+	border-color: var(--line);
+	color: var(--ink);
+}
+
+.vu-btn--outline:hover:not(:disabled) {
+	background: #fff;
+}
+
+.vu-btn--quiet {
+	background: transparent;
+	color: var(--ink);
+}
+
+.vu-btn--quiet:hover:not(:disabled) {
+	background: var(--surface-highlight);
+}
+
+.vu-btn--danger {
+	background: #fbebee;
+	border-color: transparent;
+	color: #c24132;
+}
+
+.vu-btn--danger:hover:not(:disabled) {
+	background: #f7dfe1;
+}
+
+.vu-btn--pill {
+	border-radius: 999px;
+}
+
+.vu-btn--block {
+	width: 100%;
+}
+
+.vu-btn--sm {
+	font-size: 0.8125rem;
+	padding: 0.6rem 0.9rem;
+}
+
+.vu-btn--icon {
+	border-radius: 999px;
+	height: 2.25rem;
+	padding: 0;
+	width: 2.25rem;
+}
+
+.vu-link-back {
+	align-items: center;
+	color: var(--muted);
+	display: inline-flex;
+	font-family: var(--font-sans);
+	font-size: 0.875rem;
+	font-weight: 700;
+	gap: 0.5rem;
+	text-decoration: none;
+}
+
+.vu-link-back:hover {
+	color: var(--ink);
+}
+
+/* ── Superficies ───────────────────────────────────────────────────────── */
+
+.vu-card {
+	background: var(--surface-card);
+	border: 1px solid var(--line);
+	border-radius: 1rem;
+}
+
+.vu-card--lg {
+	border-radius: 1.25rem;
+}
+
+.vu-card--shadow {
+	box-shadow: var(--shadow-sm);
+}
+
+.vu-panel {
+	background: #fff;
+	border: 1px solid var(--line);
+	border-radius: 1rem;
+	box-shadow: var(--shadow-sm);
+	padding: 1rem;
+}
+
+@media (min-width: 640px) {
+	.vu-panel {
+		padding: 1.5rem;
+	}
+}
+
+/* ── Badges de estado (colores exactos del prototipo) ──────────────────── */
+
+.vu-badge {
+	border-radius: 999px;
+	display: inline-flex;
+	font-size: 0.625rem;
+	font-weight: 800;
+	letter-spacing: 0.1em;
+	line-height: 1.2;
+	padding: 0.3rem 0.55rem;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+.vu-badge--pendiente {
+	background: #fef5e7;
+	color: var(--amber);
+}
+
+.vu-badge--aceptada {
+	background: #eaf5eb;
+	color: #225339;
+}
+
+.vu-badge--completada {
+	background: #eef3f9;
+	color: var(--navy);
+}
+
+.vu-badge--rechazada {
+	background: #fbebee;
+	color: #c24132;
+}
+
+.vu-badge--cancelada,
+.vu-badge--vencida {
+	background: #f2e8e4;
+	color: #8b493b;
+}
+
+.vu-badge--neutro {
+	background: var(--surface-highlight);
+	color: var(--muted);
+}
+
+.vu-chip {
+	background: var(--surface-highlight);
+	border-radius: 999px;
+	color: var(--muted);
+	display: inline-flex;
+	font-size: 0.625rem;
+	font-weight: 700;
+	padding: 0.3rem 0.6rem;
+}
+
+.vu-chip--sm {
+	font-size: 0.75rem;
+	padding: 0.3rem 0.65rem;
+}
+
+/* ── Formularios ───────────────────────────────────────────────────────── */
+
+.vu-label {
+	display: block;
+	font-size: 0.875rem;
+	font-weight: 700;
+	line-height: 1.3;
+}
+
+.vu-field {
+	display: block;
+}
+
+.vu-input,
+.vu-select,
+.vu-textarea {
+	background: #fff;
+	border: 1px solid var(--line);
+	border-radius: 0.75rem;
+	color: var(--ink);
+	display: block;
+	font-family: var(--font-sans);
+	font-size: 0.9375rem;
+	line-height: 1.4;
+	padding: 0.75rem 1rem;
+	width: 100%;
+}
+
+.vu-input:focus,
+.vu-select:focus,
+.vu-textarea:focus {
+	border-color: var(--coral);
+	outline: none;
+}
+
+.vu-input::placeholder,
+.vu-textarea::placeholder {
+	color: rgb(103 113 108 / 0.7);
+}
+
+.vu-input--search {
+	padding-left: 2.75rem;
+}
+
+.vu-field-with-icon {
+	position: relative;
+}
+
+/* ── Campos obligatorios ─────────────────────────────────────────────── */
+
+/*
+	Indicador único de campo obligatorio. Antes cada pantalla repetía su propio
+	estilo (o no marcaba nada), así que no se sabía qué había que completar.
+*/
+.vu-required {
+	color: var(--coral);
+	font-size: 0.6875rem;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	margin-left: 0.25rem;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+/* En los que el rótulo va solo en su línea, el bloque se separa. */
+.vu-required--block {
+	display: block;
+	margin-left: 0;
+	margin-top: 0.125rem;
+}
+
+/* Aviso de un campo que falta o está incompleto, debajo del campo. */
+.vu-field-error {
+	color: #b42318;
+	display: flex;
+	font-size: 0.8125rem;
+	gap: 0.375rem;
+	line-height: 1.4;
+	margin: 0.375rem 0 0;
+}
+
+.vu-field-error::before {
+	content: '!';
+	background: #b42318;
+	border-radius: 999px;
+	color: #fff;
+	flex-shrink: 0;
+	font-size: 0.625rem;
+	font-weight: 800;
+	height: 1rem;
+	line-height: 1rem;
+	margin-top: 0.1rem;
+	text-align: center;
+	width: 1rem;
+}
+
+/* Input marcado como incompleto: se distingue sin cambiar el layout. */
+.vu-input--invalid,
+.vu-input--invalid:focus {
+	border-color: #d0453a;
+}
+
+/*
+	Lista de lo que falta para seguir, en el pie del asistente. Es un aviso
+	informativo (no un error): el botón sigue bloqueado y esto explica por qué.
+*/
+.vu-pending {
+	background: var(--surface-highlight);
+	border-radius: 0.75rem;
+	color: var(--muted);
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	margin: 0 0 0.75rem;
+	padding: 0.625rem 0.75rem;
+	text-align: center;
+}
+
+.vu-field-with-icon > .vu-field-icon {
+	color: var(--muted);
+	left: 1rem;
+	pointer-events: none;
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+}
+
+.vu-select {
+	appearance: none;
+	background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+	background-position: calc(100% - 1.15rem) 50%, calc(100% - 0.85rem) 50%;
+	background-repeat: no-repeat;
+	background-size: 0.3rem 0.3rem, 0.3rem 0.3rem;
+	padding-right: 2.25rem;
+}
+
+.vu-select--sm {
+	border-radius: 0.375rem;
+	font-size: 0.875rem;
+	padding: 0.5rem 2rem 0.5rem 0.75rem;
+}
+
+.vu-checkbox {
+	accent-color: var(--coral);
+	height: 1rem;
+	width: 1rem;
+}
+
+.vu-checkline {
+	align-items: center;
+	cursor: pointer;
+	display: flex;
+	font-size: 0.875rem;
+	gap: 0.625rem;
+}
+
+/* ── Mensajes ──────────────────────────────────────────────────────────── */
+
+.vu-alert {
+	align-items: flex-start;
+	border: 1px solid;
+	border-radius: 0.75rem;
+	display: flex;
+	font-size: 0.875rem;
+	gap: 0.5rem;
+	line-height: 1.5;
+	padding: 1rem;
+}
+
+.vu-alert--error {
+	background: #fbebee;
+	border-color: #f3cfd2;
+	color: #8e3027;
+}
+
+.vu-alert--success {
+	background: #ecfdf3;
+	border-color: #a7e3c4;
+	color: #14532d;
+}
+
+.vu-alert--info {
+	background: var(--surface-highlight);
+	border-color: var(--line);
+	color: var(--ink);
+}
+
+/* ── Avatares ────────────────────────────────────────────────────────────
+   Un solo estilo para toda la app (el del prototipo): círculo con la foto si
+   existe y, si no, iniciales serif sobre verde claro. `vu-avatar` es el host
+   de <vu-avatar> y también sirve para los avatares escritos a mano.
+   ------------------------------------------------------------------------- */
+
+.vu-avatar {
+	align-items: center;
+	background: #e6f1e9;
+	border-radius: 999px;
+	color: #315244;
+	display: inline-flex;
+	flex-shrink: 0;
+	font-family: var(--font-serif);
+	font-weight: 700;
+	justify-content: center;
+	object-fit: cover;
+	overflow: hidden;
+}
+
+.vu-avatar--xs {
+	font-size: 0.75rem;
+	height: 2rem;
+	width: 2rem;
+}
+
+.vu-avatar--sm {
+	font-size: 0.8125rem;
+	height: 2.25rem;
+	width: 2.25rem;
+}
+
+.vu-avatar--md {
+	font-size: 1rem;
+	height: 3rem;
+	width: 3rem;
+}
+
+.vu-avatar--lg {
+	font-size: 1.25rem;
+	height: 3.5rem;
+	width: 3.5rem;
+}
+
+.vu-avatar--xl {
+	font-size: 1.375rem;
+	height: 4rem;
+	width: 4rem;
+}
+
+.vu-avatar--xxl {
+	font-size: 1.5rem;
+	height: 5.25rem;
+	width: 5.25rem;
+}
+
+.vu-avatar-photo {
+	border-radius: 999px;
+	flex-shrink: 0;
+	object-fit: cover;
+}
+
+/* ── Resumen del problema (paso 2, obligatorio) ───────────────────────── */
+
+.problem {
+	border-top: 1px solid var(--line);
+	margin-top: 1.5rem;
+	padding-top: 1.5rem;
+}
+
+.problem__label {
+	display: flex;
+	font-size: 0.875rem;
+	font-weight: 700;
+	gap: 0.5rem;
+	margin-bottom: 0.5rem;
+}
+
+.problem__required {
+	background: #fff1d9;
+	border-radius: 999px;
+	color: #91621c;
+	font-size: 0.625rem;
+	font-weight: 800;
+	letter-spacing: 0.08em;
+	padding: 0.2rem 0.5rem;
+	text-transform: uppercase;
+}
+
+.problem__textarea {
+	min-height: 6.5rem;
+	resize: vertical;
+}
+
+.problem__foot {
+	align-items: flex-start;
+	display: flex;
+	gap: 1rem;
+	justify-content: space-between;
+	margin-top: 0.5rem;
+}
+
+.problem__hint {
+	color: var(--muted);
+	font-size: 0.75rem;
+	margin: 0;
+}
+
+.problem__hint--error {
+	color: #c24132;
+	font-weight: 700;
+}
+
+.problem__counter {
+	color: var(--muted);
+	flex-shrink: 0;
+	font-size: 0.75rem;
+	font-weight: 700;
+}
+
+/* ── Mini mapa (estilo del prototipo, sin depender de un tile server) ───── */
+
+.vu-map {
+	background: #dce8e1;
+	border: 1px solid #c9d5cf;
+	border-radius: 6px;
+	height: 9rem;
+	overflow: hidden;
+	position: relative;
+	width: 100%;
+}
+
+.vu-map--tall {
+	height: 13rem;
+}
+
+.vu-map::before {
+	background-image: linear-gradient(24deg, transparent 46%, #fff 47%, #fff 50%, transparent 51%),
+		linear-gradient(112deg, transparent 42%, #fff 43%, #fff 46%, transparent 47%),
+		linear-gradient(4deg, transparent 60%, #b4cabb 61%, #b4cabb 63%, transparent 64%);
+	background-size: 130px 90px, 170px 100px, 100% 100%;
+	content: '';
+	inset: 0;
+	opacity: 0.6;
+	position: absolute;
+}
+
+.vu-map-pin {
+	background: var(--coral);
+	border: 2px solid #fff;
+	border-radius: 999px;
+	box-shadow: 0 1px 4px rgb(30 41 38 / 0.3);
+	height: 1rem;
+	left: 50%;
+	position: absolute;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	width: 1rem;
+}
+
+.vu-map-label {
+	background: rgb(255 255 255 / 0.9);
+	border-radius: 6px;
+	bottom: 0.5rem;
+	color: #315244;
+	font-size: 0.625rem;
+	font-weight: 700;
+	left: 0.5rem;
+	max-width: calc(100% - 1rem);
+	padding: 0.25rem 0.5rem;
+	position: absolute;
+}
+
+/* ── Stepper (flujo de pasos) ──────────────────────────────────────────── */
+
+.vu-stepper {
+	align-items: center;
+	display: flex;
+	justify-content: space-between;
+}
+
+.vu-stepper__item {
+	align-items: center;
+	display: flex;
+	flex: 1 1 0;
+}
+
+.vu-stepper__item:last-child {
+	flex: 0 0 auto;
+}
+
+.vu-stepper__label {
+	align-items: center;
+	display: flex;
+	gap: 0.75rem;
+}
+
+.vu-stepper__circle {
+	align-items: center;
+	background: #fff;
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	display: flex;
+	flex-shrink: 0;
+	font-size: 0.875rem;
+	font-weight: 700;
+	height: 2.25rem;
+	justify-content: center;
+	width: 2.25rem;
+}
+
+.vu-stepper__name {
+	font-size: 0.875rem;
+	font-weight: 600;
+}
+
+.vu-stepper__line {
+	background: var(--line);
+	flex: 1 1 auto;
+	height: 1px;
+	margin: 0 0.75rem;
+}
+
+.vu-stepper__item--active .vu-stepper__circle {
+	background: var(--ink);
+	border-color: var(--ink);
+	color: #fff;
+}
+
+.vu-stepper__item--active .vu-stepper__label {
+	color: var(--ink);
+}
+
+.vu-stepper__item--done .vu-stepper__circle {
+	background: var(--emerald);
+	border-color: var(--emerald);
+	color: #fff;
+}
+
+.vu-stepper__item--done .vu-stepper__line {
+	background: var(--emerald);
+}
+
+/* ── Grillas y utilidades de flex/espaciado ────────────────────────────── */
+
+.vu-stack {
+	display: flex;
+	flex-direction: column;
+}
+
+.vu-row {
+	align-items: center;
+	display: flex;
+}
+
+.vu-wrap {
+	flex-wrap: wrap;
+}
+
+.vu-gap-2 {
+	gap: 0.5rem;
+}
+
+.vu-gap-3 {
+	gap: 0.75rem;
+}
+
+.vu-gap-4 {
+	gap: 1rem;
+}
+
+.vu-grid-2 {
+	display: grid;
+	gap: 1rem;
+}
+
+@media (min-width: 1024px) {
+	.vu-grid-2 {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+.vu-divider {
+	align-items: center;
+	color: var(--muted);
+	display: flex;
+	font-size: 0.6875rem;
+	font-weight: 700;
+	gap: 0.75rem;
+	letter-spacing: 0.12em;
+	margin: 1.75rem 0;
+	text-transform: uppercase;
+}
+
+.vu-divider::before,
+.vu-divider::after {
+	background: var(--line);
+	content: '';
+	flex: 1;
+	height: 1px;
+}
+
+.vu-sr-only {
+	clip: rect(0, 0, 0, 0);
+	clip-path: inset(50%);
+	height: 1px;
+	overflow: hidden;
+	position: absolute;
+	white-space: nowrap;
+	width: 1px;
+}
+
+/* ── Panel de administración (réplica de las pantallas /admin del prototipo) ──
+   El panel tiene su propio shell (header + navegación lateral + barra inferior en
+   móvil), como el prototipo, así que estas clases viven acá y no en los componentes.
+   ------------------------------------------------------------------------------ */
+
+/*
+	El panel se estira hasta el final de la ventana (lo aporta el shell de la app,
+	que ahora incluye la navbar): no fuerza un alto propio.
+*/
+.vu-admin-shell {
+	background: var(--paper);
+	color: var(--ink);
+	flex: 1 0 auto;
+}
+
+.vu-admin-layout {
+	display: flex;
+	flex-direction: column;
+	gap: 2rem;
+	margin: 0 auto;
+	max-width: 80rem;
+	padding: 2rem var(--vu-admin-gutter);
+}
+
+@media (min-width: 640px) {
+	.vu-admin-layout {
+		padding-bottom: 3rem;
+		padding-top: 3rem;
+	}
+}
+
+@media (min-width: 1024px) {
+	.vu-admin-layout {
+		flex-direction: row;
+	}
+}
+
+.vu-admin-main {
+	flex: 1;
+	min-width: 0;
+}
+
+/* Navegación lateral del panel. */
+/* Encabezado de página del panel. */
+.vu-admin-back {
+	color: var(--muted);
+	font-family: var(--font-sans);
+	font-size: 0.875rem;
+	font-weight: 700;
+	text-decoration: none;
+}
+
+.vu-admin-back:hover {
+	color: var(--ink);
+}
+
+.vu-admin-title {
+	font-family: var(--font-serif);
+	font-size: 2.25rem;
+	letter-spacing: -0.04em;
+	line-height: 1.1;
+	margin: 0;
+}
+
+@media (min-width: 640px) {
+	.vu-admin-title {
+		font-size: 3rem;
+	}
+}
+
+.vu-admin-lead {
+	color: var(--muted);
+	font-size: 1rem;
+	line-height: 1.7;
+	margin: 1rem 0 0;
+	max-width: 42rem;
+}
+
+.vu-admin-eyebrow {
+	color: var(--coral);
+	font-size: 0.75rem;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	margin: 0;
+	text-transform: uppercase;
+}
+
+.vu-admin-eyebrow--muted {
+	color: var(--muted);
+}
+
+/* Tarjetas de indicadores del dashboard. */
+.vu-admin-metrics {
+	display: grid;
+	gap: 1rem;
+	margin-top: 2.5rem;
+}
+
+@media (min-width: 640px) {
+	.vu-admin-metrics {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (min-width: 1024px) {
+	.vu-admin-metrics {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
+.vu-admin-metric {
+	background: var(--surface-card);
+	border: 1px solid var(--line);
+	border-radius: 1rem;
+	padding: 1.25rem;
+}
+
+.vu-admin-metric__icon {
+	color: var(--coral);
+	margin-bottom: 1.25rem;
+}
+
+.vu-admin-metric__label {
+	color: var(--muted);
+	font-size: 0.75rem;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	margin: 0;
+	text-transform: uppercase;
+}
+
+.vu-admin-metric__row {
+	align-items: flex-end;
+	display: flex;
+	gap: 0.5rem;
+	justify-content: space-between;
+	margin-top: 0.5rem;
+}
+
+.vu-admin-metric__value {
+	font-family: var(--font-serif);
+	font-size: 1.875rem;
+	font-weight: 700;
+}
+
+.vu-admin-metric__note {
+	color: var(--muted);
+	font-size: 0.75rem;
+	font-weight: 700;
+}
+
+/* Rejillas de paneles (demanda por especialidad / embudo del servicio). */
+.vu-admin-split {
+	display: grid;
+	gap: 1rem;
+	margin-top: 2rem;
+	min-width: 0;
+}
+
+@media (min-width: 640px) {
+	.vu-admin-split {
+		gap: 1.5rem;
+		margin-top: 2.5rem;
+	}
+}
+
+@media (min-width: 1024px) {
+	.vu-admin-split {
+		grid-template-columns: 1.2fr 0.8fr;
+	}
+}
+
+.vu-admin-panel {
+	background: var(--surface-card);
+	border: 1px solid var(--line);
+	border-radius: 1rem;
+	min-width: 0;
+	padding: 1rem;
+}
+
+@media (min-width: 640px) {
+	.vu-admin-panel {
+		padding: 1.5rem;
+	}
+}
+
+.vu-admin-panel__title {
+	font-family: var(--font-serif);
+	font-size: 1.5rem;
+	line-height: 1.2;
+	margin: 0.5rem 0 0;
+}
+
+@media (min-width: 640px) {
+	.vu-admin-panel__title {
+		font-size: 1.65rem;
+	}
+}
+
+.vu-admin-panel__hint {
+	color: var(--muted);
+	font-size: 0.875rem;
+	line-height: 1.5;
+	margin: 0.5rem 0 0;
+}
+
+/* Barra de demanda por especialidad. */
+.vu-admin-bars {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+	margin-top: 1.5rem;
+}
+
+.vu-admin-bar__row {
+	display: flex;
+	font-size: 0.875rem;
+	gap: 0.75rem;
+	justify-content: space-between;
+}
+
+.vu-admin-bar__name {
+	font-weight: 700;
+}
+
+.vu-admin-bar__meta {
+	color: var(--muted);
+}
+
+.vu-admin-bar {
+	background: #e9eee8;
+	border-radius: 999px;
+	height: 0.5rem;
+	margin-top: 0.5rem;
+	overflow: hidden;
+}
+
+.vu-admin-bar__fill {
+	background: var(--coral);
+	border-radius: 999px;
+	height: 100%;
+	min-width: 0.5rem;
+}
+
+/* Embudo del servicio. */
+.vu-admin-funnel {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+	margin-top: 1.5rem;
+}
+
+.vu-admin-funnel__row {
+	align-items: center;
+	border-bottom: 1px solid var(--line);
+	display: flex;
+	gap: 0.75rem;
+	justify-content: space-between;
+	padding-bottom: 0.75rem;
+}
+
+.vu-admin-funnel__row:last-child {
+	border-bottom: none;
+	padding-bottom: 0;
+}
+
+.vu-admin-funnel__label {
+	color: var(--muted);
+	font-size: 0.875rem;
+}
+
+.vu-admin-funnel__value {
+	font-family: var(--font-serif);
+	font-size: 1.5rem;
+	font-weight: 700;
+}
+
+/* Estados (colores exactos del prototipo: activo, preregistro, suspendido, inactivo). */
+.vu-state {
+	border-radius: 999px;
+	display: inline-flex;
+	font-size: 0.625rem;
+	font-weight: 800;
+	letter-spacing: 0.06em;
+	padding: 0.25rem 0.625rem;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+.vu-state--sm {
+	font-size: 0.5625rem;
+	letter-spacing: 0.08em;
+	padding: 0.2rem 0.5rem;
+}
+
+.vu-state--activo {
+	background: #e6f1e9;
+	color: #315244;
+}
+
+.vu-state--suspendido {
+	background: #fce8e8;
+	color: #a33b3b;
+}
+
+.vu-state--preregistro {
+	background: #fff1d9;
+	color: #91621c;
+}
+
+.vu-state--inactivo {
+	background: #f2e8e4;
+	color: #8b493b;
+}
+
+/* Etiquetas de especialidad de un profesional. */
+.vu-admin-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.vu-admin-chip {
+	background: var(--surface-highlight);
+	border-radius: 999px;
+	font-size: 0.75rem;
+	font-weight: 700;
+	padding: 0.25rem 0.625rem;
+}
+
+.vu-admin-chip--pending {
+	background: #fff1d9;
+	color: #91621c;
+}
+
+.vu-truncate {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* ── Footer ────────────────────────────────────────────────────────────── */
+
+.vu-footer {
+	background: var(--surface-card);
+	border-top: 1px solid var(--line);
 }

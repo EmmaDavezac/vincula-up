@@ -44,11 +44,14 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/actuator/health", "/error").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/profesionales").permitAll()
+                // La reputación se muestra en el directorio y al elegir profesional: es pública.
+                .requestMatchers(HttpMethod.GET, "/api/calificaciones").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/especialidades").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/gps").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/usuarios/por-keycloak").authenticated()
                 .requestMatchers("/api/profesionales/activar", "/api/profesionales/mi-perfil", "/api/profesionales/vincular").hasRole("PROFESIONAL")
                 // ADMIN permissions
+                .requestMatchers(HttpMethod.GET, "/api/solicitudes/panel").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/usuarios").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/usuarios/yo", "/api/usuarios/por-keycloak").authenticated()
                 // Ficha de la contraparte: el profesional necesita los datos del
@@ -60,7 +63,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/especialidades", "/api/usuarios").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/especialidades/*", "/api/profesionales/*").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/api/usuarios/*").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/especialidades/*", "/api/profesionales/*", "/api/usuarios/*").hasRole("ADMIN")
+                // El padrón de profesionales no tiene borrado físico: la baja es lógica (suspender).
+                .requestMatchers(HttpMethod.DELETE, "/api/especialidades/*", "/api/usuarios/*").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/profesionales").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/profesionales/alta").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/api/profesionales/*/suspender").hasRole("ADMIN")
@@ -74,9 +78,13 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.PATCH, "/api/solicitudes/*/rechazar").hasRole("PROFESIONAL")
                 // CLIENTE permissions
                 .requestMatchers(HttpMethod.POST, "/api/solicitudes").hasRole("CLIENTE")
-                .requestMatchers(HttpMethod.PATCH, "/api/solicitudes/*/completar").hasRole("CLIENTE")
-                .requestMatchers(HttpMethod.PATCH, "/api/solicitudes/*/cancelar").hasRole("CLIENTE")
+                // Completar y cancelar los puede hacer cualquiera de los dos lados:
+                // el profesional que terminó el trabajo o el cliente que lo confirmó.
+                .requestMatchers(HttpMethod.PATCH, "/api/solicitudes/*/completar",
+                        "/api/solicitudes/*/cancelar").hasAnyRole("CLIENTE", "PROFESIONAL")
                 .requestMatchers(HttpMethod.POST, "/api/solicitudes/*/calificacion").hasRole("CLIENTE")
+                // Sólo el propio profesional: la reputación se resuelve desde la sesión.
+                .requestMatchers(HttpMethod.GET, "/api/mi-reputacion").hasRole("PROFESIONAL")
                 // Authenticated permissions
                 .requestMatchers(HttpMethod.GET, "/api/solicitudes/mias").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/solicitudes/*/mensajes").authenticated()

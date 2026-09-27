@@ -51,7 +51,7 @@ class MensajeServiceTest {
     /** Solicitud histórica: guardó el keycloakId como cliente y como profesional. */
     private Solicitud solicitudConIdentidadesHistoricas() {
         return new Solicitud(clienteKeycloakId, profesionalKeycloakId, UUID.randomUUID(),
-                "Calle 123", -34.60, -58.38, LocalDateTime.now().plusDays(1));
+                "Calle 123", -34.60, -58.38, LocalDateTime.now().plusDays(1), "Se pierde el agua en la cocina.", null);
     }
 
     @Test

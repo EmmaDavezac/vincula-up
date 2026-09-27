@@ -1,73 +1,89 @@
-<section class="landing">
-  <section class="land-hero">
-    <div class="land-copy">
-      <p class="land-eyebrow">Universidad Popular de Concepción del Uruguay</p>
-      <h1>Una red técnica con respaldo universitario.</h1>
-      <p>
-        Vincula-UP conecta a la comunidad con profesionales técnicos validados,
-        cerca de tu zona y con disponibilidad clara.
-      </p>
-      <ul class="land-list">
-        <li><strong>Servicios cercanos</strong> — Profesionales en tu zona, con disponibilidad visible.</li>
-        <li><strong>Solicitudes claras</strong> — Elegís un horario y seguís tu pedido desde un solo lugar.</li>
-        <li><strong>Respaldo institucional</strong> — Una red validada por la Universidad Popular.</li>
-      </ul>
-      <div class="land-actions">
-        @if (auth.isAuthenticated()) {
-          <a class="land-cta" routerLink="/solicitudes">Ver mis solicitudes <span aria-hidden="true">→</span></a>
-        } @else {
-          <a class="land-cta" routerLink="/ingresar">Buscar un profesional <span aria-hidden="true">→</span></a>
-          <a class="land-cta alt" (click)="auth.registerWithKeycloak()">Crear cuenta</a>
-        }
-      </div>
-    </div>
+<div class="vu-page home">
+	<section class="hero vu-container">
+		<div>
+			<p class="vu-eyebrow">Universidad Popular de Concepción del Uruguay</p>
+			<h1 class="hero__title">Antes de que entre a tu casa, ya lo conocemos nosotros.</h1>
+			<p class="vu-lead">
+				Vincula-UP conecta a los egresados técnicos de la Universidad Popular con vecinos que necesitan un
+				electricista, gasista o plomero — sin depender del boca a boca.
+			</p>
+			<div class="hero__actions">
+				<a class="vu-btn vu-btn--ink" routerLink="/solicitudes">Buscar un técnico <vu-icon name="arrow-right" [size]="16" /></a>
+				<a class="vu-btn vu-btn--outline" routerLink="/activar-perfil">Soy egresado técnico</a>
+			</div>
+		</div>
+	</section>
 
-    <aside class="land-aside" aria-label="Vincula-UP en sociedad">
-      <span class="aside-number">01</span>
-      <h2>Servicio técnico comunitario.</h2>
-      <p>
-        Desde fontanería básica hasta mantenimiento de equipos, la Universidad Popular
-        pone en camino una red de técnicos para la gente.
-      </p>
+	<section class="problem" aria-label="El problema">
+		<div class="vu-container">
+			<p class="vu-eyebrow">El problema</p>
+			<h2 class="problem__title">Contratar un técnico hoy es un acto de fe</h2>
+			<p class="problem__lead">
+				Preguntás en el grupo de WhatsApp del barrio. Alguien te pasa un número sin apellido. Mientras tanto, dejás
+				entrar a tu casa a alguien de quien no sabés nada.
+			</p>
+		</div>
+	</section>
 
-      <h3>¿Para quién es?</h3>
-      <ul class="land-targets">
-        <li>
-          <span class="land-tag" aria-label="Vecinos">V</span>
-          <span>Ayuda técnica de proximidad.</span>
-        </li>
-        <li>
-          <span class="land-tag" aria-label="Profesionales">P</span>
-          <span>Un canal para ejercer tu técnica en la comunidad.</span>
-        </li>
-        <li>
-          <span class="land-tag" aria-label="Universidad">U</span>
-          <span>Valor social del saber técnico.</span>
-        </li>
-      </ul>
+	<section class="steps vu-container" id="como-funciona">
+		<div class="steps__intro">
+			<p class="vu-eyebrow">Para vecinos</p>
+			<h2 class="steps__title">De la búsqueda al servicio, sin salir de la app</h2>
+		</div>
+		<ol class="steps__list">
+			@for (step of neighborSteps; track step; let index = $index) {
+				<li class="steps__item">
+					<span class="steps__number">0{{ index + 1 }}</span>
+					<span class="steps__text">{{ step }}</span>
+				</li>
+			}
+		</ol>
+	</section>
 
-      <h3>Más información</h3>
-      <p class="land-note">
-        Vincula-UP es una iniciativa de la Universidad Popular de Concepción del Uruguay,
-        dedicada a articular servicios técnicos de calidad para la gente.
-      </p>
-    </aside>
-  </section>
+	<section class="graduates">
+		<div class="graduates__inner vu-container">
+			<div>
+				<p class="graduates__eyebrow">Para egresados</p>
+				<h2 class="graduates__title">Tu perfil no lo armás de cero: lo respalda la universidad</h2>
+			</div>
+			<p class="graduates__lead">
+				Sos egresado técnico de la Universidad Popular. La propia universidad te suma a la plataforma — vos solo
+				activás tu cuenta, definís en qué zona trabajás y cuándo atendés, y empezás a aparecer ante gente que busca
+				justo lo que sabés hacer.
+			</p>
+		</div>
+	</section>
 
-  <section class="land-trust" aria-label="Por qué Vincula-UP">
-    <div class="land-trusted">
-      <span class="trust-mark">NUNCA</span>
-    </div>
-    <div class="land-trust-content">
-      <h3>Sin intermediarios, con acompañamiento.</h3>
-      <p>
-        Pensamos la ayuda técnica como un servicio a la comunidad, no como un
-        Marketplace de servicios cualquiera.
-      </p>
-    </div>
-  </section>
+	<section class="trust vu-container">
+		<div>
+			<p class="vu-eyebrow">Por qué confiar</p>
+			<h2 class="trust__title">No es un marketplace abierto a cualquiera</h2>
+		</div>
+		<div class="trust__list">
+			@for (point of guardrails; track point) {
+				<p class="trust__item">{{ point }}</p>
+			}
+		</div>
+	</section>
 
-  <footer class="land-footer">
-    <p>Vincula-UP · Universidad Popular de Concepción del Uruguay.</p>
-  </footer>
-</section>
+	<section class="closing vu-container">
+		<article class="closing__panel">
+			<p class="vu-eyebrow">Respaldo institucional</p>
+			<h2 class="closing__title">Un desarrollo junto a la Universidad Popular</h2>
+			<p class="closing__lead">
+				Vincula-UP nace para que la formación técnica de sus egresados no se pierda apenas terminan de cursar — y para
+				que esa formación tenga un lugar visible cuando la comunidad la necesita.
+			</p>
+		</article>
+		<div class="closing__cards">
+			<a class="closing__card closing__card--coral" routerLink="/solicitudes">
+				<span class="closing__card-title">¿Necesitás un técnico?</span>
+				<span class="closing__card-link">Buscar ahora <vu-icon name="arrow-right" [size]="16" /></span>
+			</a>
+			<a class="closing__card" routerLink="/activar-perfil">
+				<span class="closing__card-title">¿Sos egresado técnico?</span>
+				<span class="closing__card-link">Quiero sumarme <vu-icon name="arrow-right" [size]="16" /></span>
+			</a>
+		</div>
+	</section>
+</div>

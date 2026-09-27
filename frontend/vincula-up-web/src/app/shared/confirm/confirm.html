@@ -1,0 +1,45 @@
+<div class="vu-confirm__overlay" (click)="cerrar()">
+	<section
+		class="vu-confirm__dialog"
+		[class.vu-confirm__dialog--danger]="peligro()"
+		role="alertdialog"
+		aria-modal="true"
+		[attr.aria-label]="titulo()"
+		(click)="$event.stopPropagation()"
+	>
+		<header class="vu-confirm__head">
+			<span class="vu-confirm__icon" [class.vu-confirm__icon--danger]="peligro()">
+				<vu-icon [name]="icono()" [size]="20" />
+			</span>
+			<div>
+				<h2 class="vu-confirm__title">{{ titulo() }}</h2>
+				<p class="vu-confirm__message">{{ mensaje() }}</p>
+			</div>
+		</header>
+
+		@if (detalle()) {
+			<p class="vu-confirm__detail">{{ detalle() }}</p>
+		}
+
+		<footer class="vu-confirm__actions">
+			<button
+				type="button"
+				class="vu-btn vu-btn--outline vu-confirm__cancel"
+				(click)="cancelado.emit()"
+				[disabled]="cargando()"
+			>
+				{{ textoCancelar() }}
+			</button>
+			<button
+				type="button"
+				class="vu-btn vu-btn--pill vu-confirm__accept"
+				[class.vu-btn--danger]="peligro()"
+				[class.vu-btn--ink]="!peligro()"
+				(click)="confirmado.emit()"
+				[disabled]="cargando()"
+			>
+				{{ cargando() ? 'Trabajando...' : textoConfirmar() }}
+			</button>
+		</footer>
+	</section>
+</div>

@@ -3,12 +3,6 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { MatButtonModule } from '@angular/material/button';
-import { MatChipsModule } from '@angular/material/chips';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { catchError, of } from 'rxjs';
 import { RequestStatus, ServiceRequest } from '../core/models/service-request';
 import { Professional } from '../core/models/professional';
@@ -16,6 +10,9 @@ import { ApiService, ClienteInfo } from '../core/services/api.service';
 import { AuthService } from '../core/services/auth.service';
 import { RequestService } from '../core/services/request.service';
 import { fotoUtil } from '../core/utils/photo';
+import { VuAvatar } from '../shared/avatar/avatar';
+import { VuConfirm } from '../shared/confirm/confirm';
+import { VuIcon } from '../shared/icon/icon';
 
 interface MessageItem {
   id: string;
@@ -25,6 +22,13 @@ interface MessageItem {
   fechaEnvio: string;
 }
 
+/** Franjas del flujo de creación: el turno siempre se muestra como rango. */
+const FRANJAS_HORARIAS: ReadonlyArray<{ start: string; end: string; label: string }> = [
+  { start: '08:00', end: '12:00', label: '08:00 a 12:00 hs' },
+  { start: '12:00', end: '16:00', label: '12:00 a 16:00 hs' },
+  { start: '16:00', end: '20:00', label: '16:00 a 20:00 hs' },
+];
+
 interface RatingItem {
   id?: string;
   solicitudId?: string;
@@ -33,10 +37,10 @@ interface RatingItem {
 }
 
 @Component({
-    imports: [CommonModule, RouterLink, FormsModule, MatButtonModule, MatChipsModule, MatFormFieldModule, MatIconModule, MatInputModule, MatSelectModule],
-  selector: 'app-my-requests',
-  styleUrl: './my-requests.css',
-  templateUrl: './my-requests.html',
+	imports: [CommonModule, RouterLink, FormsModule, VuAvatar, VuConfirm, VuIcon],
+	selector: 'app-my-requests',
+	styleUrl: './my-requests.css',
+	templateUrl: './my-requests.html',
 })
 export class MyRequests {
   private readonly api = inject(ApiService);
@@ -48,11 +52,9 @@ export class MyRequests {
   readonly errorMessage = signal('');
   readonly successMessage = signal('');
 
-  // Filtros y orden (Material)
+  // Filtros de la lista
   readonly statusFilter = signal<'TODAS' | RequestStatus>('TODAS');
-  readonly searchTerm = signal('');
   readonly specialtyFilter = signal<string>('TODAS');
-  readonly sortOrder = signal<'RECIENTES' | 'PROXIMAS' | 'ANTIGUAS'>('RECIENTES');
 
   readonly statusOptions: ReadonlyArray<{ value: 'TODAS' | RequestStatus; label: string }> = [
     { value: 'TODAS', label: 'Todas' },
@@ -62,12 +64,6 @@ export class MyRequests {
     { value: 'COMPLETADA', label: 'Completadas' },
     { value: 'CANCELADA', label: 'Canceladas' },
     { value: 'VENCIDA', label: 'Vencidas' },
-  ];
-
-  readonly sortOptions: ReadonlyArray<{ value: 'RECIENTES' | 'PROXIMAS' | 'ANTIGUAS'; label: string }> = [
-    { value: 'RECIENTES', label: 'Más recientes primero' },
-    { value: 'PROXIMAS', label: 'Próximos turnos primero' },
-    { value: 'ANTIGUAS', label: 'Más antiguas primero' },
   ];
 
   readonly specialtyOptions = computed(() => {
@@ -81,55 +77,28 @@ export class MyRequests {
       .sort((a, b) => a.label.localeCompare(b.label, 'es'));
   });
 
-  /** Solicitudes visibles según filtros + búsqueda + orden. */
+  /** Solicitudes visibles según los filtros. */
   readonly filteredRequests = computed(() => {
     const status = this.statusFilter();
     const specialty = this.specialtyFilter();
-    const term = this.searchTerm().trim().toLowerCase();
-    const order = this.sortOrder();
 
-    const matches = this.requests().filter((request) => {
+    return this.requests().filter((request) => {
       if (status !== 'TODAS' && request.status !== status) return false;
       if (specialty !== 'TODAS') {
         const key = request.especialidadId ?? request.specialty ?? '';
         if (key !== specialty) return false;
       }
-      if (term) {
-        const haystack = [
-          this.especialidadNombre(request),
-          request.professionalName,
-          this.clienteNombre(request),
-          request.address,
-          request.date,
-          request.id,
-        ]
-          .join(' ')
-          .toLowerCase();
-        if (!haystack.includes(term)) return false;
-      }
       return true;
-    });
-
-    return [...matches].sort((a, b) => {
-      if (order === 'PROXIMAS') return this.requestDateTime(a) - this.requestDateTime(b);
-      const aCreated = this.createdTimestamp(a);
-      const bCreated = this.createdTimestamp(b);
-      if (aCreated !== bCreated) return order === 'RECIENTES' ? bCreated - aCreated : aCreated - bCreated;
-      return this.requestDateTime(a) - this.requestDateTime(b);
     });
   });
 
   readonly hasActiveFilters = computed(
-    () =>
-      this.statusFilter() !== 'TODAS' ||
-      this.specialtyFilter() !== 'TODAS' ||
-      this.searchTerm().trim().length > 0,
+    () => this.statusFilter() !== 'TODAS' || this.specialtyFilter() !== 'TODAS',
   );
 
   clearFilters(): void {
     this.statusFilter.set('TODAS');
     this.specialtyFilter.set('TODAS');
-    this.searchTerm.set('');
   }
 
   // Chat state
@@ -138,9 +107,15 @@ export class MyRequests {
   readonly chatInput = signal('');
   readonly sendingChat = signal(false);
 
-  // Reject modal/dialog state
-  readonly rejectingRequestId = signal<string | null>(null);
-  readonly rejectReason = signal('');
+  // Estado de la solicitud / rechazo modal/dialog state
+  /** Solicitud abierta en el modal de "Actualizar estado" (cliente y profesional). */
+  readonly updatingRequestId = signal<string | null>(null);
+  /** Mensaje de cancelación: obligatorio para el cliente y para el profesional. */
+  readonly motivoEstado = signal('');
+  /** Error del mensaje obligatorio, para dejarlo debajo del campo. */
+  readonly motivoError = signal('');
+  /** Transición que espera confirmación escribiendo su motivo (solo cancelar). */
+  readonly estadoAConfirmar = signal<RequestStatus | null>(null);
 
   // Rating state
   readonly ratings = signal<Record<string, RatingItem | null>>({});
@@ -163,7 +138,6 @@ export class MyRequests {
   readonly especialidades = signal<Record<string, string>>({});
   readonly loadingSpecialties = signal(true);
   readonly specialtiesError = signal('');
-  readonly detailOpen = signal<Record<string, boolean>>({});
 
   constructor() {
     this.reloadRequests();
@@ -235,14 +209,6 @@ export class MyRequests {
     return full || c.email || 'Cliente Vincula-UP';
   }
 
-  /** Iniciales del cliente para el avatar (foto o iniciales) de la solicitud. */
-  clienteInitials(request: ServiceRequest): string {
-    const c = this.clienteDe(request);
-    const parts = [c?.nombre, c?.apellido].filter((p) => p && p.trim().length > 0);
-    if (parts.length === 0) return 'VU';
-    return parts.map((p) => p!.trim()[0]!.toUpperCase()).join('').slice(0, 2);
-  }
-
   // ── Ficha del profesional (a quién le pediste el turno) ──
   loadProfesional(profesionalId: string): void {
     if (!profesionalId || this.profesionales()[profesionalId] !== undefined) return;
@@ -293,14 +259,6 @@ export class MyRequests {
     return previo && previo !== 'Profesional Vincula-UP' ? previo : 'Profesional';
   }
 
-  /** Iniciales del profesional para el avatar (foto o iniciales) de la solicitud. */
-  profesionalInitials(request: ServiceRequest): string {
-    const p = this.profesionalDe(request);
-    const parts = [p?.nombre, p?.apellido].filter((parte) => parte && parte.trim().length > 0);
-    if (parts.length === 0) return 'P';
-    return parts.map((parte) => parte!.trim()[0]!.toUpperCase()).join('').slice(0, 2);
-  }
-
   // ── Especialidad (nombre real en vez de "Servicio técnico") ──
   loadEspecialidades(): void {
     this.loadingSpecialties.set(true);
@@ -323,16 +281,6 @@ export class MyRequests {
       || /^Especialidad [0-9a-f]{8}/i.test(name || '');
     if (name && name !== 'Servicio técnico' && !isCode) return name;
     return this.loadingSpecialties() ? 'Cargando especialidad...' : 'Especialidad no disponible';
-  }
-
-  // ── Detalle expandible ──
-  toggleDetail(requestId: string | number): void {
-    const id = String(requestId);
-    this.detailOpen.update((prev) => ({ ...prev, [id]: !prev[id] }));
-  }
-
-  isDetailOpen(requestId: string | number): boolean {
-    return !!this.detailOpen()[String(requestId)];
   }
 
   // ── Ubicación: dirección + mapa embebido OSM (sin exponer coordenadas) ──
@@ -363,10 +311,6 @@ export class MyRequests {
     return this.sanitizer.bypassSecurityTrustResourceUrl(url);
   }
 
-  googleMapsUrl(request: ServiceRequest): string {
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(request.address || '')}`;
-  }
-
   isProfessional(): boolean {
     return this.auth.hasRole('PROFESIONAL');
   }
@@ -375,88 +319,187 @@ export class MyRequests {
     return this.auth.hasRole('CLIENTE');
   }
 
-  accept(request: ServiceRequest): void {
+  /**
+   * Estados a los que se puede llevar la solicitud con un mismo botón, según el rol
+   * y el estado actual. Cliente y profesional comparten completar y cancelar.
+   */
+  estadosDisponibles(request: ServiceRequest): RequestStatus[] {
+    const opciones: RequestStatus[] = [];
+    const esCliente = !this.isProfessional();
+
+    if (esCliente && request.status === 'PENDIENTE') {
+      opciones.push('CANCELADA');
+    }
+    if (this.isProfessional() && request.status === 'PENDIENTE') {
+      opciones.push('ACEPTADA', 'RECHAZADA');
+    }
+    if (request.status === 'ACEPTADA') {
+      // Completar y cancelar quedan para los dos lados.
+      opciones.push('COMPLETADA', 'CANCELADA');
+    }
+    return opciones;
+  }
+
+  /** Un solo botón para cambiar el estado: abre el modal con las opciones válidas. */
+  abrirActualizarEstado(request: ServiceRequest): void {
+    this.errorMessage.set('');
+    this.motivoEstado.set('');
+    this.estadoAConfirmar.set(null);
+    this.motivoError.set('');
+    this.updatingRequestId.set(String(request.id));
+  }
+
+  /** Solicitud abierta en el modal de estado (o null). */
+  readonly solicitudDelModal = computed(() => {
+    const id = this.updatingRequestId();
+    return id ? (this.requests().find((request) => String(request.id) === id) ?? null) : null;
+  });
+
+  /** Nombre de la contraparte según quién mira la lista. */
+  nombreContraparte(request: ServiceRequest): string {
+    return this.isProfessional() ? this.clienteNombre(request) : this.profesionalNombre(request);
+  }
+
+  etiquetaEstado(estado: RequestStatus): string {
+    const textos: Partial<Record<RequestStatus, string>> = {
+      ACEPTADA: 'Aceptar la solicitud',
+      RECHAZADA: 'Rechazar la solicitud',
+      COMPLETADA: 'Marcar como completada',
+      CANCELADA: 'Cancelar la solicitud',
+    };
+    return textos[estado] ?? 'Actualizar';
+  }
+
+  iconoEstado(estado: RequestStatus): 'check' | 'x' {
+    return estado === 'ACEPTADA' || estado === 'COMPLETADA' ? 'check' : 'x';
+  }
+
+  cerrarActualizarEstado(): void {
+    this.updatingRequestId.set(null);
+    this.motivoEstado.set('');
+    this.estadoAConfirmar.set(null);
+    this.motivoError.set('');
+  }
+
+  /**
+   * Cualquier cambio de estado pide confirmación. La cancelación tiene su propio
+   * paso (el motivo es obligatorio), y el resto —aceptar, rechazar o completar—
+   * muestra la consecuencia antes de aplicarse.
+   */
+  elegirEstado(request: ServiceRequest, nuevo: RequestStatus): void {
+    if (nuevo === 'CANCELADA') {
+      this.estadoAConfirmar.set(nuevo);
+      this.motivoEstado.set('');
+      this.motivoError.set('');
+      return;
+    }
+    this.confirmacionTransicion.set({ request, nuevo });
+  }
+
+  /** Aplica la transición elegida en el diálogo de confirmación. */
+  confirmarTransicion(): void {
+    const pendiente = this.confirmacionTransicion();
+    if (!pendiente) return;
+    this.confirmacionTransicion.set(null);
+    this.cerrarActualizarEstado();
+    this.aplicarEstado(pendiente.request, pendiente.nuevo);
+  }
+
+  /** Transición pendiente de confirmación (aceptar, rechazar o completar). */
+  readonly confirmacionTransicion = signal<{ request: ServiceRequest; nuevo: RequestStatus } | null>(null);
+
+  /** Título y consecuencia de la transición elegida. */
+  transicionTitulo(): string {
+    const nuevo = this.confirmacionTransicion()?.nuevo;
+    const titulos: Partial<Record<RequestStatus, string>> = {
+      ACEPTADA: 'Aceptar la solicitud',
+      RECHAZADA: 'Rechazar la solicitud',
+      COMPLETADA: 'Marcar como completada',
+    };
+    return (nuevo && titulos[nuevo]) || 'Actualizar el estado';
+  }
+
+  transicionMensaje(): string {
+    const pendiente = this.confirmacionTransicion();
+    if (!pendiente) return '';
+    const contraparte = this.nombreContraparte(pendiente.request);
+    if (pendiente.nuevo === 'ACEPTADA') {
+      return `¿Querés aceptar el turno de ${contraparte}?`;
+    }
+    if (pendiente.nuevo === 'RECHAZADA') {
+      return `¿Querés rechazar el pedido de ${contraparte}?`;
+    }
+    return `¿Confirmás que el turno con ${contraparte} ya terminó?`;
+  }
+
+  transicionDetalle(): string {
+    const nuevo = this.confirmacionTransicion()?.nuevo;
+    if (nuevo === 'ACEPTADA') {
+      return 'Queda confirmado el turno y se habilita el chat para coordinar con la contraparte.';
+    }
+    if (nuevo === 'RECHAZADA') {
+      return 'La solicitud se cierra y el cliente puede buscar a otro profesional. No se puede volver atrás.';
+    }
+    return 'La solicitud se cierra como completada. Después se puede calificar el servicio.';
+  }
+
+  transicionIcono(): 'check' | 'x' {
+    const nuevo = this.confirmacionTransicion()?.nuevo;
+    return nuevo === 'ACEPTADA' || nuevo === 'COMPLETADA' ? 'check' : 'x';
+  }
+
+  transicionPeligrosa(): boolean {
+    return this.confirmacionTransicion()?.nuevo === 'RECHAZADA';
+  }
+
+  /** Vuelve a la lista de opciones sin cerrar el modal. */
+  volverAEstadoOpciones(): void {
+    this.estadoAConfirmar.set(null);
+    this.motivoEstado.set('');
+    this.motivoError.set('');
+  }
+
+  /** Confirma la cancelación: sin motivo no sale, la contraparte tiene que saber por qué. */
+  confirmarCancelacion(): void {
+    const solicitud = this.solicitudDelModal();
+    if (!solicitud) return;
+    if (!this.motivoEstado().trim()) {
+      this.motivoError.set('Contale a la contraparte por qué cancelás.');
+      return;
+    }
+    this.aplicarEstado(solicitud, 'CANCELADA');
+  }
+
+  aplicarEstado(request: ServiceRequest, nuevo: RequestStatus): void {
     const actorId = this.auth.currentUser()?.id;
     if (!actorId) return;
+    const id = String(request.id);
     this.errorMessage.set('');
-    this.api.acceptRequest(String(request.id), actorId, '').pipe(
+    // El motivo solo viaja en la cancelación (obligatorio para las dos partes).
+    const motivo = this.motivoEstado().trim();
+
+    const llamada =
+      nuevo === 'COMPLETADA' ? this.api.completeRequest(id, actorId)
+      : nuevo === 'CANCELADA' ? this.api.cancelRequest(id, actorId, motivo)
+      : nuevo === 'RECHAZADA' ? this.api.rejectRequest(id, actorId, '')
+      : this.api.acceptRequest(id, actorId, '');
+
+    llamada.pipe(
       catchError((error) => {
-        this.errorMessage.set(this.api.describeError(error, 'No se pudo aceptar la solicitud'));
+        this.errorMessage.set(this.api.describeError(error, 'No se pudo actualizar el estado de la solicitud'));
         return of(null);
       }),
     ).subscribe((updated) => {
-      if (updated) {
-        this.requestService.updateStatus(request.id, updated.status);
-        this.successMessage.set('Solicitud aceptada. Podés comunicarte con el cliente por el chat.');
-      }
-    });
-  }
-
-  promptReject(request: ServiceRequest): void {
-    this.rejectingRequestId.set(String(request.id));
-    this.rejectReason.set('');
-  }
-
-  cancelReject(): void {
-    this.rejectingRequestId.set(null);
-    this.rejectReason.set('');
-  }
-
-  confirmReject(): void {
-    const requestId = this.rejectingRequestId();
-    const actorId = this.auth.currentUser()?.id;
-    if (!requestId || !actorId) return;
-
-    const motivo = this.rejectReason().trim() || 'No disponible para el horario o zona seleccionada';
-    this.errorMessage.set('');
-    this.api.rejectRequest(requestId, actorId, motivo).pipe(
-      catchError((error) => {
-        this.errorMessage.set(this.api.describeError(error, 'No se pudo rechazar la solicitud'));
-        return of(null);
-      }),
-    ).subscribe((updated) => {
-      this.rejectingRequestId.set(null);
-      if (updated) {
-        this.requestService.updateStatus(requestId, updated.status);
-        this.successMessage.set('Solicitud rechazada.');
-        this.reloadRequests();
-      }
-    });
-  }
-
-  cancel(request: ServiceRequest): void {
-    const actorId = this.auth.currentUser()?.id;
-    if (!actorId) return;
-    this.errorMessage.set('');
-    this.api.cancelRequest(String(request.id), actorId, 'Cancelada por el cliente').pipe(
-      catchError((error) => {
-        this.errorMessage.set(this.api.describeError(error, 'No se pudo cancelar la solicitud'));
-        return of(null);
-      }),
-    ).subscribe((updated) => {
-      if (updated) {
-        this.requestService.updateStatus(request.id, updated.status);
-        this.successMessage.set('Solicitud cancelada.');
-        this.reloadRequests();
-      }
-    });
-  }
-
-  complete(request: ServiceRequest): void {
-    const actorId = this.auth.currentUser()?.id;
-    if (!actorId) return;
-    this.errorMessage.set('');
-    this.api.completeRequest(String(request.id), actorId).pipe(
-      catchError((error) => {
-        this.errorMessage.set(this.api.describeError(error, 'No se pudo completar la solicitud'));
-        return of(null);
-      }),
-    ).subscribe((updated) => {
-      if (updated) {
-        this.requestService.updateStatus(request.id, updated.status);
-        this.successMessage.set('La solicitud fue marcada como completada. ¡Ahora podés calificar el servicio!');
-        this.reloadRequests();
-      }
+      this.cerrarActualizarEstado();
+      if (!updated) return;
+      this.requestService.updateStatus(request.id, updated.status);
+      this.successMessage.set(
+        nuevo === 'COMPLETADA' ? 'La solicitud fue marcada como completada. ¡Ahora podés calificar el servicio!'
+        : nuevo === 'CANCELADA' ? 'Cancelaste la solicitud. La contraparte ve el motivo que escribiste.'
+        : nuevo === 'RECHAZADA' ? 'Solicitud rechazada.'
+        : 'Solicitud aceptada. Podés comunicarte por el chat.',
+      );
+      this.reloadRequests();
     });
   }
 
@@ -583,23 +626,120 @@ export class MyRequests {
 
   statusText(status: RequestStatus): string {
     return {
-      PENDIENTE: 'Pendiente de respuesta',
-      ACEPTADA: 'Aceptada por el profesional',
-      RECHAZADA: 'Solicitud rechazada',
-      COMPLETADA: 'Servicio completado',
-      CANCELADA: 'Solicitud cancelada',
-      VENCIDA: 'Solicitud vencida',
+      PENDIENTE: 'Pendiente',
+      ACEPTADA: 'Aceptada',
+      RECHAZADA: 'Rechazada',
+      COMPLETADA: 'Completada',
+      CANCELADA: 'Cancelada',
+      VENCIDA: 'Vencida',
     }[status] ?? status;
   }
 
+  /**
+   * Textos que el sistema generaba antes de que el motivo fuera obligatorio. No
+   * los escribió ninguna persona, así que no se muestran como si fueran suyas.
+   */
+  private readonly MOTIVOS_GENERICOS = [
+    'Cancelada por la contraparte',
+    'No disponible para el horario o zona seleccionada',
+  ];
+
+  /**
+   * Aclara quién dejó la solicitud en su estado final, según quién mira la lista:
+   * el que canceló se lo ve como "vos" y el otro como la contraparte.
+   * Las solicitudes canceladas antes de que se guardara el autor no permiten
+   * atribuirlo, y en ese caso no se inventa quién fue.
+   */
+  cierreLabel(request: ServiceRequest): string {
+    const soyProfesional = this.isProfessional();
+    if (request.status === 'RECHAZADA') {
+      return soyProfesional ? 'La rechazaste vos.' : 'La rechazó el profesional.';
+    }
+    if (request.status !== 'CANCELADA') {
+      return '';
+    }
+    const rol = request.canceladaPorRol;
+    if (rol === 'CLIENTE') {
+      return soyProfesional ? 'La canceló el cliente.' : 'La cancelaste vos.';
+    }
+    if (rol === 'PROFESIONAL') {
+      return soyProfesional ? 'La cancelaste vos.' : 'La canceló el profesional.';
+    }
+    return 'Solicitud cancelada.';
+  }
+
+  /** El motivo solo se muestra si lo escribió la persona que canceló o rechazó. */
+  motivoLegible(request: ServiceRequest): string {
+    const motivo = (request.motivoCancelacion ?? '').trim();
+    if (!motivo || this.MOTIVOS_GENERICOS.includes(motivo)) {
+      return '';
+    }
+    return motivo;
+  }
+
+  /**
+   * Próximo paso a seguir. Cuando el estado ya lo dice (por ejemplo, "Aceptada por
+   * el profesional"), no se repite: la tarjeta muestra el estado en la etiqueta.
+   */
   nextAction(status: RequestStatus): string {
     return {
       PENDIENTE: 'Esperando confirmación',
-      ACEPTADA: 'Coordinación activa · Usá el chat',
-      RECHAZADA: 'Rechazada · Podés buscar otro profesional',
-      COMPLETADA: 'Servicio finalizado con éxito',
-      CANCELADA: 'Solicitud cancelada',
-      VENCIDA: 'Solicitud vencida sin respuesta',
-    }[status] ?? 'Revisá el estado de esta solicitud';
+      ACEPTADA: '',
+      RECHAZADA: '',
+      COMPLETADA: '',
+      CANCELADA: '',
+      VENCIDA: '',
+    }[status] ?? '';
+  }
+
+  /**
+   * Horario del turno como rango ("08:00 a 12:00 hs"). Las solicitudes anteriores a
+   * guardar el fin se reconstruyen con las franjas conocidas a partir del inicio.
+   */
+  horarioLabel(request: ServiceRequest): string {
+    const inicio = request.time?.trim() ?? '';
+    const fin = request.timeEnd?.trim() ?? '';
+    if (fin) {
+      return `${inicio} a ${fin} hs`;
+    }
+    const franja = FRANJAS_HORARIAS.find((item) => item.start === inicio);
+    return franja ? franja.label : inicio;
+  }
+
+  // ── Presentación (tokens del prototipo) ────────────────────────────────
+
+  /** Solicitud del chat abierto, para el modal de coordinación. */
+  readonly activeRequest = computed(() => {
+    const id = this.activeChatId();
+    return id ? (this.requests().find((request) => String(request.id) === id) ?? null) : null;
+  });
+
+  /** Etiqueta del contador superior: cambia según quién mira la pantalla. */
+  get pendingLabel(): string {
+    return this.isProfessional() ? 'solicitudes pendientes' : 'solicitudes en revisión';
+  }
+
+  countPending(): number {
+    return this.requests().filter((request) => request.status === 'PENDIENTE').length;
+  }
+
+  /** Clase del badge según el estado, con los colores del prototipo. */
+  statusClass(status: RequestStatus): string {
+    switch (status) {
+      case 'PENDIENTE':
+        return 'vu-badge--pendiente';
+      case 'ACEPTADA':
+        return 'vu-badge--aceptada';
+      case 'COMPLETADA':
+        return 'vu-badge--completada';
+      case 'RECHAZADA':
+        return 'vu-badge--rechazada';
+      case 'CANCELADA':
+        return 'vu-badge--cancelada';
+      case 'VENCIDA':
+        return 'vu-badge--vencida';
+      default:
+        return 'vu-badge--neutro';
+    }
   }
 }

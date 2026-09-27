@@ -1,282 +1,272 @@
-<!-- ── Modal de Mapa Interactivo (Leaflet / OpenStreetMap) ── -->
+<!-- ── Modal de mapa interactivo (OpenStreetMap / Leaflet) ── -->
 @if (showMapModal()) {
-  <div class="map-modal-overlay" (click)="closeMapPicker()">
-    <div class="map-modal-content" (click)="$event.stopPropagation()">
-      <div class="map-modal-header">
-        <div>
-          <h3>Elegí la ubicación de tu domicilio o base</h3>
-          <p class="map-modal-sub">Hacé clic o arrastrá el marcador para fijar el centro de tu zona de trabajo.</p>
-        </div>
-        <button type="button" class="map-modal-close" (click)="closeMapPicker()" aria-label="Cerrar">✕</button>
-      </div>
+	<div class="map-overlay" (click)="closeMapPicker()">
+		<div class="map-modal" (click)="$event.stopPropagation()">
+			<div class="map-modal__head">
+				<div>
+					<h3 class="map-modal__title">Elegí la ubicación de tu domicilio o base</h3>
+					<p class="map-modal__sub">Hacé clic o arrastrá el marcador para fijar el centro de tu zona de trabajo.</p>
+				</div>
+				<button type="button" class="vu-btn vu-btn--quiet vu-btn--icon" (click)="closeMapPicker()" aria-label="Cerrar">
+					<vu-icon name="x" [size]="20" />
+				</button>
+			</div>
 
-      <div class="map-search-bar">
-        <input
-          type="text"
-          [ngModel]="mapSearchQuery()"
-          (ngModelChange)="mapSearchQuery.set($event)"
-          placeholder="Buscar ciudad, calle o localidad en el mapa..."
-          (keydown.enter)="searchAddressInMap()"
-        />
-        <button type="button" class="btn-search-map" (click)="searchAddressInMap()" [disabled]="mapSearching()">
-          {{ mapSearching() ? 'Buscando...' : 'Buscar' }}
-        </button>
-        <button type="button" class="btn-gps-map" (click)="detectDeviceGps()" title="Usar mi ubicación GPS actual">
-          🎯 Mi GPS
-        </button>
-      </div>
+			<div class="map-search">
+				<input
+					class="vu-input"
+					type="text"
+					[ngModel]="mapSearchQuery()"
+					(ngModelChange)="mapSearchQuery.set($event)"
+					placeholder="Buscar ciudad, calle o localidad..."
+					(keydown.enter)="searchAddressInMap()"
+				/>
+				<button type="button" class="vu-btn vu-btn--ink vu-btn--sm" (click)="searchAddressInMap()" [disabled]="mapSearching()">
+					{{ mapSearching() ? 'Buscando...' : 'Buscar' }}
+				</button>
+				<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="detectDeviceGps()">Mi GPS</button>
+			</div>
 
-      <div id="activation-map" class="interactive-map-container"></div>
+			<div id="activation-map" class="map-canvas"></div>
 
-      <div class="map-selected-info">
-        <span class="pin-icon" aria-hidden="true">📍</span>
-        <div class="info-text">
-          <strong>{{ tempMapLocation()?.displayName || 'Ubicación marcada en el mapa' }}</strong>
-          @if (tempMapLocation(); as tloc) {
-            <span class="coords-display">
-              Latitud: {{ tloc.lat | number:'1.4-4' }} · Longitud: {{ tloc.lng | number:'1.4-4' }}
-            </span>
-          }
-        </div>
-      </div>
+			<div class="map-selected">
+				<vu-icon name="map-pin" [size]="16" class="map-selected__icon" />
+				<div>
+					<strong class="map-selected__name">{{ tempMapLocation()?.displayName || 'Ubicación marcada en el mapa' }}</strong>
+					@if (tempMapLocation(); as tloc) {
+						<span class="map-selected__coords">
+							Latitud: {{ tloc.lat | number: '1.4-4' }} · Longitud: {{ tloc.lng | number: '1.4-4' }}
+						</span>
+					}
+				</div>
+			</div>
 
-      <div class="map-modal-actions">
-        <button type="button" class="btn-cancel" (click)="closeMapPicker()">Cancelar</button>
-        <button type="button" class="btn-confirm-map" (click)="confirmMapLocation()">
-          Confirmar esta ubicación
-        </button>
-      </div>
-    </div>
-  </div>
+			<div class="map-modal__actions">
+				<button type="button" class="vu-btn vu-btn--quiet" (click)="closeMapPicker()">Cancelar</button>
+				<button type="button" class="vu-btn vu-btn--coral" (click)="confirmMapLocation()">Confirmar esta ubicación</button>
+			</div>
+		</div>
+	</div>
 }
 
-<section class="activation-page">
-  @if (errorMessage()) {
-    <p class="error-message">{{ errorMessage() }}</p>
-  }
+<div class="vu-page activation">
+	<section class="activation__section">
+		@if (errorMessage()) {
+			<p class="vu-alert vu-alert--error activation__alert" role="alert">{{ errorMessage() }}</p>
+		}
 
-  @if (completed()) {
-    <div class="complete-state">
-      <span class="complete-mark">✓</span>
-      <p class="eyebrow">Activación completada con éxito</p>
-      <h1>¡Tu perfil profesional ya está activo!</h1>
-      <p>A partir de este momento figurás en el directorio con tu foto de perfil y podés recibir solicitudes de clientes.</p>
-      <div class="complete-actions">
-        <a routerLink="/solicitudes" class="btn-primary-complete">Ir a mis solicitudes <span aria-hidden="true">→</span></a>
-      </div>
-    </div>
-  } @else {
-    <div class="activation-heading">
-      <p class="eyebrow">Activar perfil profesional</p>
-      <h1>Completá tu ficha para empezar a recibir solicitudes.</h1>
-      <p>Solo necesitamos tres datos para mostrarte en el directorio de Vincula-UP.</p>
-    </div>
+		@if (completed()) {
+			<div class="done">
+				<div class="done__mark">
+					<vu-icon name="check" [size]="36" />
+				</div>
+				<p class="vu-eyebrow">Perfil activado</p>
+				<h1 class="done__title">Ya estás dentro de la red.</h1>
+				<p class="vu-body done__lead">Tu perfil quedó preparado para aparecer en el directorio.</p>
+				<a class="vu-btn vu-btn--ink" routerLink="/solicitudes">Comenzar</a>
+			</div>
+		} @else {
+			<div class="vu-stepper activation__stepper" aria-label="Progreso de activación">
+				@for (label of stepLabels; track label; let index = $index) {
+					<div
+						class="vu-stepper__item"
+						[class.vu-stepper__item--active]="step() === index + 1"
+						[class.vu-stepper__item--done]="step() > index + 1"
+					>
+						<div class="vu-stepper__label">
+							<span class="vu-stepper__circle">
+								@if (step() > index + 1) {
+									<vu-icon name="check" [size]="16" />
+								} @else {
+									{{ index + 1 }}
+								}
+							</span>
+							<span class="vu-stepper__name">{{ label }}</span>
+						</div>
+						@if (index < 2) {
+							<div class="vu-stepper__line"></div>
+						}
+					</div>
+				}
+			</div>
 
-    <div class="progress" aria-label="Progreso de activacion">
-      @for (item of [1, 2, 3]; track item) {
-        <span [class.current]="step() === item" [class.done]="step() > item">{{ item }}</span>
-      }
-    </div>
+			<div class="activation__head">
+				<p class="vu-eyebrow">Paso {{ step() }} de 3</p>
+				<h1 class="activation__title">{{ stepTitle() }}</h1>
+				<p class="vu-body activation__lead">{{ stepLead() }}</p>
+			</div>
 
-    <form (ngSubmit)="next()">
-      <!-- ── PASO 1: Foto con Previsualización ── -->
-      @if (step() === 1) {
-        <div class="step-content">
-          <h2>Tu imagen profesional</h2>
-          <p class="step-help">Una foto de perfil es obligatoria para continuar. Elegí una imagen clara para que los clientes te reconozcan en el directorio.</p>
+			<!-- ── Paso 1: Foto ── -->
+			@if (step() === 1) {
+				<div class="dropzone">
+					<input type="file" accept="image/jpeg,image/png" class="vu-sr-only" (change)="selectPhoto($event)" />
 
-          @if (photoLoading()) { <p role="status">Cargando vista previa...</p> }
-          @if (photoError()) { <p class="error-message" role="alert">{{ photoError() }}</p> }
-          @if (photoPreview()) {
-            <div class="photo-preview-card">
-              <div class="preview-avatar-wrap">
-                <img [src]="photoPreview()" alt="Previsualización de foto de perfil" class="preview-avatar-img" />
-              </div>
-              <div class="preview-details">
-                <p class="preview-filename"><strong>Foto seleccionada:</strong> {{ photoName() || 'foto-perfil.jpg' }}</p>
-                <div class="preview-actions">
-                  <label class="btn-change-photo">
-                    <span>Cambiar foto</span>
-                    <input type="file" accept="image/*" (change)="selectPhoto($event)" />
-                  </label>
-                  <button type="button" class="btn-remove-photo" (click)="removePhoto()">Quitar</button>
-                </div>
-              </div>
-            </div>
-          } @else {
-            <label class="file-picker">
-              <span class="photo-placeholder">+</span>
-              <div class="picker-copy">
-                <strong>Subir una foto de perfil</strong>
-                <span>Formatos JPG o PNG. Tamaño recomendado: 400x400 px.</span>
-              </div>
-              <input type="file" accept="image/*" (change)="selectPhoto($event)" />
-            </label>
-          }
-        </div>
-      }
+					@if (photoPreview()) {
+						<img class="preview-avatar-img" [src]="photoPreview()" alt="Vista previa de tu foto de perfil" />
+					} @else {
+						<div class="dropzone__icon">
+							<vu-icon name="camera" [size]="28" />
+						</div>
+					}
 
-      <!-- ── PASO 2: Ubicación / Ciudad y Cobertura ── -->
-      @if (step() === 2) {
-        <div class="step-content">
-          <h2>Tu zona de cobertura</h2>
-          <p class="step-help">Indicá la ciudad o domicilio desde donde operás para calcular el radio de cobertura hacia los clientes.</p>
+					<h2 class="dropzone__title">{{ photoPreview() ? 'Foto lista para tu perfil' : 'Subí una foto de perfil' }}</h2>
+					<p class="dropzone__hint">JPG o PNG. Máximo 512 KiB.</p>
+					@if (photoLoading()) {
+						<p class="dropzone__hint">Leyendo la imagen…</p>
+					}
+					@if (photoError()) {
+						<p class="dropzone__error" role="alert">{{ photoError() }}</p>
+					}
 
-          <div class="location-search-field">
-            <label for="zone-query-input">Ciudad o domicilio de base</label>
-            <div class="search-input-group">
-              <input
-                id="zone-query-input"
-                name="zoneQuery"
-                [ngModel]="zoneQuery()"
-                (ngModelChange)="onZoneQueryChange($event)"
-                (blur)="hideSuggestionsLater()"
-                placeholder="Ej. Concepción del Uruguay, Colón, Gualeguaychú..."
-                required
-                autocomplete="off"
-              />
-              <button type="button" class="btn-inline-verify" (click)="validateCurrentZone()" [disabled]="validatingLocation()">
-                {{ validatingLocation() ? 'Verificando...' : 'Verificar ciudad' }}
-              </button>
-            </div>
+					<div class="dropzone__actions">
+						<label class="vu-btn vu-btn--ink">
+							<vu-icon name="upload" [size]="16" />
+							{{ photoPreview() ? 'Cambiar foto' : 'Elegir archivo' }}
+							<input type="file" accept="image/jpeg,image/png" class="vu-sr-only" (change)="selectPhoto($event)" />
+						</label>
+						@if (photoPreview()) {
+							<button type="button" class="vu-btn vu-btn--quiet" (click)="removePhoto()">Quitar</button>
+						}
+					</div>
+				</div>
+			}
 
-            @if (locationSuggestionOpen() && locationSuggestions().length > 0) {
-              <ul class="suggestions-dropdown">
-                @for (item of locationSuggestions(); track item.displayName) {
-                  <li>
-                    <button type="button" class="suggestion-item-btn" (click)="selectSuggestion(item)">
-                      <span class="pin">📍</span>
-                      <span class="text">{{ item.displayName }}</span>
-                    </button>
-                  </li>
-                }
-              </ul>
-            }
+			<!-- ── Paso 2: Zona y GPS ── -->
+			@if (step() === 2) {
+				<div class="activation__card">
+					<label class="vu-label">
+						Domicilio o ubicación <span class="vu-required">obligatorio</span>
+						<input
+							id="zone-query-input"
+							name="zoneQuery"
+							class="vu-input zone__input"
+							[ngModel]="zoneQuery()"
+							(ngModelChange)="onZoneQueryChange($event)"
+							(blur)="hideSuggestionsLater()"
+							placeholder="Ingresá tu domicilio o ubicación"
+							autocomplete="off"
+						/>
+					</label>
 
-            <div class="location-tools-bar">
-              <button type="button" class="btn-tool" (click)="detectDeviceGps()">
-                🎯 Usar mi GPS
-              </button>
-              <button type="button" class="btn-tool" (click)="openMapPicker()">
-                🗺️ Elegir en el mapa
-              </button>
-            </div>
+					@if (locationError()) {
+						<p class="activation__error" role="alert">{{ locationError() }}</p>
+					}
 
-            <!-- Sugerencias rápidas -->
-            <div class="presets-wrap">
-              <span class="presets-label">Ciudades sugeridas:</span>
-              <div class="presets-chips">
-                @for (p of presetLocations; track p.label) {
-                  <button type="button" class="chip" (click)="selectPreset(p)">
-                    {{ p.label }}
-                  </button>
-                }
-              </div>
-            </div>
+					@if (locationSuggestionOpen() && locationSuggestions().length) {
+						<ul class="zone__suggestions">
+							@for (item of locationSuggestions(); track item.displayName) {
+								<li>
+									<button type="button" (click)="selectSuggestion(item)">{{ item.displayName }}</button>
+								</li>
+							}
+						</ul>
+					}
 
-            <!-- Alerta de error -->
-            @if (locationError()) {
-              <p class="field-error" role="alert">⚠️ {{ locationError() }}</p>
-            }
+					<div class="zone__map vu-map vu-map--tall" role="img" aria-label="Mapa de zona de cobertura">
+						<span class="vu-map-pin"></span>
+						<span class="vu-map-label">Zona de cobertura</span>
+					</div>
 
-            <!-- Badge de ubicación confirmada -->
-            @if (validatedLocation(); as vloc) {
-              <div class="validated-location-card">
-                <span class="check-icon">✓</span>
-                <div class="validated-text">
-                  <p class="title">Ubicación verificada</p>
-                  <p class="address">{{ vloc.displayName }}</p>
-                  <p class="coords">Coordenadas: {{ vloc.lat | number:'1.4-4' }}, {{ vloc.lng | number:'1.4-4' }}</p>
-                </div>
-              </div>
-            }
-          </div>
+					<div class="zone__tools">
+						<button type="button" class="vu-btn vu-btn--outline vu-btn--block" (click)="openMapPicker()">
+							<vu-icon name="map-pin" [size]="16" />
+							Ajustar en el mapa
+						</button>
+						<button type="button" class="vu-btn vu-btn--outline vu-btn--block" (click)="detectDeviceGps()">
+							<vu-icon name="navigation" [size]="16" />
+							Usar mi ubicación
+						</button>
+						<button type="button" class="vu-btn vu-btn--quiet vu-btn--block" (click)="validateCurrentZone()">
+							{{ validatingLocation() ? 'Verificando...' : 'Verificar la dirección escrita' }}
+						</button>
+					</div>
 
-          <div class="radius-slider-group">
-            <div class="radius-header">
-              <label for="radius-range">Radio de cobertura</label>
-              <span class="radius-val"><strong>{{ radius() }} km</strong> a la redonda</span>
-            </div>
-            <input
-              id="radius-range"
-              [ngModel]="radius()"
-              (ngModelChange)="radius.set($event)"
-              name="radius"
-              type="range"
-              min="1"
-              max="50"
-            />
-            <p class="radius-help">Los clientes que estén a menos de {{ radius() }} km de tu ubicación podrán solicitar tus servicios.</p>
-          </div>
-        </div>
-      }
+					@if (validatedLocation()) {
+						<p class="zone__ok">
+							<vu-icon name="map-pin" [size]="18" />
+							Ubicación lista para tu perfil
+						</p>
+					}
 
-      <!-- ── PASO 3: Disponibilidad Multi-día (Alarma de Teléfono) ── -->
-      @if (step() === 3) {
-        <div class="step-content">
-          <h2>Tu disponibilidad horaria</h2>
-          <p class="step-help">Configurá los días en los que atendés solicitudes, como cuando programás la alarma en tu teléfono.</p>
+					<div class="zone__radius">
+						<div class="zone__radius-head">
+							<span>Radio de cobertura</span>
+							<span>{{ radius() }} km</span>
+						</div>
+						<input
+							aria-label="Radio de cobertura"
+							type="range"
+							min="1"
+							max="50"
+							name="radius"
+							[ngModel]="radius()"
+							(ngModelChange)="radius.set($event)"
+						/>
+						<div class="zone__radius-scale">
+							<span>1 km</span>
+							<span>50 km</span>
+						</div>
+					</div>
+				</div>
+			}
 
-          <div class="alarm-days-picker">
-            <p class="picker-label">Días de atención:</p>
-            <div class="alarm-days-row">
-              @for (day of weekDays; track day.id) {
-                <button
-                  type="button"
-                  class="alarm-day-circle"
-                  [class.selected]="isDaySelected(day.id)"
-                  (click)="toggleDay(day.id)"
-                  [attr.aria-label]="day.name"
-                  [attr.aria-pressed]="isDaySelected(day.id)"
-                  [attr.title]="day.name"
-                >
-                  <span class="short">{{ day.short }}</span>
-                  <span class="full-tag">{{ day.name }}</span>
-                </button>
-              }
-            </div>
+			<!-- ── Paso 3: Disponibilidad ── -->
+			@if (step() === 3) {
+				<div class="activation__card">
+					<fieldset class="days__fieldset">
+						<legend class="vu-label">Días disponibles <span class="vu-required">obligatorio</span></legend>
+						<div class="days">
+							@for (day of weekDays; track day.id) {
+								<button
+									type="button"
+									class="day-chip"
+									[class.is-active]="isDaySelected(day.id)"
+									[attr.aria-pressed]="isDaySelected(day.id)"
+									[attr.aria-label]="day.name"
+									(click)="toggleDay(day.id)"
+								>
+									{{ day.name }}
+								</button>
+							}
+						</div>
+					</fieldset>
 
-            <div class="alarm-shortcuts">
-              <button type="button" class="btn-shortcut" (click)="selectWeekdays()">Lunes a Viernes</button>
-              <button type="button" class="btn-shortcut" (click)="selectAllDays()">Todos los días</button>
-              <button type="button" class="btn-shortcut" (click)="selectWeekend()">Fines de semana</button>
-            </div>
+					<div class="days__summary">
+						<vu-icon name="clock" [size]="18" />
+						<span>Atención: <strong>{{ selectedDaysLabel() }}</strong></span>
+					</div>
 
-            <div class="alarm-summary-banner">
-              <span class="alarm-icon">⏰</span>
-              <span>Atención: <strong>{{ selectedDaysLabel() }}</strong></span>
-            </div>
-          </div>
+					<div class="days__presets">
+						<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="selectWeekdays()">Lunes a Viernes</button>
+						<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="selectAllDays()">Todos los días</button>
+						<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="selectWeekend()">Fines de semana</button>
+					</div>
 
-          <div class="time-range-group">
-            <p class="picker-label">Franja horaria de servicio:</p>
-            <div class="time-row">
-              <label>
-                <span>Desde las</span>
-                <input [ngModel]="start()" (ngModelChange)="start.set($event)" name="start" type="time" required />
-              </label>
-              <label>
-                <span>Hasta las</span>
-                <input [ngModel]="end()" (ngModelChange)="end.set($event)" name="end" type="time" required />
-              </label>
-            </div>
-          </div>
-        </div>
-      }
+					<div class="time-range">
+						<label class="vu-label">
+							Desde <span class="vu-required">obligatorio</span>
+							<input class="vu-input" type="time" name="start" [ngModel]="start()" (ngModelChange)="start.set($event)" />
+						</label>
+						<label class="vu-label">
+							Hasta <span class="vu-required">obligatorio</span>
+							<input class="vu-input" type="time" name="end" [ngModel]="end()" (ngModelChange)="end.set($event)" />
+						</label>
+					</div>
+				</div>
+			}
 
-      <div class="form-actions">
-        @if (step() > 1) {
-          <button class="back" type="button" (click)="previous()">Volver</button>
-        }
-        <button class="next" type="submit" [disabled]="submitting() || photoLoading() || !hasPhoto()">
-          @if (submitting()) {
-            <span>Activando perfil...</span>
-          } @else {
-            <span>{{ step() === 3 ? 'Activar mi perfil' : 'Continuar' }}</span>
-            <span aria-hidden="true">→</span>
-          }
-        </button>
-      </div>
-    </form>
-  }
-</section>
+			<div class="activation__actions">
+				<button type="button" class="vu-btn activation__back back" [class.is-hidden]="step() === 1" (click)="previous()">
+					<vu-icon name="chevron-left" [size]="16" />
+					Atrás
+				</button>
+
+				<button type="button" class="vu-btn vu-btn--ink next" [disabled]="submitting() || photoLoading() || !hasPhoto()" (click)="next()">
+					{{ step() === 3 ? 'Activar' : 'Continuar' }}
+					<vu-icon name="chevron-right" [size]="16" />
+				</button>
+			</div>
+
+		}
+	</section>
+</div>

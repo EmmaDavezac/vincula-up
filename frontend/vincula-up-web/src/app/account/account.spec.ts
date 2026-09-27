@@ -69,6 +69,7 @@ describe('Account (Mi cuenta)', () => {
     nombre.dispatchEvent(new Event('input'));
     component.personalDraft.set({ nombre: 'Sofia Belen', apellido: 'Gomez' });
     (fixture.nativeElement.querySelector('button.primary') as HTMLButtonElement).click();
+    component.confirmarGuardado();
 
     // El apellido no cambió: no se reenvía (el backend lo mantiene intacto).
     expect(api.updateMyAccount).toHaveBeenCalledWith({ nombre: 'Sofia Belen' });
@@ -80,6 +81,7 @@ describe('Account (Mi cuenta)', () => {
     component.startEdit('personal');
     component.personalDraft.set({ nombre: 'Sofia Belen', apellido: 'Gomez Lopez' });
     component.savePersonal();
+    component.confirmarGuardado();
 
     expect(api.updateMyAccount).toHaveBeenCalledTimes(1);
     expect(api.updateMyAccount.mock.calls[0][0]).toEqual({ nombre: 'Sofia Belen', apellido: 'Gomez Lopez' });
@@ -98,6 +100,7 @@ describe('Account (Mi cuenta)', () => {
     component.startEdit('photo');
     component.photoPreview.set('data:image/png;base64,abc');
     component.savePhoto();
+    component.confirmarGuardado();
 
     expect(api.updateMyAccount).toHaveBeenCalledTimes(1);
     expect(api.updateMyAccount.mock.calls[0][0]).toEqual({ fotoUrl: 'data:image/png;base64,abc' });
@@ -107,6 +110,7 @@ describe('Account (Mi cuenta)', () => {
     component.startEdit('contact');
     component.contactDraft.set({ telefono: '3764 99-9999' });
     component.saveContact();
+    component.confirmarGuardado();
 
     expect(api.updateMyAccount).toHaveBeenCalledTimes(1);
     expect(api.updateMyAccount.mock.calls[0][0]).toEqual({ telefono: '3764 99-9999' });
@@ -116,6 +120,7 @@ describe('Account (Mi cuenta)', () => {
     component.startEdit('contact');
     component.contactDraft.set({ telefono: '3764 99-9999' });
     component.saveContact();
+    component.confirmarGuardado();
 
     expect(api.updateMyAccount).toHaveBeenCalledTimes(1);
     expect(api.updateMyAccount.mock.calls[0][0]).not.toHaveProperty('email');

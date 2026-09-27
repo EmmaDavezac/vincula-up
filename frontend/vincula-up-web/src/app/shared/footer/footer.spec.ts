@@ -33,17 +33,13 @@ describe('FooterComponent', () => {
     expect(element.querySelector(".footer-link")?.getAttribute("href")).toBe("mailto:contacto@vinculaup.edu.ar");
   });
 
-  it('should render a mat-toolbar', () => {
+  it('should render the institutional columns of the footer', () => {
     const element = render();
-    expect(element.querySelector("mat-toolbar")).toBeTruthy();
-  });
-
-  it('should render redes sociales links', () => {
-    const element = render();
-    const socialLinks = Array.from(element.querySelectorAll(".social-link"))
-      .map((a) => a.getAttribute("aria-label"));
-    expect(socialLinks).toContain("Twitter");
-    expect(socialLinks).toContain("Instagram");
-    expect(socialLinks).toContain("LinkedIn");
+    const text = element.textContent ?? "";
+    expect(text).toContain("Vincula-UP · Universidad Popular de Concepción del Uruguay");
+    expect(text).toContain("Ayuda");
+    expect(text).toContain("Información");
+    expect(text).toContain("Reportar un problema");
+    expect(text).toContain(`© ${new Date().getFullYear()}`);
   });
 });
