@@ -1,19 +1,26 @@
-# Frontend dependencies and build output
-frontend/vincula-up-web/node_modules/
-frontend/vincula-up-web/dist/
+# Dependencias y build del frontend
+node_modules/
+dist/
 .angular/
 
-# Java build output
+# Build de Java
 **/target/
 
-# Local environment and IDE files
+# Archivos de entorno con secretos reales (sólo se versiona el ejemplo)
 .env
 .env.*
 !.env.example
+
+# Logs de crash de la JVM generados en desarrollo local
+hs_err_pid*.log
+replay_pid*.log
+*.hprof
+
+# Salidas sueltas de depuración
+out.html
+nohup.out
+
+# IDE
 .idea/
 .vscode/
 *.iml
-
-# Local database data
-db/postgres/
-db/pgadmin/

@@ -14,6 +14,22 @@
 
 set -euo pipefail
 
+# Cargar el .env de la raíz para que las variables de configuración (SMTP
+# incluido) estén disponibles. `set -a` las exporta al entorno: sin esto,
+# KEYCLOAK_SMTP_PASSWORD queda vacía y el reseteo de contraseña no envía emails.
+# Se hace tras `set -euo pipefail` y con tolerance a que el archivo no exista.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+if [ -f "$REPO_ROOT/.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$REPO_ROOT/.env"
+  set +a
+  echo "==> Configuración cargada desde $REPO_ROOT/.env"
+else
+  echo "==> No se encontró .env en la raíz: se usan valores por defecto"
+fi
+
 REALM="${KEYCLOAK_REALM:-vincula-up}"
 ADMIN_USER="${KEYCLOAK_ADMIN:-admin}"
 ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-admin}"

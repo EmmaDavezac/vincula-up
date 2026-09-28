@@ -23,6 +23,17 @@ services:
       # Necesario para que Keycloak sepa que está detrás de un proxy HTTPS
       KC_PROXY: edge
       KC_PROXY_HEADERS: xforwarded
+      # SMTP: el realm importado lee ${env.KEYCLOAK_SMTP_*}, que se resuelve
+      # contra el entorno del contenedor. Sin estas variables, la contraseña
+      # queda vacía y el reseteo de contraseña no puede enviar el email.
+      KC_SMTP_HOST: ${KEYCLOAK_SMTP_HOST:-smtp.gmail.com}
+      KC_SMTP_PORT: ${KEYCLOAK_SMTP_PORT:-587}
+      KC_SMTP_STARTTLS: ${KEYCLOAK_SMTP_STARTTLS:-true}
+      KC_SMTP_AUTH: ${KEYCLOAK_SMTP_AUTH:-true}
+      KC_SMTP_USER: ${KEYCLOAK_SMTP_USER:-}
+      KC_SMTP_PASSWORD: ${KEYCLOAK_SMTP_PASSWORD:-}
+      KC_SMTP_FROM: ${KEYCLOAK_SMTP_FROM:-}
+      KC_SMTP_FROM_DISPLAY_NAME: ${KEYCLOAK_SMTP_FROM_DISPLAY_NAME:-Vincula-UP}
     ports:
       - "8080:8080"
     volumes:
@@ -179,24 +190,21 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/certs:/etc/nginx/certs:ro
 
-  # ─── pgAdmin DESACTIVADO TEMPORALMENTE (rendimiento) ───
-  # No es necesario para el funcionamiento de la app: los microservicios y Keycloak
-  # se conectan a PostgreSQL directamente. Para reactivarlo, descomenta este bloque
-  # y ejecuta: docker compose up -d pgadmin
-  # pgadmin:
-  #   image: dpage/pgadmin4:8.12
-  #   container_name: vinculaup-pgadmin
-  #   depends_on:
-  #     - postgres
-  #   restart: unless-stopped
-  #   environment:
-  #     PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@vincula-up.com}
-  #     PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
-  #   ports:
-  #     - "5050:80"
-  #   volumes:
-  #     - pgadmin_data:/var/lib/pgadmin
+  pgadmin:
+    image: dpage/pgadmin4:8.12
+    container_name: vinculaup-pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@vincula-up.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
 
 volumes:
   postgres_data:
-  pgadmin_data:  # se mantiene declarado: no consume recursos y conserva los datos/connections guardados de pgAdmin
+  pgadmin_data:
