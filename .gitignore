@@ -2,9 +2,15 @@
 node_modules/
 dist/
 .angular/
+.sass-cache/
 
 # Build de Java
 **/target/
+# `build/` también (lo ignoraban los .gitignore por módulo). Las excepciones
+# evitan pisar los recursos que Spring Boot deja bajo src/main y src/test.
+**/build/
+!**/src/main/**/build/
+!**/src/test/**/build/
 
 # Archivos de entorno con secretos reales (sólo se versiona el ejemplo)
 .env
@@ -19,8 +25,20 @@ replay_pid*.log
 # Salidas sueltas de depuración
 out.html
 nohup.out
+__screenshots__/
 
 # IDE
 .idea/
 .vscode/
 *.iml
+.classpath
+.project
+.factorypath
+.settings/
+.c9/
+*.launch
+*.sublime-workspace
+
+# Sistema
+.DS_Store
+Thumbs.db

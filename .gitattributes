@@ -3,6 +3,11 @@
 *.sh   text eol=lf
 *.bash text eol=lf
 
+# El wrapper de Maven no tiene extensión, así que `*.sh` no lo cubre.
+# Igual debe quedar en LF: es un shell script. Sin la barra inicial porque
+# los wrappers viven en backend/<servicio>/, no en la raíz del repo.
+mvnw text eol=lf
+
 # Scripts y ejecutables de Windows
 *.ps1  text eol=crlf
 *.cmd  text eol=crlf
