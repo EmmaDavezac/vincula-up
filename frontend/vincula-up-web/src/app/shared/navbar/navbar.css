@@ -1,19 +1,21 @@
 /*
-El :host NO lleva position/z-index a propósito: el modal de confirmación
-(vu-confirm) vive dentro de este componente, y un contexto de apilamiento acá
-lo encerraría. Con el modal en z-index 50+ dentro de un contexto de z-index 30,
-la barra inferior de móvil (z-index 50, fuera de este componente) tapaba el
-diálogo. El z-index va sólo en la cabecera, que es lo que debe flotar.
+El sticky va en la cabecera, NO en el :host. Motivo: el modal de confirmación
+(vu-confirm) es un descendiente del navbar con position: fixed. Un ancestro con
+position: sticky se convierte en containing block de sus hijos fixed, así que el
+overlay se posicionaba contra el navbar en vez del viewport: quedaba recortado y
+la barra inferior de móvil (z-index 50) le tapaba los botones.
+
+Con el :host como bloque normal, el fixed vuelve a referirse al viewport y su
+z-index 70 compite de verdad contra el 50 de la barra.
 */
 :host {
 	display: block;
-	position: sticky;
-	top: 0;
 }
 
 .vu-header {
 	background: var(--paper);
-	position: relative;
+	position: sticky;
+	top: 0;
 	z-index: 30;
 }
 
@@ -180,7 +182,10 @@ diálogo. El z-index va sólo en la cabecera, que es lo que debe flotar.
 	position: absolute;
 	right: 0;
 	width: 14rem;
-	z-index: 40;
+	/* Por encima de la cabecera (30) y de la barra inferior (50): si queda
+	   dentro de su rango, al scrollear el panel se ve POR ENCIMA de la navbar
+	   porque su ancestro sticky ya no lo encierra. */
+	z-index: 60;
 }
 
 .user-menu__item {

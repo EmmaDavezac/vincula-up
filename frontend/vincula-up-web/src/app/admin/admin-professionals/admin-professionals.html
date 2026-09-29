@@ -137,18 +137,18 @@
 					</div>
 
 					<div class="admin-professionals__actions">
-						<button type="button" class="vu-btn vu-btn--outline vu-btn--pill vu-btn--sm" (click)="abrirDetalle(professional, 'consulta')">
+						<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="abrirDetalle(professional, 'consulta')">
 							<vu-icon name="eye" [size]="14" />
 							Consultar
 						</button>
-						<button type="button" class="vu-btn vu-btn--outline vu-btn--pill vu-btn--sm" (click)="abrirDetalle(professional, 'edicion')">
+						<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="abrirDetalle(professional, 'edicion')">
 							<vu-icon name="pencil" [size]="14" />
 							Actualizar
 						</button>
 						@if (estaSuspendido(professional)) {
 							<button
 								type="button"
-								class="vu-btn vu-btn--outline vu-btn--pill vu-btn--sm"
+								class="vu-btn vu-btn--outline vu-btn--sm"
 								(click)="reactivate(professional)"
 								[disabled]="busyId() === professional.id"
 							>
@@ -159,7 +159,7 @@
 							<!-- Suspender saca al profesional del directorio: lleva peligro y confirma. -->
 						<button
 							type="button"
-							class="vu-btn vu-btn--danger vu-btn--pill vu-btn--sm"
+							class="vu-btn vu-btn--danger vu-btn--sm"
 							(click)="suspend(professional)"
 							[disabled]="busyId() === professional.id"
 						>
@@ -176,7 +176,7 @@
 			<p class="vu-admin-panel__hint">
 				Ningún profesional coincide con «{{ consulta() }}».
 			</p>
-			<button type="button" class="vu-btn vu-btn--outline vu-btn--pill vu-btn--sm" (click)="limpiarBusqueda()">
+			<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="limpiarBusqueda()">
 				Limpiar búsqueda
 			</button>
 		</div>
@@ -263,7 +263,7 @@
 					{{ savingEdit() ? 'Guardando...' : 'Guardar cambios' }}
 				</button>
 			} @else {
-				<button type="button" class="vu-btn vu-btn--ink vu-btn--pill vu-btn--block" (click)="cerrarDetalle()">Cerrar</button>
+				<button type="button" class="vu-btn vu-btn--outline vu-btn--block" (click)="cerrarDetalle()">Cerrar</button>
 			}
 		</section>
 	</div>

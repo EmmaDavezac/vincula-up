@@ -5,7 +5,7 @@
 				<vu-icon name="check" [size]="34" class="sent__check" />
 				<h1 class="sent__title">Solicitud enviada</h1>
 				<p class="sent__lead">Tu solicitud fue enviada a {{ selectedProfessional()?.name }}.</p>
-				<a class="vu-btn vu-btn--ink vu-btn--pill" routerLink="/solicitudes">Volver a mis solicitudes</a>
+				<a class="vu-btn vu-btn--ink" routerLink="/solicitudes">Volver a mis solicitudes</a>
 			</div>
 		</div>
 	</div>
@@ -283,7 +283,7 @@
 					</button>
 
 					@if (pasoActual < 4) {
-						<button type="button" class="vu-btn vu-btn--ink vu-btn--pill" [disabled]="!canContinue" (click)="continuar()">
+						<button type="button" class="vu-btn vu-btn--ink" [disabled]="!canContinue" (click)="continuar()">
 							Continuar
 						</button>
 					} @else {

@@ -132,6 +132,21 @@
 	margin-top: 0.75rem;
 }
 
+/*
+En móvil el botón "Cambiar foto" estorba: el avatar ya es pulsable (el ícono de
+cámara abre el selector) y, al competir por el ancho con el nombre y el email en
+.profile-hero, los comprimía. Se oculta abajo de 640px y queda en escritorio.
+*/
+.hero-photo-trigger {
+	display: none;
+}
+
+@media (min-width: 640px) {
+	.hero-photo-trigger {
+		display: inline-flex;
+	}
+}
+
 /* ── Datos ─────────────────────────────────────────────────────────────── */
 
 .form-grid {

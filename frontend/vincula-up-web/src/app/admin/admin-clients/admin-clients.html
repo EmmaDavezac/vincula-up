@@ -67,7 +67,7 @@
 
 				<button
 					type="button"
-					class="vu-btn vu-btn--pill admin-clients__action"
+					class="vu-btn admin-clients__action"
 					[class.vu-btn--danger]="estaActivo(item.client)"
 					[class.vu-btn--outline]="!estaActivo(item.client)"
 					(click)="toggleAccess(item.client)"
@@ -85,7 +85,7 @@
 	} @else {
 		<div class="admin-clients__empty">
 			<p class="vu-admin-panel__hint">Ningún cliente coincide con «{{ consulta() }}».</p>
-			<button type="button" class="vu-btn vu-btn--outline vu-btn--pill vu-btn--sm" (click)="limpiarBusqueda()">
+			<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="limpiarBusqueda()">
 				Limpiar búsqueda
 			</button>
 		</div>

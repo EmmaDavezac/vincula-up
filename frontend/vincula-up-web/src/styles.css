@@ -274,7 +274,20 @@ a {
 	font-family: var(--font-serif);
 }
 
-/* ── Botones ───────────────────────────────────────────────────────────── */
+/* ── Botones ───────────────────────────────────────────────────────────────
+
+   Jerarquía de forma (NO es decorativa, define qué acción manda):
+   - La base es un rectángulo de 8px. Es el estilo por defecto: navegación,
+     acciones de fila, filtros, botones secundarios y enlaces-botón.
+   - --pill (999px) es la EXCEPCIÓN y se reserva para la acción principal de
+     una pantalla o de un diálogo: enviar, guardar, aceptar, calificar.
+   - --icon (999px) es para botones circulares sin texto (enviar chat, cerrar).
+
+   Antes los dos estilos se mezclaban sin criterio (16 pill sobre 57 base), y
+   botones gemelos de la misma pantalla aparecían con formas distintas: por
+   ejemplo "Continuar" era redondeado y "Volver a mis solicitudes" cuadrado,
+   aunque los dos son navegación. Si agregás un botón, decidí primero cuál de
+   los tres casos es. */
 
 .vu-btn {
 	align-items: center;
