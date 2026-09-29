@@ -16,6 +16,11 @@ public record SolicitudResponse(
         UUID profesionalId,
         UUID especialidadId,
         String direccionServicio,
+        /**
+         * Zona aproximada (barrio y localidad). El BFF la usa para reemplazar la
+         * dirección cuando el profesional todavía no aceptó el turno.
+         */
+        String zonaAproximada,
         String descripcion,
         Double latitud,
         Double longitud,

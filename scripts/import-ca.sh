@@ -1,6 +1,13 @@
 #!/bin/bash
-# Importa el CA de VinculaUP en Firefox y en el sistema (Ubuntu/Debian)
-# Uso: bash scripts/import-ca-firefox.sh
+# Instala la CA de VinculaUP en los navegadores de Linux (Ubuntu/Debian).
+#
+# Cubre los dos mecanismos de confianza que existen en Linux:
+#   - Store del sistema  → Chromium, Chrome, Edge, curl, Node.js, Java
+#   - Base NSS de Firefox → Firefox tiene su propio almacén, ignorando el sistema
+#
+# Uso: bash scripts/import-ca.sh
+#
+# En Windows usar el equivalente:  powershell -ExecutionPolicy Bypass -File .\scripts\import-ca.ps1
 
 set -e
 
@@ -9,16 +16,19 @@ CA_CERT="$(realpath "$CA_CERT")"
 
 echo "🔐 Importando CA: $CA_CERT"
 
-# ── 1. Sistema operativo (para Chrome/Chromium también) ──────────────────────
+# ── 1. Store del sistema ──────────────────────────────────────────────────────
+# Chromium/Chrome/Edge leen el almacén del sistema. Actualizarlo también cubre
+# curl, Node.js y la JVM, que usan la misma lista de confianza.
 echo ""
-echo "📦 Instalando en el store del sistema..."
+echo "📦 Instalando en el store del sistema (Chromium, Chrome, Edge, curl)..."
 sudo cp "$CA_CERT" /usr/local/share/ca-certificates/vinculaup-ca.crt
 sudo update-ca-certificates
 echo "✅ CA instalado en el sistema"
 
-# ── 2. Firefox (NSS database) ────────────────────────────────────────────────
+# ── 2. Base NSS de Firefox ───────────────────────────────────────────────────
+# Firefox NO consulta el store del sistema: mantiene su propia base NSS.
 echo ""
-echo "🦊 Importando en Firefox..."
+echo "🦊 Importando en Firefox (base NSS propia)..."
 
 # Instalar certutil si no está disponible
 if ! command -v certutil &>/dev/null; then
@@ -43,7 +53,7 @@ fi
 
 echo ""
 echo "══════════════════════════════════════════════════"
-echo "✅  LISTO. Reinicia Firefox para que tome efecto."
+echo "✅  LISTO. Reinicia el navegador para que tome efecto."
 echo "══════════════════════════════════════════════════"
 echo ""
 echo "Si Firefox sigue mostrando error, importa manualmente:"
@@ -53,3 +63,5 @@ echo "  3. Pestaña 'Autoridades' → Importar..."
 echo "  4. Selecciona: $CA_CERT"
 echo "  5. Marca '✅ Confiar en esta CA para identificar sitios web'"
 echo "  6. Reinicia Firefox"
+echo ""
+echo "⚠️  Importá siempre ca.crt (la CA), NUNCA server.crt (el del servidor)."

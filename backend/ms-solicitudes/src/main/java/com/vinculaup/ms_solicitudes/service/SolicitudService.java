@@ -80,7 +80,7 @@ public class SolicitudService {
 
         Solicitud solicitud = repository.save(new Solicitud(
                 request.clienteId(), profesional.id(), request.especialidadId(),
-                ubicacion.direccion(), ubicacion.latitud(), ubicacion.longitud(),
+                ubicacion.direccion(), ubicacion.zona(), ubicacion.latitud(), ubicacion.longitud(),
                 request.fechaHoraPropuesta(), request.descripcion().trim(),
                 request.fechaHoraFinPropuesta()));
         return toResponse(solicitud);
@@ -88,16 +88,21 @@ public class SolicitudService {
 
     private LocalizacionUbicacion resolverUbicacion(String direccion, Double latitud, Double longitud) {
         if (latitud != null && longitud != null) {
-            return new LocalizacionUbicacion(direccion.trim(), latitud, longitud);
+            // El cliente marcó el punto en el mapa: no hay display_name del cual
+            // sacar la zona, así que se resuelve el punto contra el proveedor.
+            String zona = geocodingClient.resolverZonaDePunto(latitud, longitud);
+            return new LocalizacionUbicacion(direccion.trim(), zona, latitud, longitud);
         }
         return geocodingClient.resolver(direccion)
-                .map(c -> new LocalizacionUbicacion(c.direccionCanonica(), c.latitud(), c.longitud()))
+                .map(c -> new LocalizacionUbicacion(c.direccionCanonica(),
+                        com.vinculaup.ms_solicitudes.client.GeocodingClient.extraerZona(c.direccionCanonica()),
+                        c.latitud(), c.longitud()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "No se pudo determinar la ubicación de la dirección exacta: " + direccion
                                 + ". Ajustá la dirección, usá el mapa, o verificá la ubicación por texto."));
     }
 
-    private record LocalizacionUbicacion(String direccion, Double latitud, Double longitud) {
+    private record LocalizacionUbicacion(String direccion, String zona, Double latitud, Double longitud) {
     }
 
     /**
@@ -344,7 +349,8 @@ public class SolicitudService {
     private SolicitudResponse toResponse(Solicitud solicitud) {
         return new SolicitudResponse(
                 solicitud.getId(), solicitud.getClienteId(), solicitud.getProfesionalId(),
-                solicitud.getEspecialidadId(), solicitud.getDireccionServicio(), solicitud.getDescripcion(),
+                solicitud.getEspecialidadId(), solicitud.getDireccionServicio(),
+                solicitud.getZonaAproximada(), solicitud.getDescripcion(),
                 solicitud.getLatitud(), solicitud.getLongitud(),
                 solicitud.getFechaHoraPropuesta(), solicitud.getFechaHoraFinPropuesta(), solicitud.getEstado(),
                 solicitud.getMotivoCancelacion(), rolQueCancelo(solicitud), solicitud.getFechaCreacion(),

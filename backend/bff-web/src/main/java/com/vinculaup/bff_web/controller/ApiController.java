@@ -23,6 +23,8 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api")
@@ -30,10 +32,13 @@ public class ApiController {
 
     private final BackendGateway gateway;
     private final com.vinculaup.bff_web.service.KeycloakAdminService keycloakAdmin;
+    private final com.vinculaup.bff_web.service.FotoStorage fotoStorage;
 
-    public ApiController(BackendGateway gateway, com.vinculaup.bff_web.service.KeycloakAdminService keycloakAdmin) {
+    public ApiController(BackendGateway gateway, com.vinculaup.bff_web.service.KeycloakAdminService keycloakAdmin,
+            com.vinculaup.bff_web.service.FotoStorage fotoStorage) {
         this.gateway = gateway;
         this.keycloakAdmin = keycloakAdmin;
+        this.fotoStorage = fotoStorage;
     }
 
     private JsonNode authenticatedUser() {
@@ -591,8 +596,63 @@ public class ApiController {
         } else if (!"CLIENTE".equals(role)) {
             throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "Rol no autorizado");
         }
-        return gateway.listarSolicitudes(userId(user), List.of(authenticatedSubject()),
-                "PROFESIONAL".equals(role) ? "RECIBIDAS" : "ENVIADAS", role);
+        return ocultarDireccionSiEstaPendiente(
+                gateway.listarSolicitudes(userId(user), List.of(authenticatedSubject()),
+                        "PROFESIONAL".equals(role) ? "RECIBIDAS" : "ENVIADAS", role),
+                role);
+    }
+
+    /**
+     * Le oculta al profesional la dirección exacta del cliente mientras la
+     * solicitud sigue pendiente.
+     * <p>
+     * El domicilio se revela recién cuando el profesional acepta: así puede decidir
+     * si le conviene sin conocer beforehand la calle exacta, y el vecino no expone
+     * su casa a un tercero que todavia se ocupo del turno.
+     * <p>
+     * En lugar de la dirección se devuelve la <b>zona</b> (barrio y localidad) y las
+     * coordenadas redondeadas a 2 decimales, que equivalen a una precisión de
+     * ~1,1 km: alcanzan para saber si la zona es conocida o si queda lejos, pero
+     * no para localizar una casa. Con 3 decimales el margen sería de ~110 m, que
+     * ya es demasiado cerca.
+     * <p>
+     * El cliente no pasa por acá: él siempre ve su propia dirección. Y a partir de
+     * ACEPTADA el profesional ve todo, porque ya se comprometió a ir.
+     */
+    private JsonNode ocultarDireccionSiEstaPendiente(JsonNode solicitudes, String role) {
+        if (!"PROFESIONAL".equals(role) || solicitudes == null || !solicitudes.isArray()) {
+            return solicitudes;
+        }
+        var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
+        var resultado = mapper.createArrayNode();
+        for (JsonNode solicitud : solicitudes) {
+            var copia = mapper.createObjectNode();
+            copia.setAll((tools.jackson.databind.node.ObjectNode) solicitud);
+
+            boolean pendiente = "PENDIENTE".equalsIgnoreCase(copia.path("estado").asText(""));
+            if (pendiente) {
+                String zona = copia.path("zonaAproximada").asText(null);
+                if (zona != null && !zona.isBlank()) {
+                    copia.put("direccionServicio", zona);
+                } else {
+                    // Sin zona calculada no se inventa nada: el frontend muestra que
+                    // la dirección exacta se ve al aceptar.
+                    copia.remove("direccionServicio");
+                }
+                redondearCoordenada(copia, "latitud");
+                redondearCoordenada(copia, "longitud");
+            }
+            resultado.add(copia);
+        }
+        return resultado;
+    }
+
+    /** Redondea a 2 decimales (~1,1 km) la coordenada indicada, si viene presente. */
+    private void redondearCoordenada(tools.jackson.databind.node.ObjectNode nodo, String campo) {
+        var valor = nodo.get(campo);
+        if (valor != null && valor.isNumber()) {
+            nodo.put(campo, Math.round(valor.asDouble() * 100.0) / 100.0);
+        }
     }
 
     /**
@@ -666,74 +726,34 @@ public class ApiController {
         return gateway.obtenerCalificacion(id);
     }
 
+    /**
+     * Sube una foto al almacenamiento y devuelve su URL pública.
+     * <p>
+     * Vive acá y no en cada microservicio para no duplicar el cliente de
+     * almacenamiento en dos servicios, y porque el BFF ya es quien valida
+     * sesión y rol. Los servicios de dominio solo reciben la URL: nunca ven el
+     * archivo.
+     */
+    @PostMapping("/fotos")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Map<String, Object> subirFoto(@RequestPart("archivo") MultipartFile archivo) {
+        authenticatedUser();
+        var subida = fotoStorage.subir(archivo);
+        return Map.of("url", subida.url(), "key", subida.key());
+    }
+
+    /**
+     * Geocodifica una direccion delegando en ms-solicitudes.
+     * <p>
+     * La implementacion de Nominatim vive una sola vez, en el
+     * {@code GeocodingClient} de ms-solicitudes: antes estaba duplicada (68
+     * lineas aca con un timeout de 8s y otra en el microservicio con 5s), sin
+     * cache y sin rate limiting. Proxiar ademas aprovecha la cache del cliente.
+     * <p>
+     * La ruta publica no cambia, asi que el frontend no se entera.
+     */
     @GetMapping("/gps")
     public Map<String, Object> obtenerUbicacionGps(@RequestParam(required = false, defaultValue = "") String direccion) {
-        String normalizedAddress = direccion == null || direccion.isBlank() ? "" : direccion.trim();
-        Map<String, Object> response = new HashMap<>();
-        response.put("address", normalizedAddress);
-        response.put("resolved", false);
-        response.put("latitude", null);
-        response.put("longitude", null);
-        response.put("latitud", null);
-        response.put("longitud", null);
-
-        if (normalizedAddress.isEmpty()) {
-            response.put("source", "empty-query");
-            response.put("error", "Dirección vacía. Escribí una calle, altura y ciudad.");
-            return response;
-        }
-
-        Exception captured = null;
-        Integer statusReceived = null;
-        try {
-            String encoded = java.net.URLEncoder.encode(normalizedAddress, java.nio.charset.StandardCharsets.UTF_8);
-            String urlStr = "https://nominatim.openstreetmap.org/search?q=" + encoded + "&format=json&limit=1&accept-language=es&addressdetails=1";
-            java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()
-                    .connectTimeout(java.time.Duration.ofSeconds(6))
-                    .build();
-            java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
-                    .uri(java.net.URI.create(urlStr))
-                    .header("User-Agent", "VinculaUP-App/1.0 (contacto@vincula-up.local)")
-                    .header("Referer", "https://vincula-up.local/")
-                    .timeout(java.time.Duration.ofSeconds(8))
-                    .GET()
-                    .build();
-            java.net.http.HttpResponse<String> httpResponse = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
-            statusReceived = httpResponse.statusCode();
-            if (statusReceived == 200) {
-                tools.jackson.databind.ObjectMapper mapper = new tools.jackson.databind.ObjectMapper();
-                tools.jackson.databind.JsonNode root = mapper.readTree(httpResponse.body());
-                if (root.isArray() && !root.isEmpty()) {
-                    tools.jackson.databind.JsonNode first = root.get(0);
-                    double lat = first.path("lat").asDouble(Double.NaN);
-                    double lon = first.path("lon").asDouble(Double.NaN);
-                    if (!Double.isNaN(lat) && !Double.isNaN(lon)) {
-                        String displayName = first.path("display_name").asText(normalizedAddress);
-                        response.put("address", displayName);
-                        response.put("latitude", lat);
-                        response.put("longitude", lon);
-                        response.put("latitud", lat);
-                        response.put("longitud", lon);
-                        response.put("source", "nominatim-osm");
-                        response.put("resolved", true);
-                        response.remove("error");
-                        return response;
-                    }
-                }
-                response.put("source", "nominatim-empty");
-                response.put("error", "Nominatim no encontró resultados para esa dirección. Intentá agregar altura o localidad.");
-                return response;
-            }
-        } catch (Exception e) {
-            captured = e;
-        }
-
-        response.put("source", captured != null ? "nominatim-error" : "nominatim-status-" + statusReceived);
-        String detail = captured != null
-                ? (captured.getMessage() == null ? captured.getClass().getSimpleName() : captured.getMessage())
-                : (statusReceived != null ? "HTTP " + statusReceived : "desconocido");
-        response.put("error", "No se pudo consultar la dirección (" + detail
-                + "). Probá de nuevo, usá el mapa interactivo o agregá localidad.");
-        return response;
+        return gateway.geocodificar(direccion);
     }
 }

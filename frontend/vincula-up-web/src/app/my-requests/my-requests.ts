@@ -315,6 +315,15 @@ export class MyRequests {
     return this.auth.hasRole('PROFESIONAL');
   }
 
+  /**
+   * Mientras la solicitud está pendiente, el profesional ve la zona y no la
+   * dirección exacta: el backend reemplaza el campo antes de que llegue acá.
+   * El cliente también la ve siempre, pero no se le antepone la etiqueta de zona.
+   */
+  isPending(request: ServiceRequest): boolean {
+    return request.status === 'PENDIENTE';
+  }
+
   isClient(): boolean {
     return this.auth.hasRole('CLIENTE');
   }

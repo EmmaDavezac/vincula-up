@@ -25,7 +25,8 @@
 7. [Modelo de datos](#7-modelo-de-datos)
 8. [Autenticación y autorización](#8-autenticación-y-autorización)
 9. [Los tres flujos completos](#9-los-tres-flujos-completos)
-10. [Geolocalización](#10-geolocalización)
+10. [Ubicaciones: geocodificación, cifrado y fotos](#10-ubicaciones-geocodificación-cifrado-y-fotos)
+    - [10.1 Geocodificación](#101-geocodificación) · [10.2 Cifrado de ubicaciones](#102-cifrado-de-ubicaciones) · [10.3 Almacenamiento de fotos](#103-almacenamiento-de-fotos-minio) · [10.4 Privacidad de la dirección](#104-privacidad-de-la-dirección-del-cliente)
 11. [Variables de entorno](#11-variables-de-entorno)
 12. [Datos de arranque](#12-datos-de-arranque)
 13. [Infraestructura: pgAdmin, TLS, Nginx](#13-infraestructura-pgadmin-tls-nginx)
@@ -148,6 +149,7 @@ el BFF (`backend/bff-web`), que cumple cuatro funciones:
 | `keycloak` | 8080 | Sí |
 | `postgres` | 5432 | Sí |
 | `pgadmin` | 5050 | Sí |
+| `minio` | 9000 (API) · 9001 (consola) | Solo con `STORAGE_TIPO=s3` (comentado en el compose) |
 | `bff-web` | 9001 | Sí |
 | `ms-usuarios` | 8081 | Solo `127.0.0.1` |
 | `ms-profesionales` | 8082 | Solo `127.0.0.1` |
@@ -235,7 +237,8 @@ RxJS para el estado de los componentes. El testing corre sobre
 │
 ├── keycloak/import/               Realm `vincula-up` (JSON de importación)
 ├── nginx/                         Config + certificados TLS
-└── scripts/                       Bootstrap, smoke test, CA, start local
+└── scripts/                       Bootstrap, CA, certificados, start local
+                                   (cada uno en .sh y .ps1, salvo start-local)
 ```
 
 > **Nota sobre el prototipo.** La maqueta original de diseño se construyó en
@@ -326,6 +329,7 @@ familias. La columna **Rol** refleja la regla real de `SecurityConfig.java`;
 
 | Método | Ruta | Rol | Descripción |
 |---|---|---|---|
+| POST | `/api/fotos` | Autenticado | Sube una foto al almacenamiento de objetos, devuelve la URL pública |
 | GET | `/api/gps` | — | Geocodificación de una dirección |
 | GET | `/actuator/health` | — | Health check (sin prefijo `/api`) |
 
@@ -347,7 +351,7 @@ son `UUID` en todas partes.
 | `apellido` | String | `family_name` del token |
 | `email` | String | Único, es la identidad de acceso |
 | `telefono` | String | Opcional |
-| `fotoUrl` | String, `text` | Data URL en base64 (hasta ~2,7 MB) |
+| `fotoUrl` | String, 512 | URL pública de la foto, servida por el almacenamiento de objetos. **El archivo no vive en la base** |
 | `rolNegocio` | Enum | `CLIENTE` · `PROFESIONAL` · `ADMIN` |
 | `estado` | Enum | `ACTIVO` · `SUSPENDIDO` |
 | `fechaAlta` | OffsetDateTime | |
@@ -360,8 +364,8 @@ son `UUID` en todas partes.
 | `usuarioId` | UUID | Referencia al `Usuario.id` (no hay FK: microservicio independiente) |
 | `legajo` | String | Identificador del padrón, p. ej. `P-2001`. Único |
 | `fotoUrl` | String, `text` | Data URL base64 |
-| `zonaCoberturaLat` | Double | Centro de la zona de cobertura |
-| `zonaCoberturaLng` | Double | |
+| `zonaCoberturaLat` | Texto cifrado | Centro de la zona de cobertura (AES-256-GCM) |
+| `zonaCoberturaLng` | Texto cifrado | |
 | `radioKm` | Double | Radio en kilómetros |
 | `estado` | Enum | `CARGADO` · `ACTIVO` · `SUSPENDIDO` |
 | `fechaCarga` | OffsetDateTime | Alta en el padrón |
@@ -377,15 +381,19 @@ son `UUID` en todas partes.
 
 ### 7.4 `ms-solicitudes` — Solicitud
 
+> Las coordenadas se guardan **cifradas**: las columnas `latitud` y `longitud`
+> almacenan texto cifrado, no el número. Ver [§10.2](#102-cifrado-de-ubicaciones).
+
 | Campo | Tipo | Notas |
 |---|---|---|
 | `id` | UUID | PK |
 | `clienteId` | UUID | Quién pide el turno |
 | `profesionalId` | UUID | Quién lo atiende |
 | `especialidadId` | UUID | Categoría elegida |
-| `direccionServicio` | String | **Se comparte con el profesional solo al aceptar** |
+| `direccionServicio` | String | Dirección del domicilio. **No se envía al profesional hasta que acepta** (ver §10.4) |
+| `zonaAproximada` | String | Barrio y localidad. Es lo que ve el profesional mientras la solicitud está pendiente |
 | `descripcion` | String | Mínimo 20 caracteres, obligatorio |
-| `latitud` / `longitud` | Double | Punto del servicio (geocodificado) |
+| `latitud` / `longitud` | Texto cifrado | Punto del servicio. Se guarda cifrado (AES-256-GCM) |
 | `fechaHoraPropuesta` | LocalDateTime | Turno pedido |
 | `fechaHoraFinPropuesta` | LocalDateTime | Fin estimado |
 | `estado` | Enum | `PENDIENTE` · `ACEPTADA` · `RECHAZADA` · `COMPLETADA` · `CANCELADA` · `VENCIDA` |
@@ -527,7 +535,8 @@ este camino.
 
 > **El realm se importa solo la primera vez.** Como Keycloak persiste en
 > Postgres, los cambios posteriores al JSON no se aplican solos: hay que correr
-> `scripts/keycloak-bootstrap.sh` (ver [§14](#14-scripts-operativos)).
+> `scripts/keycloak-bootstrap.sh` (o `.ps1` en Windows) — ver
+> [§14](#14-scripts-operativos).
 
 ---
 
@@ -600,11 +609,18 @@ sigue siendo pública, que es lo que garantiza que el cliente pueda buscar.
 
 
 
-## 10. Geolocalización
+## 10. Ubicaciones: geocodificación, cifrado y fotos
 
-`GET /api/gps?direccion=...` es público y delega en
-**Nominatim (OpenStreetMap)**. La implementación vive en
-`ApiController.obtenerUbicacionGps()` (`ApiController.java:669`).
+### 10.1 Geocodificación
+
+`GET /api/gps?direccion=...` es público y consulta **Nominatim (OpenStreetMap)**.
+
+**Hay una sola implementación**, en el `GeocodingClient` de `ms-solicitudes`.
+El BFF expone el endpoint público y proxea a `GET /solicitudes/geocodificar`
+mediante `BackendGateway.geocodificar()`. Antes había dos copias —68 líneas en
+el controlador del BFF con timeout de 8 s y otra en el microservicio con 5 s— sin
+caché ni rate limiting. La ruta pública no cambió, así que el frontend no se
+enteró de nada.
 
 **Respuesta** (siempre 200, con campos duplicados por compatibilidad):
 
@@ -614,22 +630,140 @@ sigue siendo pública, que es lo que garantiza que el cliente pueda buscar.
 | `latitude` / `longitude` | Coordenadas (null si no se resolvió) |
 | `latitud` / `longitud` | Alias del mismo valor |
 | `address` | Dirección normalizada que devuelve Nominatim |
-| `source` | `nominatim-osm` · `nominatim-empty` · `empty-query` · `fallback` |
+| `source` | `nominatim-osm` · `nominatim-empty` · `empty-query` · `nominatim-error` · `nominatim-parse` · `servicio-no-disponible` |
 | `error` | Mensaje legible, solo si no se resolvió |
 
-**Degradación:** ante timeout (8 s), error de red o respuesta vacía, el endpoint
-devuelve `resolved: false` con un mensaje y **no lanza excepción**. El cliente
-sigue pudiendo enviar la solicitud y el profesional la ve sin coordenadas.
+**Caché en memoria con TTL de 10 minutos**, LRU acotada a 500 direcciones. Solo
+se cachean los aciertos: un fallo por red puede ser transitorio y no conviene
+repetirlo durante 10 minutos. El frontend geocodifica mientras la persona escribe
+y vuelve a pedir la misma dirección al elegir el punto del mapa, así que la caché
+evita consultas repetidas contra un proveedor que limita a 1 req/s.
 
-Consideraciones operativas:
+**Degradación en dos capas.** Si Nominatim falla, `ms-solicitudes` devuelve
+`resolved: false` con un mensaje. Si además `ms-solicitudes` no responde, el BFF
+devuelve lo mismo con `source: servicio-no-disponible` en vez de cortar con 502:
+una falla del backend de solicitudes no debe dejar sin geocodificar a toda la
+app. En ninguno de los dos casos se lanza excepción.
 
-- Se manda `User-Agent` y `Referer` propios: la política de uso de Nominatim exige
-  identificarse y limita las consultas sin identificación.
-- Es una dependencia externa sin caché: cada búsqueda es una llamada a la red
-  pública. En una demo con pocos usuarios no es problema; con tráfico real
-  habría que cachear por dirección y respetar el rate limit (1 req/s).
+### 10.2 Cifrado de ubicaciones
+
+Las coordenadas se cifran **en reposo** con **AES-256-GCM**, en la capa de
+aplicación (no es cifrado de disco de Postgres). Afecta a:
+
+| Servicio | Columnas |
+|---|---|
+| `ms-solicitudes` | `solicitudes.latitud`, `solicitudes.longitud` — ubicación del domicilio del cliente |
+| `ms-profesionales` | `profesionales.zona_cobertura_lat`, `profesionales.zona_cobertura_lng` |
+
+**Cómo funciona.** `CifradorUbicaciones` cifra al escribir y descifra al leer, de
+forma transparente para services, DTOs y tests. Como las entidades no son beans de
+Spring, el cifrado se inyecta con un holder estático que el propio `CifradorUbicaciones`
+registra en un `@PostConstruct`. El resultado es `base64(iv || cifrado)`, con el
+IV aleatorio de 12 bytes al principio: dos coordenadas iguales producen textos
+distintos, así que no se puede deducir que dos vecinos están en el mismo punto.
+
+**Configuración.** Clave de 32 bytes en Base64 en `UBICACIONES_CLAVE`, **compartida
+por los dos servicios** (si difieren, cada uno descifra lo que el otro cifró):
+
+```bash
+openssl rand -base64 32    # genera una
+```
+
+Sin la variable los servicios arrancan igual y registran un aviso, guardando en
+claro: preferible eso a no dejar trabajar en desarrollo.
+
+**Qué protege y qué no.** Un dump de la base no expone ubicaciones. **No** protege
+contra un usuario con sesión que ve las coordenadas por la API, porque la API las
+devuelve descifradas: es lo que permite que el orden por cercanía se calcule en el
+navegador.
+
+**Consecuencia a tener en cuenta.** Las columnas cifradas no admiten consultas
+espaciales: no hay `WHERE latitud BETWEEN ...` ni orden por cercanía en SQL. Hoy
+eso no rompe nada porque el radio de cobertura se persiste pero no se usa para
+filtrar, y la distancia se calcula en el cliente. Si alguna vez hace falta
+filtrar por distancia en SQL, hay que agregar una columna en claro deliberada.
+
+**Compatibilidad.** Si el texto guardado no es un ciphertext válido —por ejemplo,
+un valor en claro de una base anterior— se interpreta como número en lugar de
+fallar.
 
 ---
+
+### 10.3 Almacenamiento de fotos
+
+Las fotos **no se guardan en PostgreSQL**: viven fuera de la base y ahí solo se conserva la URL.
+
+**Flujo completo:**
+
+```
+1. El usuario elige una imagen → previsualización local (data URL, no se envía)
+2. El frontend sube el archivo con POST /api/fotos (multipart/form-data)
+3. El BFF valida tipo y tamaño, lo sube al bucket y devuelve { url, key }
+4. El frontend manda esa URL a /api/profesionales/activar o /api/usuarios/yo
+5. El microservicio guarda la URL (512 caracteres)
+```
+
+**Por qué el BFF y no cada microservicio:** evita duplicar el cliente de
+almacenamiento en dos servicios, y el BFF ya es quien valida sesión y rol. Los
+servicios de dominio solo reciben la URL: nunca ven el archivo.
+
+**Dos implementaciones detrás de la misma interfaz (`FotoStorage`), elegidas con
+`STORAGE_TIPO`:**
+
+| Tipo | Dónde viven las fotos | Cuándo usarlo |
+|---|---|---|
+| `local` (default) | Volumen Docker `fotos_data`, que nginx sirve en `/fotos/` | Desarrollo y demo: no depende de ningún servicio extra |
+| `s3` | Bucket compatible con S3 (MinIO o Cloudflare R2) | Cuando haya un bucket disponible: sobrevive a que se borre el contenedor |
+
+Con `local` el BFF escribe en `STORAGE_LOCAL_DIR` (`/data/fotos`) y devuelve una
+URL relativa a `/fotos/`, que es donde nginx monta el mismo volumen. Las fotos
+quedan disponibles aunque el contenedor se recree, porque viven en el volumen.
+
+Con `s3` el bucket sirve las URLs directamente y el endpoint de lectura del BFF
+no interviene. La URL es absoluta.
+
+**Por qué existe la alternativa S3.** La API de MinIO y R2 es la misma, así que
+`FotoStorageS3` sirve para las dos: migrar a Cloudflare R2 es cambiar
+`STORAGE_TIPO=s3`, `STORAGE_ENDPOINT` y las credenciales, sin tocar código. Queda
+implementada y lista, aunque hoy el stack arranque con `local` porque la imagen
+de MinIO no se puede descargar en la red actual.
+
+**Límites (comunes a los dos):** 2 MB por imagen (`STORAGE_MAX_BYTES`) y solo
+JPEG, PNG o WebP — SVG queda excluido a propósito, porque es XML ejecutable. Las
+claves se generan con `UUID` y usan el prefijo `perfiles/`: usar el nombre
+original permitiría colisiones y rutas manipulables con `../`. `nginx` sube
+`client_max_body_size` a 3 m: ya no necesita el margen que exigía el base64.
+
+**Eliminación de datos:** las fotos que estaban en base 64 en versiones previas se
+descartaron. El esquema se recrea limpio con `docker compose down -v`; no hay
+migración de datos.
+
+### 10.4 Privacidad de la dirección del cliente
+
+El domicilio del cliente **no se le muestra al profesional hasta que acepta el turno**.
+
+| Estado | Cliente | Profesional | Admin |
+|---|---|---|---|
+| `PENDIENTE` | Su dirección completa | **Zona** (barrio y localidad) + punto redondeado a ~1,1 km | Todo (panel) |
+| `ACEPTADA` en adelante | Su dirección completa | Dirección completa y coordenadas exactas | Todo |
+
+**Por qué la zona y no nada.** El profesional necesita poder decidir: si el trabajo le queda muy lejos o si la zona le resulta insegura, son motivos reales para rechazar. Ocultarle todo lo obligaría a aceptar a ciegas, y en la práctica terminaría preguntando por la dirección igual.
+
+**Cómo se calcula la zona.** Se reutiliza el geocodificado que ya se hace al crear la solicitud: `GeocodingClient.extraerZona()` toma el `display_name` que devuelve Nominatim (`"Urquiza 1234, Barrio Norte, Concepción del Uruguay"`), descarta el primer segmento —la vía con su altura— y se queda con los dos siguientes. Es una función pura de strings: **no agrega ninguna llamada de red**. Cuando el cliente elige el punto en el mapa y manda coordenadas en vez de escribir la dirección, no hay `display_name` del cual extraerla, así que se hace **una** consulta inversa al proveedor, que entra por la caché existente.
+
+**Las coordenadas se redondean a 2 decimales**, que equivalen a ~1,1 km de margen. Con 3 decimales el punto estaría a ~110 m, demasiado cerca para llamarlo aproximado. El mapa que ve el profesional usa esas coordenadas redondeadas, así que tampoco filtra el domicilio.
+
+**Dónde se aplica el filtro.** En el BFF, en `ocultarDireccionSiEstaPendiente()`: es el único que sabe quién está preguntando, porque `ms-solicitudes` recibe el `usuarioId` como parámetro y no valida la identidad. Al salir de `PENDIENTE` no se vuelve a ocultar, aunque el profesional termine rechazando: ya vio la dirección, volver a ocultarla no aportaría nada.
+
+**Lo que esto no cubre:**
+
+- La **descripción** que escribe el cliente es texto libre: si la persona escribe la dirección ahí, se ve. La prevención es aclarar en el formulario que describa el problema, no la ubicación.
+- `ms-solicitudes` sigue devolviendo la dirección exacta a quien le pregunte: el filtrado vive en el BFF. Los microservicios están publicados solo en `127.0.0.1` y sin autenticación, así que el alcance es un acceso local.
+- Las coordenadas siguen **cifradas en reposo** en la base: el cifrado no cambia, lo que cambia es que la API devuelve un punto redondeado.
+
+---
+
+
 
 ## 11. Variables de entorno
 
@@ -681,8 +815,34 @@ Se leen del archivo `.env` en la raíz (ignorado por git). Copiar
 > `docker-compose.yml` declara `KC_SMTP_*` mapeados desde `KEYCLOAK_SMTP_*`.
 > Si se edita el `.env` hay que recrear el contenedor:
 > `docker compose up -d --force-recreate keycloak`. El
-> `keycloak-bootstrap.sh` también aplica el SMTP por `kcadm`, y carga el `.env`
-> automáticamente.
+> `keycloak-bootstrap.sh` (o `.ps1`) también aplica el SMTP por `kcadm`, y carga
+> el `.env` automáticamente.
+
+### Almacenamiento de fotos
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `STORAGE_TIPO` | `local` | `local` (volumen en disco) o `s3` (MinIO / Cloudflare R2) |
+| `STORAGE_LOCAL_DIR` | `/data/fotos` | Solo con `local`: directorio donde escribe el BFF |
+| `STORAGE_PUBLIC_URL` | `/fotos` | Base de las URLs. Con `local` es la ruta que sirve nginx; con `s3`, la URL pública del bucket |
+| `STORAGE_PREFIX` | `perfiles` | Prefijo de la clave dentro del almacenamiento |
+| `STORAGE_MAX_BYTES` | `2097152` | Máximo por imagen (2 MB) |
+
+Solo con `STORAGE_TIPO=s3`: `STORAGE_ENDPOINT`, `STORAGE_ACCESS_KEY`,
+`STORAGE_SECRET_KEY`, `STORAGE_BUCKET` (y `MINIO_ROOT_USER` /
+`MINIO_ROOT_PASSWORD` si se autohospeda MinIO).
+
+Para migrar a Cloudflare R2: `STORAGE_TIPO=s3` y
+`STORAGE_ENDPOINT=https://<account>.r2.cloudflarestorage.com` con las
+credenciales de la cuenta. El código no cambia.
+
+### Cifrado de ubicaciones
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `UBICACIONES_CLAVE` | (vacío) | Clave AES-256 de 32 bytes en Base64. **Debe ser la misma en `ms-solicitudes` y `ms-profesionales`.** Vacía = se guarda sin cifrar, con aviso en el log |
+
+Generar con `openssl rand -base64 32`.
 
 ### pgAdmin
 
@@ -739,7 +899,7 @@ Servicio activo en el stack, publicado en `http://localhost:5050`.
 
 | Campo | Valor |
 |---|---|
-| Email | `admin@vincula-up.local` (o `PGADMIN_DEFAULT_EMAIL`) |
+| Email | `admin@vincula-up.com` (o `PGADMIN_DEFAULT_EMAIL`) |
 | Contraseña | `admin` (o `PGADMIN_DEFAULT_PASSWORD`) |
 | Servidor de BD | host `postgres`, puerto `5432`, base `vinculaup` |
 | Usuario / contraseña BD | `postgres` / `postgres` |
@@ -754,49 +914,46 @@ El repositorio incluye una CA y un certificado de servidor en `nginx/certs/`.
 Los navegadores modernos exigen **dos certificados separados**, y hay que
 importar la **CA** en el navegador, nunca el certificado de servidor.
 
-Para regenerarlos hace falta una CA y un servidor firmado por ella:
+> ⚠️ Es una **CA de desarrollo auto-firmada**, válida hasta diciembre de 2028.
+> No sirve para producción: si el repositorio fuera público, cualquiera con la
+> clave podría suplantar `vincula-up.local` para todos los que la instalen.
+
+**Renovarlos** (hay scripts para ambos sistemas operativos):
 
 ```bash
-cd nginx/certs
+# Linux
+bash scripts/generate-certs.sh
 
-# 1. CA (esta se importa en el navegador)
-openssl genrsa -out ca.key 2048
-openssl req -x509 -new -nodes -key ca.key -sha256 -days 825 \
-  -out ca.crt -subj "/CN=VinculaUP-CA" \
-  -addext "basicConstraints=critical,CA:TRUE" \
-  -addext "keyUsage=critical,keyCertSign,cRLSign"
-
-# 2. Clave y CSR del servidor
-openssl genrsa -out server.key 2048
-openssl req -new -key server.key -out server.csr -subj "/CN=vincula-up.local"
-
-# 3. Firmar el certificado del servidor con la CA
-cat > /tmp/server-ext.cnf << 'EOF'
-[ext]
-subjectAltName=DNS:vincula-up.local,IP:127.0.0.1
-basicConstraints=CA:FALSE
-keyUsage=critical,digitalSignature,keyEncipherment
-extendedKeyUsage=serverAuth
-EOF
-
-openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key \
-  -CAcreateserial -out server.crt -days 825 -sha256 \
-  -extfile /tmp/server-ext.cnf -extensions ext
+# Windows
+powershell -ExecutionPolicy Bypass -File .\scripts\generate-certs.ps1
 ```
+
+Después hay que **reimportar la CA nueva** en los navegadores, eliminando antes
+la anterior (`VinculaUP-CA`) de los almacenes de confianza.
 
 **Importar la CA:**
 
-- **Script automático:** `bash scripts/import-ca-firefox.sh` (instala en el
-  store del sistema y en la base NSS de Firefox).
-- **Firefox:** Configuración → Privacidad y Seguridad → Ver Certificados →
-  Autoridades → Importar → `nginx/certs/ca.crt` → marcar *Confiar en esta CA*.
-- **Chrome/Chromium en Linux:**
-  `certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "VinculaUP-CA" -i nginx/certs/ca.crt`
+- **Script automático:** `bash scripts/import-ca.sh` (Linux) o
+  `powershell -ExecutionPolicy Bypass -File .\scripts\import-ca.ps1` (Windows).
+  Ambos instalan en el store del sistema **y** en la base NSS de Firefox.
+- **Firefox** (cualquier SO — tiene su propio almacén, no usa el del sistema):
+  Configuración → Privacidad y Seguridad → Ver Certificados → Autoridades →
+  Importar → `nginx/certs/ca.crt` → marcar *Confiar en esta CA*.
+- **Chrome/Chromium/Edge en Linux** (usan el store del sistema):
+  `sudo cp nginx/certs/ca.crt /usr/local/share/ca-certificates/vinculaup-ca.crt && sudo update-ca-certificates`
+- **Chrome/Chromium/Edge en Windows** (usan el store de Windows):
+  `certutil -addstore -f Root .\nginx\certs\ca.crt`
 
 Además hace falta resolver el dominio local:
 
 ```bash
+# Linux
 echo "127.0.0.1 vincula-up.local" | sudo tee -a /etc/hosts
+```
+
+```powershell
+# Windows (PowerShell como Administrador)
+Add-Content -Path "$env:SystemRoot\System32\drivers\etc\hosts" -Value "127.0.0.1 vincula-up.local"
 ```
 
 ### 13.3 Nginx
@@ -830,9 +987,17 @@ alpine compila Angular y solo el resultado se copia a la imagen final.
 
 ## 14. Scripts operativos
 
-Todos en `scripts/`.
+Todos en `scripts/`. Cada uno tiene versión **Linux/macOS** (`.sh`) y **Windows**
+(`.ps1`) con el mismo comportamiento.
 
-### 14.1 `keycloak-bootstrap.sh`
+| Script | SO | Para qué |
+|---|---|---|
+| `keycloak-bootstrap.sh` / `.ps1` | ambos | **Obligatorio** tras el primer arranque |
+| `import-ca.sh` / `.ps1` | ambos | Confiar la CA en los navegadores |
+| `generate-certs.sh` / `.ps1` | ambos | Regenerar la CA y el certificado |
+| `start-local.ps1` | Windows | Desarrollo sin Docker |
+
+### 14.1 `keycloak-bootstrap` (`.sh` / `.ps1`)
 
 Aplica la configuración del realm sobre una **instalación ya existente**, de
 forma idempotente, vía `kcadm.sh` por `docker exec`. Sin borrar usuarios ni datos.
@@ -840,39 +1005,50 @@ forma idempotente, vía `kcadm.sh` por `docker exec`. Sin borrar usuarios ni dat
 Es necesario porque `start-dev --import-realm` importa el realm **solo la
 primera vez**: como Keycloak persiste en Postgres, los cambios posteriores al
 JSON (auto-registro, rol por defecto, client de servicio, SMTP) no se aplican
-solos.
+solos. **Sin él, el registro de usuarios no funciona.**
 
 ```bash
-./scripts/keycloak-bootstrap.sh
+./scripts/keycloak-bootstrap.sh                              # Linux / macOS
+powershell -ExecutionPolicy Bypass -File .\scripts\keycloak-bootstrap.ps1   # Windows
 ```
 
 Qué aplica: auto-registro de clientes · rol `CLIENTE` por defecto · client de
 servicio `vincula-up-admin` con sus permisos (`manage-users`, `view-users`,
 `query-users`, `view-realm`) · configuración SMTP.
 
-Carga el `.env` de la raíz automáticamente (`set -a` + `source`), y funciona sin
-él usando defaults. Requiere el servicio `keycloak` levantado.
+Carga el `.env` de la raíz automáticamente (`set -a` + `source` en bash;
+parseo línea por línea en PowerShell) y funciona sin él usando defaults.
+Requiere el servicio `keycloak` levantado.
 
-### 14.2 `smoke-test.sh`
+### 14.2 `import-ca` (`.sh` / `.ps1`)
 
-Verificación end-to-end contra el stack levantado. Recorre el circuito completo
-con los tres usuarios de prueba: pide tokens, valida los endpoints públicos
-(`/api/profesionales`, `/api/gps`), comprueba el RBAC (un cliente no debe poder
-leer `/api/usuarios`), y ejerce el ciclo de una solicitud: aceptar → mensaje →
-completar → calificar.
+Instala `nginx/certs/ca.crt` en los dos almacenes de confianza que existen:
 
-```bash
-./scripts/smoke-test.sh
-```
-
-### 14.3 `import-ca-firefox.sh`
-
-Instala la CA de `nginx/certs/ca.crt` en el store del sistema y en la base NSS
-de Firefox:
+- el **store del sistema** → Chromium, Chrome, Edge (y `curl`, Node, la JVM);
+- la **base NSS de Firefox** → que ignora el store del sistema.
 
 ```bash
-bash scripts/import-ca-firefox.sh
+bash scripts/import-ca.sh                                    # Linux / macOS
+powershell -ExecutionPolicy Bypass -File .\scripts\import-ca.ps1   # Windows
 ```
+
+La versión de Windows instala en `CurrentUser\Root` (no requiere elevación) y
+acepta `-Machine` para el almacén local de la máquina. Ver [§13.2](#132-tls) para
+el detalle por navegador.
+
+### 14.3 `generate-certs` (`.sh` / `.ps1`)
+
+Regenera la CA y el certificado del servidor, que hoy vencen en diciembre de
+2028. Emite el certificado con `subjectAltName` para `vincula-up.local`,
+`localhost` y `127.0.0.1`, sin el cual los navegadores modernos lo rechazan.
+
+```bash
+bash scripts/generate-certs.sh                                  # Linux / macOS
+powershell -ExecutionPolicy Bypass -File .\scripts\generate-certs.ps1   # Windows
+```
+
+Pide confirmación antes de sobrescribir y borra los intermedios (`server.csr`,
+`ca.srl`). Tras regenerar hay que **reimportar la CA** (§14.2).
 
 ### 14.4 `start-local.ps1`
 
@@ -886,19 +1062,25 @@ El frontend se levanta aparte con `npm start` en otra terminal.
 
 ## 15. Estado real del MVP
 
-Estado verificado ejecutando la suite de tests el 2026-09-28.
+Estado verificado durante el desarrollo el 2026-09-28.
 
 ### 15.1 Verificación
 
 | Componente | Resultado |
 |---|---|
 | `ms-usuarios` | 11 tests, 0 fallos |
-| `ms-profesionales` | 5 tests, 0 fallos |
-| `ms-solicitudes` | 25 tests, 0 fallos |
-| `bff-web` | 25 tests, 0 fallos |
-| **Backend** | **66 tests, 0 fallos** |
-| **Frontend** | **162 tests pasan, 5 skipped** (20 archivos) |
+| `ms-profesionales` | 13 tests, 0 fallos (incluye 8 del cifrado) |
+| `ms-solicitudes` | 34 tests, 0 fallos (incluye 9 de geocodificación y zona) |
+| `bff-web` | 30 tests, 0 fallos (incluye 5 de privacidad de la dirección) |
+| **Backend** | **88 tests, 0 fallos** |
+| **Frontend** | **165 tests pasan, 5 skipped** (20 archivos) |
 | Build de producción Angular | OK, 384 kB |
+
+> ℹ️ **Esta suite se retiró del repositorio** antes de la entrega: la escritura y la
+> ejecución de los tests quedan a cargo del área de QA previa al despliegue. Lo
+> que sí permanece en el repo es el **andamiaje** para recibirlos sin cambios:
+> las dependencias `<scope>test</scope>` en los cuatro `pom.xml`, el target
+> `test` de `angular.json` y `tsconfig.spec.json`. Ver [README §Tests](README.md#tests).
 
 ### 15.2 Qué está completo
 
@@ -914,8 +1096,8 @@ Estado verificado ejecutando la suite de tests el 2026-09-28.
 | Brecha | Detalle |
 |---|---|
 | **Sin CI** | No hay `.github/`. Nada corre los tests automáticamente |
-| **Sin tests de integración reales** | Los tests del BFF usan `@MockitoBean` sobre H2: no se ejercita la cadena completa con Postgres y Keycloak reales. El `smoke-test.sh` cubre ese hueco, pero es manual |
-| **Cobertura backend asimétrica** | `ms-profesionales` tiene 5 tests frente a 5 clases de servicio; `SolicitudService` tiene 15. Faltan casos de borde |
+| **Sin tests de integración reales** | Los tests del BFF usan `@MockitoBean` sobre H2: no se ejercita la cadena completa con Postgres y Keycloak reales. La cobertura de esa cadena queda para la validación de QA previa al despliegue |
+| **Cobertura backend asimétrica** | `ProfesionalService` tiene 4 tests; `SolicitudService` tiene 15. Faltan casos de borde |
 
 ---
 
@@ -937,10 +1119,10 @@ demo, pero conviene tenerlos fichados.
 
 | # | Deuda | Impacto |
 |---|---|---|
-| 5 | **Sin caché en geocodificación** | Cada búsqueda de dirección es una llamada a Nominatim. Rate limit de 1 req/s |
+| 5 | **Sin caché en geocodificación** | Resuelto: `GeocodingClient` ahora cachea 10 min con LRU |
 | 6 | **H2 por defecto en desarrollo** | Sin `DATABASE_URL`, los datos se pierden al reiniciar y el comportamiento difiere de producción |
 | 7 | **Tests de integración incompletos** | El BFF se prueba con mocks. Un cambio en el contrato entre microservicios no lo detecta la suite |
-| 8 | **CORS con lista de orígenes fija** | `SecurityConfig.java:106-109` enumera los orígenes. Agregar un dominio es tocar código |
+| 8 | **CORS con lista de orígenes fija** | `SecurityConfig.java` enumera los orígenes. Agregar un dominio es tocar código |
 | 9 | **`webOrigins: ["*"]`** en el realm | Permitido en demo; en producción conviene restringirlo |
 
 ### 16.3 Higiene del repositorio
@@ -953,6 +1135,11 @@ Resuelto el 2026-09-28:
 - ~~`out.html`~~ → fuera del índice y agregado a `.gitignore`.
 - ~~Documentación duplicada y contradictoria~~ → consolidada en este archivo y en `README.md`.
 - ~~Prototipo Next.js de v0~~ → eliminado del repositorio; sigue desplegado en https://v0-vincula-up.vercel.app/.
+
+- ~~La dirección se veía antes de tiempo~~ → resuelto: el profesional ve la zona y un punto redondeado mientras está pendiente; el domicilio se revela al aceptar (§10.4).
+- ~~Fotos en base 64~~ → resuelto: los archivos viven en MinIO y la base guarda solo la URL.
+- ~~Geocodificación duplicada~~ → resuelto: una sola implementación en `ms-solicitudes`, con caché.
+- ~~Coordenadas en claro~~ → resuelto: cifrado AES-256-GCM en reposo.
 
 Pendiente:
 
@@ -1015,28 +1202,15 @@ implementación Angular y la maqueta comparten el mismo vocabulario visual.
 *Fin de la especificación. Para el resumen operativo ver [`README.md`](README.md).*
 
 | **Sin E2E de frontend** | Los 162 tests prueban componentes con stubs, no contra el BFF andando |
-| **Nominatim sin caché** | Dependencia externa sin cachear ni rate limiting ([§10](#10-geolocalización)) |
-| **Fotos en base 64** | Se guardan como data URL en la columna de texto. Funciona para el MVP, no escala: ~2,7 MB por foto en fila |
+| **Chat sin refresco** | Los mensajes se cargan al abrir el chat; no hay WebSocket, SSE ni polling. El receptor no los ve sin reabrir |
+| **La descripción puede filtrar la dirección** | El cliente escribe texto libre; si pone la dirección ahí, el profesional la ve. Solo previevable desde el formulario |
+| **Sin notificaciones** | Nadie recibe un email al aceptar o rechazar un turno |
+| **Estado `VENCIDA` muerto** | Está en el enum pero nadie lo asigna, y no hay `@Scheduled` en el proyecto. Una solicitud abandonada queda `PENDIENTE` para siempre |
+| **`UBICACIONES_CLAVE` por definir** | Si falta, las coordenadas se guardan en claro (con aviso en el log). Hay que definirla antes de un despliegue real |
+| **Sin borrado de objetos huérfanos** | Si un usuario sube una foto y no completa el perfil, el archivo queda en el bucket sin referencia en la base |
 | **`JPA_DDL_AUTO=update`** | El esquema se deduce del modelo en cada arranque. Aceptable en demo; en producción hace falta Flyway o Liquibase |
-| **Keycloak en `start-dev`** | Sin optimizaciones de arranque ni Clustering. Suficiente para demo, no para producción |
+| **Keycloak en `start-dev`** | Sin optimizaciones de arranque ni clustering. Suficiente para demo, no para producción |
 | **Sin tests de la pantalla `/directorio`** | Quedó obsoleta (ver §9.3) |
-
-|---|---|---|
-| `ms-usuarios` | `ALTER COLUMN keycloak_id DROP NOT NULL` | Habilita invitaciones de profesionales (columna creada `NOT NULL` en bases viejas) |
-| `ms-usuarios` | `ALTER COLUMN foto_url TYPE text` | Las fotos en base64 (~2,7 MB) no caben en `varchar(255)` |
-| `ms-profesionales` | `ALTER COLUMN foto_url TYPE text` | Ídem para el padrón |
-
----
-
-| Variable | Default | Descripción |
-|---|---|---|
-| `PGADMIN_DEFAULT_EMAIL` | `admin@vincula-up.local` | Email de ingreso |
-| `PGADMIN_DEFAULT_PASSWORD` | `admin` | Contraseña de ingreso |
-
-### Variables internas (no se tocan normalmente)
-
-`PORT` por servicio, y `USUARIOS_URL` · `PROFESIONALES_URL` · `SOLICITUDES_URL`
-en el BFF, que apuntan a los nombres de servicio en la red de Docker.
 
 ---
 

@@ -25,6 +25,22 @@ public class Profesional {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    /**
+     * Cifrador de coordenadas. Las entidades no son beans de Spring, así que el
+     * cifrado se resuelve con un holder estático que el {@code CifradorUbicaciones}
+     * registra al arrancar. Si nunca se registrara, se guarda en claro: la
+     * aplicación sigue funcionando (útil en tests), pero el cifrado no aplica.
+     */
+    private static volatile com.vinculaup.ms_profesionales.config.CifradorUbicaciones CIFRADOR;
+
+    public static void registrarCifrador(com.vinculaup.ms_profesionales.config.CifradorUbicaciones cifrador) {
+        CIFRADOR = cifrador;
+    }
+
+    private static com.vinculaup.ms_profesionales.config.CifradorUbicaciones cifrador() {
+        return CIFRADOR;
+    }
+
     @Column(nullable = false, unique = true)
     private UUID usuarioId;
 
@@ -32,13 +48,16 @@ public class Profesional {
     private String legajo;
 
     /**
-     * Foto del perfil. Se guarda como data URL Base64, por lo que necesita TEXT
-     * (el varchar por defecto truncaría/fallaría con imagenes reales).
+     * URL pública de la foto del perfil, servida por el almacenamiento de objetos
+     * (MinIO). El archivo no vive en la base: acá solo queda la URL.
      */
-    @Column(columnDefinition = "text")
+    @Column(length = 512)
     private String fotoUrl;
-    private Double zonaCoberturaLat;
-    private Double zonaCoberturaLng;
+    /** Zona de cobertura cifrada en reposo. Ver {@code CifradorUbicaciones}. */
+    @Column(name = "zona_cobertura_lat", length = 512)
+    private String zonaCoberturaLatCifrada;
+    @Column(name = "zona_cobertura_lng", length = 512)
+    private String zonaCoberturaLngCifrada;
     private Double radioKm;
 
     @Enumerated(EnumType.STRING)
@@ -81,8 +100,33 @@ public class Profesional {
     public void setLegajo(String legajo) { this.legajo = legajo; }
     public String getLegajo() { return legajo; }
     public String getFotoUrl() { return fotoUrl; }
-    public Double getZonaCoberturaLat() { return zonaCoberturaLat; }
-    public Double getZonaCoberturaLng() { return zonaCoberturaLng; }
+
+    /**
+     * Devuelve la latitud descifrada. Toda la aplicación lee por acá, así que la
+     * API sigue exponiendo coordenadas normales: el cifrado es solo en reposo.
+     */
+    public Double getZonaCoberturaLat() {
+        return cifrador() == null ? leerComoNumero(zonaCoberturaLatCifrada) : cifrador().descifrar(zonaCoberturaLatCifrada);
+    }
+
+    public Double getZonaCoberturaLng() {
+        return cifrador() == null ? leerComoNumero(zonaCoberturaLngCifrada) : cifrador().descifrar(zonaCoberturaLngCifrada);
+    }
+
+    /** Texto tal como queda guardado: sirve para verificar el cifrado. */
+    public String getZonaCoberturaLatCifrada() { return zonaCoberturaLatCifrada; }
+    public String getZonaCoberturaLngCifrada() { return zonaCoberturaLngCifrada; }
+
+    private Double leerComoNumero(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return null;
+        }
+        try {
+            return Double.valueOf(valor.trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
     public Double getRadioKm() { return radioKm; }
     public EstadoProfesional getEstado() { return estado; }
     public OffsetDateTime getFechaCarga() { return fechaCarga; }
@@ -94,8 +138,9 @@ public class Profesional {
 
     public void activar(String fotoUrl, double lat, double lng, double radioKm) {
         this.fotoUrl = fotoUrl;
-        this.zonaCoberturaLat = lat;
-        this.zonaCoberturaLng = lng;
+        // Se cifra al escribir: lo que llega del request nunca toca la base en claro.
+        this.zonaCoberturaLatCifrada = cifrador() == null ? String.valueOf(lat) : cifrador().cifrar(lat);
+        this.zonaCoberturaLngCifrada = cifrador() == null ? String.valueOf(lng) : cifrador().cifrar(lng);
         this.radioKm = radioKm;
         this.estado = EstadoProfesional.ACTIVO;
         this.fechaActivacion = OffsetDateTime.now();

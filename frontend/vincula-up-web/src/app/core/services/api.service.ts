@@ -442,6 +442,23 @@ export class ApiService {
     return this.http.get<GpsPosition>(`${this.baseUrl}/gps`, { params, headers: this.authHeaders() });
   }
 
+  /**
+   * Sube una foto al almacenamiento de objetos y devuelve su URL pública.
+   * <p>
+   * Va como archivo binario, no como data URL en base64: la base multiplicaba
+   * el peso por ~1,3 y obligaba a agrandar el límite de body de nginx. En la
+   * base de datos queda solo la URL que devuelve el BFF.
+   */
+  uploadPhoto(file: File): Observable<{ url: string; key: string }> {
+    const form = new FormData();
+    form.append('archivo', file, file.name);
+    // Sin Content-Type explícito: el navegador debe poner el boundary del
+    // multipart. Forzarlo a application/json rompe el envío.
+    return this.http.post<{ url: string; key: string }>(`${this.baseUrl}/fotos`, form, {
+      headers: this.authHeaders(),
+    });
+  }
+
   getMessages(requestId: string, userId: string): Observable<unknown[]> {
     const params = new HttpParams().set('usuarioId', userId);
     return this.http.get<unknown[]>(`${this.baseUrl}/solicitudes/${requestId}/mensajes`, { params, headers: this.authHeaders() });

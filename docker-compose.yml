@@ -100,6 +100,7 @@ services:
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:-postgres}
       JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
+      UBICACIONES_CLAVE: ${UBICACIONES_CLAVE:-}
     ports:
       - "127.0.0.1:8082:8082"
     healthcheck:
@@ -125,6 +126,9 @@ services:
       JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
       PROFESIONALES_URL: http://ms-profesionales:8082
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
+      # Misma clave que en ms-profesionales: si difieren, cada servicio descifra
+      # lo que el otro cifró y las coordenadas quedan ilegibles.
+      UBICACIONES_CLAVE: ${UBICACIONES_CLAVE:-}
     ports:
       - "127.0.0.1:8083:8083"
     healthcheck:
@@ -161,7 +165,23 @@ services:
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-vincula-up}
       KEYCLOAK_ADMIN_CLIENT_ID: ${KEYCLOAK_ADMIN_CLIENT_ID:-vincula-up-admin}
       KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-vincula-up-admin-secret}
+      # Almacenamiento de fotos. El BFF sube el archivo y devuelve la URL; los
+      # servicios de dominio solo guardan esa URL, nunca el archivo.
+      #   local (default) -> volumen de disco que nginx sirve en /fotos/
+      #   s3              -> MinIO o Cloudflare R2 (bloque comentado mas arriba)
+      STORAGE_TIPO: ${STORAGE_TIPO:-local}
+      STORAGE_LOCAL_DIR: /data/fotos
+      STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL:-/fotos}
+      # Solo se usan con STORAGE_TIPO=s3.
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://minio:9000}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-vinculaminio}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-vinculaminio123}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-vincula-up-media}
+      STORAGE_PREFIX: ${STORAGE_PREFIX:-perfiles}
+      STORAGE_MAX_BYTES: ${STORAGE_MAX_BYTES:-2097152}
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
+    volumes:
+      - fotos_data:/data/fotos
     ports:
       - "9001:9001"
     healthcheck:
@@ -189,6 +209,7 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/certs:/etc/nginx/certs:ro
+      - fotos_data:/usr/share/nginx/html/fotos:ro
 
   pgadmin:
     image: dpage/pgadmin4:8.12
@@ -198,13 +219,63 @@ services:
         condition: service_healthy
     restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@vincula-up.local}
+      # El .local no lo acepta pgAdmin 8.12: exige un TLD real (com, net, org).
+      # Es solo la credencial de la consola web de pgAdmin, no toca la app.
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@vincula-up.com}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
     ports:
       - "5050:80"
     volumes:
       - pgadmin_data:/var/lib/pgadmin
 
+  # Almacenamiento de archivos (fotos de perfil) con STORAGE_TIPO=s3.
+  #
+  # commented out a proposito: la imagen de MinIO no se puede descargar en la red
+  # actual (el registry devuelve 401), asi que el stack arranca con el
+  # almacenamiento por defecto, que es un volumen en disco (fotos_data).
+  # Para volver a MinIO o Cloudflare R2: descomentar estos servicios, poner
+  # STORAGE_TIPO=s3 en el .env y completar las variables STORAGE_*.
+  #
+  # minio:
+  #   image: quay.io/minio/minio:latest
+  #   container_name: vinculaup-minio
+  #   restart: unless-stopped
+  #   command: server /data --console-address ":9001"
+  #   environment:
+  #     MINIO_ROOT_USER: ${MINIO_ROOT_USER:-vinculaminio}
+  #     MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-vinculaminio123}
+  #   ports:
+  #     - "9000:9000"
+  #     - "9001:9001"
+  #   volumes:
+  #     - minio_data:/data
+  #   healthcheck:
+  #     test: ["CMD", "mc", "ready", "local"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 12
+  #     start_period: 20s
+  #
+  # # Job unico: crea el bucket y abre la lectura publica. Las fotos son caras de
+  # # perfiles publicos, y los <img> del directorio no mandan token.
+  # minio-init:
+  #   image: minio/mc:latest
+  #   container_name: vinculaup-minio-init
+  #   depends_on:
+  #     minio:
+  #       condition: service_healthy
+  #   restart: "no"
+  #   entrypoint: >
+  #     /bin/sh -c "
+  #     mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-vinculaminio} ${MINIO_ROOT_PASSWORD:-vinculaminio123} &&
+  #     mc mb --ignore-existing local/${STORAGE_BUCKET:-vincula-up-media} &&
+  #     mc anonymous set download local/${STORAGE_BUCKET:-vincula-up-media} &&
+  #     echo 'Bucket listo: ${STORAGE_BUCKET:-vincula-up-media}'
+  #     "
+
 volumes:
   postgres_data:
   pgadmin_data:
+  # Fotos de perfil cuando STORAGE_TIPO=local. nginx lo sirve en /fotos/.
+  # Con STORAGE_TIPO=s3 (MinIO o R2) este volumen queda sin uso.
+  fotos_data:

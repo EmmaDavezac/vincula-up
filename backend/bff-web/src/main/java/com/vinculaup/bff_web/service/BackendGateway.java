@@ -1,6 +1,7 @@
 package com.vinculaup.bff_web.service;
 
 import tools.jackson.databind.JsonNode;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -19,6 +20,8 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 
 @Service
 public class BackendGateway {
+
+    private static final Logger log = LoggerFactory.getLogger(BackendGateway.class);
 
     private final RestClient usuarios;
     private final RestClient profesionales;
@@ -298,6 +301,58 @@ public class BackendGateway {
         return get(solicitudes, "/solicitudes/{id}/calificacion", null, null, solicitudId);
     }
 
+    /**
+     * Geocodifica una dirección. Delega en ms-solicitudes, que es donde vive la
+     * única implementación de Nominatim (con su caché).
+     * <p>
+     * Si el microservicio no responde se devuelve un resultado con
+     * {@code resolved: false} en vez de cortar con 502: el cliente puede seguir
+     * con el mapa interactivo, y una falla del backend de solicitudes no debe
+     * dejar sin geocodificar a toda la app.
+     */
+    public Map<String, Object> geocodificar(String direccion) {
+        String normalizada = direccion == null ? "" : direccion.trim();
+        if (normalizada.isEmpty()) {
+            return sinResolver("", "empty-query",
+                    "Dirección vacía. Escribí una calle, altura y ciudad.");
+        }
+        try {
+            JsonNode nodo = get(solicitudes, "/solicitudes/geocodificar", "direccion", normalizada);
+            Map<String, Object> response = new HashMap<>();
+            nodo.properties().forEach(entry -> response.put(entry.getKey(),
+                    entry.getValue().isNull() ? null : entry.getValue().asText()));
+            response.put("latitude", nodo.path("latitude").isNumber() ? nodo.get("latitude").asDouble() : null);
+            response.put("longitude", nodo.path("longitude").isNumber() ? nodo.get("longitude").asDouble() : null);
+            response.put("latitud", response.get("latitude"));
+            response.put("longitud", response.get("longitude"));
+            response.put("resolved", nodo.path("resolved").asBoolean(false));
+            return response;
+        } catch (RuntimeException ex) {
+            log.warn("ms-solicitudes no respondió la geocodificación de '{}': {}", normalizada, ex.getMessage());
+            return sinResolver(normalizada, "servicio-no-disponible",
+                    "El servicio de mapas no está disponible en este momento. "
+                            + "Probá de nuevo o usá el mapa interactivo.");
+        }
+    }
+
+    /**
+     * Respuesta de geocodificación sin coordenadas. Va en un HashMap y no en
+     * {@code Map.of} porque las coordenadas sin resolver son {@code null}, y
+     * {@code Map.of} no admite valores nulos.
+     */
+    private Map<String, Object> sinResolver(String direccion, String source, String error) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("address", direccion);
+        response.put("resolved", false);
+        response.put("latitude", null);
+        response.put("longitude", null);
+        response.put("latitud", null);
+        response.put("longitud", null);
+        response.put("source", source);
+        response.put("error", error);
+        return response;
+    }
+
     private JsonNode get(RestClient client, String path, String queryName, String queryValue, Object... pathVariables) {
         try {
             RestClient.RequestHeadersSpec<?> request = client.get().uri(uriBuilder -> {
@@ -352,7 +407,6 @@ public class BackendGateway {
     private ResponseStatusException unavailable(RestClientException exception) {
         if (exception instanceof org.springframework.web.client.HttpStatusCodeException httpEx) {
             String payload = httpEx.getResponseBodyAsString();
-            org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(BackendGateway.class);
             log.warn("Servicio interno respondió {}: {}", httpEx.getStatusCode(), payload);
             return new ResponseStatusException(
                     httpEx.getStatusCode(), extractDownstreamMessage(payload, httpEx.getStatusCode()), exception);

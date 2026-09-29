@@ -19,6 +19,22 @@ public class Solicitud {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    /**
+     * Cifrador de coordenadas. Las entidades no son beans de Spring, así que el
+     * cifrado se resuelve con un holder estático que el {@code CifradorUbicaciones}
+     * registra al arrancar. Si nunca se registrara, se guarda en claro: la
+     * aplicación sigue funcionando (útil en tests), pero el cifrado no aplica.
+     */
+    private static volatile com.vinculaup.ms_solicitudes.config.CifradorUbicaciones CIFRADOR;
+
+    public static void registrarCifrador(com.vinculaup.ms_solicitudes.config.CifradorUbicaciones cifrador) {
+        CIFRADOR = cifrador;
+    }
+
+    private static com.vinculaup.ms_solicitudes.config.CifradorUbicaciones cifrador() {
+        return CIFRADOR;
+    }
+
     @Column(nullable = false)
     private UUID clienteId;
 
@@ -32,17 +48,33 @@ public class Solicitud {
     private String direccionServicio;
 
     /**
+     * Zona aproximada (barrio y localidad) que se le muestra al profesional
+     * mientras la solicitud está pendiente: alcanza para saber si le queda lejos
+     * o si la zona le resulta insegura, sin revelar calle ni altura.
+     * <p>
+     * No va cifrada a propósito: es un barrio, no un domicilio, y tiene que ser
+     * legible para el filtro por rol del BFF y para los tests.
+     */
+    @Column(length = 255)
+    private String zonaAproximada;
+
+    /**
      * Resumen del problema que escribe el cliente al crear la solicitud. Es obligatorio:
      * es lo primero que lee el profesional para saber qué tiene que resolver.
      */
     @Column(length = 1000)
     private String descripcion;
 
-    @Column(nullable = true)
-    private Double latitud;
+    /**
+     * Coordenadas del servicio, cifradas en reposo. Ver
+     * {@code CifradorUbicaciones}: la API las devuelve descifradas, la base
+     * no las guarda en claro.
+     */
+    @Column(name = "latitud", length = 512)
+    private String latitudCifrada;
 
-    @Column(nullable = true)
-    private Double longitud;
+    @Column(name = "longitud", length = 512)
+    private String longitudCifrada;
 
     @Column(nullable = false)
     private LocalDateTime fechaHoraPropuesta;
@@ -77,15 +109,24 @@ public class Solicitud {
     protected Solicitud() {
     }
 
+    /** Constructor sin zona: la solicitud queda sin zona aproximada (no se usó). */
     public Solicitud(UUID clienteId, UUID profesionalId, UUID especialidadId, String direccionServicio,
             Double latitud, Double longitud, LocalDateTime fechaHoraPropuesta, String descripcion,
             LocalDateTime fechaHoraFinPropuesta) {
+        this(clienteId, profesionalId, especialidadId, direccionServicio, null,
+                latitud, longitud, fechaHoraPropuesta, descripcion, fechaHoraFinPropuesta);
+    }
+
+    public Solicitud(UUID clienteId, UUID profesionalId, UUID especialidadId, String direccionServicio,
+            String zonaAproximada, Double latitud, Double longitud, LocalDateTime fechaHoraPropuesta,
+            String descripcion, LocalDateTime fechaHoraFinPropuesta) {
         this.clienteId = clienteId;
         this.profesionalId = profesionalId;
         this.especialidadId = especialidadId;
         this.direccionServicio = direccionServicio;
-        this.latitud = latitud;
-        this.longitud = longitud;
+        this.zonaAproximada = zonaAproximada;
+        this.latitudCifrada = cifrar(latitud);
+        this.longitudCifrada = cifrar(longitud);
         this.fechaHoraPropuesta = fechaHoraPropuesta;
         this.descripcion = descripcion;
         this.fechaHoraFinPropuesta = fechaHoraFinPropuesta;
@@ -99,9 +140,39 @@ public class Solicitud {
     public UUID getProfesionalId() { return profesionalId; }
     public UUID getEspecialidadId() { return especialidadId; }
     public String getDireccionServicio() { return direccionServicio; }
+    public String getZonaAproximada() { return zonaAproximada; }
     public String getDescripcion() { return descripcion; }
-    public Double getLatitud() { return latitud; }
-    public Double getLongitud() { return longitud; }
+    /**
+     * Devuelve la latitud descifrada. La API sigue exponiendo coordenadas
+     * normales: el cifrado es solo en reposo.
+     */
+    public Double getLatitud() { return descifrar(latitudCifrada); }
+    public Double getLongitud() { return descifrar(longitudCifrada); }
+
+    /** Texto tal como queda guardado: sirve para verificar el cifrado. */
+    public String getLatitudCifrada() { return latitudCifrada; }
+    public String getLongitudCifrada() { return longitudCifrada; }
+
+    private static String cifrar(Double valor) {
+        if (valor == null) {
+            return null;
+        }
+        return CIFRADOR == null ? String.valueOf(valor) : CIFRADOR.cifrar(valor);
+    }
+
+    private static Double descifrar(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return null;
+        }
+        if (CIFRADOR == null) {
+            try {
+                return Double.valueOf(valor.trim());
+            } catch (NumberFormatException ex) {
+                return null;
+            }
+        }
+        return CIFRADOR.descifrar(valor);
+    }
     public LocalDateTime getFechaHoraPropuesta() { return fechaHoraPropuesta; }
     public LocalDateTime getFechaHoraFinPropuesta() { return fechaHoraFinPropuesta; }
     public EstadoSolicitud getEstado() { return estado; }
@@ -117,8 +188,8 @@ public class Solicitud {
 
     public void cambiarUbicacion(String direccionServicio, Double latitud, Double longitud) {
         this.direccionServicio = direccionServicio;
-        this.latitud = latitud;
-        this.longitud = longitud;
+        this.latitudCifrada = cifrar(latitud);
+        this.longitudCifrada = cifrar(longitud);
     }
 
     public void rechazar(String motivo) {

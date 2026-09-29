@@ -2,7 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { catchError, of } from 'rxjs';
+import { catchError, map, of } from 'rxjs';
 import { ApiService } from '../core/services/api.service';
 import { AuthService } from '../core/services/auth.service';
 import { VuIcon } from '../shared/icon/icon';
@@ -47,6 +47,11 @@ export class Activation {
   readonly photoError = signal('');
   readonly hasPhoto = computed(() => this.photoPreview().trim().length > 0);
   private photoReader: FileReader | null = null;
+  /**
+   * El archivo elegido, que se sube al almacenamiento al activar. El
+   * `photoPreview` es solo la previsualización local (data URL): nunca se envía.
+   */
+  private selectedPhotoFile: File | null = null;
   private activatedProfileId: string | null = null;
 
   // ── Paso 2: Zona y Cobertura (con validación de ciudad / GPS / Mapa) ──
@@ -160,6 +165,8 @@ export class Activation {
     const reader = new FileReader();
     this.photoReader = reader;
     this.photoLoading.set(true);
+    // Se guarda el archivo: la data URL es solo para ver la previsualización.
+    this.selectedPhotoFile = file;
     reader.onload = () => {
       if (this.photoReader !== reader) return;
       this.photoPreview.set(typeof reader.result === 'string' ? reader.result : '');
@@ -176,6 +183,7 @@ export class Activation {
   removePhoto(): void {
     this.photoReader?.abort();
     this.photoReader = null;
+    this.selectedPhotoFile = null;
     this.photoLoading.set(false);
     this.photoError.set('');
     this.photoName.set('');
@@ -502,13 +510,39 @@ export class Activation {
     };
 
     const keycloakId = this.auth.getKeycloakId();
-    const photo = this.photoPreview();
-
     this.submitting.set(true);
+
+    // La foto se sube primero: la activación solo recibe la URL pública, así
+    // que el base64 deja de viajar por la API y de guardarse en la base.
+    const subirFoto$ = this.selectedPhotoFile
+      ? this.api.uploadPhoto(this.selectedPhotoFile).pipe(
+          map((r) => r.url),
+          catchError((error) => {
+            this.errorMessage.set(this.api.describeError(error, 'No se pudo subir la foto.'));
+            this.submitting.set(false);
+            return of(null);
+          }),
+        )
+      : of(null);
+
+    subirFoto$.subscribe((fotoUrl) => {
+      if (this.selectedPhotoFile && !fotoUrl) {
+        return;
+      }
+      this.activarConFoto(fotoUrl, usuarioId, keycloakId, loc);
+    });
+  }
+
+  private activarConFoto(
+    fotoUrl: string | null,
+    usuarioId: string,
+    keycloakId: string | null,
+    loc: ValidatedLocation,
+  ): void {
     const payload = {
       usuarioId,
       keycloakId: keycloakId ?? undefined,
-      fotoUrl: photo,
+      fotoUrl: fotoUrl ?? '',
       zonaCoberturaLat: loc.lat,
       zonaCoberturaLng: loc.lng,
       radioKm: Number(this.radius()),

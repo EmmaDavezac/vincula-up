@@ -211,6 +211,11 @@
 	overflow-wrap: anywhere;
 }
 
+.req-card__address--pending {
+	color: var(--amber);
+	font-style: italic;
+}
+
 .req-card__map {
 	border: 1px solid var(--line);
 	border-radius: 0.5rem;

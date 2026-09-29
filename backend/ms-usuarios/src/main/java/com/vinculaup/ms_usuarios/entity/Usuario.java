@@ -32,13 +32,11 @@ public class Usuario {
     private String email;
     private String telefono;
     /**
-     * Foto de perfil guardada como data URL (base64): una imagen de 2 MB ocupa
-     * varios megabytes, muy por encima del varchar(255) que Hibernate crea por
-     * defecto, así que la columna se declara text. Para bases ya creadas con el
-     * tipo anterior, {@code UsuarioDataInitializer} la agranda al arrancar
-     * (ddl-auto=update no modifica columnas existentes).
+     * URL pública de la foto de perfil, servida por el almacenamiento de objetos
+     * (MinIO). La base solo guarda la URL: el archivo vive afuera, así que acá
+     * alcanza con una columna corta.
      */
-    @Column(columnDefinition = "text")
+    @Column(length = 512)
     private String fotoUrl;
 
     @Enumerated(EnumType.STRING)

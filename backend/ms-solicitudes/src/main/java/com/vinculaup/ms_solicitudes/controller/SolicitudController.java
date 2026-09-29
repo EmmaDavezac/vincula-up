@@ -4,10 +4,13 @@ import com.vinculaup.ms_solicitudes.dto.CrearSolicitudRequest;
 import com.vinculaup.ms_solicitudes.dto.CambiarEstadoRequest;
 import com.vinculaup.ms_solicitudes.dto.SolicitudPanelResponse;
 import com.vinculaup.ms_solicitudes.dto.SolicitudResponse;
+import com.vinculaup.ms_solicitudes.client.GeocodingClient;
 import com.vinculaup.ms_solicitudes.service.SolicitudPanelService;
 import com.vinculaup.ms_solicitudes.service.SolicitudService;
 import jakarta.validation.Valid;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,10 +29,36 @@ public class SolicitudController {
 
     private final SolicitudService service;
     private final SolicitudPanelService panelService;
+    private final GeocodingClient geocodingClient;
 
-    public SolicitudController(SolicitudService service, SolicitudPanelService panelService) {
+    public SolicitudController(SolicitudService service, SolicitudPanelService panelService,
+            GeocodingClient geocodingClient) {
         this.service = service;
         this.panelService = panelService;
+        this.geocodingClient = geocodingClient;
+    }
+
+    /**
+     * Geocodifica una dirección. Es la única implementación del proyecto: el
+     * endpoint público {@code GET /api/gps} del BFF proxea a este método, y la
+     * creación de solicitudes usa el mismo cliente con su caché.
+     */
+    @GetMapping("/geocodificar")
+    public Map<String, Object> geocodificar(@RequestParam(required = false, defaultValue = "") String direccion) {
+        GeocodingClient.Resultado resultado = geocodingClient.consultar(direccion);
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("address", resultado.direccion());
+        response.put("resolved", resultado.resolved());
+        response.put("latitude", resultado.latitud());
+        response.put("longitude", resultado.longitud());
+        // Alias en español: el frontend histórico lee estos dos nombres.
+        response.put("latitud", resultado.latitud());
+        response.put("longitud", resultado.longitud());
+        response.put("source", resultado.source());
+        if (resultado.error() != null) {
+            response.put("error", resultado.error());
+        }
+        return response;
     }
 
     @PostMapping

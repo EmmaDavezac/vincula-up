@@ -53,6 +53,11 @@ export class Account {
   readonly photoError = signal('');
   readonly photoLoading = signal(false);
   private photoReader: FileReader | null = null;
+  /**
+   * El archivo recién elegido. El `photoPreview` es la data URL local que se
+   * muestra mientras se elige: no se envía, se sube el archivo y se guarda la URL.
+   */
+  private selectedPhotoFile: File | null = null;
 
   readonly initials = computed(() => {
     const user = this.account();
@@ -231,18 +236,42 @@ export class Account {
       this.photoError.set('La foto es la misma que ya tenés guardada.');
       return;
     }
-    // Solo se envía la foto. Vacío ('') = quitar la foto guardada;
-    // el resto del perfil queda intacto.
-    const quita = !preview;
-    this.pedirGuardado(
-      quita ? 'Quitar tu foto' : 'Actualizar tu foto',
-      quita ? '¿Querés quitar tu foto de perfil?' : '¿Querés guardar esta foto?',
-      quita
-        ? 'Vuelven tus iniciales. Podés cargar una foto cuando quieras.'
-        : 'Es la foto que te ven los profesionales y el resto de la comunidad.',
-      quita,
-      { fotoUrl: preview },
-    );
+    // Quitar la foto no sube nada: se manda vacío y el backend la borra.
+    if (!preview) {
+      this.pedirGuardado(
+        'Quitar tu foto',
+        '¿Querés quitar tu foto de perfil?',
+        'Vuelven tus iniciales. Podés cargar una foto cuando quieras.',
+        true,
+        { fotoUrl: '' },
+      );
+      return;
+    }
+    // Hay un archivo nuevo: se sube primero y solo después se pide confirmar,
+    // con la URL ya resuelta. Así el base64 nunca llega al perfil.
+    const archivo = this.selectedPhotoFile;
+    if (!archivo) {
+      this.photoError.set('No se pudo leer la imagen. Elegí el archivo nuevamente.');
+      return;
+    }
+    this.saving.set(true);
+    this.api.uploadPhoto(archivo).pipe(
+      catchError((error) => {
+        this.photoError.set(this.api.describeError(error, 'No se pudo subir la foto.'));
+        this.saving.set(false);
+        return of(null);
+      }),
+    ).subscribe((subida) => {
+      this.saving.set(false);
+      if (!subida) return;
+      this.pedirGuardado(
+        'Actualizar tu foto',
+        '¿Querés guardar esta foto?',
+        'Es la foto que te ven los profesionales y el resto de la comunidad.',
+        false,
+        { fotoUrl: subida.url },
+      );
+    });
   }
 
   /**
@@ -285,6 +314,8 @@ export class Account {
       if (!updated) return;
       this.account.set(updated);
       this.photoPreview.set(updated.fotoUrl ?? '');
+      // Ya está guardada y subida: el archivo local ya no se necesita.
+      this.selectedPhotoFile = null;
       this.syncSession(updated);
       this.editing.set(null);
       this.cardNotice.set('Tu información se actualizó correctamente.');
@@ -309,6 +340,7 @@ export class Account {
     }
     this.abortPhotoRead();
     this.photoLoading.set(true);
+    this.selectedPhotoFile = file;
     const reader = new FileReader();
     this.photoReader = reader;
     reader.onload = () => {

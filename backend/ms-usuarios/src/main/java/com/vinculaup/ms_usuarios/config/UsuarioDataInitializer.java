@@ -17,7 +17,6 @@ public class UsuarioDataInitializer {
     public CommandLineRunner seedUsuarios(UsuarioRepository repository, JdbcTemplate jdbcTemplate) {
         return args -> {
             relajarKeycloakId(jdbcTemplate);
-            ampliarFotoUrl(jdbcTemplate);
             log.info("Usuarios administrados exclusivamente por Keycloak. No se sembraron usuarios demo.");
         };
     }
@@ -42,20 +41,9 @@ public class UsuarioDataInitializer {
     }
 
     /**
-     * La foto de perfil se guarda como data URL (base64): una imagen de 2 MB
-     * ocupa ~2,7 MB de texto, muy por encima del {@code varchar(255)} con el que
-     * Hibernate creó la columna en bases preexistentes (ddl-auto=update no
-     * modifica el tipo de una columna ya creada). La ampliamos a {@code text}
-     * al arrancar. Best-effort: en Postgres un ALTER sobre una columna ya
-     * {@code text} es un no-op exitoso; si el motor no soporta la sintaxis
-     * (H2 crea la tabla nueva por arranque) se registra y el servicio arranca igual.
+     * La foto ya no se guarda en la base: vive en el almacenamiento de objetos
+     * y acá solo queda la URL pública. Una URL corta entra de sobra en
+     * {@code varchar(512)}, así que no hace falta ampliar la columna ni ejecutar
+     * ningún ALTER al arrancar.
      */
-    private void ampliarFotoUrl(JdbcTemplate jdbcTemplate) {
-        try {
-            jdbcTemplate.execute("ALTER TABLE usuarios ALTER COLUMN foto_url TYPE text");
-            log.info("Columna usuarios.foto_url ampliada a text: fotos de perfil en base64 habilitadas.");
-        } catch (RuntimeException ex) {
-            log.debug("No se pudo ampliar usuarios.foto_url (probablemente ya es text): {}", ex.getMessage());
-        }
-    }
 }

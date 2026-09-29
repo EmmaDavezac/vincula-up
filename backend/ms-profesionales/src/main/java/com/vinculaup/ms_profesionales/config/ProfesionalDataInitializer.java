@@ -36,12 +36,10 @@ public class ProfesionalDataInitializer {
     public CommandLineRunner seedProfesionales(
             org.springframework.transaction.support.TransactionTemplate transactionTemplate,
             jakarta.persistence.EntityManager entityManager,
-            org.springframework.jdbc.core.JdbcTemplate jdbcTemplate,
             EspecialidadRepository especialidadRepo,
             ProfesionalRepository profesionalRepo,
             DisponibilidadRepository disponibilidadRepo) {
         return args -> {
-            ampliarFotoUrl(jdbcTemplate);
             try {
                 transactionTemplate.executeWithoutResult(
                         status -> seed(entityManager, especialidadRepo, profesionalRepo, disponibilidadRepo));
@@ -53,22 +51,10 @@ public class ProfesionalDataInitializer {
     }
 
     /**
-     * La foto del perfil profesional se guarda como data URL (base64): una imagen
-     * de ~600 KB ocupa varios cientos de miles de caracteres, muy por encima del
-     * {@code varchar(255)} con el que se creó la columna en bases preexistentes
-     * (ddl-auto=update no modifica el tipo de una columna ya creada, aunque la
-     * entidad hoy la declare {@code text}). La ampliamos a {@code text} al
-     * arrancar. Best-effort, igual que en ms-usuarios: si el motor no soporta la
-     * sentencia (H2 crea la tabla nueva por arranque) se registra y sigue.
+     * La foto del perfil profesional ya no se guarda en la base: vive en el
+     * almacenamiento de objetos y acá solo queda la URL pública, que entra de
+     * sobra en una columna corta. No hace falta ningún ALTER al arrancar.
      */
-    private void ampliarFotoUrl(org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
-        try {
-            jdbcTemplate.execute("ALTER TABLE profesionales ALTER COLUMN foto_url TYPE text");
-            log.info("Columna profesionales.foto_url ampliada a text: fotos de perfil en base64 habilitadas.");
-        } catch (RuntimeException ex) {
-            log.debug("No se pudo ampliar profesionales.foto_url (probablemente ya es text): {}", ex.getMessage());
-        }
-    }
 
     private void seed(
             jakarta.persistence.EntityManager entityManager,

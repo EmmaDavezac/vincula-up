@@ -78,6 +78,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.PATCH, "/api/solicitudes/*/rechazar").hasRole("PROFESIONAL")
                 // CLIENTE permissions
                 .requestMatchers(HttpMethod.POST, "/api/solicitudes").hasRole("CLIENTE")
+                // Subida de fotos: la usa cualquier cuenta con sesión, porque
+                // cliente, profesional y admin cambian su foto de perfil.
+                .requestMatchers(HttpMethod.POST, "/api/fotos").authenticated()
                 // Completar y cancelar los puede hacer cualquiera de los dos lados:
                 // el profesional que terminó el trabajo o el cliente que lo confirmó.
                 .requestMatchers(HttpMethod.PATCH, "/api/solicitudes/*/completar",

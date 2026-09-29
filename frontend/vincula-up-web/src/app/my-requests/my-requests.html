@@ -109,10 +109,23 @@
 							</div>
 						}
 
-						<p class="req-card__address">
-							<vu-icon name="map-pin" [size]="15" />
-							{{request.address }}
-						</p>
+						<!--
+							Al profesional le llega la zona (barrio y localidad), no la calle
+							exacta, mientras la solicitud esta pendiente. La direccion completa
+							aparece cuando acepta: alcanza para decidir si le queda lejos o
+							si la zona le resulta insegura.
+						-->
+						@if (request.address) {
+							<p class="req-card__address">
+								<vu-icon name="map-pin" [size]="15" />
+								{{ isPending(request) ? 'Zona: ' + request.address : request.address }}
+							</p>
+						} @else if (isProfessional() && isPending(request)) {
+							<p class="req-card__address req-card__address--pending">
+								<vu-icon name="map-pin" [size]="15" />
+								La direccion exacta se muestra cuando aceptas el turno.
+							</p>
+						}
 
 						<!--
 							El mapa es para el profesional: es él quien tiene que llegar al
