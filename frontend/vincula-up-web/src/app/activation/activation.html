@@ -99,14 +99,14 @@
 			<!-- ── Paso 1: Foto ── -->
 			@if (step() === 1) {
 				<div class="dropzone">
-					<input type="file" accept="image/jpeg,image/png" class="vu-sr-only" (change)="selectPhoto($event)" />
-
 					@if (photoPreview()) {
 						<img class="preview-avatar-img" [src]="photoPreview()" alt="Vista previa de tu foto de perfil" />
 					} @else {
-						<div class="dropzone__icon">
+						<!-- El ícono es la zona táctil: en móvil ocupa mucho menos que un botón. -->
+						<label class="dropzone__icon" aria-label="Elegir foto de perfil">
 							<vu-icon name="camera" [size]="28" />
-						</div>
+							<input type="file" accept="image/jpeg,image/png" class="vu-sr-only" (change)="selectPhoto($event)" />
+						</label>
 					}
 
 					<h2 class="dropzone__title">{{ photoPreview() ? 'Foto lista para tu perfil' : 'Subí una foto de perfil' }}</h2>
@@ -128,7 +128,7 @@
 							<button type="button" class="vu-btn vu-btn--quiet" (click)="removePhoto()">Quitar</button>
 						}
 					</div>
-				</div>
+			</div>
 			}
 
 			<!-- ── Paso 2: Zona y GPS ── -->

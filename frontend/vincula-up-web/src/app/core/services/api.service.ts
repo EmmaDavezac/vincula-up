@@ -221,16 +221,6 @@ export class ApiService {
    * se usa `suspendProfessional`; no existe borrado físico ni en el microservicio ni acá.
    */
 
-  saveUser(id: string | null, request: { keycloakId: string; nombre: string; apellido: string; email: string; telefono: string; rolNegocio: string }): Observable<unknown> {
-    const options = { headers: this.authHeaders() };
-    return id ? this.http.patch(`${this.baseUrl}/usuarios/${id}`, request, options)
-      : this.http.post(`${this.baseUrl}/usuarios`, request, options);
-  }
-
-  deleteUser(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.baseUrl}/usuarios/${id}`, { headers: this.authHeaders() });
-  }
-
   getSpecialties(): Observable<unknown[]> {
     return this.http.get<unknown[]>(`${this.baseUrl}/especialidades`, { headers: this.authHeaders() });
   }

@@ -88,10 +88,14 @@ public class ProfesionalDataInitializer {
             especialidades.add(elec);
         }
         Profesional luciano = new Profesional(lucianoUsuarioId, "P-2001", especialidades);
-        // randomuser.me admite hotlink (a diferencia de Unsplash, que devuelve
-        // 403 fuera de su CDN): la foto de demo se ve en Solicitar y Mis solicitudes.
+        // Foto de demo versionada en el repo (frontend/vincula-up-web/public/demo-
+        // luciano-benitez.svg) y servida por nginx como estático. Antes apuntaba a
+        // randomuser.me, que es un servicio externo: sin internet la imagen daba
+        // error y la foto de un desconocido se confundía con un dato real.
+        // Ojo: el BFF resuelve la foto final desde ms-usuarios, así que en una
+        // base ya sembrada hay que actualizá también usuarios.foto_url.
         luciano.activar(
-                "https://randomuser.me/api/portraits/men/32.jpg",
+                "/demo-luciano-benitez.svg",
                 -32.4844, -58.2328, 20.0
         );
         luciano = profesionalRepo.save(luciano);

@@ -1,12 +1,20 @@
+/*
+El :host NO lleva position/z-index a propósito: el modal de confirmación
+(vu-confirm) vive dentro de este componente, y un contexto de apilamiento acá
+lo encerraría. Con el modal en z-index 50+ dentro de un contexto de z-index 30,
+la barra inferior de móvil (z-index 50, fuera de este componente) tapaba el
+diálogo. El z-index va sólo en la cabecera, que es lo que debe flotar.
+*/
 :host {
 	display: block;
 	position: sticky;
 	top: 0;
-	z-index: 30;
 }
 
 .vu-header {
 	background: var(--paper);
+	position: relative;
+	z-index: 30;
 }
 
 /* Enlaces de navegación por rol */

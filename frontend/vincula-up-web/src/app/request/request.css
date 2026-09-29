@@ -473,10 +473,22 @@
 	text-align: center;
 }
 
+/*
+El ícono de confirmación va centrado. `display: block` + `margin: 0 auto` no
+alcanza: al ser bloque, el ancho se estira al 100% del contenedor y el margen
+automático no compensa nada, así que el svg se pegaba a la izquierda. Se usa
+flex con `justify-content: center` sobre un ancho fijo, que sí centra.
+*/
 .sent__check {
+	align-items: center;
+	background: #d1fae5;
+	border-radius: 50%;
 	color: var(--emerald);
-	display: block;
+	display: flex;
+	height: 3.5rem;
+	justify-content: center;
 	margin: 0 auto;
+	width: 3.5rem;
 }
 
 .sent__title {

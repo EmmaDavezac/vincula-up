@@ -17,12 +17,6 @@ export const routes: Routes = [
 		title: 'Vincula-UP | Inicio',
 	},
 	{
-		path: 'directorio',
-		canActivate: [requireRole('ADMIN')],
-		loadComponent: () => import('./directory/directory').then((module) => module.Directory),
-		title: 'Vincula-UP | Directorio',
-	},
-	{
 		path: 'como-funciona',
 		loadComponent: () => import('./simple-page').then((module) => module.SimplePage),
 		data: {
