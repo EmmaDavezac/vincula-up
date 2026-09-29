@@ -237,8 +237,16 @@ RxJS para el estado de los componentes. El testing corre sobre
 │
 ├── keycloak/import/               Realm `vincula-up` (JSON de importación)
 ├── nginx/                         Config + certificados TLS
-└── scripts/                       Bootstrap, CA, certificados, start local
-                                   (cada uno en .sh y .ps1, salvo start-local)
+└── scripts/
+    ├── linux-macos/               *.sh — Linux y macOS
+    │   ├── keycloak-bootstrap.sh
+    │   ├── import-ca.sh
+    │   └── generate-certs.sh
+    └── windows/                   *.ps1 — Windows
+        ├── keycloak-bootstrap.ps1
+        ├── import-ca.ps1
+        ├── generate-certs.ps1
+        └── start-local.ps1        Desarrollo sin Docker (solo Windows)
 ```
 
 > **Nota sobre el prototipo.** La maqueta original de diseño se construyó en
@@ -535,7 +543,7 @@ este camino.
 
 > **El realm se importa solo la primera vez.** Como Keycloak persiste en
 > Postgres, los cambios posteriores al JSON no se aplican solos: hay que correr
-> `scripts/keycloak-bootstrap.sh` (o `.ps1` en Windows) — ver
+> `scripts/linux-macos/keycloak-bootstrap.sh` (o `.ps1` en Windows) — ver
 > [§14](#14-scripts-operativos).
 
 ---
@@ -922,10 +930,10 @@ importar la **CA** en el navegador, nunca el certificado de servidor.
 
 ```bash
 # Linux
-bash scripts/generate-certs.sh
+bash scripts/linux-macos/generate-certs.sh
 
 # Windows
-powershell -ExecutionPolicy Bypass -File .\scripts\generate-certs.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\generate-certs.ps1
 ```
 
 Después hay que **reimportar la CA nueva** en los navegadores, eliminando antes
@@ -933,7 +941,7 @@ la anterior (`VinculaUP-CA`) de los almacenes de confianza.
 
 **Importar la CA:**
 
-- **Script automático:** `bash scripts/import-ca.sh` (Linux) o
+- **Script automático:** `bash scripts/linux-macos/import-ca.sh` (Linux) o
   `powershell -ExecutionPolicy Bypass -File .\scripts\import-ca.ps1` (Windows).
   Ambos instalan en el store del sistema **y** en la base NSS de Firefox.
 - **Firefox** (cualquier SO — tiene su propio almacén, no usa el del sistema):
@@ -987,15 +995,19 @@ alpine compila Angular y solo el resultado se copia a la imagen final.
 
 ## 14. Scripts operativos
 
-Todos en `scripts/`. Cada uno tiene versión **Linux/macOS** (`.sh`) y **Windows**
-(`.ps1`) con el mismo comportamiento.
+Están agrupados por sistema operativo: `scripts/linux-macos/` (`.sh`, para
+Linux y macOS) y `scripts/windows/` (`.ps1`). Cada función tiene su versión en
+ambos, salvo `start-local` que es solo Windows.
 
-| Script | SO | Para qué |
+| Función | Linux / macOS | Windows |
 |---|---|---|
-| `keycloak-bootstrap.sh` / `.ps1` | ambos | **Obligatorio** tras el primer arranque |
-| `import-ca.sh` / `.ps1` | ambos | Confiar la CA en los navegadores |
-| `generate-certs.sh` / `.ps1` | ambos | Regenerar la CA y el certificado |
-| `start-local.ps1` | Windows | Desarrollo sin Docker |
+| **Bootstrap del realm** (obligatorio tras el primer arranque) | `keycloak-bootstrap.sh` | `keycloak-bootstrap.ps1` |
+| Confiar la CA en los navegadores | `import-ca.sh` | `import-ca.ps1` |
+| Regenerar la CA y el certificado | `generate-certs.sh` | `generate-certs.ps1` |
+| Desarrollo sin Docker | — | `start-local.ps1` |
+
+Todos resuelven la raíz del repo por ruta relativa, así que se pueden invocar
+desde cualquier directorio.
 
 ### 14.1 `keycloak-bootstrap` (`.sh` / `.ps1`)
 
@@ -1008,8 +1020,8 @@ JSON (auto-registro, rol por defecto, client de servicio, SMTP) no se aplican
 solos. **Sin él, el registro de usuarios no funciona.**
 
 ```bash
-./scripts/keycloak-bootstrap.sh                              # Linux / macOS
-powershell -ExecutionPolicy Bypass -File .\scripts\keycloak-bootstrap.ps1   # Windows
+./scripts/linux-macos/keycloak-bootstrap.sh                              # Linux / macOS
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\keycloak-bootstrap.ps1   # Windows
 ```
 
 Qué aplica: auto-registro de clientes · rol `CLIENTE` por defecto · client de
@@ -1028,8 +1040,8 @@ Instala `nginx/certs/ca.crt` en los dos almacenes de confianza que existen:
 - la **base NSS de Firefox** → que ignora el store del sistema.
 
 ```bash
-bash scripts/import-ca.sh                                    # Linux / macOS
-powershell -ExecutionPolicy Bypass -File .\scripts\import-ca.ps1   # Windows
+bash scripts/linux-macos/import-ca.sh                                # Linux / macOS
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\import-ca.ps1   # Windows
 ```
 
 La versión de Windows instala en `CurrentUser\Root` (no requiere elevación) y
@@ -1043,8 +1055,8 @@ Regenera la CA y el certificado del servidor, que hoy vencen en diciembre de
 `localhost` y `127.0.0.1`, sin el cual los navegadores modernos lo rechazan.
 
 ```bash
-bash scripts/generate-certs.sh                                  # Linux / macOS
-powershell -ExecutionPolicy Bypass -File .\scripts\generate-certs.ps1   # Windows
+bash scripts/linux-macos/generate-certs.sh                                  # Linux / macOS
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\generate-certs.ps1   # Windows
 ```
 
 Pide confirmación antes de sobrescribir y borra los intermedios (`server.csr`,

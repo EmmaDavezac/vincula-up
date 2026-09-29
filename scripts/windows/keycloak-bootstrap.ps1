@@ -3,7 +3,7 @@
     Aplica el flujo de registro de Vincula-UP sobre un realm ya existente.
 
 .DESCRIPTION
-    Equivalente en Windows de scripts/keycloak-bootstrap.sh.
+    Equivalente en Windows de scripts/linux-macos/keycloak-bootstrap.sh.
 
     Por qué existe: 'start-dev --import-realm' sólo importa el realm la PRIMERA
     vez. Como Keycloak persiste en Postgres, en una instalación ya en marcha los
@@ -15,7 +15,7 @@
     Requiere: Docker Compose con el servicio 'keycloak' levantado.
 
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File .\scripts\keycloak-bootstrap.ps1
+    powershell -ExecutionPolicy Bypass -File .\scripts\windows\keycloak-bootstrap.ps1
 
 .NOTES
     Es idempotente: correrlo de nuevo actualiza en vez de duplicar.
@@ -33,7 +33,9 @@ $ErrorActionPreference = 'Stop'
 # Sin esto las variables de configuración (SMTP incluido) quedan vacías y el
 # reseteo de contraseña no envía emails. Se parsea en vez de 'source' porque
 # PowerShell no tiene equivalente directo.
-$repoRoot = Split-Path -Parent $PSScriptRoot
+# El script vive en scripts\windows\, así que la raíz del repo es dos niveles
+# arriba: scripts\windows\ -> scripts\ -> <raíz>.
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $envFile = Join-Path $repoRoot '.env'
 if (Test-Path $envFile) {
     Write-Host "==> Configuración cargada desde $envFile"

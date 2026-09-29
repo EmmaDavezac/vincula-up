@@ -9,13 +9,16 @@
 # IMPORTANTE: al regenerar, todos los navegadores que tengan instalada la CA
 # vieja van a marcar el sitio como no confiable. Hay que reimportar la nueva.
 #
-# Uso:  bash scripts/generate-certs.sh
-# En Windows:  powershell -ExecutionPolicy Bypass -File .\scripts\generate-certs.ps1
+# Uso:  bash scripts/linux-macos/generate-certs.sh
+# En Windows:
+#   powershell -ExecutionPolicy Bypass -File .\scripts\windows\generate-certs.ps1
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CERTS_DIR="$(dirname "$SCRIPT_DIR")/nginx/certs"
+# El script vive en scripts/linux-macos/, así que la raíz del repo es dos
+# niveles arriba: scripts/linux-macos/ -> scripts/ -> <raíz>.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+CERTS_DIR="$REPO_ROOT/nginx/certs"
 DAYS=825
 
 command -v openssl >/dev/null 2>&1 || { echo "ERROR: hace falta openssl."; exit 1; }
@@ -66,7 +69,7 @@ echo "✅ Certificados regenerados en $CERTS_DIR"
 openssl x509 -in server.crt -noout -subject -enddate
 echo
 echo "Ahora importá la CA nueva (ca.crt) en los navegadores:"
-echo "  bash scripts/import-ca.sh"
+echo "  bash scripts/linux-macos/import-ca.sh"
 echo
 echo "⚠️  Si tenías importada la CA anterior, eliminá 'VinculaUP-CA' de los"
 echo "    almacenes de confianza antes de importar la nueva."

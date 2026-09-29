@@ -49,6 +49,25 @@ cobertura se guardan **cifradas** con AES-256-GCM.
 
 No hace falta Node ni Java para levantar la aplicación: todo compila dentro de Docker.
 
+### Scripts
+
+Están agrupados por sistema operativo. Cada función tiene su versión en ambos,
+salvo `start-local` que es solo Windows.
+
+| Función | 🐧 Linux / macOS | 🪟 Windows |
+|---|---|---|
+| **Bootstrap del realm** — obligatorio tras el primer arranque | `bash scripts/linux-macos/keycloak-bootstrap.sh` | `powershell -ExecutionPolicy Bypass -File .\scripts\windows\keycloak-bootstrap.ps1` |
+| Confiar la CA en los navegadores | `bash scripts/linux-macos/import-ca.sh` | `powershell -ExecutionPolicy Bypass -File .\scripts\windows\import-ca.ps1` |
+| Regenerar la CA y el certificado | `bash scripts/linux-macos/generate-certs.sh` | `powershell -ExecutionPolicy Bypass -File .\scripts\windows\generate-certs.ps1` |
+| Desarrollo sin Docker | — | `.\scripts\windows\start-local.ps1` |
+
+En Windows, `ExecutionPolicy Bypass` evita el error de "script deshabilitado por
+la política de ejecución"; también podés ejecutarlos con `.\scripts\windows\<script>.ps1`
+desde PowerShell si tu equipo ya lo tiene permitido.
+
+Todos resuelven la raíz del repo por ruta relativa, así que se pueden invocar
+desde cualquier directorio.
+
 ---
 
 ## Puesta en marcha
@@ -84,7 +103,7 @@ falta generar nada.
 
 **🐧 Linux**
 ```bash
-bash scripts/import-ca.sh
+bash scripts/linux-macos/import-ca.sh
 ```
 
 **🪟 Windows** (desde PowerShell en el repo):
@@ -141,7 +160,7 @@ Al terminar, importa la configuración del realm una vez:
 
 **🐧 Linux**
 ```bash
-./scripts/keycloak-bootstrap.sh
+./scripts/linux-macos/keycloak-bootstrap.sh
 ```
 
 **🪟 Windows**
@@ -171,7 +190,7 @@ el repositorio fuera público, cualquiera con la clave podría suplantar
 
 **Renovarlos** (por vencimiento, o si preferís que cada máquina tenga su propia CA):
 
-**🐧 Linux** · `bash scripts/generate-certs.sh`
+**🐧 Linux** · `bash scripts/linux-macos/generate-certs.sh`
 **🪟 Windows** · `powershell -ExecutionPolicy Bypass -File .\scripts\generate-certs.ps1`
 
 Después hay que **volver a importar la CA nueva** en los navegadores. Si tenías

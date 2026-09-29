@@ -9,7 +9,10 @@
 # no se aplican solos. Este script los aplica de forma idempotente vía kcadm.sh
 # sin borrar usuarios ni datos.
 #
-# Uso:  ./scripts/keycloak-bootstrap.sh
+# Uso:  ./scripts/linux-macos/keycloak-bootstrap.sh
+# En Windows:
+#   powershell -ExecutionPolicy Bypass -File .\scripts\windows\keycloak-bootstrap.ps1
+#
 # Requiere: docker compose con el servicio `keycloak` levantado.
 
 set -euo pipefail
@@ -18,8 +21,9 @@ set -euo pipefail
 # incluido) estén disponibles. `set -a` las exporta al entorno: sin esto,
 # KEYCLOAK_SMTP_PASSWORD queda vacía y el reseteo de contraseña no envía emails.
 # Se hace tras `set -euo pipefail` y con tolerance a que el archivo no exista.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+# El script vive en scripts/linux-macos/, así que la raíz del repo es dos
+# niveles arriba: scripts/linux-macos/ -> scripts/ -> <raíz>.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 if [ -f "$REPO_ROOT/.env" ]; then
   set -a
   # shellcheck disable=SC1091

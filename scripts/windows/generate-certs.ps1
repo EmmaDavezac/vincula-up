@@ -3,7 +3,7 @@
     Genera la CA y el certificado del servidor de Vincula-UP.
 
 .DESCRIPTION
-    Equivalente en Windows de scripts/generate-certs.sh.
+    Equivalente en Windows de scripts/linux-macos/generate-certs.sh.
 
     Por qué existe: los certificados versionados en nginx/certs/ son una CA de
     DESARROLLO auto-firmada. Regeneralos si vencen (diciembre 2028) o si preferís
@@ -13,7 +13,7 @@
     vieja van a marcar el sitio como no confiable. Hay que reimportar la nueva.
 
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File .\scripts\generate-certs.ps1
+    powershell -ExecutionPolicy Bypass -File .\scripts\windows\generate-certs.ps1
 
 .NOTES
     Requiere openssl en el PATH (Windows 10 1809+ lo trae; si no, instalalo con
@@ -30,8 +30,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$scriptDir = Split-Path -Parent $PSScriptRoot
-$certsDir = Join-Path (Split-Path -Parent $scriptDir) 'nginx\certs'
+# El script vive en scripts\windows\, así que la raíz del repo es dos niveles
+# arriba: scripts\windows\ -> scripts\ -> <raíz>.
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$certsDir = Join-Path $repoRoot 'nginx\certs'
 $days = $Days
 
 if (-not (Get-Command openssl -ErrorAction SilentlyContinue)) {

@@ -1,5 +1,7 @@
 $ErrorActionPreference = 'Stop'
-$root = Split-Path -Parent $PSScriptRoot
+# El script vive en scripts\windows\, así que la raíz del repo es dos niveles
+# arriba: scripts\windows\ -> scripts\ -> <raíz>.
+$root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $javaOptions = '-Xms128m -Xmx512m -Xss256k -XX:+UseSerialGC -XX:ActiveProcessorCount=2'
 $services = @(
   @{ Name = 'ms-usuarios'; Path = 'backend\ms-usuarios'; Port = 8081 },

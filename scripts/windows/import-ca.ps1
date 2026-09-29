@@ -7,10 +7,10 @@
       - Store de Windows (CurrentUser\Root) → Chromium, Chrome, Edge, .NET
       - Base NSS de Firefox             → Firefox tiene su propio almacén
 
-    Equivalente en Linux:  bash scripts/import-ca.sh
+    Equivalente en Linux:  bash scripts/linux-macos/import-ca.sh
 
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File .\scripts\import-ca.ps1
+    powershell -ExecutionPolicy Bypass -File .\scripts\windows\import-ca.ps1
 
 .NOTES
     El store se instala en CurrentUser (no requiere privilegios de administrador)
@@ -25,7 +25,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$caCert = Join-Path (Split-Path -Parent $PSScriptRoot) 'nginx\certs\ca.crt'
+# El script vive en scripts\windows\, así que la raíz del repo es dos niveles
+# arriba: scripts\windows\ -> scripts\ -> <raíz>.
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$caCert = Join-Path $repoRoot 'nginx\certs\ca.crt'
 if (-not (Test-Path $caCert)) {
     Write-Error "No se encontró el certificado de la CA en: $caCert"
     exit 1

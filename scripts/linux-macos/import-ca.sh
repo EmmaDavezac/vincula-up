@@ -5,14 +5,22 @@
 #   - Store del sistema  → Chromium, Chrome, Edge, curl, Node.js, Java
 #   - Base NSS de Firefox → Firefox tiene su propio almacén, ignorando el sistema
 #
-# Uso: bash scripts/import-ca.sh
+# Uso: bash scripts/linux-macos/import-ca.sh
 #
-# En Windows usar el equivalente:  powershell -ExecutionPolicy Bypass -File .\scripts\import-ca.ps1
+# En Windows usar el equivalente:
+#   powershell -ExecutionPolicy Bypass -File .\scripts\windows\import-ca.ps1
 
 set -e
 
-CA_CERT="$(dirname "$0")/../nginx/certs/ca.crt"
-CA_CERT="$(realpath "$CA_CERT")"
+# El script vive en scripts/linux-macos/, así que la raíz del repo es dos
+# niveles arriba: scripts/linux-macos/ -> scripts/ -> <raíz>.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+CA_CERT="$REPO_ROOT/nginx/certs/ca.crt"
+
+if [ ! -f "$CA_CERT" ]; then
+  echo "ERROR: no se encontró la CA en $CA_CERT" >&2
+  exit 1
+fi
 
 echo "🔐 Importando CA: $CA_CERT"
 
