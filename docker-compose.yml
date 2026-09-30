@@ -1,4 +1,45 @@
-
+# =============================================================================
+#  Stack completo de Vincula-UP: 8 servicios, todos en una red de Docker
+# =============================================================================
+#
+#  LEVANTAR
+#    cp .env.example .env   (Linux)   |   Copy-Item .env.example .env (Windows)
+#    docker compose up --build
+#    docker compose down -v            # borra tambien los volumenes (datos)
+#
+#  ── MAPA DE PUERTOS Y URLs ──────────────────────────────────────────────────
+#  ┌──────────────────┬──────────┬───────────────────────────────────┬─────────────────┐
+#  │ Servicio         │ Puerto   │ URL desde el navegador            │ Qué es          │
+#  ├──────────────────┼──────────┼───────────────────────────────────┼─────────────────┤
+#  │ nginx            │ 80, 443  │ https://vincula-up.local          │ La aplicación   │
+#  │ bff-web          │ 9001     │ http://localhost:9001/api/...     │ La API          │
+#  │ keycloak         │ 8080     │ http://localhost:8080            │ Login + consola │
+#  │ pgadmin          │ 5050     │ http://localhost:5050            │ Consola de la BD│
+#  │ postgres         │ 5432     │ (no se abre en el navegador)     │ Base de datos   │
+#  │ ms-usuarios      │ 8081     │ (solo 127.0.0.1, sin interfaz)  │ Cuentas         │
+#  │ ms-profesionales │ 8082     │ (solo 127.0.0.1, sin interfaz)  │ Padrón          │
+#  │ ms-solicitudes   │ 8083     │ (solo 127.0.0.1, sin interfaz)  │ Solicitudes     │
+#  └──────────────────┴──────────┴───────────────────────────────────┴─────────────────┘
+#
+#  POR QUÉ LOS ms-* ESTÁN LIMITADOS A 127.0.0.1
+#  Los tres microservicios de dominio NO validan tokens ni aplican permisos: son
+#  internos. Publicar sus puertos en toda la red dejaría la base de datos
+#  accesible sin autenticación. Todo el tráfico del navegador entra por nginx y
+#  pasa por el bff-web, que sí valida el token de Keycloak. Por eso sus puertos
+#  se publican solo en el loopback: sirven para depurar desde la máquina, pero no
+#  son alcanzables desde la red.
+#
+#  ── CONVENCIONES ───────────────────────────────────────────────────────────
+#  - container_name: todos empiezan con `vinculaup-` para no chocar con otras
+#    instalaciones de Docker de la misma máquina.
+#  - depends_on + condition: service_healthy: espera a que el servicio anterior
+#    esté realmente listo, no solo arrancado. Sin esto el BFF llama a un
+#    microservicio que todavía no escucha y devuelve 502.
+#  - Los ${VARIABLE:-valor} leen del .env y usan el valor de la derecha si no
+#    está definido. Todas están documentadas en .env.example.
+#  - El bloque de MinIO al final está comentado a propósito: la imagen no se
+#    puede descargar en la red actual, así que el almacenamiento por defecto es
+#    un volumen en disco (fotos_data).
 
 services:
   keycloak:
@@ -71,6 +112,9 @@ services:
       DATABASE_USERNAME: ${DATABASE_USERNAME:-postgres}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:-postgres}
       JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
+      # Siembra los datos de demo (especialidades, profesionales, solicitudes).
+      # Con false la base arranca vacia.
+      SEMBRAR_DEMO: ${SEMBRAR_DEMO:-true}
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
     ports:
       # Sólo accesible desde el host: ms-usuarios no expone autenticación propia,
@@ -99,6 +143,9 @@ services:
       DATABASE_USERNAME: ${DATABASE_USERNAME:-postgres}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:-postgres}
       JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
+      # Siembra los datos de demo (especialidades, profesionales, solicitudes).
+      # Con false la base arranca vacia.
+      SEMBRAR_DEMO: ${SEMBRAR_DEMO:-true}
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
       UBICACIONES_CLAVE: ${UBICACIONES_CLAVE:-}
     ports:
@@ -124,6 +171,9 @@ services:
       DATABASE_USERNAME: ${DATABASE_USERNAME:-postgres}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:-postgres}
       JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
+      # Siembra los datos de demo (especialidades, profesionales, solicitudes).
+      # Con false la base arranca vacia.
+      SEMBRAR_DEMO: ${SEMBRAR_DEMO:-true}
       PROFESIONALES_URL: http://ms-profesionales:8082
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
       # Misma clave que en ms-profesionales: si difieren, cada servicio descifra

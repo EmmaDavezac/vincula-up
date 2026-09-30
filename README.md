@@ -199,15 +199,109 @@ primero.
 
 ---
 
-## URLs
+## Accesos
 
-| Servicio | URL |
+Todos los servicios quedan levantados por `docker compose up --build`. Estos
+son los accesos y **cómo entrar a cada uno**:
+
+| Servicio | URL | Credenciales |
+|---|---|---|
+| **App web** | https://vincula-up.local | usuario de prueba (abajo) |
+| **Keycloak** (login) | http://localhost:8080 | `admin` / `admin` |
+| **pgAdmin** (base de datos) | http://localhost:5050 | `admin@vincula-up.com` / `admin` |
+| **BFF API** | http://localhost:9001/api/... | pide token; ver abajo |
+| Postgres | `localhost:5432` (host) | base `vinculaup` · `postgres` / `postgres` |
+
+### La aplicación
+
+`https://vincula-up.local` · usuarios de prueba (todos con contraseña `password`):
+
+| Rol | Email | Qué puede hacer |
+|---|---|---|
+| Cliente | `cliente@vincula-up.local` | Pedir un técnico, chatear, calificar |
+| Profesional | `profesional@vincula-up.local` | Activar perfil, aceptar trabajos, chatear |
+| Administrador | `admin@vincula-up.local` | Padrón, categorías, clientes, métricas |
+
+> La primera vez que entrás con una cuenta, esta se crea sola en la base (la
+> gestiona Keycloak). Ver la nota de `SEMBRAR_DEMO` más abajo.
+
+### pgAdmin — ver la base de datos
+
+1. Abrí **http://localhost:5050** e ingresá con `admin@vincula-up.com` / `admin`.
+2. Es la **primera** vez: pgAdmin no tiene servidores cargados. Menú
+   **Servers → Add Server** (o el ícono de enchufe, arriba a la izquierda).
+3. Completá:
+
+   | Campo | Valor |
+   |---|---|
+   | Name | `vincula-up` (lo que quieras) |
+   | Host | `postgres` ← **no** `localhost` |
+   | Port | `5432` |
+   | Maintenance database | `vinculaup` |
+   | Username | `postgres` |
+   | Password | `postgres` |
+
+4. **Save**. Te conectás y podés navegar `Schemas → public → Tables`.
+
+> **¿Por qué el host es `postgres` y no `localhost`?** pgAdmin corre *dentro* de
+> Docker. Desde ahí, `localhost` es el propio contenedor de pgAdmin; el nombre
+> `postgres` es el servicio de base de datos en la red de Docker.
+> (Para conectarte desde una app en tu máquina, ahí sí va `localhost`.)
+
+### Keycloak — identidades, roles y usuarios
+
+1. Abrí **http://localhost:8080**, entrá con `admin` / `admin`.
+2. Arriba a la izquierda, elegí el realm **`vincula-up`** (no `master`).
+3. Desde ahí:
+
+| Sección | Qué muestra |
 |---|---|
-| **App web** | https://vincula-up.local |
-| **Keycloak** | http://localhost:8080 |
-| **pgAdmin** | http://localhost:5050 |
-| **MinIO** (consola) | http://localhost:9001 |
-| **BFF API** | http://localhost:9001 |
+| **Users** | Las cuentas. `cliente@`, `profesional@`, `admin@` son las de prueba |
+| **Clients** | `vincula-up-public` (la app) y `vincula-up-admin` (el client de servicio) |
+| **Roles** | `CLIENTE`, `PROFESIONAL`, `ADMIN` |
+| **Realm settings → Email** | Configuración de SMTP para recuperar contraseñas |
+
+> El primer ingreso de un profesional invitado lo **promueve** de `CLIENTE` a
+> `PROFESIONAL` automáticamente (si el email estaba prerregistrado en el padrón).
+
+### BFF API (para depurar)
+
+No se navega: expone JSON y pide token. Se consulta con `curl`:
+```bash
+# Listado público de profesionales (no pide token)
+curl -s http://localhost:9001/api/profesionales
+
+# Un endpoint que sí pide token: primero conseguís uno
+TOKEN=$(curl -s -X POST http://localhost:8080/realms/vincula-up/protocol/openid-connect/token \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'grant_type=password' -d 'client_id=vincula-up-public' \
+  -d 'username=admin@vincula-up.local' -d 'password=password' \
+  | grep -o '"access_token":"[^"]*' | cut -d'"' -f4)
+
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:9001/api/usuarios
+```
+
+> **Por qué no se abre `http://localhost:8081` (ms-usuarios) ni `:8082`,
+> `:8083` en el navegador:** esos microservicios internos no validan tokens ni
+> aplican permisos. Sus puertos están publicados **solo en `127.0.0.1`** (la
+> propia máquina), nunca en la red. Todo el tráfico de la app pasa por nginx y
+> el BFF, que sí valida el token.
+
+### Datos de demostración
+
+Con `SEMBRAR_DEMO=true` (por defecto) se siembran: 6 especialidades, un
+profesional de ejemplo con disponibilidad, y **4 solicitudes en distintos
+estados** (pendiente, aceptada con chat, completada y calificada, rechazada)
+para que los listados no se vean vacíos.
+
+> Las **solicitudes** solo se siembran si las cuentas de prueba ya existen en
+> la base, y eso recien pasa despues del **primer ingreso** de cada una. Si
+> levantas el stack y los listados siguen vacios: entra una vez con `cliente@`
+> y con `profesional@`, y despues `docker compose restart ms-solicitudes`.
+
+Para una base limpia: `SEMBRAR_DEMO=false` en el `.env`, y
+`docker compose down -v && docker compose up --build` (hay que recrear el
+volumen para que el cambio aplique).
 
 ---
 

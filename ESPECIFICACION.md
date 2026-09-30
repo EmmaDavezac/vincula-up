@@ -1070,6 +1070,37 @@ microservicio con `mvnw.cmd spring-boot:run` y un perfil JVM liviano
 memoria. Los servicios usan **H2 en memoria**: los datos se pierden al reiniciar.
 El frontend se levanta aparte con `npm start` en otra terminal.
 
+### 14.5 Aviso de prerregistro por correo
+
+No es un script: es parte del BFF, pero se documenta acá porque es el paso que
+cierra el flujo de alta de un profesional.
+
+**El flujo completo:**
+
+1. El **administrador** da de alta al profesional desde el panel
+   (`POST /api/profesionales/alta`), con sus datos, legajo y especialidad. Esto
+   crea la cuenta en `ms-usuarios` **sin cuenta de Keycloak**: es una invitación.
+2. El BFF envía un correo al profesional (`NotificacionService`) con el legajo, la
+   especialidad y un enlace directo a `/activar-perfil`.
+3. El **profesional** se registra en Keycloak con ese mismo correo. Al primer
+   ingreso, `ms-usuarios` lo reconoce por email y conserva su rol `PROFESIONAL`
+   (un email no prerregistrado nace como `CLIENTE`).
+4. El BFF promueve el rol en Keycloak (`KeycloakAdminService`) para que el
+   siguiente token ya traiga `PROFESIONAL`.
+5. El profesional **activa su perfil** (foto, zona de cobertura y horarios).
+
+> **El correo es best-effort**: si el SMTP no está configurado o el servidor
+> rechaza el mensaje, el prerregistro queda guardado y el fallo queda en el log
+> del BFF. Dar de alta a un profesional nunca falla porque no salió un correo.
+
+**Configuración:** reusa el mismo SMTP que Keycloak (`KEYCLOAK_SMTP_*`), así que
+no hay credenciales duplicadas. `APP_URL` es la base del enlace del correo; si
+se despliega en otro dominio, hay que cambiarla.
+
+> **Limitación conocida:** con `verifyEmail: false` (el estado actual del realm),
+> el paso 3 no verifica que el correo sea del propio profesional. Alguien con
+> acceso a su casilla puede activarlo primero. Ver §16.2.
+
 ---
 
 ## 15. Estado real del MVP
@@ -1123,19 +1154,20 @@ demo, pero conviene tenerlos fichados.
 | # | Deuda | Impacto |
 |---|---|---|
 | 1 | **Sin CI** | Nada garantiza que el código compile. Un cambio roto se descubre en la máquina de quien lo hizo |
-| 2 | **Fotos en base64** | ~2,7 MB por foto en la fila. Postgres y nginx lo manejan hoy, pero no escala y no hay migración a almacenamiento de objetos |
-| 3 | **`ddl-auto=update` como esquema** | Sin migraciones versionadas no hay forma de reproducir una base ni de revertir un cambio de modelo |
-| 4 | **Secret del client de servicio en defaults** | `vincula-up-admin-secret` está en `.env.example`. Sin rotación es un secreto público del repositorio |
+| 2 | **Sin tests** | La suite se retiró del repo: la escritura y la ejecución quedan a cargo de QA antes del despliegue. El andamiaje sigue en su lugar (dependencias `<scope>test</scope>` en los cuatro `pom.xml`, target `test` de `angular.json`, `tsconfig.spec.json`) |
+| 3 | **`ddl-auto=update` como esquema** | Sin migraciones versionadas no hay forma de reproducir una base ni de revertir un cambio de modelo. Correr el stack con `JPA_DDL_AUTO=validate` falla: no hay esquema que valide |
+| 4 | **Secret del client de servicio sin rotar** | `KEYCLOAK_ADMIN_CLIENT_SECRET` quedó **vacío** en `.env.example` a propósito (no se publica un secreto usable). Hay que generar uno con `openssl rand -hex 24` y cargarlo en el `.env` y en Keycloak (Clients → `vincula-up-admin`). **Mientras esté vacío, la promoción de rol del profesional invitado no funciona** |
+| 5 | **`webOrigins: ["*"]`** en el client público | Permitido en demo; en producción conviene restringirlo a los orígenes reales |
 
 ### 16.2 Prioridad media
 
 | # | Deuda | Impacto |
 |---|---|---|
-| 5 | **Sin caché en geocodificación** | Resuelto: `GeocodingClient` ahora cachea 10 min con LRU |
-| 6 | **H2 por defecto en desarrollo** | Sin `DATABASE_URL`, los datos se pierden al reiniciar y el comportamiento difiere de producción |
-| 7 | **Tests de integración incompletos** | El BFF se prueba con mocks. Un cambio en el contrato entre microservicios no lo detecta la suite |
-| 8 | **CORS con lista de orígenes fija** | `SecurityConfig.java` enumera los orígenes. Agregar un dominio es tocar código |
-| 9 | **`webOrigins: ["*"]`** en el realm | Permitido en demo; en producción conviene restringirlo |
+| 6 | **`verifyEmail: false`** | Un profesional puede activar su perfil con el email de otro, porque nadie confirma que la dirección sea suya. Cerrarlo requiere `verifyEmail: true` en el realm **y** `docker compose down -v`; además rompe las cuentas `@vincula-up.local` de prueba, que no son deliverables |
+| 7 | **H2 por defecto en desarrollo** | Sin `DATABASE_URL`, los datos se pierden al reiniciar y el comportamiento difiere de producción |
+| 8 | **Tests de integración incompletos** | Sin suite, un cambio en el contrato entre microservicios no lo detecta nada. Hoy se verificó a mano: con `SEMBRAR_DEMO=true` la siembra cubre los cuatro estados del ciclo |
+| 9 | **CORS con lista de orígenes fija** | `SecurityConfig.java` enumera los orígenes. Agregar un dominio es tocar código |
+| 10 | **Geocodificación puede resolver a otra ciudad** | Nominatim a veces devuelve un lugar homónimo: una dirección de Concepción del Uruguay terminó en Entre Ríos, Argentina. Es un comportamiento del servicio público, no del código; convendría validar el país del resultado |
 
 ### 16.3 Higiene del repositorio
 
@@ -1155,8 +1187,39 @@ Resuelto el 2026-09-28:
 
 Pendiente:
 
-- Eliminar los `.gitignore` boilerplate de los subproyectos Spring Boot
-  (`backend/*/.gitignore`) si no aportan nada sobre este.
+- (ninguno de higiene del repositorio: los `.gitignore` boilerplate de
+  `backend/*/` y el del frontend se absorbieron en el `.gitignore` de la raíz
+  el 2026-09-29, junto con los `.gitattributes` duplicados.)
+
+---
+
+## 16-bis. Datos de demostración
+
+Con `SEMBRAR_DEMO=true` (por defecto) cada base nueva se siembra al arrancar:
+
+| Qué | Dónde | Contenido |
+|---|---|---|
+| 6 especialidades | `ms-profesionales` | Electricidad, plomería, refrigeración, electrodomésticos, pintura, cerrajería |
+| 1 profesional | `ms-profesionales` | Luciano Benítez, legajo `P-2001`, activado, con foto local y disponibilidad de lunes a sábado |
+| 4 solicitudes | `ms-solicitudes` | 1 pendiente, 1 aceptada con 2 mensajes, 1 completada y calificada, 1 rechazada |
+
+La siembra es **idempotente** (si ya hay datos no inserta nada) y
+**best-effort** (un fallo se registra y el servicio arranca igual: un inicializador
+que tumba el contenedor dejaría toda la API en 502).
+
+**Los usuarios no se siembran**: los crea Keycloak al registrarse, y la fila en
+`ms-usuarios` aparece recién en el **primer ingreso**. Por eso las solicitudes
+solo se siembran después de que alguien haya entrado una vez con `cliente@` y
+con `profesional@`; si no, el inicializador lo avisa por log con el mensaje
+*"No se siembran solicitudes: falta la cuenta de…"*.
+
+> Esto se debe a que los identificadores de usuario los genera la base y no hay
+> un UUID fijo que hardcodear. El inicializador los resuelve por email con una
+> consulta SQL, ya que los tres microservicios comparten la misma base.
+
+Para una base limpia: `SEMBRAR_DEMO=false` en el `.env`, más
+`docker compose down -v && docker compose up --build` (el volumen hay que
+recrearlo para que el cambio aplique).
 
 ---
 

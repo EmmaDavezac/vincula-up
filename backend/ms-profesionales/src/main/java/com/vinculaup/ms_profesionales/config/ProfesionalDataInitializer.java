@@ -26,6 +26,12 @@ public class ProfesionalDataInitializer {
     /**
      * Siembra el padrón de demo.
      * <p>
+     * Solo corre con {@code SEMBRAR_DEMO=true} (por defecto). Con la bandera en
+     * false la base queda vacía: ni especialidades, ni profesionales, ni
+     * disponibilidad. Las especialidades las necesita la aplicación para
+     * funcionar (el alta de un profesional las elige de una lista), así que en
+     * una base vacía hay que crearlas desde el panel de administración.
+     * <p>
      * La siembra es best-effort: nunca debe tumbar el arranque del microservicio. Un fallo
      * de seed (por ejemplo una base ya sembrada por una versión anterior del inicializador
      * con identificadores fijos) dejaría el contenedor en un bucle de reinicios y todas las
@@ -34,12 +40,17 @@ public class ProfesionalDataInitializer {
      */
     @Bean
     public CommandLineRunner seedProfesionales(
+            @org.springframework.beans.factory.annotation.Value("${sembrar.demo:true}") boolean sembrarDemo,
             org.springframework.transaction.support.TransactionTemplate transactionTemplate,
             jakarta.persistence.EntityManager entityManager,
             EspecialidadRepository especialidadRepo,
             ProfesionalRepository profesionalRepo,
             DisponibilidadRepository disponibilidadRepo) {
         return args -> {
+            if (!sembrarDemo) {
+                log.info("SEMBRAR_DEMO=false: no se siembra el padrón de demo.");
+                return;
+            }
             try {
                 transactionTemplate.executeWithoutResult(
                         status -> seed(entityManager, especialidadRepo, profesionalRepo, disponibilidadRepo));
