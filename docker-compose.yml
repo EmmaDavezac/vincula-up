@@ -179,6 +179,18 @@ services:
       STORAGE_BUCKET: ${STORAGE_BUCKET:-vincula-up-media}
       STORAGE_PREFIX: ${STORAGE_PREFIX:-perfiles}
       STORAGE_MAX_BYTES: ${STORAGE_MAX_BYTES:-2097152}
+      # Avisos por correo (mismo SMTP que usa Keycloak). Sin password, el aviso
+      # de prerregistro no sale pero el alta del profesional se guarda igual.
+      KEYCLOAK_SMTP_HOST: ${KEYCLOAK_SMTP_HOST:-}
+      KEYCLOAK_SMTP_PORT: ${KEYCLOAK_SMTP_PORT:-587}
+      KEYCLOAK_SMTP_USER: ${KEYCLOAK_SMTP_USER:-}
+      KEYCLOAK_SMTP_PASSWORD: ${KEYCLOAK_SMTP_PASSWORD:-}
+      KEYCLOAK_SMTP_AUTH: ${KEYCLOAK_SMTP_AUTH:-true}
+      KEYCLOAK_SMTP_STARTTLS: ${KEYCLOAK_SMTP_STARTTLS:-true}
+      KEYCLOAK_SMTP_FROM: ${KEYCLOAK_SMTP_FROM:-}
+      KEYCLOAK_SMTP_FROM_DISPLAY_NAME: ${KEYCLOAK_SMTP_FROM_DISPLAY_NAME:-Vincula-UP}
+      # Enlace que va en el correo para que el profesional active su perfil.
+      APP_URL: ${APP_URL:-https://vincula-up.local}
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
     volumes:
       - fotos_data:/data/fotos

@@ -33,12 +33,15 @@ public class ApiController {
     private final BackendGateway gateway;
     private final com.vinculaup.bff_web.service.KeycloakAdminService keycloakAdmin;
     private final com.vinculaup.bff_web.service.FotoStorage fotoStorage;
+    private final com.vinculaup.bff_web.service.NotificacionService notificar;
 
     public ApiController(BackendGateway gateway, com.vinculaup.bff_web.service.KeycloakAdminService keycloakAdmin,
-            com.vinculaup.bff_web.service.FotoStorage fotoStorage) {
+            com.vinculaup.bff_web.service.FotoStorage fotoStorage,
+            com.vinculaup.bff_web.service.NotificacionService notificar) {
         this.gateway = gateway;
         this.keycloakAdmin = keycloakAdmin;
         this.fotoStorage = fotoStorage;
+        this.notificar = notificar;
     }
 
     private JsonNode authenticatedUser() {
@@ -298,11 +301,44 @@ public class ApiController {
         return gateway.crearProfesional(body);
     }
 
+    /**
+     * Activación del perfil profesional.
+     * <p>
+     * La foto se sube aparte a {@code POST /api/fotos} y llega como URL pública.
+     * Ese dato tiene que quedar en <b>ms-usuarios</b>, que es de donde la lee la
+     * aplicación (el perfil de ms-profesionales es un padrón técnico y no muestra
+     * fotos). Antes solo se guardaba del lado de ms-profesionales, con lo que la
+     * imagen se perdía: el archivo quedaba subido al almacenamiento y la URL,
+     * huérfana.
+     */
     @RequestMapping(value = "/profesionales/activar", method = {RequestMethod.PATCH, RequestMethod.POST, RequestMethod.PUT})
     public JsonNode activarProfesional(@RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
         professionalProfile(user, false);
-        return gateway.activarProfesional(identityBody(body, user, "usuarioId"));
+        JsonNode resultado = gateway.activarProfesional(identityBody(body, user, "usuarioId"));
+        guardarFotoEnUsuario(body, user);
+        return resultado;
+    }
+
+    /**
+     * Copia la foto activada a la cuenta del usuario.
+     * <p>
+     * Es best-effort a propósito: si ms-usuarios no responde, el perfil ya quedó
+     * activo y con su zona, y frenar la activación dejaría al profesional sin
+     * servicio. El frontend igual puede reenviar la foto desde "Mi cuenta".
+     */
+    private void guardarFotoEnUsuario(JsonNode body, JsonNode user) {
+        String fotoUrl = body.path("fotoUrl").asText("").trim();
+        if (fotoUrl.isEmpty() || user == null || !user.hasNonNull("id")) {
+            return;
+        }
+        try {
+            var foto = tools.jackson.databind.json.JsonMapper.builder().build().createObjectNode();
+            foto.put("fotoUrl", fotoUrl);
+            gateway.actualizarUsuario(UUID.fromString(user.get("id").asText()), foto);
+        } catch (RuntimeException ignored) {
+            // Ver el javadoc: la activación ya está confirmada y no debe abortarse.
+        }
     }
 
     @GetMapping("/profesionales/mi-perfil")
@@ -454,6 +490,13 @@ public class ApiController {
 
         try {
             JsonNode perfil = gateway.crearProfesional(perfilBody);
+            // Aviso best-effort: si el correo no sale, el prerregistro ya quedó
+            // guardado y el administrador puede avisar por otra vía.
+            notificar.avisarPrerregistro(
+                    email,
+                    nombreCompleto(object),
+                    legajo,
+                    primeraEspecialidad(perfil));
             var respuesta = mapper.createObjectNode();
             respuesta.set("usuario", usuario);
             respuesta.set("profesional", perfil);
@@ -477,6 +520,28 @@ public class ApiController {
     public ResponseEntity<JsonNode> buscarUsuarioPorEmail(@RequestParam String email) {
         JsonNode usuario = gateway.buscarUsuarioPorEmail(email);
         return usuario == null ? ResponseEntity.noContent().build() : ResponseEntity.ok(usuario);
+    }
+
+    /** Nombre y apellido del cuerpo del alta, para el saludo del correo. */
+    private String nombreCompleto(JsonNode body) {
+        String nombre = body.path("nombre").asText("").trim();
+        String apellido = body.path("apellido").asText("").trim();
+        return (nombre + " " + apellido).trim();
+    }
+
+    /**
+     * Nombre de la primera especialidad del perfil recién creado, para el correo
+     * de prerregistro. Viene anidada en la respuesta de ms-profesionales; si no
+     * está, se devuelve vacío y el aviso sale igual sin ese detalle.
+     */
+    private String primeraEspecialidad(JsonNode perfil) {
+        for (JsonNode especialidad : perfil.path("especialidades")) {
+            String nombre = especialidad.path("nombre").asText("").trim();
+            if (!nombre.isEmpty()) {
+                return nombre;
+            }
+        }
+        return "";
     }
 
     /** Baneo de una cuenta (clientes incluidos) por incumplimiento de normas. */

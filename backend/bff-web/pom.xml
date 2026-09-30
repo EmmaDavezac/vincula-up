@@ -64,6 +64,13 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
 		</dependency>
+		<!-- Avisos por correo: hoy, el mail de prerregistro que el administrador
+		     envía al profesional. Reutiliza el mismo SMTP que Keycloak
+		     (KEYCLOAK_SMTP_*), así no hay credenciales duplicadas en el .env. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
 
 		<!-- Almacenamiento de archivos vía API S3 (MinIO en local, compatible con
 		     Cloudflare R2 cambiando endpoint y credenciales). -->

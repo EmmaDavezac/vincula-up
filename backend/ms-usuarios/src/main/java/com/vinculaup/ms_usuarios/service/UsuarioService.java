@@ -86,6 +86,20 @@ public class UsuarioService {
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
     }
 
+    /**
+     * Resuelve la cuenta de alguien que acaba de autenticarse en Keycloak.
+     * <p>
+     * El rol de negocio se decide <b>solo por el padrón</b>: si el email ya
+     * estaba cargado por el administrador (prerregistro) la cuenta se vincula y
+     * conserva su PROFESIONAL; si el email no está en el padrón, la cuenta nueva
+     * nace como CLIENTE.
+     * <p>
+     * Antes, al auto-crear, el rol se tomaba del claim del token de Keycloak
+     * ({@code rol}). Eso dejaba el prerregistro en manos de la configuración de
+     * Keycloak: si el token decía PROFESIONAL, cualquiera entraba como
+     * profesional sin pasar por el padrón. El parámetro {@code rol} se conserva
+     * para los usuarios que ya existían, pero ya no decide altas.
+     */
     public UsuarioResponse buscarPorKeycloakIdOAutoCrear(UUID keycloakId, String email, String nombre, String apellido, RolNegocio rol) {
         return repository.findByKeycloakId(keycloakId).map(this::toResponse).orElseGet(() -> {
             if (email != null && !email.isBlank()) {
@@ -97,11 +111,11 @@ public class UsuarioService {
                     existing.completarDatosPersonales(nombre, apellido);
                     return toResponse(existing);
                 }
-                // Auto-create user from Keycloak claims
-                RolNegocio finalRol = rol != null ? rol : RolNegocio.CLIENTE;
+                // Auto-create user from Keycloak claims.
+                // CLIENTE es el único rol que se concede sin pasar por el padrón.
                 String finalNombre = nombre != null && !nombre.isBlank() ? nombre.trim() : "Usuario";
                 String finalApellido = apellido != null ? apellido.trim() : "";
-                Usuario newUser = new Usuario(keycloakId, finalNombre, finalApellido, email.trim().toLowerCase(), "", finalRol);
+                Usuario newUser = new Usuario(keycloakId, finalNombre, finalApellido, email.trim().toLowerCase(Locale.ROOT), "", RolNegocio.CLIENTE);
                 return toResponse(repository.save(newUser));
             }
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado para Keycloak ID: " + keycloakId);
