@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Vincula-UP">
+	<!--
+		Marca de Vincula-UP: el cuadro coral con la V que abre la barra superior
+		(la clase .vu-brand-mark de styles.css, cuadrada y con las esquinas
+		redondeadas). El icono se pinta fuera de la pagina, asi que no ve los
+		tokens del tema y los dos colores van escritos: el coral de la marca
+		(#e35f43) y blanco para la V. El coral es un tono medio, contrasta igual
+		de bien sobre una barra de pestanas clara y una oscura, asi que no hace
+		falta una variante por tema.
+
+		La V esta dibujada como trazado y no como texto: un <text> dependeria de
+		la serif que tenga instalada quien abra la pestana, y a 16 px no hay
+		margen para que el glifo se corra.
+
+		La V, en la caja de 64: hombro izquierdo (17,18)-(28,18), muesca del
+		centro (32,36), hombro derecho (36,18)-(47,18) y punta (32,46).
+
+		El favicon.ico y el apple-touch-icon.png son esta misma figura
+		pasada a pixeles a mano. Si cambia la marca hay que rehacer los tres,
+		no solo el SVG.
+	-->
+	<rect width="64" height="64" rx="15" fill="#e35f43" />
+	<path d="M17 18h11l4 18 4-18h11L32 46z" fill="#ffffff" />
+</svg>
