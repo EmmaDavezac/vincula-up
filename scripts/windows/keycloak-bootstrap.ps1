@@ -69,6 +69,9 @@ $smtpFrom       = if ($env:KEYCLOAK_SMTP_FROM)               { $env:KEYCLOAK_SMT
 $smtpFromName   = if ($env:KEYCLOAK_SMTP_FROM_DISPLAY_NAME)  { $env:KEYCLOAK_SMTP_FROM_DISPLAY_NAME }  else { 'Vincula-UP' }
 $smtpUser       = if ($env:KEYCLOAK_SMTP_USER)               { $env:KEYCLOAK_SMTP_USER }               else { '' }
 $smtpPassword   = if ($env:KEYCLOAK_SMTP_PASSWORD)           { $env:KEYCLOAK_SMTP_PASSWORD }           else { '' }
+# Client público del frontend. Sus redirectUris se sincronizan más abajo leyendo el
+# JSON del import, que es la fuente de verdad.
+$publicClientId = if ($env:KEYCLOAK_PUBLIC_CLIENT_ID)        { $env:KEYCLOAK_PUBLIC_CLIENT_ID }        else { 'vincula-up-public' }
 
 # Invariante del secreto: este script es el UNICO camino del .env a Keycloak.
 # El import del realm no resuelve sus placeholders ${env.*} (ver
@@ -151,6 +154,42 @@ if (-not $clientUuid) {
         -s "secret=$adminSecret" `
         -s serviceAccountsEnabled=true
     Write-Host '    client ya existía: se actualizaron secret y service account'
+}
+
+# ── 2b. Client público: redirectUris del JSON del import ────────────────────
+# Por qué leer el JSON y no hardcodear la lista: 'keycloak/import/vincula-up-realm.json'
+# es la fuente de verdad de redirectUris/webOrigins (y lo que se aplica al crear el
+# realm). Copiar los valores acá sería una segunda lista que se desincroniza sola.
+# Con 'https://*' en esa lista, los túneles de Cloudflare de demo funcionan sin
+# tocar nada cada vez que cloudflared genera una URL nueva.
+Write-Host "==> Sincronizando el client público $publicClientId con el JSON del import"
+$publicClientUuid = (docker exec -i $Container $kcadm get clients -r $realm `
+    -q "clientId=$publicClientId" --fields id --format csv --noquotes |
+    Select-Object -Last 1).Trim()
+
+if (-not $publicClientUuid) {
+    Write-Host "    AVISO: el client $publicClientId no existe en el realm $realm." -ForegroundColor Yellow
+    Write-Host '    No se toca nada: probablemente falte importar el realm.' -ForegroundColor Yellow
+} else {
+    $publicClientJson = Join-Path $repoRoot 'keycloak/import/vincula-up-realm.json'
+    $publicClient = (Get-Content $publicClientJson -Raw | ConvertFrom-Json).clients |
+        Where-Object { $_.clientId -eq $publicClientId } | Select-Object -First 1
+
+    if (-not $publicClient -or -not $publicClient.redirectUris) {
+        Write-Host "    AVISO: no se pudo leer redirectUris de $publicClientJson. No se toca nada." -ForegroundColor Yellow
+    } else {
+        # ConvertTo-Json -Compress es lo que espera kcadm para un atributo de lista.
+        $redirectUris = @($publicClient.redirectUris) | ConvertTo-Json -Compress
+        $webOrigins   = @($publicClient.webOrigins)   | ConvertTo-Json -Compress
+        if (-not $webOrigins.StartsWith('[')) { $webOrigins = "[$webOrigins]" }
+
+        # 'attributes."..."' con notación de puntos fija UNA clave sin pisar el resto.
+        Invoke-Kcadm update "clients/$publicClientUuid" -r $realm `
+            -s "redirectUris=$redirectUris" `
+            -s "webOrigins=$webOrigins" `
+            -s 'attributes."pkce.code.challenge.method"=S256'
+        Write-Host "    redirectUris aplicado: $redirectUris"
+    }
 }
 
 # ── 3. Permisos de administración de usuarios ───────────────────────────────

@@ -44,6 +44,9 @@ ADMIN_USER="${KEYCLOAK_ADMIN:-admin}"
 ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-admin}"
 ADMIN_CLIENT_ID="${KEYCLOAK_ADMIN_CLIENT_ID:-vincula-up-admin}"
 ADMIN_CLIENT_SECRET="${KEYCLOAK_ADMIN_CLIENT_SECRET:-vincula-up-admin-secret}"
+# Client público del frontend. Su redirectUris se sincronizan más abajo leyendo el
+# JSON del import, que es la fuente de verdad.
+PUBLIC_CLIENT_ID="${KEYCLOAK_PUBLIC_CLIENT_ID:-vincula-up-public}"
 CONTAINER="${KEYCLOAK_CONTAINER:-vinculaup-keycloak}"
 KCADM=/opt/keycloak/bin/kcadm.sh
 
@@ -110,6 +113,44 @@ else
     -s secret="$ADMIN_CLIENT_SECRET" \
     -s serviceAccountsEnabled=true
   echo "    client ya existía: se actualizaron secret y service account"
+fi
+
+echo "==> Sincronizando el client público $PUBLIC_CLIENT_ID con el JSON del import"
+# Por qué leer el JSON y no hardcodear la lista: `keycloak/import/vincula-up-realm.json`
+# es la fuente de verdad de redirectUris/webOrigins (y lo que se aplica al crear el
+# realm). Copiar los valores acá sería una segunda lista que se desincroniza sola.
+# Con `https://*` en esa lista, los túneles de Cloudflare de demo funcionan sin
+# tocar nada cada vez que cloudflared genera una URL nueva.
+PUBLIC_CLIENT_UUID="$(kcadm get clients -r "$REALM" -q clientId="$PUBLIC_CLIENT_ID" --fields id --format csv --noquotes | tail -n 1 || true)"
+if [ -z "${PUBLIC_CLIENT_UUID:-}" ]; then
+  echo "    AVISO: el client $PUBLIC_CLIENT_ID no existe en el realm $REALM."
+  echo "    No se toca nada: probablemente falte importar el realm."
+elif ! command -v python3 >/dev/null 2>&1; then
+  echo "    OMITIDO: se necesita python3 para leer el JSON del import."
+  echo "    Sincronizá redirectUris a mano desde la consola de administración."
+else
+  PUBLIC_CLIENT_JSON="$REPO_ROOT/keycloak/import/vincula-up-realm.json"
+  # Una sola lectura del JSON: la primera línea es redirectUris, la segunda webOrigins.
+  CLIENT_CONFIG="$(python3 -c '
+import json, sys
+for c in json.load(open(sys.argv[1])).get("clients", []):
+    if c.get("clientId") == sys.argv[2]:
+        print(json.dumps(c.get("redirectUris", [])))
+        print(json.dumps(c.get("webOrigins", [])))
+        break
+' "$PUBLIC_CLIENT_JSON" "$PUBLIC_CLIENT_ID" 2>/dev/null || true)"
+  REDIRECT_URIS="$(printf '%s\n' "$CLIENT_CONFIG" | sed -n 1p)"
+  WEB_ORIGINS="$(printf '%s\n' "$CLIENT_CONFIG" | sed -n 2p)"
+  if [ -z "${REDIRECT_URIS:-}" ] || [ "$REDIRECT_URIS" = "[]" ]; then
+    echo "    AVISO: no se pudo leer redirectUris de $PUBLIC_CLIENT_JSON. No se toca nada."
+  else
+    # `attributes."..."` con notación de puntos fija UNA clave sin pisar el resto.
+    kcadm update "clients/$PUBLIC_CLIENT_UUID" -r "$REALM" \
+      -s "redirectUris=$REDIRECT_URIS" \
+      -s "webOrigins=${WEB_ORIGINS:-[]}" \
+      -s 'attributes."pkce.code.challenge.method"=S256'
+    echo "    redirectUris aplicado: $REDIRECT_URIS"
+  fi
 fi
 
 echo "==> Otorgando permisos de administración de usuarios al service account"
