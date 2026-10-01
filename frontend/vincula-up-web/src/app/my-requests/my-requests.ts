@@ -13,6 +13,7 @@ import { fotoUtil } from '../core/utils/photo';
 import { VuAvatar } from '../shared/avatar/avatar';
 import { VuConfirm } from '../shared/confirm/confirm';
 import { VuIcon } from '../shared/icon/icon';
+import { VuSkeletonList } from '../shared/skeleton-list/skeleton-list';
 
 interface MessageItem {
   id: string;
@@ -37,7 +38,7 @@ interface RatingItem {
 }
 
 @Component({
-	imports: [CommonModule, RouterLink, FormsModule, VuAvatar, VuConfirm, VuIcon],
+	imports: [CommonModule, RouterLink, FormsModule, VuAvatar, VuConfirm, VuIcon, VuSkeletonList],
 	selector: 'app-my-requests',
 	styleUrl: './my-requests.css',
 	templateUrl: './my-requests.html',
@@ -51,6 +52,11 @@ export class MyRequests {
   readonly requests = this.requestService.myRequests;
   readonly errorMessage = signal('');
   readonly successMessage = signal('');
+  /**
+   * Primera carga de la lista: mientras dura se muestra el skeleton y no el
+   * estado vacío (que diría "todavía no tenés solicitudes" sin haber llegado nada).
+   */
+  readonly loading = signal(true);
 
   // Filtros de la lista
   readonly statusFilter = signal<'TODAS' | RequestStatus>('TODAS');
@@ -161,6 +167,8 @@ export class MyRequests {
           return of(null);
         }),
       ).subscribe((requests) => {
+        // Pase lo que pase (lista o error) la carga terminó: se oculta el skeleton.
+        this.loading.set(false);
         if (requests) {
           const filtered = isProf
             ? requests.filter((r) => r.clienteId !== userId)
@@ -182,6 +190,9 @@ export class MyRequests {
           }
         }
       });
+    } else {
+      // Sin sesión no se pide nada: si no, el skeleton quedaría visible para siempre.
+      this.loading.set(false);
     }
   }
 
@@ -216,7 +227,7 @@ export class MyRequests {
     this.profesionales.update((prev) => ({ ...prev, [profesionalId]: null }));
     this.api.getProfessionalById(profesionalId).pipe(catchError(() => of(null))).subscribe((prof) => {
       if (prof) {
-        this.profesionales.update((prev) => ({ ...prev, [profesionalId]: { ...prof, fotoUrl: fotoUtil(prof.fotoUrl) } }));
+        this.profesionales.update((prev) => ({ ...prev, [profesionalId]: prof }));
       }
     });
   }
@@ -236,16 +247,16 @@ export class MyRequests {
   }
 
   /**
-   * Foto del profesional lista para el `<img>`: `null` si no hay foto o si ya
-   * falló la carga (hotlink bloqueado, URL vencida…), para mostrar iniciales.
+   * Id del usuario dueño de la foto del profesional de la solicitud. La imagen la
+   * pide el `vu-avatar` por su id (el backend controla si ese rol puede verla);
+   * `null` cuando la ficha todavía no cargó o el profesional no tiene foto.
    */
-  fotoProfesional(request: ServiceRequest): string | null {
-    const prof = this.profesionalDe(request);
-    const foto = fotoUtil(prof?.fotoUrl);
-    if (!foto) return null;
-    if (prof?.id && this.failedPhotos().has(prof.id)) return null;
-    if (!prof?.id && this.failedPhotos().has(request.professionalId)) return null;
-    return foto;
+  usuarioIdProfesional(request: ServiceRequest): string | null {
+    return this.profesionalDe(request)?.usuarioId ?? null;
+  }
+
+  tieneFotoProfesional(request: ServiceRequest): boolean {
+    return this.profesionalDe(request)?.tieneFoto === true;
   }
 
   profesionalNombre(request: ServiceRequest): string {
@@ -686,20 +697,6 @@ export class MyRequests {
     return motivo;
   }
 
-  /**
-   * Próximo paso a seguir. Cuando el estado ya lo dice (por ejemplo, "Aceptada por
-   * el profesional"), no se repite: la tarjeta muestra el estado en la etiqueta.
-   */
-  nextAction(status: RequestStatus): string {
-    return {
-      PENDIENTE: 'Esperando confirmación',
-      ACEPTADA: '',
-      RECHAZADA: '',
-      COMPLETADA: '',
-      CANCELADA: '',
-      VENCIDA: '',
-    }[status] ?? '';
-  }
 
   /**
    * Horario del turno como rango ("08:00 a 12:00 hs"). Las solicitudes anteriores a

@@ -38,6 +38,8 @@ public class KeycloakAdminService {
     private static final String ROL_CLIENTE = "CLIENTE";
     private static final String ROL_PROFESIONAL = "PROFESIONAL";
     private static final String AUTHORIZATION = "Authorization";
+    /** Secreto de demo versionado en el repositorio: sirve para local, no para exponer. */
+    private static final String SECRETO_DEMO = "vincula-up-admin-secret";
 
     private final RestClient client;
     private final String realm;
@@ -56,6 +58,19 @@ public class KeycloakAdminService {
         this.realm = realm;
         this.clientId = clientId;
         this.clientSecret = clientSecret;
+        // El arranque no falla por un secreto mal puesto: la promoción es
+        // best-effort y se reintenta en cada login. Pero conviene que quede en
+        // el log, porque si no el síntoma es "el profesional entra y sigue
+        // siendo CLIENTE", sin ningún error visible.
+        if (!habilitado()) {
+            log.warn("Administración de Keycloak deshabilitada: falta client-id o client-secret "
+                    + "(KEYCLOAK_ADMIN_CLIENT_ID / KEYCLOAK_ADMIN_CLIENT_SECRET). La promoción a "
+                    + "PROFESIONAL del profesional invitado no va a funcionar.");
+        } else if (SECRETO_DEMO.equals(clientSecret)) {
+            log.warn("El client de servicio usa el secreto de DEMO, que es público (está en el "
+                    + "repositorio). Alcanza para local, pero hay que rotarlo antes de exponer el "
+                    + "stack: ver README, 'El secreto del client de servicio'.");
+        }
     }
 
     /** Sin credenciales de servicio la administración de Keycloak queda deshabilitada. */

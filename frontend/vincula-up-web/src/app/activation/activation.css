@@ -73,7 +73,7 @@
 }
 
 .activation__back {
-	background: #fff;
+	background: var(--surface-input);
 	border: 1px solid var(--line);
 	color: var(--ink);
 	flex-shrink: 0;
@@ -164,7 +164,7 @@
 }
 
 .zone__suggestions {
-	background: #fff;
+	background: var(--surface-input);
 	border: 1px solid var(--line);
 	border-radius: 0.75rem;
 	list-style: none;
@@ -191,8 +191,35 @@
 	background: var(--surface-highlight);
 }
 
+/*
+	El paso 2 lleva un Leaflet real en solo lectura: muestra el punto elegido y
+	el profesional ve de verdad dónde quedó su zona. El ajuste fino se hace en el
+	modal, que sí es interactivo. Antes esto era un dibujo con gradientes.
+*/
 .zone__map {
+	background: var(--surface-tint);
+	border: 1px solid var(--line);
+	border-radius: 0.5rem;
+	height: 13rem;
 	margin-top: 0.25rem;
+	width: 100%;
+}
+
+/* Leaflet exige altura explícita en el contenedor, y además el bloque inline que
+	inserta para los tiles no debe romper el ancho de la tarjeta. */
+.zone__map .leaflet-container {
+	background: var(--surface-tint);
+	font-family: var(--font-sans);
+}
+
+.zone__map .leaflet-control-attribution {
+	background: var(--surface-card);
+	color: var(--muted);
+	font-size: 0.625rem;
+}
+
+.zone__map .leaflet-control-attribution a {
+	color: var(--coral);
 }
 
 .zone__tools {
@@ -262,7 +289,7 @@
 }
 
 .day-chip {
-	background: #fff;
+	background: var(--surface-input);
 	border: 1px solid var(--line);
 	border-radius: 0.5rem;
 	color: var(--ink);
@@ -280,7 +307,7 @@
 .day-chip.is-active {
 	background: var(--emerald);
 	border-color: var(--emerald);
-	color: #fff;
+	color: var(--on-solid);
 }
 
 .days__summary {
@@ -322,7 +349,7 @@
 	align-items: center;
 	background: var(--emerald);
 	border-radius: 999px;
-	color: #fff;
+	color: var(--on-solid);
 	display: flex;
 	height: 5rem;
 	justify-content: center;
@@ -347,7 +374,7 @@
 
 .map-overlay {
 	align-items: center;
-	background: rgb(0 0 0 / 0.3);
+	background: var(--scrim);
 	display: flex;
 	inset: 0;
 	justify-content: center;
@@ -397,7 +424,7 @@
 }
 
 .map-canvas {
-	background: #dfe8df;
+	background: var(--surface-success-soft);
 	border: 1px solid var(--line);
 	border-radius: 0.75rem;
 	height: 18rem;

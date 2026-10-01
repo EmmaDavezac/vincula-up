@@ -1,0 +1,187 @@
+/*
+Documentos largos (términos, preguntas frecuentes).
+
+Solo se usan tokens de `styles.css`, ninguno color suelto: así el tema oscuro
+de la Fase 4 los revierte sin tocar este archivo.
+*/
+
+.legal__head {
+	padding-bottom: 2rem;
+	padding-top: 3rem;
+}
+
+.legal__bajada {
+	font-size: 1.0625rem;
+	margin-top: 1.25rem;
+	max-width: 44rem;
+}
+
+.legal__version {
+	color: var(--muted);
+	font-size: 0.8125rem;
+	margin: 1rem 0 0;
+}
+
+.legal__layout {
+	display: grid;
+	gap: 2.5rem;
+	padding-bottom: 4rem;
+}
+
+@media (min-width: 1024px) {
+	.legal__layout {
+		grid-template-columns: 15rem minmax(0, 1fr);
+	}
+}
+
+/* ── Índice ─────────────────────────────────────────────────────────── */
+
+.legal__toc-title {
+	color: var(--muted);
+	font-size: 0.6875rem;
+	font-weight: 800;
+	letter-spacing: 0.08em;
+	margin: 0 0 0.75rem;
+	text-transform: uppercase;
+}
+
+.legal__toc ul {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.legal__toc li + li {
+	margin-top: 0.5rem;
+}
+
+.legal__toc a {
+	color: var(--ink);
+	font-size: 0.875rem;
+	text-decoration: none;
+}
+
+.legal__toc a:hover {
+	color: var(--coral);
+	text-decoration: underline;
+}
+
+@media (min-width: 1024px) {
+	/* El índice acompaña la lectura: se queda quieto mientras se recorre el texto. */
+	.legal__toc {
+		align-self: start;
+		position: sticky;
+		top: 5.5rem;
+	}
+}
+
+/* ── Cuerpo ─────────────────────────────────────────────────────────── */
+
+.legal__body {
+	max-width: 46rem;
+	min-width: 0;
+}
+
+.legal__section + .legal__section {
+	border-top: 1px solid var(--line);
+	margin-top: 2.5rem;
+	padding-top: 2.5rem;
+}
+
+.legal__section-title {
+	font-family: var(--font-serif);
+	font-size: 1.5rem;
+	letter-spacing: -0.02em;
+	line-height: 1.2;
+	margin: 0 0 1rem;
+}
+
+/* El ancla no debe quedar tapado por la barra superior al saltar desde el índice. */
+.legal__section {
+	scroll-margin-top: 5.5rem;
+}
+
+.legal__p {
+	color: var(--ink);
+	line-height: 1.7;
+	margin: 0 0 1rem;
+}
+
+.legal__list {
+	color: var(--ink);
+	line-height: 1.7;
+	margin: 0 0 1rem;
+	padding-left: 1.25rem;
+}
+
+.legal__list li + li {
+	margin-top: 0.5rem;
+}
+
+/* ── Acordeón del FAQ ───────────────────────────────────────────────── */
+
+.legal__faq {
+	background: var(--surface-highlight);
+	border-radius: 0.75rem;
+	overflow: hidden;
+}
+
+.legal__faq + .legal__faq {
+	margin-top: 0.5rem;
+}
+
+.legal__faq-question {
+	cursor: pointer;
+	font-weight: 700;
+	list-style: none;
+	padding: 1rem 1.125rem;
+}
+
+.legal__faq-question::-webkit-details-marker {
+	display: none;
+}
+
+/* La flecha acompaña al acordeón y acompaña al estado abierto/cerrado. */
+.legal__faq-question::before {
+	content: '+';
+	color: var(--coral);
+	display: inline-block;
+	font-weight: 800;
+	margin-right: 0.625rem;
+}
+
+.legal__faq[open] .legal__faq-question::before {
+	content: '−';
+}
+
+.legal__faq-answer {
+	padding: 0 1.125rem 1.125rem;
+}
+
+.legal__faq-answer p {
+	line-height: 1.7;
+	margin: 0;
+}
+
+.legal__faq-answer p + p {
+	margin-top: 0.75rem;
+}
+
+/* ── Pie ────────────────────────────────────────────────────────────── */
+
+.legal__footer {
+	align-items: center;
+	border-top: 1px solid var(--line);
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+	justify-content: space-between;
+	margin-top: 3rem;
+	padding-top: 1.5rem;
+}
+
+.legal__footer p {
+	color: var(--muted);
+	font-size: 0.875rem;
+	margin: 0;
+}

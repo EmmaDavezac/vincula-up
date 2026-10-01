@@ -47,16 +47,26 @@ public class NotificacionService {
     /**
      * Avisa al profesional que el administrador lo prerregistró.
      * <p>
-     * @param email     correo del profesional (es el que usó el administrador al
-     *                  cargarlo en el padrón)
-     * @param nombre    nombre con el que se lo ve en la aplicación
-     * @param legajo    legajo asignado en el padrón
+     * El texto va en términos del servicio y no de la implementación: el
+     * profesional no tiene por qué saber con qué sistema se guarda su prerregistro,
+     * y decirlo le da información que no necesita.
+     * <p>
+     * Lo importante es que el correo explique el paso que más se confunde: entrar no
+     * alcanza, hace falta tener cuenta <b>con ese mismo correo</b>. Es la clave con la
+     * que se lo encuentra, y por eso el correo se repite en el cuerpo.
+     *
+     * @param email        correo del profesional (es el que usó el administrador al
+     *                     cargarlo en el padrón)
+     * @param nombre       nombre con el que se lo ve en la aplicación
+     * @param legajo       legajo asignado en el padrón
      * @param especialidad nombre de la especialidad elegida
+     * @return {@code true} si el correo salió. Es best-effort: si no se pudo enviar,
+     *         el prerregistro queda igual y se le avisa al administrador.
      */
-    public void avisarPrerregistro(String email, String nombre, String legajo, String especialidad) {
+    public boolean avisarPrerregistro(String email, String nombre, String legajo, String especialidad) {
         if (email == null || email.isBlank()) {
             log.warn("No se pudo avisar el prerregistro: el profesional no tiene email");
-            return;
+            return false;
         }
         String saludo = (nombre == null || nombre.isBlank()) ? "" : "Hola " + nombre.strip() + ",\n\n";
         String cuerpo = saludo
@@ -65,21 +75,22 @@ public class NotificacionService {
                 + "  · Legajo: " + legajo + "\n"
                 + (especialidad == null || especialidad.isBlank() ? "" : "  · Especialidad: " + especialidad + "\n")
                 + "\n"
-                + "Para aparecer en el padrón y recibir solicitudes te falta activar tu perfil.\n"
-                + "Entrá con este mismo correo y completá la activación:\n\n"
-                + "  " + appUrl + "/activar-perfil\n\n"
-                + "Vas a necesitar una foto de perfil, tu zona de cobertura y los horarios\n"
-                + "en los que podés trabajar.\n\n"
-                + "Si no esperabas este correo, ignoralo y respondé a la Universidad Popular.\n";
+                + "Para aparecer en el padrón y recibir solicitudes te falta activar tu perfil.\n\n"
+                + "  1. Entrá en " + appUrl + "/activar-perfil\n"
+                + "  2. Iniciá sesión. Si todavía no tenés una cuenta, creala con este correo:\n"
+                + "     " + email + "\n"
+                + "  3. Completá tu perfil: foto, zona de cobertura y horarios.\n\n"
+                + "Usá exactamente esa dirección: es con la que encontramos tu prerregistro.\n\n"
+                + "Si no esperabas este correo, ignorálo.\n";
 
-        enviar(email, "Vincula-UP | Tu prerregistro como profesional", cuerpo);
+        return enviar(email, "Vincula-UP | Tu prerregistro como profesional", cuerpo);
     }
 
-    private void enviar(String destinatario, String asunto, String cuerpo) {
+    private boolean enviar(String destinatario, String asunto, String cuerpo) {
         JavaMailSender sender = mailSender.getIfAvailable();
         if (sender == null) {
             log.warn("No se envió '{}' a {}: no hay SMTP configurado (KEYCLOAK_SMTP_*)", asunto, destinatario);
-            return;
+            return false;
         }
         try {
             // MimeMessage y no SimpleMailMessage para poder poner el nombre de la
@@ -95,8 +106,10 @@ public class NotificacionService {
             helper.setText(cuerpo, false);
             sender.send(message);
             log.info("Prerregistro avisado por correo a {}", destinatario);
+            return true;
         } catch (Exception ex) {
             log.warn("No se pudo enviar '{}' a {}: {}", asunto, destinatario, ex.getMessage());
+            return false;
         }
     }
 }

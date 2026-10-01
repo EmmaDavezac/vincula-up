@@ -1,0 +1,42 @@
+:host {
+	display: block;
+}
+
+.admin-category-new__head {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+	justify-content: space-between;
+}
+
+.admin-category-new__lead {
+	font-size: 0.875rem;
+	line-height: 1.6;
+	margin: 0.75rem 0 0;
+	max-width: 42rem;
+}
+
+.admin-category-new__alert {
+	margin: 1.5rem 0 0;
+}
+
+.admin-category-new__form {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	margin-top: 1.5rem;
+}
+
+.admin-category-new__input {
+	margin-top: 0.375rem;
+	max-width: 28rem;
+}
+
+.admin-category-new__actions {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	justify-content: flex-end;
+	margin-top: 0.5rem;
+}

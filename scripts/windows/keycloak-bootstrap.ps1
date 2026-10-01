@@ -70,6 +70,24 @@ $smtpFromName   = if ($env:KEYCLOAK_SMTP_FROM_DISPLAY_NAME)  { $env:KEYCLOAK_SMT
 $smtpUser       = if ($env:KEYCLOAK_SMTP_USER)               { $env:KEYCLOAK_SMTP_USER }               else { '' }
 $smtpPassword   = if ($env:KEYCLOAK_SMTP_PASSWORD)           { $env:KEYCLOAK_SMTP_PASSWORD }           else { '' }
 
+# Invariante del secreto: este script es el UNICO camino del .env a Keycloak.
+# El import del realm no resuelve sus placeholders ${env.*} (ver
+# keycloak/import/README.md), asi que si rotas KEYCLOAK_ADMIN_CLIENT_SECRET hay
+# que volver a correr esto. Si no, el BFF pide tokens con un secreto y Keycloak
+# responde 401: la promocion de rol falla en silencio, solo con un warning.
+# El default de demo es publico (esta en el repositorio). Se avisa fuerte para
+# que nadie exponga el stack creyendo que tiene un secreto propio.
+$secretoDemo = 'vincula-up-admin-secret'
+if ($adminSecret -eq $secretoDemo) {
+    Write-Host ''
+    Write-Host "  AVISO: se esta usando el secreto de demo de $adminClientId, que es" -ForegroundColor Yellow
+    Write-Host '  PUBLICO. Alcanza para local, pero cualquiera que lea el repositorio' -ForegroundColor Yellow
+    Write-Host '  puede pedir un token de servicio y promover cuentas a PROFESIONAL.' -ForegroundColor Yellow
+    Write-Host '  Para rotarlo: genera uno (openssl rand -hex 24), ponelo en' -ForegroundColor Yellow
+    Write-Host '  KEYCLOAK_ADMIN_CLIENT_SECRET del .env y volve a correr este script.' -ForegroundColor Yellow
+    Write-Host ''
+}
+
 $kcadm = '/opt/keycloak/bin/kcadm.sh'
 
 function Invoke-Kcadm {
@@ -95,9 +113,12 @@ Write-Host "==> Autenticado como $adminUser"
 
 # ── 1. Auto-registro de clientes ────────────────────────────────────────────
 Write-Host "==> Habilitando auto-registro y rol CLIENTE por defecto en el realm $realm"
+# `registrationEmailAsUsername=true` hace que el registro pida SOLO el correo y lo
+# use como nombre de usuario interno. La aplicación se accede por email, así que
+# pedir además un "nombre de usuario" era un campo de más que nadie recordaba.
 Invoke-Kcadm update "realms/$realm" `
     -s registrationAllowed=true `
-    -s registrationEmailAsUsername=false `
+    -s registrationEmailAsUsername=true `
     -s loginWithEmailAllowed=true `
     -s duplicateEmailsAllowed=false `
     -s resetPasswordAllowed=true
@@ -161,6 +182,13 @@ if ($smtpPassword) {
 }
 
 Write-Host ''
-Write-Host 'Listo. El BFF debe conocer estas credenciales (docker-compose.yml):' -ForegroundColor Green
-Write-Host "  KEYCLOAK_ADMIN_CLIENT_ID=$adminClientId"
-Write-Host "  KEYCLOAK_ADMIN_CLIENT_SECRET=$adminSecret"
+Write-Host 'Listo.' -ForegroundColor Green
+Write-Host "  Client de servicio : $adminClientId"
+if ($adminSecret -eq $secretoDemo) {
+    Write-Host '  Secreto            : el de DEMO, que es publico. Rotar antes de exponer.'
+} else {
+    Write-Host '  Secreto            : propio (no se imprime).'
+}
+Write-Host ''
+Write-Host 'Si rotaste el secreto, el BFF quedo con el valor viejo. Recrealo:'
+Write-Host '  docker compose up -d --force-recreate bff-web'

@@ -131,6 +131,13 @@ public class BackendGateway {
         }
     }
 
+    /** Registra la aceptación de los términos. El id sale del token, no del body. */
+    public JsonNode aceptarTerminos(UUID id, String version) {
+        var body = tools.jackson.databind.json.JsonMapper.builder().build().createObjectNode();
+        body.put("version", version);
+        return patch(usuarios, "/usuarios/{id}/terminos", body, id);
+    }
+
     /** Baneo administrativo de la cuenta (reversible). */
     public JsonNode suspenderUsuario(UUID id) {
         return patch(usuarios, "/usuarios/{id}/suspender", null, id);

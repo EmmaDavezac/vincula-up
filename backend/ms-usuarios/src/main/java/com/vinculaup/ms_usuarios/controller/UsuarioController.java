@@ -1,5 +1,6 @@
 package com.vinculaup.ms_usuarios.controller;
 
+import com.vinculaup.ms_usuarios.dto.AceptarTerminosRequest;
 import com.vinculaup.ms_usuarios.dto.ActualizarUsuarioRequest;
 import com.vinculaup.ms_usuarios.dto.CrearUsuarioRequest;
 import com.vinculaup.ms_usuarios.dto.UsuarioResponse;
@@ -48,6 +49,15 @@ public class UsuarioController {
     @GetMapping("/por-email")
     public UsuarioResponse buscarPorEmail(@RequestParam String email) {
         return service.buscarPorEmail(email);
+    }
+
+    /**
+     * Registro de la aceptación de los términos. El id lo resuelve el BFF desde el
+     * token: acá no se valida nada, es un microservicio interno.
+     */
+    @PatchMapping("/{id}/terminos")
+    public UsuarioResponse aceptarTerminos(@PathVariable UUID id, @RequestBody AceptarTerminosRequest request) {
+        return service.aceptarTerminos(id, request.version());
     }
 
     @GetMapping("/{id}")

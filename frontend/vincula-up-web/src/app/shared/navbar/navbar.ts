@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { filter } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
+import { TemaService } from '../../core/services/tema.service';
 import { UserRole } from '../../core/models/user-profile';
 import { VuAvatar } from '../avatar/avatar';
 import { VuConfirm } from '../confirm/confirm';
@@ -16,6 +17,8 @@ import { VuIcon } from '../icon/icon';
 })
 export class NavbarComponent {
 	protected readonly auth = inject(AuthService);
+	/** Tema claro/oscuro. El toggle vive en la barra y no pide sesión. */
+	protected readonly tema = inject(TemaService);
 	protected userMenuOpen = false;
 
 	private readonly router = inject(Router);

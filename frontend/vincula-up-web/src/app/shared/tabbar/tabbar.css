@@ -2,16 +2,20 @@
 Barra inferior fija, sólo en móvil. Es la misma en todo el sitio (incluido el
 panel de administración): en escritorio se oculta porque la navegación está en
 la barra superior.
+
+El alto sale de `--tabbar-h`, que el pie también reserva. Sin ese espacio, la
+barra fija tapaba la última fila del pie en móvil.
 */
 .vu-tabbar {
-	background: rgb(246 243 236 / 0.95);
+	background: var(--bar-translucent);
 	border-top: 1px solid var(--line);
 	bottom: 0;
-	box-shadow: 0 -4px 16px rgb(30 41 38 / 0.08);
+	box-shadow: 0 -4px 16px rgb(var(--shadow-color) / calc(0.08 * var(--shadow-strength)));
 	display: none;
 	grid-auto-columns: minmax(0, 1fr);
 	grid-auto-flow: column;
 	inset-inline: 0;
+	min-height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
 	padding: 0.5rem 0.5rem max(0.65rem, env(safe-area-inset-bottom));
 	position: fixed;
 	z-index: 50;

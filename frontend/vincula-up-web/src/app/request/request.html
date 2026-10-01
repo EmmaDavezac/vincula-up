@@ -17,7 +17,7 @@
 				Volver al listado
 			</a>
 
-			<p class="vu-eyebrow-inline">Nueva solicitud</p>
+			<p class="vu-eyebrow-inline">Pedir un servicio</p>
 
 			@if (errorMessage()) {
 				<p class="vu-alert vu-alert--error request__alert" role="alert">{{ errorMessage() }}</p>
@@ -223,7 +223,7 @@
 						</div>
 
 						@if (loadingProfessionals()) {
-							<p class="vu-body">Cargando profesionales...</p>
+							<vu-skeleton-list variant="row" [count]="3" />
 						} @else if (!filteredProfessionals().length) {
 							<div class="empty-profs">
 								<p class="vu-body">
@@ -243,7 +243,7 @@
 										[class.is-active]="selectedProfessional()?.id === prof.id"
 										(click)="selectProfessional(prof)"
 									>
-									<vu-avatar size="lg" [nombre]="prof.name" [foto]="prof.fotoUrl" />
+									<vu-avatar size="lg" [nombre]="prof.name" [usuarioId]="prof.usuarioId" [tieneFoto]="prof.tieneFoto === true" />
 									<span class="professional-pick__info">
 											<b class="vu-truncate">{{ prof.name }}</b>
 											<span class="professional-pick__meta">

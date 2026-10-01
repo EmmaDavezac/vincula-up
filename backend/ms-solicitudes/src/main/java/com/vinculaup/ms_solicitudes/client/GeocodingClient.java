@@ -37,7 +37,7 @@ public class GeocodingClient {
 
     private static final String URL_BASE = "https://nominatim.openstreetmap.org/search";
     private static final String URL_REVERSA = "https://nominatim.openstreetmap.org/reverse";
-    private static final String USER_AGENT = "VinculaUP-App/1.0 (contacto@vincula-up.local)";
+    private static final String USER_AGENT = "VinculaUP-App/1.0 (vinculaup@gmail.com)";
     private static final int MAX_ENTRADAS_CACHE = 500;
     private static final long TTL_MILLIS = 10 * 60 * 1000L;
 

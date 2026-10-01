@@ -77,6 +77,79 @@ export class Activation {
   private interactiveMapInstance: any = null;
   private interactiveMapMarker: any = null;
 
+  /*
+   * Vista de referencia del paso 2. Es un Leaflet aparte del del modal, y va en
+   * solo lectura: sin arrastre, sin zoom con rueda y sin clic, para que no compita
+   * con el input de texto ni dé la impresión de que se puede ajustar el punto acá.
+   * El ajuste real sigue siendo el del modal.
+   */
+  private zoneMapInstance: any = null;
+  private zoneMapMarker: any = null;
+  private zoneMapAttempts = 0;
+
+  /**
+   * Crea (o refresca) el mapa de referencia.
+   *
+   * <p>Se llama cada vez que cambia la ubicación validada, así que tiene que
+   * tolerar que el contenedor todavía no exista (el paso 2 puede no estar montado)
+   * o que Leaflet aún no haya cargado: en ambos casos reintenta con un límite,
+   * igual que hace el mapa del wizard de solicitudes.
+   */
+  private syncZoneMap(): void {
+    const L = (window as any).L;
+    const container = document.getElementById('zone-map');
+    if (!L || !container) {
+      if (this.zoneMapAttempts++ < 20) {
+        setTimeout(() => this.syncZoneMap(), 150);
+      }
+      return;
+    }
+
+    const loc = this.validatedLocation();
+    if (!loc) return;
+
+    if (this.zoneMapInstance && !document.body.contains(this.zoneMapInstance.getContainer())) {
+      this.zoneMapInstance.remove();
+      this.zoneMapInstance = null;
+      this.zoneMapMarker = null;
+    }
+
+    if (!this.zoneMapInstance) {
+      this.zoneMapInstance = L.map('zone-map', {
+        attributionControl: true,
+        dragging: false,
+        doubleClickZoom: false,
+        keyboard: false,
+        scrollWheelZoom: false,
+        zoomControl: false,
+      }).setView([loc.lat, loc.lng], 13);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap contributors',
+      }).addTo(this.zoneMapInstance);
+
+      // `L.circleMarker` y no `L.marker`: el marcador clásico de Leaflet es una
+      // imagen que se rompe si no se resuelve la ruta de sus PNG, y acá no hay
+      // bundler resolviendo nada. El color va como atributo SVG, así que no
+      // puede leer el token `--coral`: se copia su valor (#e35f43).
+      this.zoneMapMarker = L.circleMarker([loc.lat, loc.lng], {
+        color: '#e35f43',
+        fillColor: '#e35f43',
+        fillOpacity: 0.9,
+        radius: 9,
+        weight: 2,
+      }).addTo(this.zoneMapInstance);
+    } else {
+      this.zoneMapInstance.setView([loc.lat, loc.lng], 13);
+      this.zoneMapMarker?.setLatLng([loc.lat, loc.lng]);
+    }
+
+    // El contenedor puede haber cambiado de tamaño (por ejemplo, al aparecer el
+    // panel de sugerencias de arriba). Sin esto las tiles quedan corridas.
+    setTimeout(() => this.zoneMapInstance?.invalidateSize(), 200);
+  }
+
   readonly presetLocations: Array<{ label: string; hint: string; lat: number; lng: number; displayName: string }> = [
     {
       label: 'Concepción del Uruguay',
@@ -242,6 +315,7 @@ export class Activation {
     this.locationSuggestions.set([]);
     this.locationSuggestionOpen.set(false);
     this.locationError.set('');
+    this.syncZoneMap();
   }
 
   selectPreset(preset: { label: string; lat: number; lng: number; displayName: string }): void {
@@ -251,6 +325,7 @@ export class Activation {
     this.locationSuggestions.set([]);
     this.locationSuggestionOpen.set(false);
     this.locationError.set('');
+    this.syncZoneMap();
   }
 
   validateCurrentZone(onValid?: () => void): void {
@@ -284,6 +359,7 @@ export class Activation {
       this.validatedLocation.set(loc);
       this.zoneQuery.set(displayName);
       this.locationError.set('');
+      this.syncZoneMap();
       if (onValid) onValid();
     });
   }
@@ -309,6 +385,7 @@ export class Activation {
           this.validatedLocation.set(loc);
           this.zoneQuery.set(name);
           this.locationError.set('');
+          this.syncZoneMap();
         });
       },
       () => {
@@ -420,6 +497,8 @@ export class Activation {
     this.zoneQuery.set(name);
     this.locationError.set('');
     this.closeMapPicker();
+    // El mapa de referencia corre al punto recién confirmado.
+    this.syncZoneMap();
   }
 
   // ── Métodos de Disponibilidad (Alarma) ──
@@ -465,6 +544,10 @@ export class Activation {
     // Paso 1: Foto
     if (this.step() === 1) {
       this.step.set(2);
+      // El mapa del paso 2 recién se monta con el paso, así que se pide después
+      // del cambio de signal (y reintenta solo si el contenedor aún no existe).
+      this.zoneMapAttempts = 0;
+      setTimeout(() => this.syncZoneMap(), 150);
       return;
     }
 
@@ -512,11 +595,11 @@ export class Activation {
     const keycloakId = this.auth.getKeycloakId();
     this.submitting.set(true);
 
-    // La foto se sube primero: la activación solo recibe la URL pública, así
+    // La foto se sube primero: la activación solo recibe la clave del archivo, así
     // que el base64 deja de viajar por la API y de guardarse en la base.
     const subirFoto$ = this.selectedPhotoFile
       ? this.api.uploadPhoto(this.selectedPhotoFile).pipe(
-          map((r) => r.url),
+          map((r) => r.key),
           catchError((error) => {
             this.errorMessage.set(this.api.describeError(error, 'No se pudo subir la foto.'));
             this.submitting.set(false);
@@ -525,16 +608,16 @@ export class Activation {
         )
       : of(null);
 
-    subirFoto$.subscribe((fotoUrl) => {
-      if (this.selectedPhotoFile && !fotoUrl) {
+    subirFoto$.subscribe((clave) => {
+      if (this.selectedPhotoFile && !clave) {
         return;
       }
-      this.activarConFoto(fotoUrl, usuarioId, keycloakId, loc);
+      this.activarConFoto(clave, usuarioId, keycloakId, loc);
     });
   }
 
   private activarConFoto(
-    fotoUrl: string | null,
+    clave: string | null,
     usuarioId: string,
     keycloakId: string | null,
     loc: ValidatedLocation,
@@ -542,7 +625,7 @@ export class Activation {
     const payload = {
       usuarioId,
       keycloakId: keycloakId ?? undefined,
-      fotoUrl: fotoUrl ?? '',
+      fotoUrl: clave ?? '',
       zonaCoberturaLat: loc.lat,
       zonaCoberturaLng: loc.lng,
       radioKm: Number(this.radius()),

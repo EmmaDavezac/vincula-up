@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { catchError, forkJoin, map, of } from 'rxjs';
@@ -20,6 +21,7 @@ import { ApiService } from '../../core/services/api.service';
 import { VuAvatar } from '../../shared/avatar/avatar';
 import { VuConfirm } from '../../shared/confirm/confirm';
 import { VuIcon } from '../../shared/icon/icon';
+import { VuSkeletonList } from '../../shared/skeleton-list/skeleton-list';
 
 /**
  * Clientes registrados: actividad (solicitudes realizadas), estado de la cuenta y
@@ -28,7 +30,7 @@ import { VuIcon } from '../../shared/icon/icon';
  */
 @Component({
 	selector: 'app-admin-clients',
-	imports: [FormsModule, RouterLink, VuAvatar, VuConfirm, VuIcon],
+	imports: [DatePipe, FormsModule, RouterLink, VuAvatar, VuConfirm, VuIcon, VuSkeletonList],
 	templateUrl: './admin-clients.html',
 	styleUrl: './admin-clients.css',
 })
@@ -135,6 +137,25 @@ export class AdminClients {
 		return conteo;
 	}
 
+	/**
+	 * Detalle del cliente. Es de solo lectura: muestra los datos de la cuenta y
+	 * permite activar o desactivar el acceso. Los datos de contacto no se editan
+	 * desde acá, los edita la persona desde "Mi cuenta".
+	 *
+	 * <p>La suspensión y la reactivación salen de acá y no de la fila: en una
+	 * lista, un botón rojo junto a cada nombre invita a apretarlo sin querer.
+	 */
+	readonly modal = signal<AdminUser | null>(null);
+
+	abrirDetalle(client: AdminUser): void {
+		this.aviso.set({ texto: '', tipo: 'info' });
+		this.modal.set(client);
+	}
+
+	cerrarDetalle(): void {
+		this.modal.set(null);
+	}
+
 	// ── Acceso ─────────────────────────────────────────────────────────
 
 	/** Desactivar o reactivar la cuenta: siempre con confirmación previa. */
@@ -177,6 +198,9 @@ export class AdminClients {
 			// con la foto vieja del backend.
 			const estado = suspendiendo ? 'SUSPENDIDO' : 'ACTIVO';
 			this.clients.update((items) => items.map((item) => (item.id === client.id ? { ...item, estado } : item)));
+			// Si el detalle está abierto sobre esta misma cuenta, se lo actualiza para
+			// que el botón no quede ofreciendo la acción que ya no corresponde.
+			this.modal.update((abierto) => (abierto && abierto.id === client.id ? { ...abierto, estado } : abierto));
 			this.aviso.set(
 				avisoExito(
 					suspendiendo

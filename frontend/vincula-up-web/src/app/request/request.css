@@ -111,7 +111,7 @@
 }
 
 .wizard__back-btn:hover:not(.is-hidden) {
-	background: #fff;
+	background: var(--surface-input);
 }
 
 .wizard__back-btn.is-hidden {
@@ -139,7 +139,7 @@
 /* Botón chico: solo un ícono de navegación con el texto al lado. */
 .location-gps {
 	align-items: center;
-	background: #fff;
+	background: var(--surface-input);
 	border: 1px solid var(--line);
 	border-radius: 0.75rem;
 	color: var(--ink);
@@ -161,7 +161,7 @@
 }
 
 .location-gps.is-active {
-	background: #fff7ed;
+	background: var(--surface-warning-soft);
 	border-color: var(--coral);
 	color: var(--coral);
 }
@@ -183,7 +183,7 @@
 }
 
 .suggestions {
-	background: #fff;
+	background: var(--surface-input);
 	border: 1px solid var(--line);
 	border-radius: 0.75rem;
 	list-style: none;
@@ -232,7 +232,7 @@
 }
 
 .category {
-	background: #fff;
+	background: var(--surface-input);
 	border: 1px solid var(--line);
 	border-radius: 0.75rem;
 	color: var(--ink);
@@ -250,12 +250,12 @@
 
 /* Especialidad publicada pero todavía sin técnicos disponibles. */
 .category--sin-tecnicos {
-	background: #fafafa;
+	background: var(--surface-neutral-soft);
 	color: var(--muted);
 }
 
 .category__flag {
-	background: #fff7ed;
+	background: var(--surface-warning-soft);
 	border-radius: 999px;
 	color: var(--coral);
 	display: block;
@@ -284,7 +284,7 @@
 /* Paso 4 sin técnicos para la especialidad elegida. */
 .empty-profs {
 	align-items: center;
-	background: #fff;
+	background: var(--surface-input);
 	border: 1px dashed var(--line);
 	border-radius: 0.75rem;
 	display: flex;
@@ -295,7 +295,7 @@
 }
 
 .category.is-active {
-	background: #fff7ed;
+	background: var(--surface-warning-soft);
 	border-color: var(--coral);
 }
 
@@ -320,7 +320,7 @@
 }
 
 .day {
-	background: #fff;
+	background: var(--surface-input);
 	border: 1px solid var(--line);
 	border-radius: 0.5rem;
 	color: var(--ink);
@@ -338,7 +338,7 @@
 .day.is-active {
 	background: var(--coral);
 	border-color: var(--coral);
-	color: #fff;
+	color: var(--on-solid);
 }
 
 .schedule__select {
@@ -372,7 +372,7 @@
 }
 
 .sort {
-	background: #fff;
+	background: var(--surface-input);
 	border: 1px solid var(--line);
 	border-radius: 999px;
 	color: var(--ink);
@@ -384,7 +384,7 @@
 }
 
 .sort.is-active {
-	background: #fff7ed;
+	background: var(--surface-warning-soft);
 	border-color: var(--coral);
 	color: var(--coral);
 }
@@ -397,7 +397,7 @@
 
 .professional-pick {
 	align-items: center;
-	background: #fff;
+	background: var(--surface-input);
 	border: 1px solid var(--line);
 	border-radius: 0.75rem;
 	color: var(--ink);
@@ -415,7 +415,7 @@
 }
 
 .professional-pick.is-active {
-	background: #fff7ed;
+	background: var(--surface-warning-soft);
 	border-color: var(--coral);
 }
 
@@ -436,7 +436,7 @@
 
 .professional-pick__rating {
 	align-items: center;
-	color: #c38a25;
+	color: var(--alert-warning-ink-2);
 	display: flex;
 	font-size: 0.75rem;
 	font-weight: 700;
@@ -466,8 +466,8 @@
 }
 
 .sent__card {
-	background: #ecfdf3;
-	border: 1px solid #a7e3c4;
+	background: var(--alert-info-bg-2);
+	border: 1px solid var(--alert-success-border);
 	border-radius: 1rem;
 	padding: 2rem;
 	text-align: center;
@@ -481,7 +481,7 @@ flex con `justify-content: center` sobre un ancho fijo, que sí centra.
 */
 .sent__check {
 	align-items: center;
-	background: #d1fae5;
+	background: var(--alert-success-bg-2);
 	border-radius: 50%;
 	color: var(--emerald);
 	display: flex;
@@ -498,7 +498,7 @@ flex con `justify-content: center` sobre un ancho fijo, que sí centra.
 }
 
 .sent__lead {
-	color: #14532d;
+	color: var(--alert-success-ink-2);
 	font-size: 0.875rem;
 	margin: 0.5rem 0 1.5rem;
 }
@@ -547,7 +547,7 @@ flex con `justify-content: center` sobre un ancho fijo, que sí centra.
 
 .map-overlay {
 	align-items: center;
-	background: rgb(0 0 0 / 0.3);
+	background: var(--scrim);
 	display: flex;
 	inset: 0;
 	justify-content: center;
@@ -597,7 +597,7 @@ flex con `justify-content: center` sobre un ancho fijo, que sí centra.
 }
 
 .map-canvas {
-	background: #dfe8df;
+	background: var(--surface-success-soft);
 	border: 1px solid var(--line);
 	border-radius: 0.75rem;
 	height: 18rem;

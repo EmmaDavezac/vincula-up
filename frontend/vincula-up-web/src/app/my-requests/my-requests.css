@@ -112,7 +112,7 @@
 }
 
 .req-card {
-	background: #fff;
+	background: var(--surface-input);
 	border: 1px solid var(--line);
 	border-radius: 1.25rem;
 	box-shadow: var(--shadow-sm);
@@ -170,13 +170,6 @@
 	gap: 0.25rem;
 }
 
-.req-card__detail {
-	color: var(--muted);
-	font-size: 0.875rem;
-	line-height: 1.5;
-	margin: 1rem 0 0;
-}
-
 .req-card__problem {
 	background: var(--surface-highlight);
 	border-radius: 0.75rem;
@@ -232,9 +225,9 @@
 }
 
 .req-card__reason {
-	background: #fbebee;
+	background: var(--alert-error-bg);
 	border-radius: 0.375rem;
-	color: #8e3027;
+	color: var(--alert-info-ink-2);
 	font-size: 0.875rem;
 	line-height: 1.25rem;
 	margin: 1rem 0 0;
@@ -300,7 +293,7 @@
 }
 
 .star.is-on {
-	color: #c38a25;
+	color: var(--alert-warning-ink-2);
 }
 
 .rating__score {
@@ -317,7 +310,7 @@
 }
 
 .rating__display {
-	color: #a56c19;
+	color: var(--amber);
 	font-size: 0.875rem;
 	font-weight: 600;
 	margin: 0;
@@ -342,7 +335,7 @@
 
 .modal-overlay {
 	align-items: flex-end;
-	background: rgb(30 41 38 / 0.4);
+	background: rgb(var(--shadow-color) / calc(0.4 * var(--shadow-strength)));
 	display: flex;
 	inset: 0;
 	justify-content: center;
@@ -431,7 +424,7 @@
 .status-option:not(.is-cancel):not(.is-reject) {
 	background: var(--coral);
 	border-color: var(--coral);
-	color: #fff;
+	color: var(--on-solid);
 }
 
 .status-option:not(.is-cancel):not(.is-reject):hover {
@@ -440,11 +433,11 @@
 }
 
 .status-option.is-reject {
-	color: #a33b3b;
+	color: var(--alert-warning-strong);
 }
 
 .status-option.is-cancel {
-	color: #8b493b;
+	color: var(--alert-neutral-ink);
 }
 
 .status-modal__motivo {
@@ -458,7 +451,7 @@
 }
 
 .status-modal__error {
-	color: #b42318;
+	color: var(--alert-error-strong);
 	font-size: 0.8125rem;
 	margin: 0.5rem 0 0;
 }
@@ -541,15 +534,15 @@
 }
 
 .bubble {
-	background: #fff;
+	background: var(--surface-input);
 	border-radius: 0.875rem;
-	box-shadow: 0 1px 2px rgb(30 41 38 / 0.08);
+	box-shadow: 0 1px 2px rgb(var(--shadow-color) / calc(0.08 * var(--shadow-strength)));
 	max-width: 84%;
 	padding: 0.5rem 0.75rem;
 }
 
 .bubble.is-mine {
-	background: var(--ink);
+	background: var(--band-dark);
 }
 
 .bubble__sender {
@@ -567,12 +560,12 @@
 }
 
 .bubble.is-mine .bubble__text {
-	color: rgb(255 255 255 / 0.85);
+	color: var(--band-ink-soft);
 }
 
 .bubble.is-mine .bubble__sender,
 .bubble.is-mine .bubble__time {
-	color: #fff;
+	color: var(--band-ink);
 }
 
 .bubble__time {

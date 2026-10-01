@@ -35,7 +35,10 @@ export interface ClienteInfo {
   apellido: string;
   email: string;
   telefono?: string;
+  /** Clave del archivo de la foto en el servidor, no una URL. */
   fotoUrl?: string | null;
+  /** Si el cliente tiene foto guardada (lo deriva el frontend de esa clave). */
+  tieneFoto?: boolean;
   fechaAlta?: string;
 }
 
@@ -46,7 +49,11 @@ export interface UserAccount {
   apellido: string;
   email: string;
   telefono?: string;
+  /** Clave del archivo de la foto en el servidor, no una URL. La imagen se pide
+   *  por `/api/usuarios/{id}/foto`, que exige sesión y controla el rol. */
   fotoUrl?: string | null;
+  /** Si tiene foto guardada: es lo que el `vu-avatar` necesita para pedirla. */
+  tieneFoto?: boolean;
   rolNegocio: string;
   estado?: string;
   fechaAlta?: string;
@@ -94,6 +101,14 @@ export interface MyReputation {
   promedio: number;
   cantidad: number;
   resenas: ReputationReview[];
+}
+
+/** Resultado del alta de un profesional desde el panel de administración. */
+export interface AltaProfesionalResultado {
+  usuario: { id: string };
+  profesional: { id: string; legajo: string };
+  /** Si el aviso por correo salió. Si es `false`, hay que avisarle por otra vía. */
+  correoEnviado: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -172,7 +187,9 @@ export class ApiService {
       nombre: nombre || null,
       apellido: apellido || null,
       especialidades,
-      fotoUrl: typeof raw['fotoUrl'] === 'string' ? (raw['fotoUrl'] as string) : null,
+      // La foto no viene como URL: el backend manda solo el booleano y el
+      // `vu-avatar` pide la imagen por `/api/usuarios/{usuarioId}/foto`.
+      tieneFoto: raw['tieneFoto'] === true,
       estado: typeof raw['estado'] === 'string' ? (raw['estado'] as string) : 'ACTIVO',
       // Zona de cobertura: sin estos datos el directorio no puede calcular la
       // distancia ni el asistente ordenar por proximidad.
@@ -277,13 +294,16 @@ export class ApiService {
     if (estado) {
       params = params.set('estado', estado);
     }
-    return this.http.get<Array<{ id: string; nombre: string; apellido: string; email: string; telefono?: string; fotoUrl?: string; rolNegocio: string; estado?: string; keycloakId?: string | null }>>(`${this.baseUrl}/usuarios`, { params, headers: this.authHeaders() });
+    return this.http.get<Array<{ id: string; nombre: string; apellido: string; email: string; telefono?: string; tieneFoto?: boolean; rolNegocio: string; estado?: string; keycloakId?: string | null }>>(`${this.baseUrl}/usuarios`, { params, headers: this.authHeaders() });
   }
 
   /**
-   * Alta de un profesional con sus datos: crea el usuario invitado (todavía sin
-   * cuenta Keycloak) y su perfil pendiente de activación. El profesional
-   * completa el alta registrándose en Keycloak con este email y activando su perfil.
+   * Alta de un profesional con sus datos: guarda el prerregistro y el perfil
+   * pendiente de activación, y le manda al profesional las instrucciones.
+   *
+   * <p>El backend rechaza con 409 si el correo ya tiene una cuenta: el prerregistro
+   * es solo para direcciones que todavía no se registraron. `correoEnviado` dice si
+   * el aviso salió, para que el panel no dé por hecho que el profesional se enteró.
    */
   createProfessionalInvite(request: {
     nombre: string;
@@ -292,8 +312,16 @@ export class ApiService {
     telefono: string;
     legajo: string;
     especialidadIds: string[];
-  }): Observable<unknown> {
-    return this.http.post(`${this.baseUrl}/profesionales/alta`, request, { headers: this.authHeaders() });
+  }): Observable<AltaProfesionalResultado> {
+    return this.http.post<AltaProfesionalResultado>(`${this.baseUrl}/profesionales/alta`, request, { headers: this.authHeaders() });
+  }
+
+  /**
+   * Actualiza los datos de un usuario desde el panel. Lo usa el detalle del
+   * cliente. El email no viaja: es la identidad con la que se vincula la cuenta.
+   */
+  updateUser(id: string, request: { nombre?: string; apellido?: string; telefono?: string }): Observable<UserAccount> {
+    return this.http.patch<UserAccount>(`${this.baseUrl}/usuarios/${id}`, request, { headers: this.authHeaders() });
   }
 
   /** Baneo administrativo de una cuenta (clientes incluidos). */
@@ -308,7 +336,15 @@ export class ApiService {
 
   getUserById(id: string): Observable<ClienteInfo | null> {
     if (!id) return of(null);
-    return this.http.get<ClienteInfo>(`${this.baseUrl}/usuarios/${id}`, { headers: this.authHeaders() });
+    return this.http.get<ClienteInfo>(`${this.baseUrl}/usuarios/${id}`, { headers: this.authHeaders() }).pipe(
+      // La foto llega como clave del archivo, no como URL: de ahí se deriva si
+      // hay foto. La imagen la pide el `vu-avatar` por su endpoint, que exige
+      // sesión y controla la visibilidad por rol.
+      map((usuario) => ({
+        ...usuario,
+        tieneFoto: Boolean(usuario?.fotoUrl && usuario.fotoUrl.trim().length > 0),
+      })),
+    );
   }
 
   /**
@@ -433,18 +469,19 @@ export class ApiService {
   }
 
   /**
-   * Sube una foto al almacenamiento de objetos y devuelve su URL pública.
+   * Sube una foto al almacenamiento y devuelve su clave.
    * <p>
    * Va como archivo binario, no como data URL en base64: la base multiplicaba
-   * el peso por ~1,3 y obligaba a agrandar el límite de body de nginx. En la
-   * base de datos queda solo la URL que devuelve el BFF.
+   * el peso por ~1,3 y obligaba a agrandar el límite de body de nginx. En la base
+   * de datos queda solo la clave, y la imagen se sirve por
+   * `/api/usuarios/{id}/foto` (que exige sesión y controla el rol).
    */
-  uploadPhoto(file: File): Observable<{ url: string; key: string }> {
+  uploadPhoto(file: File): Observable<{ key: string }> {
     const form = new FormData();
     form.append('archivo', file, file.name);
     // Sin Content-Type explícito: el navegador debe poner el boundary del
     // multipart. Forzarlo a application/json rompe el envío.
-    return this.http.post<{ url: string; key: string }>(`${this.baseUrl}/fotos`, form, {
+    return this.http.post<{ key: string }>(`${this.baseUrl}/fotos`, form, {
       headers: this.authHeaders(),
     });
   }

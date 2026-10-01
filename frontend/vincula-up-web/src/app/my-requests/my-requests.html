@@ -13,7 +13,7 @@
 			@if (isClient()) {
 				<a class="vu-btn vu-btn--coral requests__new" routerLink="/solicitar">
 					<vu-icon name="plus" [size]="17" />
-					Crear nueva solicitud
+					Nueva solicitud
 				</a>
 			}
 		</div>
@@ -31,7 +31,10 @@
 			<p class="vu-alert vu-alert--success requests__alert" role="status">{{ successMessage() }}</p>
 		}
 
-		@if (requests().length) {
+		@if (loading()) {
+			<!-- Skeleton de la grilla de tarjetas: no adivina el contenido, sólo la forma. -->
+			<vu-skeleton-list variant="card" [count]="4" />
+		} @else if (requests().length) {
 			<div class="requests__bar">
 				<div>
 					<p class="vu-eyebrow-sm">{{ countPending() }} {{ pendingLabel }}</p>
@@ -72,7 +75,7 @@
 						<div class="req-card__head">
 							@if (isProfessional()) {
 								@if (clienteDe(request); as cli) {
-									<vu-avatar size="md" [nombre]="clienteNombre(request)" [foto]="cli.fotoUrl" />
+									<vu-avatar size="md" [nombre]="clienteNombre(request)" [usuarioId]="cli.id" [tieneFoto]="cli.tieneFoto === true" />
 								} @else {
 									<vu-avatar size="md" [nombre]="clienteNombre(request)" />
 								}
@@ -81,7 +84,7 @@
 									<p class="req-card__sub vu-truncate">{{ especialidadNombre(request) }}</p>
 								</div>
 							} @else {
-								<vu-avatar size="md" [nombre]="profesionalNombre(request) || 'Sin asignar'" [foto]="fotoProfesional(request)" />
+								<vu-avatar size="md" [nombre]="profesionalNombre(request) || 'Sin asignar'" [usuarioId]="usuarioIdProfesional(request)" [tieneFoto]="tieneFotoProfesional(request)" />
 								<div class="req-card__identity">
 									<h2 class="req-card__name">{{ profesionalNombre(request) || 'Sin asignar' }}</h2>
 									<p class="req-card__sub vu-truncate">{{ especialidadNombre(request) }}</p>
@@ -96,10 +99,6 @@
 								{{ request.date }} · {{ horarioLabel(request) }}
 							</span>
 						</div>
-
-						@if (nextAction(request.status); as proximo) {
-						<p class="req-card__detail">{{ proximo }}</p>
-					}
 
 						<!-- Resumen del problema que escribió el cliente: es lo que explica el motivo de la visita. -->
 						@if (request.description) {
@@ -137,6 +136,11 @@
 									<iframe class="embedded-map" title="Mapa de la ubicación: {{ request.address }}" [src]="mapUrl" loading="lazy"></iframe>
 								</div>
 							} @else {
+								<!--
+									Sin coordenadas no hay nada que dibujar: la solicitud se
+									creó antes de que existiera el guardado de latitud/longitud.
+									Este bloque es un cartel, no un mapa, y el texto lo dice.
+								-->
 								<div class="vu-map req-card__map" role="img" [attr.aria-label]="'Ubicación aproximada de ' + request.address">
 									<span class="vu-map-pin"></span>
 									<span class="vu-map-label">Ubicación aproximada · {{ request.address }}</span>

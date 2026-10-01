@@ -8,8 +8,8 @@
 
 		@if (loading()) {
 			<div class="card skeleton" aria-busy="true">
-				<div class="skeleton-avatar"></div>
-				<div class="skeleton-lines"><span></span><span></span><span></span></div>
+				<div class="skeleton-avatar vu-skeleton"></div>
+				<div class="skeleton-lines"><span class="vu-skeleton"></span><span class="vu-skeleton"></span><span class="vu-skeleton"></span></div>
 			</div>
 		} @else if (loadError()) {
 			<div class="card error-card" role="alert">
@@ -23,7 +23,7 @@
 
 			<div class="card profile-hero">
 				<label class="avatar avatar-editable" title="Elegir una nueva foto de perfil">
-					<vu-avatar size="xxl" [nombre]="fullName()" [foto]="photoPreview() || account()?.fotoUrl" />
+					<vu-avatar size="xxl" [nombre]="fullName()" [foto]="photoPreview()" [usuarioId]="account()?.id" [tieneFoto]="tieneFoto()" />
 					<input #photoInput type="file" accept="image/jpeg,image/png" (change)="onPhotoSelected($event)" hidden />
 					<span class="avatar-edit-hint" aria-hidden="true"><vu-icon name="camera" [size]="15" /></span>
 				</label>

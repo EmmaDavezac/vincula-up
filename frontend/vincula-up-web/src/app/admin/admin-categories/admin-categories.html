@@ -5,30 +5,18 @@
 		<h1 class="vu-admin-title">Categorías</h1>
 		<p class="vu-admin-lead admin-categories__lead">Administrá las especialidades disponibles para los profesionales.</p>
 	</div>
-	<span class="vu-state vu-state--activo admin-categories__count">{{ categories().length }} categorías</span>
+	<a class="vu-btn vu-btn--coral vu-btn--pill admin-categories__new" routerLink="/admin/categorias/nueva">
+		<vu-icon name="plus" [size]="16" />
+		Nueva categoría
+	</a>
 </div>
 
 @if (aviso().texto) {
 	<p class="vu-alert admin-categories__alert" [class]="avisoClase(aviso().tipo)" role="status">{{ aviso().texto }}</p>
 }
 
-<form class="vu-admin-panel admin-categories__create" (submit)="createCategory(); $event.preventDefault()">
-	<label class="vu-label" for="admin-category-name">Nombre de la categoría <span class="vu-required">obligatorio</span></label>
-	<input
-		id="admin-category-name"
-		class="vu-input"
-		type="text"
-		name="nuevaCategoria"
-		[(ngModel)]="nuevaCategoria"
-		placeholder="Nombre de la nueva categoría"
-	/>
-	<button type="submit" class="vu-btn vu-btn--ink admin-categories__submit" [disabled]="busy()">
-		{{ busy() ? 'Guardando...' : 'Crear categoría' }}
-	</button>
-</form>
-
 @if (loading()) {
-	<p class="vu-admin-panel__hint">Cargando categorías...</p>
+	<vu-skeleton-list variant="grid" [count]="6" />
 } @else if (categories().length) {
 	<div class="admin-categories__grid">
 		@for (category of categories(); track category.id) {
@@ -53,7 +41,7 @@
 					<button type="button" class="vu-btn vu-btn--danger vu-btn--sm" (click)="deleteCategory(category)" [disabled]="busy()">
 						Eliminar
 					</button>
-					<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="startRename(category)" [disabled]="busy()">
+					<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="startRename(category)" [disabled]="busy()">
 						Renombrar
 					</button>
 				}

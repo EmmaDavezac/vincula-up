@@ -17,13 +17,15 @@ export const routes: Routes = [
 		title: 'Vincula-UP | Inicio',
 	},
 	{
-		path: 'como-funciona',
-		loadComponent: () => import('./simple-page').then((module) => module.SimplePage),
-		data: {
-			title: 'Una forma mas clara de pedir ayuda',
-			message: 'Explorá profesionales, elegí un horario y seguí tu solicitud desde un solo lugar.',
-		},
-		title: 'Vincula-UP | Como funciona',
+		path: 'terminos',
+		loadComponent: () => import('./legal/terminos/terminos').then((module) => module.Terminos),
+		title: 'Vincula-UP | Terminos y condiciones',
+	},
+	{
+		path: 'preguntas-frecuentes',
+		loadComponent: () =>
+			import('./legal/preguntas-frecuentes/preguntas-frecuentes').then((module) => module.PreguntasFrecuentes),
+		title: 'Vincula-UP | Preguntas frecuentes',
 	},
 	{
 		path: 'ingresar',

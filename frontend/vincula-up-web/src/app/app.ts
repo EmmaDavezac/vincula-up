@@ -4,9 +4,10 @@ import { filter } from 'rxjs';
 import { NavbarComponent } from './shared/navbar/navbar';
 import { FooterComponent } from './shared/footer/footer';
 import { VuTabbar } from './shared/tabbar/tabbar';
+import { TerminosModal } from './legal/terminos-modal';
 
 @Component({
-  imports: [RouterOutlet, NavbarComponent, FooterComponent, VuTabbar],
+  imports: [RouterOutlet, NavbarComponent, FooterComponent, VuTabbar, TerminosModal],
   selector: 'app-root',
   styleUrl: './app.css',
   templateUrl: './app.html',

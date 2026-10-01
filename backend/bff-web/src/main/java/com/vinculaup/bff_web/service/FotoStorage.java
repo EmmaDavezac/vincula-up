@@ -8,14 +8,16 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Guarda los archivos de las fotos de perfil y devuelve la URL pública.
+ * Guarda y devuelve los archivos de las fotos de perfil.
  * <p>
- * Hay dos implementaciones detrás de esta interfaz: {@link FotoStorageLocal}
- * (disco, la que se usa por defecto) y {@link FotoStorageS3} (MinIO o Cloudflare
- * R2). Se elige una u otra con {@code storage.tipo}, así el resto de la
- * aplicación no cambia en ninguno de los dos casos.
+ * Hay una sola implementación, {@link FotoStorageLocal}, que escribe en el volumen
+ * de disco del BFF. No hay cliente de bucket: no se usa ningún servicio de
+ * objetos.
  * <p>
- * Lo que se persiste en la base es siempre la URL, nunca el archivo.
+ * Lo que se persiste en la base es la <b>clave</b> del archivo
+ * ({@code perfiles/<uuid>.jpg}), nunca la URL. Las fotos de perfil no son públicas:
+ * se piden a {@code GET /api/usuarios/{id}/foto}, que valida sesión y rol antes de
+ * devolver los bytes. Por eso acá no se compone ninguna URL pública.
  */
 public interface FotoStorage {
 
@@ -24,15 +26,23 @@ public interface FotoStorage {
 
     String FALLBACK = "application/octet-stream";
 
-    /**
-     * Resultado de la subida: la URL que se persiste en la base y la clave
-     * interna con la que se recupera el archivo.
-     */
-    record FotoSubida(String url, String key) {
+    /** Archivo recuperado del almacenamiento, listo para responder. */
+    record FotoLeida(byte[] contenido, String contentType) {
     }
 
-    /** Sube la foto y devuelve la URL pública por la que se puede verla. */
-    FotoSubida subir(MultipartFile archivo);
+    /**
+     * Sube la foto y devuelve la clave con la que se recupera después.
+     *
+     * @see #validarYGenerarClave(MultipartFile, String, long)
+     */
+    String subir(MultipartFile archivo);
+
+    /**
+     * Devuelve el archivo de la clave dada, o {@code null} si no está guardado.
+     * Que sea {@code null} no es un error: una foto borrada o una cuenta sin foto
+     * se resuelven con las iniciales del avatar.
+     */
+    FotoLeida leer(String clave);
 
     /**
      * Valida tipo y tamaño, y devuelve la clave interna del archivo.

@@ -18,7 +18,8 @@ export interface AdminProfessional {
 	especialidades: AdminSpecialty[];
 	nombre?: string | null;
 	apellido?: string | null;
-	fotoUrl?: string | null;
+	/** Si el perfil del padrón tiene foto (respaldo de la de la cuenta). */
+	tieneFoto?: boolean;
 }
 
 /** Usuario del padrón (profesional invitado o registrado) o cliente, con su estado. */
@@ -28,7 +29,12 @@ export interface AdminUser {
 	apellido: string;
 	email: string;
 	telefono?: string;
-	fotoUrl?: string | null;
+	/**
+	 * Si la persona tiene foto de perfil. La imagen no viaja como URL: el
+	 * `vu-avatar` la pide por `/api/usuarios/{id}/foto`, que exige sesión y
+	 * controla la visibilidad por rol.
+	 */
+	tieneFoto?: boolean;
 	rolNegocio: string;
 	estado?: string;
 	keycloakId?: string | null;

@@ -20,6 +20,97 @@
 	--surface-highlight: #f3f5f1;
 
 	/*
+	 * Superficies que también cambian con el tema. Antes vivían escritas en cada
+	 * regla (`background: var(--surface-input)` en los campos, `#f2e8e4` en las suaves): con el
+	 * tema oscuro quedaban parches blancos en medio de la pantalla. Al ser tokens,
+	 * el bloque de abajo alcanza para dar vuelta todo.
+	 */
+	--surface-input: var(--on-accent);
+	--surface-subtle: #f2e8e4;
+	--surface-tint: #dce8e1;
+	--surface-sunken: #e9eee8;
+
+	/*
+	 * Alertas. Cada familia lleva fondo, tinta y borde porque se usan juntas en los
+	 * avisos de las tarjetas, del panel y del formulario de activación. En oscuro
+	 * el fondo se apaga y la tinta se aclara: al revés quedaría texto claro sobre
+	 * fondo claro.
+	 */
+	--alert-error-bg: #fbebee;
+	--alert-error-ink: #c24132;
+	--alert-error-border: #f3cfd2;
+	--alert-error-strong: #b42318;
+
+	--alert-success-bg: #eaf5eb;
+	--alert-success-ink: #225339;
+	--alert-success-border: #a7e3c4;
+	--alert-success-ink-2: #14532d;
+
+	--alert-warning-bg: #fef5e7;
+	--alert-warning-ink: #91621c;
+	--alert-warning-strong: #a33b3b;
+
+	--alert-info-bg: #eef3f9;
+	--alert-info-ink: #315244;
+	--alert-info-bg-2: #ecfdf3;
+	--alert-info-ink-2: #8e3027;
+
+	--alert-neutral-bg: #f7dfe1;
+	--alert-neutral-ink: #8b493b;
+	--alert-neutral-bg-2: #fff1d9;
+
+	/*
+	 * Superficies y tintas que aparecieron al revisar archivo por archivo: verdes y
+	 * Ã¡mbar muy suaves que se usan de fondo en las tarjetas de estado, y el verde de
+	 * la marca usado como superficie y no como texto.
+	 */
+	--surface-success-soft: #dfe8df;
+	--surface-warning-soft: #fff7ed;
+	--surface-neutral-soft: #fafafa;
+	--alert-success-bg-2: #d1fae5;
+	--alert-warning-ink-2: #c38a25;
+
+	/* Superficies "duras": fondo verde de marca y bordes que no son de alerta. */
+	--surface-strong: #263834;
+	--line-strong: #c9d5cf;
+
+	/*
+	 * Lo que va sobre un color de acento: el fondo de los campos, el borde de las
+	 * fotos y el patrón de líneas del mapa dibujado. En claro es el blanco de las
+	 * cajas; en oscuro se invierte a casi negro, porque un fondo claro en un campo
+	 * de formulario sería un parche brillante en medio de la pantalla.
+	 */
+	--on-accent: #ffffff;
+	--deco-line: #b4cabb;
+
+	/*
+	 * Superficie oscura de marca: el botón primario (`.vu-btn--ink`), la banda
+	 * "Para egresados" de la portada y la burbuja propia del chat.
+	 *
+	 * No cambia con el tema, a propósito. `--ink` no sirve para esto: es un token
+	 * de *tinta*, y como tal se invierte (pasa a blanco en el tema oscuro). Usado
+	 * como fondo dejaba el botón primario blanco sobre una pantalla oscura, y al
+	 * pasar el mouse el fondo iba a casi negro manteniendo la tinta oscura, o sea,
+	 * texto invisible.
+	 *
+	 * La lista completa de superficies que no cambian está en el Anexo C.
+	 */
+	--band-dark: #1e2926;
+	--band-dark-hover: #263834;
+	--band-ink: #ffffff;
+	--band-ink-soft: rgb(255 255 255 / 0.85);
+	--band-muted: rgb(255 255 255 / 0.7);
+	--band-accent: #f39a7d;
+
+	/*
+	 * Tinta sobre un fondo saturado (coral, esmeralda, navy). Siempre blanca: son
+	 * colores oscuros y quedan legibles con texto claro en los dos temas. No puede
+	 * ser `--on-accent`, que en el tema oscuro es casi negro justamente para que los
+	 * campos de formulario no brillen.
+	 */
+	--on-solid: #ffffff;
+
+	/*
 	 * Margen lateral de los bloques centrados (secciones, navbar y footer). Vive acá
 	 * para que los tres compartan exactamente el mismo eje: si cada uno define su
 	 * padding por separado, en desktop el navbar y el footer se quedan más angostos
@@ -34,15 +125,28 @@
 	 */
 	--vu-admin-gutter: 1rem;
 
+	/*
+	 * Alto de la barra inferior de móvil. Lo comparten la barra, que lo aplica, y el
+	 * pie, que reserva ese espacio: si el número viviera duplicado, cualquier cambio
+	 * en uno de los dos volvería a tapar el pie.
+	 */
+	--tabbar-h: 4.25rem;
+
 	/* Tipografías (mismas pilas que las del prototipo) */
 	--font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 	--font-serif: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
 
-	/* Sombras del prototipo */
-	--shadow-xs: 0 2px 8px rgb(30 41 38 / 0.035);
-	--shadow-sm: 0 2px 10px rgb(30 41 38 / 0.04);
-	--shadow-md: 0 8px 30px rgb(30 41 38 / 0.06);
-	--shadow-lg: 0 10px 40px rgb(30 41 38 / 0.12);
+	/*
+	 * Sombras. El color y la intensidad salen de dos variables para que el tema
+	 * oscuro no necesite reescribir cada sombra: sobre fondo claro casi no se ven
+	 * (verde muy suave) y sobre fondo oscuro hay quearlas de negro fuerte o no se ven.
+	 */
+	--shadow-color: 30 41 38;
+	--shadow-strength: 1;
+	--shadow-xs: 0 2px 8px rgb(var(--shadow-color) / calc(0.035 * var(--shadow-strength)));
+	--shadow-sm: 0 2px 10px rgb(var(--shadow-color) / calc(0.04 * var(--shadow-strength)));
+	--shadow-md: 0 8px 30px rgb(var(--shadow-color) / calc(0.06 * var(--shadow-strength)));
+	--shadow-lg: 0 10px 40px rgb(var(--shadow-color) / calc(0.12 * var(--shadow-strength)));
 
 	color-scheme: light;
 	background: var(--paper);
@@ -51,6 +155,135 @@
 	font-synthesis: none;
 	text-rendering: optimizeLegibility;
 	-webkit-font-smoothing: antialiased;
+}
+
+
+/*
+ * Tema oscuro.
+ *
+ * Se redefine todo lo que hay en `:root` y nada más: si alguna regla de la
+ * aplicación quedó con un color suelto, el tema oscuro la va a delatar (un parche
+ * blanco en medio de una pantalla oscura). Por eso el color se centraliza en
+ * tokens y no se escribe en las reglas.
+ *
+ * La paleta mantiene el mismo criterio que la clara: el papel es el fondo general
+ * y la tarjeta es un pelón más clara para que se lean como niveles distintos. Los
+ * acentos (coral, emerald, amber, navy) NO se tocan: ya tienen contraste suficiente
+ * sobre fondo oscuro y son la identidad de la marca.
+ *
+ * `color-scheme: dark` no es decorativo: le avisa al navegador para que los
+ * campos de formulario, los checkboxes y las barras de desplazamiento se pinten
+ * oscuros sin tocar una regla de Angular.
+ */
+	[data-tema='oscuro'] {
+	/* Superficies */
+	--paper: #14181a;
+	--surface-card: #1d2422;
+	--surface-highlight: #242b28;
+	--surface-input: #171d1f;
+	--surface-subtle: #242b28;
+	--surface-tint: #2c3632;
+	--surface-sunken: #101415;
+
+	/* Tinta */
+	--ink: #e8edea;
+	--muted: #9aa8a2;
+	--line: #333d39;
+
+	/* Alertas: el fondo se apaga y la tinta se aclara, nunca al revés. */
+	--alert-error-bg: #2e1a1c;
+	--alert-error-ink: #f0928a;
+	--alert-error-border: #54302f;
+	--alert-error-strong: #d9544a;
+
+	--alert-success-bg: #16281d;
+	--alert-success-ink: #7fc79c;
+	--alert-success-border: #2c4a37;
+	--alert-success-ink-2: #8fd6a9;
+
+	--alert-warning-bg: #2c2313;
+	--alert-warning-ink: #e3b567;
+	--alert-warning-strong: #c98b3d;
+
+	--alert-info-bg: #16242b;
+	--alert-info-ink: #8bb4c9;
+	--alert-info-bg-2: #16281d;
+	--alert-info-ink-2: #f0928a;
+
+	--alert-neutral-bg: #2a1c1f;
+	--alert-neutral-ink: #e0a99a;
+	--alert-neutral-bg-2: #2c2313;
+
+	/*
+ * Sombras: sobre fondo oscuro una sombra verde muy suave no se ve. Pasa a
+ * negro puro y con más fuerza; si no, las tarjetas dejan de separarse del
+ * fondo y la pantalla se ve plana.
+ */
+	--surface-success-soft: #1e2b24;
+	--surface-warning-soft: #2a2216;
+	--surface-neutral-soft: #1a1f1d;
+	--alert-success-bg-2: #16281d;
+	--alert-warning-ink-2: #e3b567;
+
+	--surface-strong: #0d1112;
+	--line-strong: #3d4844;
+
+	--on-accent: #0d1112;
+	/* En oscuro el velo tapa mas: con 30% el fondo apenas se apaga. */
+	--scrim: rgb(0 0 0 / 0.55);
+	--bar-translucent: rgb(20 24 26 / 0.92);
+	--deco-line: #3a4742;
+
+	--shadow-color: 0 0 0;
+	--shadow-strength: 2.6;
+
+	color-scheme: dark;
+	}
+
+/*
+	Leaflet y OpenStreetMap.
+	Las tiles de OSM son siempre claras: sin este filtro, en tema oscuro la
+	activación y el pedido de servicio mostraban un rectángulo blanco en medio de
+	una pantalla oscura. `invert` invierte el mapa entero y `hue-rotate` de 180°
+	devuelve los colores a su tono (el verde de los parques vuelve a ser verde y
+	no violeta). Va sobre `.leaflet-tile-pane`, no sobre el mapa completo, para no
+	invertir también el marcador y los controles, que son nuestros.
+*/
+[data-tema='oscuro'] .leaflet-tile-pane {
+	filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92) saturate(0.75);
+}
+
+/* El pin del mapa es un SVG con `fill` de la marca: invertido quedaría azul, así
+	que se devuelve a su color antes de que lo pinte el filtro de arriba. */
+[data-tema='oscuro'] .leaflet-overlay-pane svg,
+[data-tema='oscuro'] .leaflet-marker-icon {
+	filter: invert(1) hue-rotate(180deg);
+}
+
+/* Leaflet carga su CSS desde unpkg y trae fondos propios, que en oscuro quedan
+	claros igual: los controles se recolorean con los tokens de la app. */
+[data-tema='oscuro'] .leaflet-container {
+	background: var(--surface-tint);
+}
+
+[data-tema='oscuro'] .leaflet-bar,
+[data-tema='oscuro'] .leaflet-control-attribution {
+	background: var(--surface-card);
+	color: var(--muted);
+}
+
+[data-tema='oscuro'] .leaflet-bar a {
+	background: var(--surface-card);
+	border-bottom-color: var(--line);
+	color: var(--ink);
+}
+
+[data-tema='oscuro'] .leaflet-bar a:hover {
+	background: var(--surface-highlight);
+}
+
+[data-tema='oscuro'] .leaflet-control-attribution a {
+	color: var(--coral);
 }
 
 * {
@@ -160,7 +393,7 @@ a {
 	align-items: center;
 	background: var(--coral);
 	border-radius: 10px;
-	color: #fff;
+	color: var(--surface-input);
 	display: flex;
 	font-family: var(--font-serif);
 	font-size: 1.5rem;
@@ -304,11 +537,17 @@ a {
 	padding: 0.875rem 1.25rem;
 	text-align: center;
 	text-decoration: none;
+	/*
+	 * Solo fondo y borde reaccionan al hover. Antes el botón además se levantaba
+	 * 2px con `translateY`, y eso generaba el movimiento que incomodaba: el
+	 * texto bailaba dentro del botón y en superficies chicas (la tarjeta de
+	 * "solicitud enviada", los avisos de error) empujaba todo lo de abajo.
+	 * Sin `transform` en la lista, nada se mueve.
+	 */
 	transition:
-		background-color 0.18s ease,
-		border-color 0.18s ease,
-		color 0.18s ease,
-		transform 0.18s ease;
+		background-color 0.15s ease,
+		border-color 0.15s ease,
+		color 0.15s ease;
 	white-space: nowrap;
 }
 
@@ -322,24 +561,27 @@ a {
 	opacity: 0.4;
 }
 
+/*
+	El botón primario es la superficie oscura de marca en los dos temas. No usa
+	`--ink`: ese token se invierte y en oscuro dejaría el botón blanco, con el hover
+	en casi negro y el texto en tinta oscura, ilegible al pasar el mouse.
+*/
 .vu-btn--ink {
-	background: var(--ink);
-	color: #fff;
+	background: var(--band-dark);
+	color: var(--band-ink);
 }
 
 .vu-btn--ink:hover:not(:disabled) {
-	background: #263834;
-	transform: translateY(-2px);
+	background: var(--band-dark-hover);
 }
 
 .vu-btn--coral {
 	background: var(--coral);
-	color: #fff;
+	color: var(--surface-input);
 }
 
 .vu-btn--coral:hover:not(:disabled) {
 	background: var(--coral-dark);
-	transform: translateY(-2px);
 }
 
 .vu-btn--outline {
@@ -349,26 +591,35 @@ a {
 }
 
 .vu-btn--outline:hover:not(:disabled) {
-	background: #fff;
+	background: var(--surface-input);
 }
 
+/*
+	 * Botón silencioso. Igual lleva borde: sin él, sobre el papel claro o
+	 * dentro de una tarjeta blanca el texto se perdía y no se sabía que había
+	 * algo que se podía apretar. El hover cambia el borde, no el fondo, para
+	 * que el botón no cambie de golpe.
+	 */
 .vu-btn--quiet {
 	background: transparent;
+	border-color: var(--line);
 	color: var(--ink);
 }
 
 .vu-btn--quiet:hover:not(:disabled) {
-	background: var(--surface-highlight);
+	background: transparent;
+	border-color: var(--muted);
+	color: var(--ink);
 }
 
 .vu-btn--danger {
-	background: #fbebee;
+	background: var(--alert-error-bg);
 	border-color: transparent;
-	color: #c24132;
+	color: var(--alert-error-ink);
 }
 
 .vu-btn--danger:hover:not(:disabled) {
-	background: #f7dfe1;
+	background: var(--alert-neutral-bg);
 }
 
 .vu-btn--pill {
@@ -423,7 +674,7 @@ a {
 }
 
 .vu-panel {
-	background: #fff;
+	background: var(--surface-input);
 	border: 1px solid var(--line);
 	border-radius: 1rem;
 	box-shadow: var(--shadow-sm);
@@ -451,29 +702,29 @@ a {
 }
 
 .vu-badge--pendiente {
-	background: #fef5e7;
+	background: var(--alert-warning-bg);
 	color: var(--amber);
 }
 
 .vu-badge--aceptada {
-	background: #eaf5eb;
-	color: #225339;
+	background: var(--alert-success-bg);
+	color: var(--alert-success-ink);
 }
 
 .vu-badge--completada {
-	background: #eef3f9;
+	background: var(--alert-info-bg);
 	color: var(--navy);
 }
 
 .vu-badge--rechazada {
-	background: #fbebee;
-	color: #c24132;
+	background: var(--alert-error-bg);
+	color: var(--alert-error-ink);
 }
 
 .vu-badge--cancelada,
 .vu-badge--vencida {
-	background: #f2e8e4;
-	color: #8b493b;
+	background: var(--surface-subtle);
+	color: var(--alert-neutral-ink);
 }
 
 .vu-badge--neutro {
@@ -512,7 +763,7 @@ a {
 .vu-input,
 .vu-select,
 .vu-textarea {
-	background: #fff;
+	background: var(--surface-input);
 	border: 1px solid var(--line);
 	border-radius: 0.75rem;
 	color: var(--ink);
@@ -533,7 +784,7 @@ a {
 
 .vu-input::placeholder,
 .vu-textarea::placeholder {
-	color: rgb(103 113 108 / 0.7);
+	color: color-mix(in srgb, var(--muted) 70%, transparent);
 }
 
 .vu-input--search {
@@ -569,7 +820,7 @@ a {
 
 /* Aviso de un campo que falta o está incompleto, debajo del campo. */
 .vu-field-error {
-	color: #b42318;
+	color: var(--alert-error-strong);
 	display: flex;
 	font-size: 0.8125rem;
 	gap: 0.375rem;
@@ -579,9 +830,9 @@ a {
 
 .vu-field-error::before {
 	content: '!';
-	background: #b42318;
+	background: var(--alert-error-strong);
 	border-radius: 999px;
-	color: #fff;
+	color: var(--surface-input);
 	flex-shrink: 0;
 	font-size: 0.625rem;
 	font-weight: 800;
@@ -595,7 +846,7 @@ a {
 /* Input marcado como incompleto: se distingue sin cambiar el layout. */
 .vu-input--invalid,
 .vu-input--invalid:focus {
-	border-color: #d0453a;
+	border-color: var(--coral-dark);
 }
 
 /*
@@ -665,15 +916,15 @@ a {
 }
 
 .vu-alert--error {
-	background: #fbebee;
-	border-color: #f3cfd2;
-	color: #8e3027;
+	background: var(--alert-error-bg);
+	border-color: var(--alert-error-border);
+	color: var(--alert-info-ink-2);
 }
 
 .vu-alert--success {
-	background: #ecfdf3;
-	border-color: #a7e3c4;
-	color: #14532d;
+	background: var(--alert-info-bg-2);
+	border-color: var(--alert-success-border);
+	color: var(--alert-success-ink-2);
 }
 
 .vu-alert--info {
@@ -690,9 +941,9 @@ a {
 
 .vu-avatar {
 	align-items: center;
-	background: #e6f1e9;
+	background: var(--alert-success-bg);
 	border-radius: 999px;
-	color: #315244;
+	color: var(--alert-info-ink);
 	display: inline-flex;
 	flex-shrink: 0;
 	font-family: var(--font-serif);
@@ -761,9 +1012,9 @@ a {
 }
 
 .problem__required {
-	background: #fff1d9;
+	background: var(--alert-neutral-bg-2);
 	border-radius: 999px;
-	color: #91621c;
+	color: var(--alert-warning-ink);
 	font-size: 0.625rem;
 	font-weight: 800;
 	letter-spacing: 0.08em;
@@ -791,7 +1042,7 @@ a {
 }
 
 .problem__hint--error {
-	color: #c24132;
+	color: var(--alert-error-ink);
 	font-weight: 700;
 }
 
@@ -805,8 +1056,8 @@ a {
 /* ── Mini mapa (estilo del prototipo, sin depender de un tile server) ───── */
 
 .vu-map {
-	background: #dce8e1;
-	border: 1px solid #c9d5cf;
+	background: var(--surface-tint);
+	border: 1px solid var(--line-strong);
 	border-radius: 6px;
 	height: 9rem;
 	overflow: hidden;
@@ -819,9 +1070,9 @@ a {
 }
 
 .vu-map::before {
-	background-image: linear-gradient(24deg, transparent 46%, #fff 47%, #fff 50%, transparent 51%),
-		linear-gradient(112deg, transparent 42%, #fff 43%, #fff 46%, transparent 47%),
-		linear-gradient(4deg, transparent 60%, #b4cabb 61%, #b4cabb 63%, transparent 64%);
+	background-image: linear-gradient(24deg, transparent 46%, var(--on-accent) 47%, var(--on-accent) 50%, transparent 51%),
+		linear-gradient(112deg, transparent 42%, var(--on-accent) 43%, var(--on-accent) 46%, transparent 47%),
+		linear-gradient(4deg, transparent 60%, var(--deco-line) 61%, var(--deco-line) 63%, transparent 64%);
 	background-size: 130px 90px, 170px 100px, 100% 100%;
 	content: '';
 	inset: 0;
@@ -831,9 +1082,9 @@ a {
 
 .vu-map-pin {
 	background: var(--coral);
-	border: 2px solid #fff;
+	border: 2px solid var(--on-accent);
 	border-radius: 999px;
-	box-shadow: 0 1px 4px rgb(30 41 38 / 0.3);
+	box-shadow: 0 1px 4px rgb(var(--shadow-color) / calc(0.3 * var(--shadow-strength)));
 	height: 1rem;
 	left: 50%;
 	position: absolute;
@@ -843,10 +1094,10 @@ a {
 }
 
 .vu-map-label {
-	background: rgb(255 255 255 / 0.9);
+	background: rgb(var(--surface-input) / 0.92);
 	border-radius: 6px;
 	bottom: 0.5rem;
-	color: #315244;
+	color: var(--alert-info-ink);
 	font-size: 0.625rem;
 	font-weight: 700;
 	left: 0.5rem;
@@ -881,7 +1132,7 @@ a {
 
 .vu-stepper__circle {
 	align-items: center;
-	background: #fff;
+	background: var(--surface-input);
 	border: 1px solid var(--line);
 	border-radius: 999px;
 	display: flex;
@@ -908,7 +1159,7 @@ a {
 .vu-stepper__item--active .vu-stepper__circle {
 	background: var(--ink);
 	border-color: var(--ink);
-	color: #fff;
+	color: var(--surface-input);
 }
 
 .vu-stepper__item--active .vu-stepper__label {
@@ -918,7 +1169,7 @@ a {
 .vu-stepper__item--done .vu-stepper__circle {
 	background: var(--emerald);
 	border-color: var(--emerald);
-	color: #fff;
+	color: var(--surface-input);
 }
 
 .vu-stepper__item--done .vu-stepper__line {
@@ -992,6 +1243,35 @@ a {
 	position: absolute;
 	white-space: nowrap;
 	width: 1px;
+}
+
+/* ── Skeleton de carga ─────────────────────────────────────────────────────
+	Placeholder con pulso que se muestra mientras un listado carga. Vive acá (y
+	no en el CSS de un componente) porque lo usan varias pantallas: los colores
+	salen de tokens, así que en el tema oscuro se da vuelta solo, y con
+	prefers-reduced-motion la animación se apaga y queda el bloque quieto.
+	------------------------------------------------------------------------ */
+.vu-skeleton {
+	animation: vu-skeleton-pulse 1.4s ease-in-out infinite;
+	background: var(--surface-highlight);
+	border-radius: 0.75rem;
+}
+
+@keyframes vu-skeleton-pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+
+	50% {
+		opacity: 0.5;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.vu-skeleton {
+		animation: none;
+	}
 }
 
 /* ── Panel de administración (réplica de las pantallas /admin del prototipo) ──
@@ -1224,7 +1504,7 @@ a {
 }
 
 .vu-admin-bar {
-	background: #e9eee8;
+	background: var(--surface-sunken);
 	border-radius: 999px;
 	height: 0.5rem;
 	margin-top: 0.5rem;
@@ -1290,23 +1570,23 @@ a {
 }
 
 .vu-state--activo {
-	background: #e6f1e9;
-	color: #315244;
+	background: var(--alert-success-bg);
+	color: var(--alert-info-ink);
 }
 
 .vu-state--suspendido {
-	background: #fce8e8;
-	color: #a33b3b;
+	background: var(--alert-error-bg);
+	color: var(--alert-warning-strong);
 }
 
 .vu-state--preregistro {
-	background: #fff1d9;
-	color: #91621c;
+	background: var(--alert-neutral-bg-2);
+	color: var(--alert-warning-ink);
 }
 
 .vu-state--inactivo {
-	background: #f2e8e4;
-	color: #8b493b;
+	background: var(--surface-subtle);
+	color: var(--alert-neutral-ink);
 }
 
 /* Etiquetas de especialidad de un profesional. */
@@ -1325,8 +1605,8 @@ a {
 }
 
 .vu-admin-chip--pending {
-	background: #fff1d9;
-	color: #91621c;
+	background: var(--alert-neutral-bg-2);
+	color: var(--alert-warning-ink);
 }
 
 .vu-truncate {

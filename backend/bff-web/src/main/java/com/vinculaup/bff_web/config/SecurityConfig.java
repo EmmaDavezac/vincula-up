@@ -69,6 +69,11 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/profesionales/alta").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/api/profesionales/*/suspender").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/api/profesionales/*/reactivar").hasRole("ADMIN")
+                // Cualquier rol: es la aceptación de los términos, que se le pide a
+                // todo el que entra (cliente, profesional y también el admin).
+                .requestMatchers(HttpMethod.PATCH, "/api/terminos/aceptar").authenticated()
+                // Suspender va por /api/usuarios/*, que es ADMIN: un cliente
+                // desactivado no puede reactivarse a sí mismo.
                 .requestMatchers(HttpMethod.PATCH, "/api/usuarios/*/suspender").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/api/usuarios/*/reactivar").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/usuarios/por-email").hasRole("ADMIN")

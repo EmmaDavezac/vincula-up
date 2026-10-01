@@ -42,6 +42,21 @@
 		</nav>
 
 		<div class="toolbar-actions">
+			<!--
+				Tema claro/oscuro. Va antes del menú de usuario para que también esté
+				disponible sin sesión: cambiar el tema no pide iniciar sesión.
+			-->
+			<button
+				type="button"
+				class="theme-toggle"
+				(click)="tema.alternar()"
+				[attr.aria-label]="tema.etiqueta()"
+				[attr.aria-pressed]="tema.oscuro()"
+				[title]="tema.etiqueta()"
+			>
+				<vu-icon [name]="tema.oscuro() ? 'sun' : 'moon'" [size]="17" />
+			</button>
+
 			@if (auth.currentUser(); as user) {
 				<div class="user-menu">
 					<button
@@ -51,7 +66,7 @@
 						aria-haspopup="menu"
 						(click)="userMenuOpen = !userMenuOpen"
 					>
-						<vu-avatar size="xs" [nombre]="user.name" [foto]="user.fotoUrl" />
+						<vu-avatar size="xs" [nombre]="user.name" [usuarioId]="user.id" [tieneFoto]="user.tieneFoto" />
 						<span class="user-menu__identity">
 							<span class="user-menu__name">{{ user.name }}</span>
 							<span class="user-menu__role">{{ user.roleLabel || roleTexto(user.role) }}</span>

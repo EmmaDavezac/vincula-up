@@ -89,16 +89,23 @@ public class UsuarioService {
     /**
      * Resuelve la cuenta de alguien que acaba de autenticarse en Keycloak.
      * <p>
-     * El rol de negocio se decide <b>solo por el padrón</b>: si el email ya
-     * estaba cargado por el administrador (prerregistro) la cuenta se vincula y
-     * conserva su PROFESIONAL; si el email no está en el padrón, la cuenta nueva
-     * nace como CLIENTE.
+     * Si el email ya estaba cargado por el administrador (prerregistro) la cuenta
+     * se vincula y conserva el rol del padrón; si no, la cuenta nueva nace con el
+     * rol que trae el token de Keycloak.
      * <p>
-     * Antes, al auto-crear, el rol se tomaba del claim del token de Keycloak
-     * ({@code rol}). Eso dejaba el prerregistro en manos de la configuración de
-     * Keycloak: si el token decía PROFESIONAL, cualquiera entraba como
-     * profesional sin pasar por el padrón. El parámetro {@code rol} se conserva
-     * para los usuarios que ya existían, pero ya no decide altas.
+     * <b>Por qué el claim puede decidir el alta.</b> El registro abierto del
+     * realm asigna {@code default-roles-vincula-up} → {@code CLIENTE}, así que
+     * cualquiera que se auto-registra nace como cliente: el claim nunca trae
+     * {@code PROFESIONAL} ni {@code ADMIN} por la vía del registro. Escribir
+     * siempre {@code CLIENTE} (como se hizo antes) dejaba dos cuentas de prueba
+     * degradadas sin ruta de vuelta —el administrador institucional quedaba
+     * trancado, porque nada en la aplicación crea un ADMIN— y obligaba a corregir
+     * la base a mano. Ahora la fuente es Keycloak, que es donde el rol se otorga.
+     * <p>
+     * El padrón sigue siendo el único camino hacia {@code PROFESIONAL}: una
+     * cuenta de Keycloak con ese rol que no esté cargada en el padrón nace
+     * como cliente, y el BFF la promueve recién cuando {@code ms-usuarios} la
+     * reconoce como profesional (ver {@code KeycloakAdminService}).
      */
     public UsuarioResponse buscarPorKeycloakIdOAutoCrear(UUID keycloakId, String email, String nombre, String apellido, RolNegocio rol) {
         return repository.findByKeycloakId(keycloakId).map(this::toResponse).orElseGet(() -> {
@@ -111,11 +118,13 @@ public class UsuarioService {
                     existing.completarDatosPersonales(nombre, apellido);
                     return toResponse(existing);
                 }
-                // Auto-create user from Keycloak claims.
-                // CLIENTE es el único rol que se concede sin pasar por el padrón.
+                // Alta desde los claims de Keycloak. Si el token no trae rol
+                // (o trae uno que no existe en el enum) la cuenta nace como
+                // CLIENTE: es el rol por defecto del registro abierto.
                 String finalNombre = nombre != null && !nombre.isBlank() ? nombre.trim() : "Usuario";
                 String finalApellido = apellido != null ? apellido.trim() : "";
-                Usuario newUser = new Usuario(keycloakId, finalNombre, finalApellido, email.trim().toLowerCase(Locale.ROOT), "", RolNegocio.CLIENTE);
+                Usuario newUser = new Usuario(keycloakId, finalNombre, finalApellido, email.trim().toLowerCase(Locale.ROOT), "",
+                        rol != null ? rol : RolNegocio.CLIENTE);
                 return toResponse(repository.save(newUser));
             }
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado para Keycloak ID: " + keycloakId);
@@ -169,6 +178,25 @@ public class UsuarioService {
                 usuario.getFotoUrl(),
                 usuario.getRolNegocio(),
                 usuario.getEstado(),
-                usuario.getFechaAlta());
+                usuario.getFechaAlta(),
+                usuario.haAceptadoTerminos(),
+                usuario.getTerminosVersion(),
+                usuario.getTerminosAceptadoEn());
+    }
+
+    /**
+     * Registra la aceptación de los términos y condiciones.
+     *
+     * <p>Reaceptar está permitido: si el texto cambia, la aplicación vuelve a
+     * pedirlo y lo que se guarda es la versión nueva con su fecha, no un
+     * historial. Para una demo alcanza con tener fecha y versión.
+     *
+     * @param version versión del documento que aceptó
+     */
+    @Transactional
+    public UsuarioResponse aceptarTerminos(UUID id, String version) {
+        Usuario usuario = findUsuario(id);
+        usuario.aceptarTerminos(version);
+        return toResponse(usuario);
     }
 }

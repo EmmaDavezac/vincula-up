@@ -6,9 +6,10 @@ export interface UserProfile {
   role: UserRole;
   roleLabel: string;
   /**
-   * Foto de perfil real (data URL subida en "Mi cuenta"). No viaja en el token de
-   * Keycloak: se consulta una vez por sesión contra /api/usuarios/yo, así que
-   * puede venir vacía hasta que esa consulta responda.
+   * Si la persona con sesión tiene foto de perfil. La foto no viaja en el token ni
+   * como URL: el backend la entrega en `GET /api/usuarios/{id}/foto`, que exige
+   * sesión y controla la visibilidad por rol. Acá solo queda el dato de si hay
+   * algo que pedir; la imagen la resuelve el `FotoService`.
    */
-  fotoUrl?: string | null;
+  tieneFoto: boolean;
 }

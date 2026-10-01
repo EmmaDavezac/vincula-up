@@ -1,0 +1,74 @@
+<a class="vu-admin-back" routerLink="/admin/profesionales">← Profesionales</a>
+
+<div class="admin-new__head">
+	<div>
+		<h1 class="vu-admin-title">Nuevo profesional</h1>
+		<p class="vu-admin-lead admin-new__lead">
+			Registrá a un profesional y enviale la invitación. Él completa la activación
+			del perfil con la foto, la zona de cobertura y su disponibilidad.
+		</p>
+	</div>
+</div>
+
+@if (error()) {
+	<p class="vu-alert admin-new__alert" role="alert">{{ error() }}</p>
+}
+
+<form class="vu-admin-panel admin-new__form" (submit)="send(); $event.preventDefault()">
+	<div class="admin-new__grid">
+		<label class="vu-label">
+			Nombre <span class="vu-required">obligatorio</span>
+			<input class="vu-input" type="text" name="nombre" [(ngModel)]="form.nombre" placeholder="Luciano" />
+		</label>
+		<label class="vu-label">
+			Apellido <span class="vu-required">obligatorio</span>
+			<input class="vu-input" type="text" name="apellido" [(ngModel)]="form.apellido" placeholder="Benitez" />
+		</label>
+		<label class="vu-label">
+			Correo electrónico <span class="vu-required">obligatorio</span>
+			<input class="vu-input" type="email" name="email" [(ngModel)]="form.email" placeholder="profesional@email.com" />
+		</label>
+		<label class="vu-label">
+			Teléfono <span class="admin-new__optional">(opcional)</span>
+			<input class="vu-input" type="text" name="telefono" [(ngModel)]="form.telefono" placeholder="3442-555555" />
+		</label>
+		<label class="vu-label">
+			Legajo <span class="vu-required">obligatorio</span>
+			<input class="vu-input" type="text" name="legajo" [(ngModel)]="form.legajo" placeholder="P-2040" />
+		</label>
+	</div>
+
+	<fieldset class="admin-new__fieldset">
+		<legend class="vu-label">Especialidades <span class="vu-required">obligatorio</span></legend>
+		@if (loadingSpecialties()) {
+			<p class="vu-admin-panel__hint">Cargando especialidades...</p>
+		} @else if (specialties().length === 0) {
+			<p class="vu-admin-panel__hint">
+				No hay especialidades cargadas. Creá una categoría antes de registrar al profesional.
+			</p>
+		} @else {
+			<div class="admin-new__checks">
+				@for (specialty of specialties(); track specialty.id) {
+					<label class="admin-new__check" [class.is-checked]="form.especialidadIds.includes(specialty.id)">
+						<input
+							type="checkbox"
+							class="vu-checkbox"
+							[checked]="form.especialidadIds.includes(specialty.id)"
+							(change)="toggleSpecialty(specialty.id)"
+						/>
+						{{ specialty.nombre }}
+					</label>
+				}
+			</div>
+			<span class="admin-new__hint">Podés elegir más de una especialidad.</span>
+		}
+	</fieldset>
+
+	<div class="admin-new__actions">
+		<a class="vu-btn vu-btn--quiet" routerLink="/admin/profesionales">Cancelar</a>
+		<button type="submit" class="vu-btn vu-btn--ink vu-btn--pill" [disabled]="submitting()">
+			<vu-icon name="check" [size]="16" />
+			{{ submitting() ? 'Guardando...' : 'Guardar' }}
+		</button>
+	</div>
+</form>

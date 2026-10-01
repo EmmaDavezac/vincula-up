@@ -78,7 +78,7 @@
 
 .role-card {
 	align-items: center;
-	background: #fff;
+	background: var(--surface-input);
 	border: 1px solid var(--line);
 	border-radius: 8px;
 	display: flex;
@@ -109,7 +109,7 @@
 }
 
 .role-card__icon--ink {
-	background: rgb(30 41 38 / 0.1);
+	background: rgb(var(--shadow-color) / calc(0.1 * var(--shadow-strength)));
 	color: var(--ink);
 }
 

@@ -55,10 +55,14 @@
 		</article>
 
 		<article class="vu-admin-panel">
-			<p class="vu-admin-eyebrow">Embudo del servicio</p>
+			<!--
+				Sin eyebrow: el título ya dice qué es. "Embudo del servicio" encima de
+				"Del pedido al impacto" repetía lo mismo y además sonaba a jargon de
+				ventas, no a una red de trabajo comunitario.
+			-->
 			<h2 class="vu-admin-panel__title">Del pedido al impacto</h2>
 			<div class="vu-admin-funnel">
-				@for (etapa of embudo(); track etapa.label) {
+				@for (etapa of etapas(); track etapa.label) {
 					<div class="vu-admin-funnel__row">
 						<span class="vu-admin-funnel__label">{{ $index + 1 }}. {{ etapa.label }}</span>
 						<strong class="vu-admin-funnel__value">{{ etapa.value }}</strong>

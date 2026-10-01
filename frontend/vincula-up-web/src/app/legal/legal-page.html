@@ -1,0 +1,77 @@
+<div class="vu-page legal">
+	<div class="vu-container legal__head">
+		<p class="vu-eyebrow">{{ doc().eyebrow }}</p>
+		<h1 class="vu-display-sm">{{ doc().titulo }}</h1>
+		<p class="vu-body legal__bajada">{{ doc().bajada }}</p>
+
+		@if (doc().version; as version) {
+			<p class="legal__version">{{ version }}</p>
+		}
+	</div>
+
+	<div class="vu-container legal__layout">
+		<!-- Índice: en desktop queda fijo al costado mientras se recorre. -->
+		<nav class="legal__toc" aria-label="Contenido del documento">
+			<p class="legal__toc-title">Contenido</p>
+			<ul>
+				@for (seccion of doc().secciones; track seccion.id) {
+					<li><a routerLink="." [fragment]="seccion.id">{{ seccion.titulo }}</a></li>
+				}
+			</ul>
+		</nav>
+
+		<article class="legal__body">
+			@for (seccion of doc().secciones; track seccion.id) {
+				<section class="legal__section" [id]="seccion.id">
+					<h2 class="legal__section-title">{{ seccion.titulo }}</h2>
+
+					@if (seccion.faq; as par) {
+						<!--
+							Acordeón nativo: se abre y cierra sin JavaScript y es accesible
+							con teclado y lector de pantalla, que es justo lo que un
+							details+summary da y un div con click no.
+
+							Además el ancla de la URL (índice o enlace profundo) lo abre:
+							`abierto()` compara el fragmento con el id de la sección, para
+							que llegar por link no muestre la pregunta cerrada.
+						-->
+						<details class="legal__faq" [open]="abierto(seccion.id)">
+							<summary class="legal__faq-question">{{ par.pregunta }}</summary>
+							<div class="legal__faq-answer">
+								@for (parrafo of par.respuesta; track $index) {
+									<p>{{ parrafo }}</p>
+								}
+							</div>
+						</details>
+					} @else {
+						@for (parrafo of seccion.parrafos ?? []; track $index) {
+							<p class="legal__p">{{ parrafo }}</p>
+						}
+						@if (seccion.lista; as items) {
+							<ul class="legal__list">
+								@for (item of items; track $index) {
+									<li>{{ item }}</li>
+								}
+							</ul>
+						}
+					}
+				</section>
+			}
+
+			<footer class="legal__footer">
+				<p>
+					¿Tenés una duda o querés reportar un problema?
+					<a [href]="'mailto:' + contacto">{{ contacto }}</a>
+				</p>
+				<!-- Enlace cruzado al otro documento: siempre apunta al que no se está
+					leyendo; si la ruta no tiene par, no se muestra. -->
+				@if (otroDoc(); as otro) {
+					<a class="vu-btn vu-btn--outline vu-btn--sm" [routerLink]="otro.ruta">
+						<vu-icon name="help-circle" [size]="15" />
+						{{ otro.etiqueta }}
+					</a>
+				}
+			</footer>
+		</article>
+	</div>
+</div>

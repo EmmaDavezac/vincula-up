@@ -34,6 +34,11 @@ else
   echo "==> No se encontró .env en la raíz: se usan valores por defecto"
 fi
 
+# Invariante del secreto: este script es el ÚNICO camino del .env a Keycloak.
+# El import del realm no resuelve sus placeholders ${env.*} (ver
+# keycloak/import/README.md), así que si rotás KEYCLOAK_ADMIN_CLIENT_SECRET hay
+# que volver a correr esto. Si no, el BFF pide tokens con un secreto y Keycloak
+# responde 401: la promoción de rol falla en silencio, solo con un warning.
 REALM="${KEYCLOAK_REALM:-vincula-up}"
 ADMIN_USER="${KEYCLOAK_ADMIN:-admin}"
 ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-admin}"
@@ -41,6 +46,19 @@ ADMIN_CLIENT_ID="${KEYCLOAK_ADMIN_CLIENT_ID:-vincula-up-admin}"
 ADMIN_CLIENT_SECRET="${KEYCLOAK_ADMIN_CLIENT_SECRET:-vincula-up-admin-secret}"
 CONTAINER="${KEYCLOAK_CONTAINER:-vinculaup-keycloak}"
 KCADM=/opt/keycloak/bin/kcadm.sh
+
+# El default de demo es público (está en el repositorio). Se avisa fuerte para
+# que nadie exponga el stack creyendo que tiene un secreto propio.
+SECRETO_DEMO="vincula-up-admin-secret"
+if [ "$ADMIN_CLIENT_SECRET" = "$SECRETO_DEMO" ]; then
+  echo
+  echo "  AVISO: se está usando el secreto de demo de $ADMIN_CLIENT_ID, que es"
+  echo "  PÚBLICO. Alcanza para local, pero cualquiera que lea el repositorio"
+  echo "  puede pedir un token de servicio y promover cuentas a PROFESIONAL."
+  echo "  Para rotarlo: generá uno (openssl rand -hex 24), ponelo en"
+  echo "  KEYCLOAK_ADMIN_CLIENT_SECRET del .env y volvé a correr este script."
+  echo
+fi
 
 kcadm() {
   docker exec -i "$CONTAINER" "$KCADM" "$@"
@@ -57,9 +75,12 @@ done
 echo "==> Autenticado como $ADMIN_USER"
 
 echo "==> Habilitando auto-registro y rol CLIENTE por defecto en el realm $REALM"
+# `registrationEmailAsUsername=true` hace que el registro pida SOLO el correo y lo
+# use como nombre de usuario interno. La aplicación se accede por email, así que
+# pedir además un "nombre de usuario" era un campo de más que nadie recordaba.
 kcadm update "realms/$REALM" \
   -s registrationAllowed=true \
-  -s registrationEmailAsUsername=false \
+  -s registrationEmailAsUsername=true \
   -s loginWithEmailAllowed=true \
   -s duplicateEmailsAllowed=false \
   -s resetPasswordAllowed=true
@@ -118,6 +139,13 @@ else
 fi
 
 echo
-echo "Listo. El BFF debe conocer estas credenciales (docker-compose.yml):"
-echo "  KEYCLOAK_ADMIN_CLIENT_ID=$ADMIN_CLIENT_ID"
-echo "  KEYCLOAK_ADMIN_CLIENT_SECRET=$ADMIN_CLIENT_SECRET"
+echo "Listo."
+echo "  Client de servicio : $ADMIN_CLIENT_ID"
+if [ "$ADMIN_CLIENT_SECRET" = "$SECRETO_DEMO" ]; then
+  echo "  Secreto            : el de DEMO, que es público. Rotar antes de exponer."
+else
+  echo "  Secreto            : propio (no se imprime)."
+fi
+echo
+echo "Si rotaste el secreto, el BFF quedó con el valor viejo. Recrealo:"
+echo "  docker compose up -d --force-recreate bff-web"

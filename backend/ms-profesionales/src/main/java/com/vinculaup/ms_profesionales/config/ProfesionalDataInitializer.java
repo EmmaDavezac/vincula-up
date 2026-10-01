@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 @Configuration
 public class ProfesionalDataInitializer {
@@ -38,11 +39,22 @@ public class ProfesionalDataInitializer {
      * llamadas del BFF/nginx responderían 502. Si algo falla se registra y se sigue: los
      * perfiles se crean y activan bajo demanda desde {@code /profesionales/activar}.
      */
+    /** Cuenta de prueba del realm de Keycloak: el profesional de la demo. */
+    private static final String EMAIL_PROFESIONAL = "profesional@vincula-up.local";
+
+    /**
+     * Id de Keycloak de esa misma cuenta ({@code keycloak/import/vincula-up-realm.json}).
+     * Se usa solo como respaldo cuando {@code ms-usuarios} todavía no tiene la fila:
+     * {@code ms-profesionales} no depende de ese servicio y puede arrancar antes.
+     */
+    private static final String KEYCLOAK_ID_PROFESIONAL = "22222222-2222-2222-2222-222222222222";
+
     @Bean
     public CommandLineRunner seedProfesionales(
             @org.springframework.beans.factory.annotation.Value("${sembrar.demo:true}") boolean sembrarDemo,
             org.springframework.transaction.support.TransactionTemplate transactionTemplate,
             jakarta.persistence.EntityManager entityManager,
+            JdbcTemplate jdbcTemplate,
             EspecialidadRepository especialidadRepo,
             ProfesionalRepository profesionalRepo,
             DisponibilidadRepository disponibilidadRepo) {
@@ -53,7 +65,7 @@ public class ProfesionalDataInitializer {
             }
             try {
                 transactionTemplate.executeWithoutResult(
-                        status -> seed(entityManager, especialidadRepo, profesionalRepo, disponibilidadRepo));
+                        status -> seed(entityManager, jdbcTemplate, especialidadRepo, profesionalRepo, disponibilidadRepo));
             } catch (RuntimeException ex) {
                 log.warn("No se pudo sembrar el padrón de profesionales de demo (el servicio arranca igual): {}",
                         ex.getMessage(), ex);
@@ -69,6 +81,7 @@ public class ProfesionalDataInitializer {
 
     private void seed(
             jakarta.persistence.EntityManager entityManager,
+            JdbcTemplate jdbcTemplate,
             EspecialidadRepository especialidadRepo,
             ProfesionalRepository profesionalRepo,
             DisponibilidadRepository disponibilidadRepo) {
@@ -85,7 +98,18 @@ public class ProfesionalDataInitializer {
         seedEspecialidad(entityManager, especialidadRepo, "Cerrajería integral",
                 UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"));
 
-        UUID lucianoUsuarioId = UUID.fromString("22222222-2222-2222-2222-222222222222");
+        // El usuarioId del padrón es el id de ms-usuarios. Antes se sembraba con el
+        // keycloakId de Luciano, que no es el mismo: el perfil quedaba apuntando a
+        // un usuario inexistente y dependía de que el BFF lo corrigiera después
+        // con POST /profesionales/vincular. Ahora se resuelve por email (los tres
+        // microservicios comparten base) y el respaldo sigue siendo el keycloakId,
+        // por si este servicio arranca antes que ms-usuarios.
+        UUID lucianoUsuarioId = usuarioPorEmail(jdbcTemplate, EMAIL_PROFESIONAL);
+        if (lucianoUsuarioId == null) {
+            lucianoUsuarioId = UUID.fromString(KEYCLOAK_ID_PROFESIONAL);
+            log.info("La cuenta {} todavía no está en ms-usuarios: el perfil de demo se siembra "
+                    + "con su keycloakId y se reasocia al primer ingreso.", EMAIL_PROFESIONAL);
+        }
         // Idempotencia: si el padrón ya existe (o lo sembró una versión previa con otro
         // usuario/identidad) no se vuelve a insertar ni se toca.
         if (profesionalRepo.existsByUsuarioId(lucianoUsuarioId)
@@ -99,14 +123,13 @@ public class ProfesionalDataInitializer {
             especialidades.add(elec);
         }
         Profesional luciano = new Profesional(lucianoUsuarioId, "P-2001", especialidades);
-        // Foto de demo versionada en el repo (frontend/vincula-up-web/public/demo-
-        // luciano-benitez.svg) y servida por nginx como estático. Antes apuntaba a
-        // randomuser.me, que es un servicio externo: sin internet la imagen daba
-        // error y la foto de un desconocido se confundía con un dato real.
-        // Ojo: el BFF resuelve la foto final desde ms-usuarios, así que en una
-        // base ya sembrada hay que actualizá también usuarios.foto_url.
+        // Sin foto: el perfil se muestra con iniciales. Antes apuntaba al SVG de
+        // demo (frontend/vincula-up-web/public/demo-luciano-benitez.svg), que
+        // nginx servía como estático. Las fotos de perfil ahora se leen por el
+        // BFF (GET /api/usuarios/{id}/foto) y no salen del volumen, así que un
+        // asset del frontend ya no llega: el avatar cae a iniciales y listo.
         luciano.activar(
-                "/demo-luciano-benitez.svg",
+                null,
                 -32.4844, -58.2328, 20.0
         );
         luciano = profesionalRepo.save(luciano);
@@ -120,6 +143,21 @@ public class ProfesionalDataInitializer {
             disponibilidadRepo.save(new Disponibilidad(profId, dia, LocalTime.of(8, 0), LocalTime.of(20, 0)));
         }
         log.info("Disponibilidad semanal configurada para profesional {}", profId);
+    }
+
+    /**
+     * Id de {@code ms-usuarios} del correo dado, o {@code null} si la cuenta
+     * todavía no existe (nadie entró con ella). Se resuelve por SQL directo
+     * porque este servicio no depende de {@code ms-usuarios}: los tres
+     * microservicios comparten la misma base.
+     */
+    private UUID usuarioPorEmail(JdbcTemplate jdbcTemplate, String email) {
+        try {
+            return jdbcTemplate.queryForObject(
+                    "SELECT id FROM usuarios WHERE email = ?", (rs, row) -> rs.getObject(1, UUID.class), email);
+        } catch (org.springframework.dao.EmptyResultDataAccessException sinCuenta) {
+            return null;
+        }
     }
 
     private Especialidad seedEspecialidad(jakarta.persistence.EntityManager entityManager, EspecialidadRepository repository, String nombre, UUID fixedId) {

@@ -40,52 +40,13 @@
 	margin: 1.5rem 0 0;
 }
 
-/* ── Formulario de preregistro ─────────────────────────────────────────── */
-
-.admin-professionals__form {
-	margin-top: 1.5rem;
-}
-
-.admin-professionals__form-head {
-	align-items: center;
-	display: flex;
-	justify-content: space-between;
-}
-
-.admin-professionals__form-title {
-	font-family: var(--font-serif);
-	font-size: 1.5rem;
-}
-
-.admin-professionals__form-grid {
-	display: grid;
-	gap: 1rem;
-	margin-top: 1.25rem;
-}
-
-@media (min-width: 768px) {
-	.admin-professionals__form-grid {
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-	}
-}
-
-.admin-professionals__form-grid .vu-input {
-	margin-top: 0.375rem;
-}
-
-.admin-professionals__optional {
-	color: var(--muted);
-	font-weight: 400;
-}
-
-.admin-professionals__fieldset {
-	border: none;
-	margin: 1.5rem 0;
-	padding: 0;
-}
-
+/*
+	El alta del profesional se fue a su propia pantalla
+	(`admin-professional-new.css`), así que acá ya no queda nada del formulario de
+	preregistro. Lo que sigue son las casillas de especialidad del modal de edición.
+*/
 .admin-professionals__checks {
-	background: #fff;
+	background: var(--surface-input);
 	border: 1px solid var(--line);
 	border-radius: 0.75rem;
 	display: grid;
@@ -111,8 +72,8 @@
 	gap: 0.5rem;
 	padding: 0.5rem;
 	transition:
-		background-color 0.18s ease,
-		color 0.18s ease;
+		background-color 0.15s ease,
+		color 0.15s ease;
 }
 
 .admin-professionals__check:hover {
@@ -120,15 +81,8 @@
 }
 
 .admin-professionals__check.is-checked {
-	background: #e6f1e9;
-	color: #315244;
-}
-
-.admin-professionals__hint {
-	color: var(--muted);
-	display: block;
-	font-size: 0.75rem;
-	margin-top: 0.5rem;
+	background: var(--alert-success-bg);
+	color: var(--alert-info-ink);
 }
 
 /* ── Cards del padrón (dos columnas, como el prototipo) ────────────────── */
@@ -215,7 +169,7 @@
 
 .admin-professionals__overlay {
 	align-items: center;
-	background: rgb(0 0 0 / 0.3);
+	background: var(--scrim);
 	display: flex;
 	inset: 0;
 	justify-content: center;
@@ -245,6 +199,13 @@
 	display: flex;
 	gap: 0.75rem;
 	justify-content: space-between;
+}
+
+/* Las acciones de la cabecera se agrupan a la derecha y se pegan entre sí. */
+.admin-professionals__modal-head-actions {
+	display: flex;
+	flex-shrink: 0;
+	gap: 0.5rem;
 }
 
 .admin-professionals__modal-person {
@@ -291,6 +252,28 @@
 .admin-professionals__modal-grid dd {
 	font-size: 0.875rem;
 	margin: 0.25rem 0 0;
+}
+
+/*
+Zona de acciones sensibles del detalle. Va separada del resto con un borde
+arriba y aire: la idea es que el botón de desactivar no quede pegado al de
+modificar, así se lee como otra cosa y no como el siguiente paso del flujo.
+*/
+.admin-professionals__modal-danger {
+	border-top: 1px solid var(--line);
+	margin-top: 1.5rem;
+	padding-top: 0.5rem;
+}
+
+.admin-professionals__modal-danger .admin-professionals__modal-label {
+	margin-top: 0.75rem;
+}
+
+.admin-professionals__modal-hint {
+	color: var(--muted);
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	margin: 0.5rem 0 0;
 }
 
 /* ── Buscador del padrón ────────────────────────────────────────────── */

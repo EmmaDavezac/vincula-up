@@ -68,7 +68,7 @@ export class VuTabbar {
 		// ese botón queda en la barra superior, también en móvil.
 		return [
 			{ path: '/', label: 'Inicio', icon: 'home', exact: true },
-			{ path: '/como-funciona', label: 'Cómo funciona', icon: 'arrow-right', exact: false },
+			{ path: '/preguntas-frecuentes', label: 'Preguntas', icon: 'help-circle', exact: false },
 			{ path: '/ingresar', label: 'Ingresar', icon: 'lock', exact: false },
 		];
 	});

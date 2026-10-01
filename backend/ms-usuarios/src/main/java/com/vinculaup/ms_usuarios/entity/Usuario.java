@@ -32,9 +32,10 @@ public class Usuario {
     private String email;
     private String telefono;
     /**
-     * URL pública de la foto de perfil, servida por el almacenamiento de objetos
-     * (MinIO). La base solo guarda la URL: el archivo vive afuera, así que acá
-     * alcanza con una columna corta.
+     * Clave del archivo de la foto de perfil, dentro del volumen de fotos
+     * ({@code perfiles/<uuid>.jpg}). El archivo vive afuera y la clave no se
+     * expone: la foto se pide por {@code GET /api/usuarios/{id}/foto}, que valida
+     * sesión y rol. Por eso alcanza con una columna corta.
      */
     @Column(length = 512)
     private String fotoUrl;
@@ -51,6 +52,23 @@ public class Usuario {
     private EstadoUsuario estado;
 
     private OffsetDateTime fechaAlta;
+
+    /**
+     * Versión de los términos y condiciones que la persona aceptó, y cuándo.
+     *
+     * <p>Las dos columnas son nullable a propósito, igual que {@code estado}: las
+     * cuentas que ya existían antes de que los términos fueran obligatorios
+     * quedan con {@code null} y se leen como "no aceptó", así que la aplicación
+     * se los pide en el primer ingreso.
+     *
+     * <p>Guardar la <b>versión</b> y no solo una fecha es lo que permite volver a
+     * pedir la aceptación cuando el texto cambia: la comparación la hace el
+     * frontend contra la versión que tiene publicada.
+     */
+    @Column(length = 32)
+    private String terminosVersion;
+
+    private OffsetDateTime terminosAceptadoEn;
 
     protected Usuario() {
     }
@@ -97,6 +115,25 @@ public class Usuario {
         if ((this.apellido == null || this.apellido.isBlank()) && apellido != null && !apellido.isBlank()) {
             this.apellido = apellido.trim();
         }
+    }
+
+    /** Acepta los términos y condiciones de la versión dada, queda registrado cuándo. */
+    public void aceptarTerminos(String version) {
+        this.terminosVersion = version;
+        this.terminosAceptadoEn = OffsetDateTime.now();
+    }
+
+    public String getTerminosVersion() {
+        return terminosVersion;
+    }
+
+    /** {@code true} si aceptó alguna versión de los términos (la actual la compara el frontend). */
+    public boolean haAceptadoTerminos() {
+        return terminosAceptadoEn != null;
+    }
+
+    public OffsetDateTime getTerminosAceptadoEn() {
+        return terminosAceptadoEn;
     }
 
     public void suspender() { this.estado = EstadoUsuario.SUSPENDIDO; }

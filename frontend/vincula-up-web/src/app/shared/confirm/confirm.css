@@ -3,7 +3,7 @@
 
 .vu-confirm__overlay {
 	align-items: flex-end;
-	background: rgb(30 41 38 / 0.45);
+	background: rgb(var(--shadow-color) / calc(0.45 * var(--shadow-strength)));
 	display: flex;
 	inset: 0;
 	justify-content: center;
@@ -57,8 +57,8 @@
 }
 
 .vu-confirm__icon--danger {
-	background: #fbebee;
-	color: #c24132;
+	background: var(--alert-error-bg);
+	color: var(--alert-error-ink);
 }
 
 .vu-confirm__title {
@@ -94,9 +94,9 @@
 }
 
 .vu-confirm__dialog--danger .vu-confirm__accept {
-	background: #c24132;
+	background: var(--alert-error-ink);
 	border-color: transparent;
-	color: #fff;
+	color: var(--on-solid);
 }
 
 .vu-confirm__dialog--danger .vu-confirm__accept:hover:not(:disabled) {

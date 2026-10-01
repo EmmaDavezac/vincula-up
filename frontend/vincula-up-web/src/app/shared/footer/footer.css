@@ -8,6 +8,18 @@
 	padding: 2.5rem var(--vu-gutter);
 }
 
+/*
+La barra inferior es fija y ocupa el ancho de la pantalla, así que sin este
+espacio el pie se terminaba debajo de ella y la última fila quedaba tapada.
+El espacio se reserva sólo donde la barra existe (hasta 1023px) y mide lo mismo
+que ella, incluido el safe-area del notch.
+*/
+@media (max-width: 1023px) {
+	.footer-inner {
+		padding-bottom: calc(var(--tabbar-h) + max(0.65rem, env(safe-area-inset-bottom)) + 1rem);
+	}
+}
+
 .footer-grid {
 	display: grid;
 	gap: 2rem;
@@ -35,7 +47,7 @@
 	align-items: center;
 	background: var(--coral);
 	border-radius: 8px;
-	color: #fff;
+	color: var(--on-solid);
 	display: flex;
 	font-family: var(--font-serif);
 	font-size: 1.125rem;

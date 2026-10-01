@@ -48,8 +48,10 @@ public class Profesional {
     private String legajo;
 
     /**
-     * URL pública de la foto del perfil, servida por el almacenamiento de objetos
-     * (MinIO). El archivo no vive en la base: acá solo queda la URL.
+     * Clave del archivo de la foto del perfil, dentro del volumen de fotos
+     * ({@code perfiles/<uuid>.jpg}). El archivo no vive en la base y la clave no
+     * se expone: la foto se pide por {@code GET /api/usuarios/{id}/foto}, que
+     * valida sesión y rol antes de devolver los bytes.
      */
     @Column(length = 512)
     private String fotoUrl;

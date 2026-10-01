@@ -19,7 +19,7 @@
 }
 
 @if (loading()) {
-	<p class="vu-admin-panel__hint">Cargando clientes...</p>
+	<vu-skeleton-list variant="row" [count]="5" />
 } @else if (clients().length) {
 	<div class="admin-clients__search">
 		<label class="vu-sr-only" for="admin-search-clients">Buscar clientes</label>
@@ -52,7 +52,7 @@
 		@for (item of clientesOrdenados(); track item.client.id) {
 			<div class="admin-clients__row">
 				<div class="admin-clients__person">
-					<vu-avatar size="md" [nombre]="nombre(item.client)" [foto]="item.client.fotoUrl" />
+					<vu-avatar size="md" [nombre]="nombre(item.client)" [usuarioId]="item.client.id" [tieneFoto]="item.client.tieneFoto === true" />
 					<div class="admin-clients__person-info">
 						<h2 class="admin-clients__name">{{ nombre(item.client) }}</h2>
 						<p class="admin-clients__email">{{ item.client.email }}</p>
@@ -62,26 +62,20 @@
 				<p class="admin-clients__activity">
 					<span class="admin-clients__count-strong">{{ item.solicitudes }}</span> solicitudes realizadas
 				</p>
-
 				<span class="vu-state" [class]="estadoClase(item.client.estado)">{{ estadoLabel(item.client.estado) }}</span>
 
-				<button
-					type="button"
-					class="vu-btn admin-clients__action"
-					[class.vu-btn--danger]="estaActivo(item.client)"
-					[class.vu-btn--outline]="!estaActivo(item.client)"
-					(click)="toggleAccess(item.client)"
-					[disabled]="busyId() === item.client.id"
-				>
-					@if (busyId() === item.client.id) {
-						{{ estaActivo(item.client) ? 'Desactivando...' : 'Activando...' }}
-					} @else {
-						{{ estaActivo(item.client) ? 'Desactivar' : 'Activar' }}
-					}
+				<!--
+					La fila sólo ofrece consultar. Desactivar o reactivar queda adentro
+					del detalle: cambia lo que la persona puede hacer y, en rojo junto a
+					cada nombre, queda a un clic de distancia.
+				-->
+				<button type="button" class="vu-btn vu-btn--outline vu-btn--sm admin-clients__action" (click)="abrirDetalle(item.client)">
+					<vu-icon name="eye" [size]="14" />
+					Consultar
 				</button>
 			</div>
 		}
-	</div>
+		</div>
 	} @else {
 		<div class="admin-clients__empty">
 			<p class="vu-admin-panel__hint">Ningún cliente coincide con «{{ consulta() }}».</p>
@@ -92,6 +86,95 @@
 	}
 } @else {
 	<p class="vu-admin-panel__hint">Todavía no hay clientes registrados.</p>
+}
+
+<!--
+Detalle del cliente: consulta y gestión del acceso. La fila de la lista sólo abre
+esto; la única acción que altera la cuenta queda adentro, con su confirmación.
+-->
+@if (modal(); as abierto) {
+	<div class="admin-clients__overlay" (click)="cerrarDetalle()">
+		<section class="admin-clients__modal" role="dialog" aria-modal="true" aria-labelledby="admin-client-title" (click)="$event.stopPropagation()">
+			<header class="admin-clients__modal-head">
+				<div class="admin-clients__person">
+					<vu-avatar size="md" [nombre]="nombre(abierto)" [usuarioId]="abierto.id" [tieneFoto]="abierto.tieneFoto === true" />
+					<div class="admin-clients__person-info">
+						<h2 class="admin-clients__name" id="admin-client-title">{{ nombre(abierto) }}</h2>
+						<p class="admin-clients__email">{{ abierto.email }}</p>
+					</div>
+				</div>
+				<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="cerrarDetalle()" aria-label="Cerrar detalle">
+					<vu-icon name="x" [size]="19" />
+				</button>
+			</header>
+
+			<!--
+				"Consultar" es solo lectura. Antes este modal traía los campos de
+				contacto editables y un botón "Guardar cambios", con lo que abrir para
+				consultar ya era una edición: el rótulo mentía y el botón de guardar
+				quedaba a un clic de un campo modificable. Para cambiar los datos de
+				contacto, la persona los edita desde "Mi cuenta".
+			-->
+			<dl class="admin-clients__modal-grid">
+				<div>
+					<dt>Email</dt>
+					<dd>{{ abierto.email }}</dd>
+				</div>
+				<div>
+					<dt>Nombre</dt>
+					<dd>{{ abierto.nombre || 'Sin dato' }}</dd>
+				</div>
+				<div>
+					<dt>Apellido</dt>
+					<dd>{{ abierto.apellido || 'Sin dato' }}</dd>
+				</div>
+				<div>
+					<dt>Teléfono</dt>
+					<dd>{{ abierto.telefono || 'Sin teléfono' }}</dd>
+				</div>
+				<div>
+					<dt>Alta</dt>
+					<dd>{{ abierto.fechaAlta ? (abierto.fechaAlta | date: 'd/M/yyyy') : 'Sin dato' }}</dd>
+				</div>
+				<div>
+					<dt>Estado</dt>
+					<dd>
+						<span class="vu-state" [class]="estadoClase(abierto.estado)">{{ estadoLabel(abierto.estado) }}</span>
+					</dd>
+				</div>
+			</dl>
+
+			<div class="admin-clients__modal-danger">
+				<p class="admin-clients__modal-label">Acceso a la cuenta</p>
+				@if (estaActivo(abierto)) {
+					<button
+						type="button"
+						class="vu-btn vu-btn--danger vu-btn--block"
+						(click)="toggleAccess(abierto)"
+						[disabled]="busyId() === abierto.id"
+					>
+						<vu-icon name="pause" [size]="14" />
+						{{ busyId() === abierto.id ? 'Desactivando...' : 'Desactivar cuenta' }}
+					</button>
+					<p class="admin-clients__modal-hint">
+						No podrá entrar ni hacer pedidos. Sus solicitudes y calificaciones se conservan y
+						podés reactivarla después.
+					</p>
+				} @else {
+					<button
+						type="button"
+						class="vu-btn vu-btn--outline vu-btn--block"
+						(click)="toggleAccess(abierto)"
+						[disabled]="busyId() === abierto.id"
+					>
+						<vu-icon name="play" [size]="14" />
+						{{ busyId() === abierto.id ? 'Reactivando...' : 'Reactivar cuenta' }}
+					</button>
+					<p class="admin-clients__modal-hint">Vuelve a poder entrar y hacer pedidos.</p>
+				}
+			</div>
+		</section>
+	</div>
 }
 
 <!-- Confirmación única de toda acción que modifica o da de baja. -->

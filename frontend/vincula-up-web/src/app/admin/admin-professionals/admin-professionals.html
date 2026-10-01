@@ -15,74 +15,15 @@
 			}
 		</p>
 	</div>
-	<button type="button" class="vu-btn vu-btn--coral vu-btn--pill" (click)="toggleForm()">
+	<a class="vu-btn vu-btn--coral vu-btn--pill" routerLink="/admin/profesionales/nuevo">
 		<vu-icon name="plus" [size]="16" />
-		Nuevo preregistro
-	</button>
+		Nuevo profesional
+	</a>
 </div>
 
 @if (aviso().texto) {
 	<p class="vu-alert admin-professionals__alert" [class]="avisoClase(aviso().tipo)" role="status">{{ aviso().texto }}</p>
 }
-
-<!-- ── Preregistrar profesional ── -->
-@if (formOpen()) {
-	<form class="vu-admin-panel admin-professionals__form" (submit)="createProfessionalInvite(); $event.preventDefault()">
-		<div class="admin-professionals__form-head">
-			<h2 class="admin-professionals__form-title">Preregistrar profesional</h2>
-			<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="toggleForm()" aria-label="Cerrar formulario">
-				<vu-icon name="x" [size]="19" />
-			</button>
-		</div>
-		<p class="vu-admin-panel__hint">El profesional recibirá la invitación y completará la activación de su perfil.</p>
-
-		<div class="admin-professionals__form-grid">
-			<label class="vu-label">
-				Nombre <span class="vu-required">obligatorio</span>
-				<input class="vu-input" type="text" name="nombre" [(ngModel)]="form.nombre" placeholder="Luciano" />
-			</label>
-			<label class="vu-label">
-				Apellido <span class="vu-required">obligatorio</span>
-				<input class="vu-input" type="text" name="apellido" [(ngModel)]="form.apellido" placeholder="Benitez" />
-			</label>
-			<label class="vu-label">
-				Correo electrónico <span class="vu-required">obligatorio</span>
-				<input class="vu-input" type="email" name="email" [(ngModel)]="form.email" placeholder="profesional@email.com" />
-			</label>
-			<label class="vu-label">
-				Teléfono <span class="admin-professionals__optional">(opcional)</span>
-				<input class="vu-input" type="text" name="telefono" [(ngModel)]="form.telefono" placeholder="3442-555555" />
-			</label>
-			<label class="vu-label">
-				Legajo <span class="vu-required">obligatorio</span>
-				<input class="vu-input" type="text" name="legajo" [(ngModel)]="form.legajo" placeholder="P-2040" />
-			</label>
-		</div>
-
-		<fieldset class="admin-professionals__fieldset">
-			<legend class="vu-label">Especialidades <span class="vu-required">obligatorio</span></legend>
-			<div class="admin-professionals__checks">
-				@for (specialty of specialties(); track specialty.id) {
-					<label class="admin-professionals__check" [class.is-checked]="form.especialidadIds.includes(specialty.id)">
-						<input
-							type="checkbox"
-							class="vu-checkbox"
-							[checked]="form.especialidadIds.includes(specialty.id)"
-							(change)="toggleSpecialty(specialty.id)"
-						/>
-						{{ specialty.nombre }}
-					</label>
-				}
-			</div>
-			<span class="admin-professionals__hint">Podés elegir más de una especialidad.</span>
-		</fieldset>
-
-		<button type="submit" class="vu-btn vu-btn--ink vu-btn--pill" [disabled]="submitting()">
-			{{ submitting() ? 'Guardando...' : 'Guardar preregistro' }}
-		</button>
-	</form>
-}
-
 
 <!-- ── Buscar en el padrón ── -->
 <div class="admin-professionals__search">
@@ -106,14 +47,14 @@
 
 <!-- ── Padrón ── -->
 @if (loading()) {
-	<p class="vu-admin-panel__hint">Cargando padrón...</p>
+	<vu-skeleton-list variant="card" [count]="4" />
 } @else if (professionals().length) {
 	@if (profesionalesFiltrados().length) {
 		<div class="admin-professionals__list">
 			@for (professional of profesionalesFiltrados(); track professional.id) {
 				<article class="vu-admin-panel admin-professionals__card">
 					<div class="admin-professionals__card-head">
-						<vu-avatar size="xl" [nombre]="nombre(professional)" [foto]="foto(professional)" />
+						<vu-avatar size="xl" [nombre]="nombre(professional)" [usuarioId]="usuarioIdFoto(professional)" [tieneFoto]="tieneFoto(professional)" />
 						<div class="admin-professionals__identity">
 							<div class="admin-professionals__card-top">
 								<div class="admin-professionals__card-info">
@@ -137,36 +78,15 @@
 					</div>
 
 					<div class="admin-professionals__actions">
+						<!--
+							La tarjeta sólo ofrece consultar. Activar, desactivar y dar de
+							baja quedan adentro del detalle: son acciones que cambian lo que la
+							persona puede hacer, y a la vista parecen un clic más.
+						-->
 						<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="abrirDetalle(professional, 'consulta')">
 							<vu-icon name="eye" [size]="14" />
 							Consultar
 						</button>
-						<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="abrirDetalle(professional, 'edicion')">
-							<vu-icon name="pencil" [size]="14" />
-							Actualizar
-						</button>
-						@if (estaSuspendido(professional)) {
-							<button
-								type="button"
-								class="vu-btn vu-btn--outline vu-btn--sm"
-								(click)="reactivate(professional)"
-								[disabled]="busyId() === professional.id"
-							>
-								<vu-icon name="play" [size]="14" />
-								{{ busyId() === professional.id ? 'Levantando...' : 'Reactivar' }}
-							</button>
-						} @else if (puedeSuspenderse(professional)) {
-							<!-- Suspender saca al profesional del directorio: lleva peligro y confirma. -->
-						<button
-							type="button"
-							class="vu-btn vu-btn--danger vu-btn--sm"
-							(click)="suspend(professional)"
-							[disabled]="busyId() === professional.id"
-						>
-							<vu-icon name="pause" [size]="14" />
-							{{ busyId() === professional.id ? 'Suspendiendo...' : 'Suspender' }}
-						</button>
-						}
 					</div>
 				</article>
 			}
@@ -195,17 +115,30 @@
 			aria-labelledby="admin-detail-title"
 			(click)="$event.stopPropagation()"
 		>
+			<!--
+				"Modificar" va en la esquina superior derecha, junto a la X: es una
+				acción de la cabecera, no del cuerpo del modal. A la izquierda compite
+				con el avatar y con el nombre, y se leía como parte de la ficha.
+			-->
 			<header class="admin-professionals__modal-head">
 				<div class="admin-professionals__modal-person">
-					<vu-avatar size="md" [nombre]="nombre(abierto.profesional)" [foto]="foto(abierto.profesional)" />
+					<vu-avatar size="md" [nombre]="nombre(abierto.profesional)" [usuarioId]="usuarioIdFoto(abierto.profesional)" [tieneFoto]="tieneFoto(abierto.profesional)" />
 					<div class="admin-professionals__card-info">
 						<h2 class="admin-professionals__modal-name" id="admin-detail-title">{{ nombre(abierto.profesional) }}</h2>
 						<p class="admin-professionals__email">{{ email(abierto.profesional) }}</p>
 					</div>
 				</div>
-				<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="cerrarDetalle()" aria-label="Cerrar detalle">
-					<vu-icon name="x" [size]="19" />
-				</button>
+				<div class="admin-professionals__modal-head-actions">
+					@if (abierto.modo !== 'edicion') {
+						<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="abrirDetalle(abierto.profesional, 'edicion')">
+							<vu-icon name="pencil" [size]="14" />
+							Modificar
+						</button>
+					}
+					<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="cerrarDetalle()" aria-label="Cerrar detalle">
+						<vu-icon name="x" [size]="19" />
+					</button>
+				</div>
 			</header>
 
 			@if (abierto.modo === 'edicion') {
@@ -262,7 +195,50 @@
 				<button type="button" class="vu-btn vu-btn--ink vu-btn--pill vu-btn--block" (click)="guardarCambios()" [disabled]="savingEdit()">
 					{{ savingEdit() ? 'Guardando...' : 'Guardar cambios' }}
 				</button>
-			} @else {
+			}
+
+			<!--
+				Zona de acciones sensibles. Va al pie del detalle y no en la tarjeta: son
+				botones que cambian lo que la persona puede hacer, y con la confirmación
+				de por medio igual conviene que no queden a la vista de la lista.
+			-->
+			<div class="admin-professionals__modal-danger">
+				<p class="admin-professionals__modal-label">Acceso al padrón</p>
+				@if (estaDesactivado(abierto.profesional)) {
+					<button
+						type="button"
+						class="vu-btn vu-btn--outline vu-btn--block"
+						(click)="reactivar(abierto.profesional)"
+						[disabled]="busyId() === abierto.profesional.id"
+					>
+						<vu-icon name="play" [size]="14" />
+						{{ busyId() === abierto.profesional.id ? 'Reactivando...' : 'Reactivar cuenta' }}
+					</button>
+					<p class="admin-professionals__modal-hint">
+						Vuelve a aparecer en el directorio y a recibir solicitudes.
+					</p>
+				} @else if (puedeDesactivarse(abierto.profesional)) {
+					<button
+						type="button"
+						class="vu-btn vu-btn--danger vu-btn--block"
+						(click)="desactivar(abierto.profesional)"
+						[disabled]="busyId() === abierto.profesional.id"
+					>
+						<vu-icon name="pause" [size]="14" />
+						{{ busyId() === abierto.profesional.id ? 'Desactivando...' : 'Desactivar cuenta' }}
+					</button>
+					<p class="admin-professionals__modal-hint">
+						Sale del directorio y deja de recibir solicitudes. No se borra nada y se puede
+						reactivar después.
+					</p>
+				} @else {
+					<p class="admin-professionals__modal-hint">
+						Este perfil todavía no completó su activación, así que no hay nada que desactivar.
+					</p>
+				}
+			</div>
+
+			@if (abierto.modo !== 'edicion') {
 				<button type="button" class="vu-btn vu-btn--outline vu-btn--block" (click)="cerrarDetalle()">Cerrar</button>
 			}
 		</section>

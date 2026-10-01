@@ -16,6 +16,11 @@ export interface Professional {
   zonaCoberturaLat?: number | null;
   zonaCoberturaLng?: number | null;
   radioKm?: number | null;
-  fotoUrl?: string | null;
+  /**
+   * Si el profesional tiene foto de perfil. La imagen no viaja como URL: el
+   * `vu-avatar` la pide por `/api/usuarios/{usuarioId}/foto`, que exige sesión y
+   * controla la visibilidad por rol.
+   */
+  tieneFoto?: boolean;
   estado?: string;
 }

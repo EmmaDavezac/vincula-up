@@ -44,6 +44,36 @@ z-index 70 compite de verdad contra el 50 de la barra.
 	}
 }
 
+/*
+Toggle de tema. Es un botón circular discreto: el cambio de tema es una
+preferencia personal y no debería competir con las acciones de la barra. El
+borde usa `--line`, que ya cambia con el tema.
+*/
+.theme-toggle {
+	align-items: center;
+	appearance: none;
+	background: transparent;
+	border: 1px solid var(--line);
+	border-radius: 50%;
+	color: var(--ink);
+	cursor: pointer;
+	display: inline-flex;
+	height: 2.125rem;
+	justify-content: center;
+	padding: 0;
+	transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+	width: 2.125rem;
+}
+
+.theme-toggle:hover {
+	background: var(--surface-highlight);
+	border-color: var(--muted);
+}
+
+.theme-toggle:focus-visible {
+	outline: 2px solid var(--coral);
+	outline-offset: 2px;
+}
 .toolbar-actions {
 	align-items: center;
 	display: flex;
@@ -100,15 +130,6 @@ z-index 70 compite de verdad contra el 50 de la barra.
 	}
 }
 
-/*
-	"Crear cuenta" no se levanta al pasar el mouse. Los botones ink de la navbar
-	son sólo los dos de "Crear cuenta" (barra y panel), así que el efecto queda
-	acotado a la navbar y no toca los demás botones de la app.
-*/
-.vu-btn--ink:hover:not(:disabled) {
-	transform: none;
-}
-
 /* Menú de usuario (UserMenu del prototipo) */
 .user-menu {
 	position: relative;
@@ -119,7 +140,7 @@ z-index 70 compite de verdad contra el 50 de la barra.
 	background: var(--surface-card);
 	border: 1px solid var(--line);
 	border-radius: 999px;
-	box-shadow: 0 1px 2px rgb(30 41 38 / 0.06);
+	box-shadow: 0 1px 2px rgb(var(--shadow-color) / calc(0.06 * var(--shadow-strength)));
 	color: var(--ink);
 	cursor: pointer;
 	display: flex;
@@ -215,5 +236,5 @@ z-index 70 compite de verdad contra el 50 de la barra.
 }
 
 .user-menu__item--danger:hover {
-	background: #fbebee;
+	background: var(--alert-error-bg);
 }

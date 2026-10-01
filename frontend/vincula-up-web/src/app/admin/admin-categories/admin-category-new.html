@@ -1,0 +1,39 @@
+<a class="vu-admin-back" routerLink="/admin/categorias">← Categorías</a>
+
+<div class="admin-category-new__head">
+	<div>
+		<h1 class="vu-admin-title">Nueva categoría</h1>
+		<p class="vu-admin-lead admin-category-new__lead">
+			Las categorías son las especialidades que puede tener un profesional. Aparecen
+			al elegir las especialidades de un profesional, tanto en el alta como al
+			modificar su ficha.
+		</p>
+	</div>
+</div>
+
+@if (error()) {
+	<p class="vu-alert admin-category-new__alert" role="alert">{{ error() }}</p>
+}
+
+<form class="vu-admin-panel admin-category-new__form" (submit)="crear(); $event.preventDefault()">
+	<label class="vu-label" for="admin-category-name">
+		Nombre de la categoría <span class="vu-required">obligatorio</span>
+		<input
+			id="admin-category-name"
+			class="vu-input admin-category-new__input"
+			type="text"
+			name="nombre"
+			[(ngModel)]="nombre"
+			placeholder="Por ejemplo: Electricidad"
+			autocomplete="off"
+		/>
+	</label>
+
+	<div class="admin-category-new__actions">
+		<a class="vu-btn vu-btn--quiet" routerLink="/admin/categorias">Cancelar</a>
+		<button type="submit" class="vu-btn vu-btn--ink vu-btn--pill" [disabled]="busy() || loading()">
+			<vu-icon name="check" [size]="16" />
+			{{ busy() ? 'Guardando...' : 'Guardar' }}
+		</button>
+	</div>
+</form>

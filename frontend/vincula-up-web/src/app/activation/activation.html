@@ -162,10 +162,14 @@
 						</ul>
 					}
 
-					<div class="zone__map vu-map vu-map--tall" role="img" aria-label="Mapa de zona de cobertura">
-						<span class="vu-map-pin"></span>
-						<span class="vu-map-label">Zona de cobertura</span>
-					</div>
+					<!--
+						Antes esto era un `<div class="vu-map">`: tres `linear-gradient`
+						y un pin de CSS que imitaban un mapa sin serlo. Ahora es un
+						Leaflet real, en modo lectura: muestra dónde quedó el punto
+						elegido y sirve de referencia, mientras el ajuste fino se hace
+						en el modal de abajo.
+					-->
+					<div id="zone-map" class="zone__map" role="application" aria-label="Vista de la zona de cobertura elegida"></div>
 
 					<div class="zone__tools">
 						<button type="button" class="vu-btn vu-btn--outline vu-btn--block" (click)="openMapPicker()">

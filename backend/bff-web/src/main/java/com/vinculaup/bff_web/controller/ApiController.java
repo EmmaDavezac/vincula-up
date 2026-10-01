@@ -267,6 +267,7 @@ public class ApiController {
         var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
         var copia = mapper.createObjectNode();
         copia.setAll((tools.jackson.databind.node.ObjectNode) profesional);
+        String clave = null;
         if (usuario != null) {
             if (usuario.hasNonNull("nombre")) copia.put("nombre", usuario.get("nombre").asText());
             if (usuario.hasNonNull("apellido")) copia.put("apellido", usuario.get("apellido").asText());
@@ -275,12 +276,16 @@ public class ApiController {
             // respaldo para los perfiles cargados antes de que existiera la cuenta.
             // Ojo con la cadena vacía: un perfil sin foto la guarda como "" y, si se
             // tomara como "tiene foto", taparía la imagen real de la cuenta.
-            if (usuario.hasNonNull("fotoUrl") && !usuario.get("fotoUrl").asText("").isBlank()) {
-                copia.put("fotoUrl", usuario.get("fotoUrl").asText());
-            } else if (!copia.hasNonNull("fotoUrl") || copia.get("fotoUrl").asText("").isBlank()) {
-                copia.remove("fotoUrl");
-            }
+            clave = claveNormalizada(usuario.path("fotoUrl").asText(""));
         }
+        if (clave == null) {
+            clave = claveNormalizada(profesional.path("fotoUrl").asText(""));
+        }
+        // La clave del archivo no viaja en la respuesta: la foto se pide por
+        // GET /api/usuarios/{id}/foto, que valida sesión y rol. Acá solo queda el
+        // dato de si hay algo que mostrar.
+        copia.remove("fotoUrl");
+        copia.put("tieneFoto", clave != null);
         return copia;
     }
 
@@ -467,6 +472,18 @@ public class ApiController {
         var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
 
         JsonNode usuario = gateway.buscarUsuarioPorEmail(email);
+        // El prerregistro es para alguien que todavía no tiene cuenta. Si el correo
+        // ya tiene una sesión, hay una persona real detrás de esa dirección: al
+        // registrarse con ese mismo mail se quedaría con este prerregistro y su
+        // legajo sin haberlo pedido, así que se rechaza y se pide otro correo.
+        //
+        // El criterio es `keycloakId`: si viene vacío es una invitación anterior del
+        // mismo administrador (todavía sin cuenta, o sin perfil, así que se puede
+        // completar). Si viene lleno, alguien ya usó esa cuenta.
+        if (usuario != null && !usuario.path("keycloakId").asText("").isBlank()) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT,
+                    "Ese correo ya está en uso. Elegí otro para el prerregistro.");
+        }
         boolean usuarioNuevo = false;
         if (usuario == null) {
             var usuarioBody = mapper.createObjectNode();
@@ -491,8 +508,9 @@ public class ApiController {
         try {
             JsonNode perfil = gateway.crearProfesional(perfilBody);
             // Aviso best-effort: si el correo no sale, el prerregistro ya quedó
-            // guardado y el administrador puede avisar por otra vía.
-            notificar.avisarPrerregistro(
+            // guardado y el administrador puede avisar por otra vía. Se le devuelve
+            // el resultado para que el panel no dé por hecho que el mail llegó.
+            boolean correoEnviado = notificar.avisarPrerregistro(
                     email,
                     nombreCompleto(object),
                     legajo,
@@ -500,6 +518,7 @@ public class ApiController {
             var respuesta = mapper.createObjectNode();
             respuesta.set("usuario", usuario);
             respuesta.set("profesional", perfil);
+            respuesta.put("correoEnviado", correoEnviado);
             return respuesta;
         } catch (RuntimeException ex) {
             if (usuarioNuevo) {
@@ -520,6 +539,26 @@ public class ApiController {
     public ResponseEntity<JsonNode> buscarUsuarioPorEmail(@RequestParam String email) {
         JsonNode usuario = gateway.buscarUsuarioPorEmail(email);
         return usuario == null ? ResponseEntity.noContent().build() : ResponseEntity.ok(usuario);
+    }
+
+    /**
+     * Aceptación de los términos y condiciones.
+     *
+     * <p>El id de la cuenta sale del token, nunca del cuerpo: si lo aceptara del
+     * body, cualquiera con su propia sesión podría registrar la aceptación en la
+     * cuenta de otro.
+     *
+     * @param body {@code {"version": "1.0 · 30 de septiembre de 2026"}}
+     */
+    @PatchMapping("/terminos/aceptar")
+    public JsonNode aceptarTerminos(@RequestBody JsonNode body) {
+        JsonNode user = authenticatedUser();
+        String version = body.path("version").asText("").trim();
+        if (version.isEmpty()) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Falta la versión de los términos");
+        }
+        return gateway.aceptarTerminos(UUID.fromString(user.path("id").asText()), version);
     }
 
     /** Nombre y apellido del cuerpo del alta, para el saludo del correo. */
@@ -721,8 +760,9 @@ public class ApiController {
     }
 
     /**
-     * Solicitudes de toda la plataforma para el dashboard de administración (embudo del
-     * servicio, demanda por especialidad y satisfacción). Reservado al rol ADMIN.
+     * Solicitudes de toda la plataforma para el dashboard de administración
+     * (recorrido de las solicitudes, demanda por especialidad y satisfacción).
+     * Reservado al rol ADMIN.
      */
     @GetMapping("/solicitudes/panel")
     public JsonNode listarSolicitudesPanel() {
@@ -792,19 +832,126 @@ public class ApiController {
     }
 
     /**
-     * Sube una foto al almacenamiento y devuelve su URL pública.
+     * Sube una foto al almacenamiento y devuelve su clave.
      * <p>
      * Vive acá y no en cada microservicio para no duplicar el cliente de
      * almacenamiento en dos servicios, y porque el BFF ya es quien valida
-     * sesión y rol. Los servicios de dominio solo reciben la URL: nunca ven el
+     * sesión y rol. Los servicios de dominio solo reciben la clave: nunca ven el
      * archivo.
      */
     @PostMapping("/fotos")
     @ResponseStatus(HttpStatus.CREATED)
     public Map<String, Object> subirFoto(@RequestPart("archivo") MultipartFile archivo) {
         authenticatedUser();
-        var subida = fotoStorage.subir(archivo);
-        return Map.of("url", subida.url(), "key", subida.key());
+        return Map.of("key", fotoStorage.subir(archivo));
+    }
+
+    /**
+     * Foto de perfil de un usuario, con control de visibilidad por rol.
+     * <p>
+     * Las fotos no son públicas: el BFF las devuelve, nginx no las sirve, y la
+     * clave del archivo nunca viaja en las respuestas JSON (solo el booleano
+     * {@code tieneFoto}). Así no hay una URL que copiar y pegar para verle la
+     * foto a alguien.
+     * <p>
+     * <b>Quién ve la foto de quién:</b>
+     * <pre>
+     * mi rol \ foto del otro | CLIENTE | PROFESIONAL | ADMIN
+     * CLIENTE               |   no    |     sí     |  no
+     * PROFESIONAL           |   sí    |     no     |  no
+     * ADMIN                 |   sí    |     sí     |  no
+     * </pre>
+     * Más la propia, que siempre se ve. Traducido: un cliente ve a los
+     * profesionales (los elige y agenda con ellos), un profesional ve a los
+     * clientes (coordinan el turno) y el administrador ve a los dos, pero nadie
+     * ve a los de su mismo rol ni a otro administrador.
+     */
+    @GetMapping("/usuarios/{id}/foto")
+    public ResponseEntity<byte[]> obtenerFoto(@PathVariable UUID id) {
+        JsonNode actor = authenticatedUser();
+        JsonNode destino = gateway.buscarUsuarioPorId(id);
+        if (destino == null || !destino.isObject()) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado");
+        }
+        if (!puedeVerFotoDe(actor, destino)) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "No tenés permiso para ver esta foto");
+        }
+        String clave = claveDeFoto(destino, id);
+        if (clave == null) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Este usuario no tiene foto de perfil");
+        }
+        com.vinculaup.bff_web.service.FotoStorage.FotoLeida foto = fotoStorage.leer(clave);
+        if (foto == null) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Este usuario no tiene foto de perfil");
+        }
+        // ETag + no-cache: el navegador revalida en vez de re-descargar, y la
+        // respuesta sigue siendo privada (nada de "public" como antes, que
+        // dejaba la foto en cachés compartidos).
+        String etag = "\"" + Integer.toHexString(clave.hashCode()) + "-" + foto.contenido().length + "\"";
+        return ResponseEntity.ok()
+                .eTag(etag)
+                .cacheControl(org.springframework.http.CacheControl.noCache().cachePrivate())
+                .contentType(org.springframework.http.MediaType.parseMediaType(foto.contentType()))
+                .body(foto.contenido());
+    }
+
+    /**
+     * Aplica la matriz de visibilidad de fotos. El rol del que mira sale del
+     * token y el del dueño de la foto de {@code ms-usuarios}; la única excepción
+     * es la propia foto, que siempre se ve.
+     */
+    private boolean puedeVerFotoDe(JsonNode actor, JsonNode destino) {
+        String idActor = actor.path("id").asText("");
+        String idDueño = destino.path("id").asText("");
+        if (!idActor.isBlank() && idActor.equals(idDueño)) {
+            return true;
+        }
+        String rolDueño = destino.path("rolNegocio").asText("");
+        String[] permitidos = switch (authenticatedRole()) {
+            case "CLIENTE" -> new String[] {"PROFESIONAL"};
+            case "PROFESIONAL" -> new String[] {"CLIENTE"};
+            case "ADMIN" -> new String[] {"CLIENTE", "PROFESIONAL"};
+            default -> new String[0];
+        };
+        for (String permitido : permitidos) {
+            if (permitido.equalsIgnoreCase(rolDueño)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Clave del archivo de la foto de un usuario: primero la de su cuenta
+     * (ms-usuarios, la que sube y actualiza desde "Mi cuenta") y, si no tiene,
+     * la del padrón (ms-profesionales), que es el respaldo de los perfiles
+     * cargados antes de que existiera la cuenta.
+     * <p>
+     * Devuelve {@code null} si no tiene ninguna: el avatar cae a iniciales.
+     */
+    private String claveDeFoto(JsonNode usuario, UUID usuarioId) {
+        String clave = claveNormalizada(usuario.path("fotoUrl").asText(""));
+        if (clave != null) {
+            return clave;
+        }
+        JsonNode padron = gateway.buscarProfesionalPorIdOUsuario(usuarioId);
+        return padron == null ? null : claveNormalizada(padron.path("fotoUrl").asText(""));
+    }
+
+    /**
+     * Las bases con datos previos guardaban la URL pública completa
+     * ({@code /fotos/perfiles/x.jpg}); el almacenamiento solo conoce la clave
+     * relativa. Se acepta cualquiera de las dos formas para no obligar a migrar.
+     */
+    private String claveNormalizada(String valor) {
+        String clave = valor == null ? "" : valor.trim();
+        if (clave.startsWith("/fotos/")) {
+            clave = clave.substring("/fotos/".length());
+        }
+        return clave.isBlank() ? null : clave;
     }
 
     /**

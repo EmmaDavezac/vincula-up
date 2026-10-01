@@ -15,5 +15,10 @@ public record UsuarioResponse(
         String fotoUrl,
         RolNegocio rolNegocio,
         EstadoUsuario estado,
-        OffsetDateTime fechaAlta) {
+        OffsetDateTime fechaAlta,
+        /** Si aceptó alguna versión de los términos. La versión vigente la compara el frontend. */
+        boolean terminosAceptado,
+        /** Versión que aceptó. Si el texto cambia, no coincide y hay que volver a pedir. */
+        String terminosVersion,
+        OffsetDateTime terminosAceptadoEn) {
 }

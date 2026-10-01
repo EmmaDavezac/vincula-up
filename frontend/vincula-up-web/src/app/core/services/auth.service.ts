@@ -1,10 +1,12 @@
 import { inject, Injectable, computed, effect, signal } from '@angular/core';
 import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { catchError, map, of, Observable, switchMap, tap } from 'rxjs';
+import { catchError, map, Observable, of, switchMap, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { UserProfile, UserRole } from '../models/user-profile';
 import { inicioDeSesion } from '../guards/role.guard';
+import { FotoService } from './foto.service';
+import { VERSION_TERMINOS } from '../../legal/terminos/terminos';
 
 interface UsuarioLookupResponse {
   id: string;
@@ -13,7 +15,14 @@ interface UsuarioLookupResponse {
   apellido: string;
   email: string;
   telefono?: string;
-  fotoUrl?: string;
+  /** Clave del archivo de la foto en el servidor. No es una URL: la imagen se
+   *  pide por `GET /api/usuarios/{id}/foto`, que valida sesión y rol. */
+  fotoUrl?: string | null;
+  /** Si aceptó alguna versión de los términos. La vigente la compara el frontend. */
+  terminosAceptado?: boolean;
+  /** Versión de los términos que aceptó. */
+  terminosVersion?: string | null;
+  terminosAceptadoEn?: string | null;
   rolNegocio: UserRole;
   fechaAlta?: string;
 }
@@ -41,17 +50,27 @@ export class AuthService {
   private readonly user = signal<UserProfile | null>(this.restoreSession());
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  /**
+   * Pide las fotos de perfil. No depende de AuthService (evitaría un ciclo), así
+   * que el token se le pasa desde acá con `establecerToken`.
+   */
+  private readonly fotos = inject(FotoService);
   readonly currentUser = this.user.asReadonly();
   readonly isAuthenticated = computed(() => this.user() !== null);
   readonly isProfessionalActive = signal<boolean>(this.restoreProfActive());
   readonly loginError = signal('');
   /** Evita reintentos en loop al refrescar el token tras una promoción de rol. */
   private roleRefreshRequested = false;
-  /** La foto propia se pide una sola vez por sesión (ver `loadOwnPhoto`). */
+  /** La foto propia y el estado legal se piden una sola vez por sesión. */
   private photoRequested = false;
+  /** Si el backend ya respondió sobre la cuenta. Antes de eso no se sabe. */
+  private readonly cuentaConsultada = signal(false);
+  /** Si aceptó la versión vigente de los términos. */
+  private readonly terminosAceptados = signal(false);
 
   constructor() {
     this.handleCodeCallback();
+    this.fotos.establecerToken(this.getToken());
 
     // La foto de perfil se pide sola cuando hay sesión con token: así el avatar
     // aparece con la foto real sin importar si la navbar estaba en pantalla antes
@@ -175,6 +194,9 @@ export class AuthService {
     this.isProfessionalActive.set(false);
     // La próxima sesión vuelve a pedir la foto de la cuenta nueva.
     this.photoRequested = false;
+    // Las fotos cacheadas eran de la sesión que termina: se liberan las URLs blob
+    // para no dejarlas colgadas y para que la cuenta siguiente no las herede.
+    this.fotos.limpiar();
 
     // Cerrar la sesión en Keycloak (RP-Initiated Logout)
     // Sin esto, Keycloak recuerda la sesión SSO y loguea automáticamente
@@ -297,6 +319,9 @@ export class AuthService {
             name: `${usuario.nombre} ${usuario.apellido}`.trim(),
             role: usuario.rolNegocio,
             roleLabel: this.roleLabel(usuario.rolNegocio),
+            // Se completa en `loadOwnPhoto`, que consulta la cuenta: acá todavía
+            // no se sabe si hay foto.
+            tieneFoto: Boolean(usuario.fotoUrl && usuario.fotoUrl.trim().length > 0),
           } satisfies UserProfile;
 
           this.persistSession(token, profile);
@@ -308,6 +333,7 @@ export class AuthService {
             name: claims.name ?? 'Usuario Vincula-UP',
             role: claims.role as UserRole,
             roleLabel: this.roleLabel(claims.role as UserRole),
+            tieneFoto: false,
           } satisfies UserProfile;
 
           this.persistSession(token, profile);
@@ -331,6 +357,9 @@ export class AuthService {
     if (token.id_token) localStorage.setItem(ID_TOKEN_KEY, token.id_token);
     this.persistProfile(profile);
     this.user.set(profile);
+    // El token es nuevo (login o refresh): el FotoService lo necesita a mano
+    // para poder pedir las fotos con el header de autorización.
+    this.fotos.establecerToken(token.access_token);
     if (profile.role === 'PROFESIONAL') {
       this.checkProfessionalStatus();
     }
@@ -407,7 +436,9 @@ export class AuthService {
       try {
         const parsed = JSON.parse(savedProfile) as UserProfile;
         if (parsed && parsed.id && parsed.role && this.isValidRole(parsed.role)) {
-          return parsed;
+          // Normaliza el campo: los perfiles guardados antes de que existiera
+          // `tieneFoto` (guardaban la URL de la foto) llegan sin él.
+          return { ...parsed, tieneFoto: parsed.tieneFoto === true };
         }
       } catch {
         localStorage.removeItem(PROFILE_KEY);
@@ -419,6 +450,7 @@ export class AuthService {
       name: payload.name ?? 'Usuario Vincula-UP',
       role: payload.role,
       roleLabel: this.roleLabel(payload.role),
+      tieneFoto: false,
     };
   }
 
@@ -432,11 +464,16 @@ export class AuthService {
   }
 
   /**
-   * Foto de la persona con sesión, para mostrarla en la navbar y en el panel.
-   * <p>
-   * La foto no viaja en el token de Keycloak, así que se pide a
-   * {@code /api/usuarios/yo} una única vez por sesión. Si falla (servidor caído,
-   * cuenta suspendida) el avatar cae a iniciales sin romper la navegación.
+   * Datos de la cuenta con sesión: la foto de perfil y el estado legal.
+   *
+   * <p>Una sola llamada contra {@code /api/usuarios/yo} trae las dos cosas: si hay
+   * foto para que la pida el {@link FotoService}, y si aceptó los términos
+   * vigentes. Se consulta una vez por sesión. Si algo falla (servidor caído, cuenta
+   * suspendida, sin permiso) el avatar cae a iniciales y la navegación sigue.
+   *
+   * <p>Ante un fallo no se da el estado legal por conocido: `terminosPendientes`
+   * devuelve {@code true} y el modal se queda esperando, en vez de dejar pasar a
+   * alguien que no aceptó.
    */
   loadOwnPhoto(force = false): void {
     const current = this.user();
@@ -456,26 +493,69 @@ export class AuthService {
 
     const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
     this.http
-      .get<{ fotoUrl?: string | null }>(`${environment.apiUrl}/usuarios/yo`, { headers })
+      .get<UsuarioLookupResponse>(`${environment.apiUrl}/usuarios/yo`, { headers })
       .pipe(
-        map((cuenta) => this.refreshProfile({ fotoUrl: cuenta?.fotoUrl ?? null })),
+        map((cuenta) => {
+          const tieneFoto = Boolean(cuenta?.fotoUrl && cuenta.fotoUrl.trim().length > 0);
+          this.refreshProfile({ tieneFoto });
+          this.cuentaConsultada.set(true);
+          // La versión vigente la publica el frontend (es donde vive el texto):
+          // si cambió lo que aceptó, hay que volver a pedirlo.
+          this.terminosAceptados.set(
+            cuenta?.terminosAceptado === true && cuenta.terminosVersion === VERSION_TERMINOS,
+          );
+          if (tieneFoto) {
+            this.fotos.cargar(cuenta!.id);
+          }
+          return cuenta;
+        }),
         catchError(() => of(null)),
       )
       .subscribe();
   }
 
   /**
-   * Refresca los datos visibles de la sesión (nombre/email/foto) tras editar el
-   * perfil en "Mi cuenta", sin obligar a un re-login.
+   * Si hay que pedir los términos y condiciones.
+   *
+   * <p>Es {@code true} con sesión abierta y sin aceptación de la versión vigente.
+   * Antes de que responda el backend se considera {@code true}: se prefiere mostrar
+   * el modal un instante antes de bloquear de más, y no al revés. El modal es una capa
+   * sobre la aplicación, no una pantalla: no se puede saltar navegando.
    */
-  refreshProfile(patch: { id?: string; name?: string; fotoUrl?: string | null }): void {
+  readonly terminosPendientes = computed(() => {
+    if (!this.user()) {
+      return false;
+    }
+    if (!this.cuentaConsultada()) {
+      return true;
+    }
+    return !this.terminosAceptados();
+  });
+
+  /** Registra la aceptación. La versión viaja al backend para quede registrada. */
+  registrarAceptacionTerminos(): Observable<UsuarioLookupResponse> {
+    const headers = new HttpHeaders({ Authorization: `Bearer ${this.getToken() ?? ''}` });
+    return this.http
+      .patch<UsuarioLookupResponse>(
+        `${environment.apiUrl}/terminos/aceptar`,
+        { version: VERSION_TERMINOS },
+        { headers },
+      )
+      .pipe(tap(() => this.terminosAceptados.set(true)));
+  }
+
+  /**
+   * Refresca los datos visibles de la sesión (nombre/email) tras editar el perfil
+   * en "Mi cuenta", sin obligar a un re-login.
+   */
+  refreshProfile(patch: { id?: string; name?: string; tieneFoto?: boolean }): void {
     const current = this.user();
     if (!current) return;
     const updated: UserProfile = {
       ...current,
       id: patch.id ?? current.id,
       name: patch.name ?? current.name,
-      fotoUrl: patch.fotoUrl !== undefined ? patch.fotoUrl : current.fotoUrl,
+      tieneFoto: patch.tieneFoto ?? current.tieneFoto,
     };
     this.user.set(updated);
     try {

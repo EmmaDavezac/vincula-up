@@ -5,9 +5,52 @@
     <title>Vincula-UP | Red técnica con respaldo universitario</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <!--
+      El icono va en los tres formatos porque los tres hacen falta y se pisarian
+      entre si si faltara alguno:
+
+      - El .ico primero y sin type: es el que piden a secas los navegadores que no
+        leen SVG, y el que trae 16, 32 y 48 px para la pestana y los marcadores.
+      - El SVG despues: los navegadores que lo soportan se quedan con este porque
+        viene mas abajo en la lista, y al ser vectorial se ve nitido tambien en
+        pantallas densas, donde la pestana pide 32 px reales.
+      - El PNG para iOS, que ignora los otros dos cuando se agrega a la pantalla
+        de inicio. Va a sangre porque iOS le aplica su propia mascara de esquinas.
+
+      Los tres salen de la misma geometria, descrita en el comentario de
+      public/favicon.svg. Los tres estan versionados: si cambia la marca hay que
+      rehacer los tres a mano, no solo el SVG.
+    -->
+    <link rel="icon" href="favicon.ico" sizes="48x48" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+      /*
+       * Aplica el tema antes de que se pinte cualquier cosa.
+       *
+       * Angular arranca despues de este script y hasta entonces la pantalla esta en
+       * blanco: sin esto, quien tenga el tema oscuro ve un destello blanco en cada
+       * recarga. El bloque [data-tema='oscuro'] de styles.css espera este atributo
+       * en <html>.
+       *
+       * Va escrito a mano y no importado de un archivo porque un import llega tarde
+       * para evitar el destello. Tiene que coincidir con TemaService: misma clave,
+       * mismos valores.
+       */
+      (function () {
+        try {
+          var guardado = localStorage.getItem('vincula-up-tema');
+          var oscuro =
+            guardado === 'oscuro' ||
+            (guardado !== 'claro' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.setAttribute('data-tema', oscuro ? 'oscuro' : 'claro');
+        } catch (e) {
+          document.documentElement.setAttribute('data-tema', 'claro');
+        }
+      })();
+    </script>
   </head>
   <body>
     <app-root></app-root>

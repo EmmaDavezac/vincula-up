@@ -14,8 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Vista de solo lectura para el panel de administración: reúne todas las solicitudes con su
- * calificación para que el dashboard pueda medir el embudo del servicio, la demanda por
- * especialidad y la satisfacción sin que el frontend tenga que agregar endpoint por endpoint.
+ * calificación para que el dashboard pueda medir el recorrido de las solicitudes, la
+ * demanda por especialidad y la satisfacción sin que el frontend tenga que agregar
+ * endpoint por endpoint.
  */
 @Service
 @Transactional(readOnly = true)

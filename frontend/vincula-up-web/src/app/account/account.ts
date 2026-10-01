@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { catchError, of } from 'rxjs';
 import { ApiService, MyReputation, UserAccount, UserAccountUpdate } from '../core/services/api.service';
 import { AuthService } from '../core/services/auth.service';
+import { FotoService } from '../core/services/foto.service';
 import { environment } from '../../environments/environment';
 import { VuAvatar } from '../shared/avatar/avatar';
 import { VuConfirm } from '../shared/confirm/confirm';
@@ -28,6 +29,8 @@ type CardKey = 'personal' | 'contact' | 'photo';
 export class Account {
   private readonly api = inject(ApiService);
   readonly auth = inject(AuthService);
+  /** Pide y cachea la foto guardada (la que sube la persona desde esta pantalla). */
+  private readonly fotos = inject(FotoService);
 
   /** Input de archivo dentro del avatar clicable del hero. */
   private readonly photoInput = viewChild<ElementRef<HTMLInputElement>>('photoInput');
@@ -55,9 +58,21 @@ export class Account {
   private photoReader: FileReader | null = null;
   /**
    * El archivo recién elegido. El `photoPreview` es la data URL local que se
-   * muestra mientras se elige: no se envía, se sube el archivo y se guarda la URL.
+   * muestra mientras se elige: no se envía, se sube el archivo y se guarda la
+   * clave que devuelve el backend.
    */
   private selectedPhotoFile: File | null = null;
+
+  /**
+   * Si la cuenta tiene foto guardada. La foto guardada no es una URL: la pide el
+   * `vu-avatar` por id al backend, que controla la visibilidad. Mientras se elige
+   * una nueva manda la vista previa local.
+   */
+  readonly tieneFoto = computed(() => {
+    const usuario = this.account();
+    if (!usuario) return false;
+    return usuario.tieneFoto ?? Boolean(usuario.fotoUrl && usuario.fotoUrl.trim().length > 0);
+  });
 
   readonly initials = computed(() => {
     const user = this.account();
@@ -140,7 +155,9 @@ export class Account {
     ).subscribe((user) => {
       if (user) {
         this.account.set(user);
-        this.photoPreview.set(user.fotoUrl ?? '');
+        // Sin foto seleccionada hay que mostrar la guardada: la deja resolver el
+        // avatar por su id, no la vista previa local (que es solo data URL).
+        this.photoPreview.set('');
         this.syncSession(user);
         // La reputación sólo existe para el rol profesional.
         if (user.rolNegocio === 'PROFESIONAL') {
@@ -161,23 +178,22 @@ export class Account {
       this.personalDraft.set({ nombre: user.nombre ?? '', apellido: user.apellido ?? '' });
     } else if (card === 'contact') {
       this.contactDraft.set({ telefono: user.telefono ?? '' });
-    } else {
-      this.photoPreview.set(user.fotoUrl ?? '');
     }
+    // La tarjeta de foto no precarga nada: la foto guardada la resuelve el avatar
+    // por su id, y la vista previa local arranca vacía hasta elegir un archivo.
     this.editing.set(card);
   }
 
   cancelEdit(): void {
     if (this.saving()) return;
-    const eraFoto = this.editing() === 'photo';
     this.abortPhotoRead();
     this.editing.set(null);
     this.cardError.set('');
     this.photoError.set('');
     this.photoLoading.set(false);
-    // Al cancelar la foto, el avatar vuelve a mostrar la foto guardada
-    // (no la vista previa descartada).
-    if (eraFoto) this.photoPreview.set(this.account()?.fotoUrl ?? '');
+    // Al cancelar, el avatar vuelve a mostrar la foto guardada (la del backend),
+    // no la vista previa descartada.
+    this.photoPreview.set('');
   }
 
   savePersonal(): void {
@@ -226,18 +242,15 @@ export class Account {
 
   savePhoto(): void {
     this.photoError.set('');
-    const preview = this.photoPreview().trim();
-    const current = (this.account()?.fotoUrl ?? '').trim();
-    if (!preview && !current) {
-      this.photoError.set('Elegí una foto antes de guardar.');
-      return;
-    }
-    if (preview === current) {
-      this.photoError.set('La foto es la misma que ya tenés guardada.');
-      return;
-    }
-    // Quitar la foto no sube nada: se manda vacío y el backend la borra.
-    if (!preview) {
+    // La vista previa local solo existe cuando se eligió un archivo sin guardar.
+    const hayArchivoNuevo = this.selectedPhotoFile !== null;
+
+    if (!hayArchivoNuevo) {
+      // Sin archivo elegido, guardar solo puede significar "quitar la foto".
+      if (!this.tieneFoto()) {
+        this.photoError.set('Elegí una foto antes de guardar.');
+        return;
+      }
       this.pedirGuardado(
         'Quitar tu foto',
         '¿Querés quitar tu foto de perfil?',
@@ -247,8 +260,9 @@ export class Account {
       );
       return;
     }
-    // Hay un archivo nuevo: se sube primero y solo después se pide confirmar,
-    // con la URL ya resuelta. Así el base64 nunca llega al perfil.
+
+    // Hay un archivo nuevo: se sube primero y solo después se pide confirmar, con
+    // la clave ya resuelta. Así el base64 nunca llega al perfil.
     const archivo = this.selectedPhotoFile;
     if (!archivo) {
       this.photoError.set('No se pudo leer la imagen. Elegí el archivo nuevamente.');
@@ -269,7 +283,7 @@ export class Account {
         '¿Querés guardar esta foto?',
         'Es la foto que te ven los profesionales y el resto de la comunidad.',
         false,
-        { fotoUrl: subida.url },
+        { fotoUrl: subida.key },
       );
     });
   }
@@ -313,9 +327,15 @@ export class Account {
       this.saving.set(false);
       if (!updated) return;
       this.account.set(updated);
-      this.photoPreview.set(updated.fotoUrl ?? '');
-      // Ya está guardada y subida: el archivo local ya no se necesita.
+      // La foto cambió: se descarta la vista previa local y se le pide al
+      // FotoService la nueva, para que el avatar la muestre sin recargar.
+      this.photoPreview.set('');
       this.selectedPhotoFile = null;
+      const guardada = Boolean(updated.fotoUrl && updated.fotoUrl.trim().length > 0);
+      this.fotos.invalidar(updated.id);
+      if (guardada) {
+        this.fotos.cargar(updated.id);
+      }
       this.syncSession(updated);
       this.editing.set(null);
       this.cardNotice.set('Tu información se actualizó correctamente.');
@@ -392,6 +412,7 @@ export class Account {
     this.auth.refreshProfile({
       id: user.id,
       name: `${user.nombre ?? ''} ${user.apellido ?? ''}`.trim() || 'Usuario Vincula-UP',
+      tieneFoto: this.tieneFoto(),
     });
   }
 }

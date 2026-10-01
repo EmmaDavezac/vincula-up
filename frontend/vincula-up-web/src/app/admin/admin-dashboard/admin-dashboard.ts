@@ -13,16 +13,16 @@ interface Demanda {
 	porcentaje: number;
 }
 
-/** Etapa del embudo del servicio, del pedido al impacto. */
-interface Embudo {
+/** Etapa del recorrido de una solicitud, del pedido al impacto. */
+interface Etapa {
 	label: string;
 	value: number;
 }
 
 /**
- * Resumen de administración: mismos indicadores que el dashboard del prototipo
- * (demanda por especialidad y embudo del servicio) pero calculados sobre las
- * solicitudes, el padrón y los clientes reales del backend.
+ * Resumen de administración: los indicadores del panel (demanda por especialidad
+ * y el recorrido de las solicitudes) calculados sobre las solicitudes, el padrón
+ * y los clientes reales del backend.
  */
 @Component({
 	selector: 'app-admin-dashboard',
@@ -87,8 +87,8 @@ export class AdminDashboard {
 		}));
 	});
 
-	/** Embudo del pedido al impacto. */
-	readonly embudo = computed<ReadonlyArray<Embudo>>(() => {
+	/** Recorrido de la solicitud: recibida, aceptada, completada y valorada. */
+	readonly etapas = computed<ReadonlyArray<Etapa>>(() => {
 		const solicitudes = this.solicitudes();
 		const completadas = solicitudes.filter((item) => item.estado === 'COMPLETADA').length;
 		// Todo lo que avanzó del estado pendiente: aceptada, completada o cancelada.

@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 import {
 	AdminAviso,
@@ -12,6 +12,8 @@ import {
 } from '../../core/models/admin';
 import { ApiService } from '../../core/services/api.service';
 import { VuConfirm } from '../../shared/confirm/confirm';
+import { VuIcon } from '../../shared/icon/icon';
+import { VuSkeletonList } from '../../shared/skeleton-list/skeleton-list';
 
 /**
  * Catálogo de categorías (especialidades): alta, renombre y baja. La baja falla con
@@ -19,12 +21,13 @@ import { VuConfirm } from '../../shared/confirm/confirm';
  */
 @Component({
 	selector: 'app-admin-categories',
-	imports: [FormsModule, RouterLink, VuConfirm],
+	imports: [FormsModule, RouterLink, VuConfirm, VuIcon, VuSkeletonList],
 	templateUrl: './admin-categories.html',
 	styleUrl: './admin-categories.css',
 })
 export class AdminCategories {
 	private readonly api = inject(ApiService);
+	private readonly router = inject(Router);
 
 	readonly categories = signal<AdminSpecialty[]>([]);
 	readonly loading = signal(true);
@@ -53,13 +56,27 @@ export class AdminCategories {
 		this.confirmacion.set(null);
 	}
 
-	nuevaCategoria = '';
+	constructor() {
+		this.leerAvisoDeAlta();
+		this.cargar();
+	}
+
+	/** Mensaje que deja la pantalla de alta al volver con `navigate(..., { state })`. */
+	private leerAvisoDeAlta(): void {
+		const state = this.router.getCurrentNavigation()?.extras.state;
+		const mensaje = state?.['mensaje'] as string | undefined;
+		if (!mensaje) return;
+		this.aviso.set(avisoExito(mensaje));
+	}
+
 	readonly renamingId = signal<string | null>(null);
 	renameValue = '';
 
-	constructor() {
-		this.cargar();
-	}
+	/*
+	 * El alta de una categoría se hace en otra pantalla (`/admin/categorias/nueva`),
+	 * así que el catálogo ya no lleva el formulario encima. Quedan el renombre y la
+	 * baja, que se operan sobre cada tarjeta.
+	 */
 
 	private cargar(): void {
 		this.loading.set(true);
@@ -72,34 +89,6 @@ export class AdminCategories {
 		).subscribe((items) => {
 			this.categories.set(items);
 			this.loading.set(false);
-		});
-	}
-
-	createCategory(): void {
-		const nombre = this.nuevaCategoria.trim();
-		if (!nombre) {
-			this.aviso.set(avisoError('Escribí el nombre de la nueva categoría.'));
-			return;
-		}
-		if (this.categories().some((item) => item.nombre.toLowerCase() === nombre.toLowerCase())) {
-			this.aviso.set(avisoError(`La categoría "${nombre}" ya existe en el catálogo.`));
-			return;
-		}
-
-		this.busy.set(true);
-		this.api.saveSpecialty(null, nombre).pipe(
-			catchError((error) => {
-				this.busy.set(false);
-				this.aviso.set(avisoError(this.api.describeError(error, 'No se pudo crear la categoría.')));
-				return of(null);
-			}),
-		).subscribe((result) => {
-			this.busy.set(false);
-			if (result) {
-				this.nuevaCategoria = '';
-				this.aviso.set(avisoExito(`"${nombre}" se agregó al catálogo.`));
-				this.cargar();
-			}
 		});
 	}
 

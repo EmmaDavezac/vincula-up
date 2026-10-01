@@ -1,16 +1,15 @@
 # Especificación Técnica — Vincula-UP
 
-> **Documento único de referencia del proyecto.** Reemplaza a la documentación
-> dispersa que existía antes (`mvp-gaps.md`, `README-auth-real.md`,
-> `LOCAL-DEVELOPMENT.md` y `docs/ESPECIFICACION_PROTOTIPO_VISUAL_FIGMA.md`).
-> Si algo no está aquí, no está documentado.
+> **Documento único de referencia del proyecto.** Si algo no está aquí, no está
+> documentado.
 >
-> El [`README.md`](README.md) tiene el resumen operativo: qué es, cómo se
-> deploya, credenciales y funcionalidades. Este archivo tiene el detalle completo.
+> El [`README.md`](README.md) tiene el resumen: qué hace el sistema, el stack y el
+> deploy local desde cero. El [`MANUAL.md`](MANUAL.md) tiene el uso y la operación:
+> los servicios, el secreto del client de servicio, los certificados, el desarrollo
+> y el tema. Este archivo tiene el detalle técnico completo.
 
 **Proyecto:** Vincula-UP — Red Técnica con Respaldo Universitario (Universidad Popular de Concepción del Uruguay)
 **Alcance:** MVP (Minimum Viable Product)
-**Última actualización:** 2026-09-28
 
 ---
 
@@ -21,12 +20,12 @@
 3. [Arquitectura](#3-arquitectura)
 4. [Stack y versiones](#4-stack-y-versiones)
 5. [Estructura del repositorio](#5-estructura-del-repositorio)
-6. [API del BFF: los 40 endpoints](#6-api-del-bff-los-40-endpoints)
+6. [API del BFF: los 45 endpoints](#6-api-del-bff-los-45-endpoints)
 7. [Modelo de datos](#7-modelo-de-datos)
 8. [Autenticación y autorización](#8-autenticación-y-autorización)
 9. [Los tres flujos completos](#9-los-tres-flujos-completos)
 10. [Ubicaciones: geocodificación, cifrado y fotos](#10-ubicaciones-geocodificación-cifrado-y-fotos)
-    - [10.1 Geocodificación](#101-geocodificación) · [10.2 Cifrado de ubicaciones](#102-cifrado-de-ubicaciones) · [10.3 Almacenamiento de fotos](#103-almacenamiento-de-fotos-minio) · [10.4 Privacidad de la dirección](#104-privacidad-de-la-dirección-del-cliente)
+    - [10.1 Geocodificación](#101-geocodificación) · [10.2 Cifrado de ubicaciones](#102-cifrado-de-ubicaciones) · [10.3 Almacenamiento de fotos](#103-almacenamiento-de-fotos) · [10.4 Quién ve la foto de quién](#104-quién-ve-la-foto-de-quién) · [10.5 Privacidad de la dirección](#105-privacidad-de-la-dirección-del-cliente)
 11. [Variables de entorno](#11-variables-de-entorno)
 12. [Datos de arranque](#12-datos-de-arranque)
 13. [Infraestructura: pgAdmin, TLS, Nginx](#13-infraestructura-pgadmin-tls-nginx)
@@ -34,6 +33,12 @@
 15. [Estado real del MVP](#15-estado-real-del-mvp)
 16. [Deuda técnica conocida](#16-deuda-técnica-conocida)
 17. [Diseño visual](#17-diseño-visual)
+
+Anexos:
+
+- [A. Términos y datos](#anexo-a-términos-y-datos)
+- [B. Preguntas frecuentes](#anexo-b-preguntas-frecuentes)
+- [C. Tema claro y oscuro](#anexo-c-tema-claro-y-oscuro)
 
 ---
 
@@ -67,10 +72,26 @@ Sin usuarios simulados ni autenticación falsa.
 
 Los roles son **roles de negocio**, no roles de Keycloak. Viven en
 `ms-usuarios` (`Usuario.rolNegocio`) y se replican como roles de realm en
-Keycloak. La correspondencia no es 1:1 en una sola dirección: un profesional
-invitado por el administrador se auto-registra en Keycloak y nace ahí con rol
-`CLIENTE`; el BFF lo promueve a `PROFESIONAL` en su primer login
-(ver [§8.4](#84-promoción-de-rol-del-profesional-invitado)).
+Keycloak. La correspondencia no es 1:1 en una sola dirección, en los dos
+sentidos:
+
+- **Keycloak → `ms-usuarios`:** cuando alguien entra por primera vez y no hay
+  fila en el padrón, el rol sale del token (`GET /usuarios/por-keycloak?rol=`).
+  Es seguro porque el registro abierto del realm asigna
+  `default-roles-vincula-up` → `CLIENTE`: un auto-registrado nunca nace
+  `PROFESIONAL` ni `ADMIN` por esa vía.
+- **`ms-usuarios` → Keycloak:** un profesional invitado por el administrador se
+  auto-registra en Keycloak y nace ahí con rol `CLIENTE`; el BFF lo promueve a
+  `PROFESIONAL` en su primer login (ver [§8.4](#84-promoción-de-rol-del-profesional-invitado)).
+
+**Por qué el frontend y el backend tienen que mirar lo mismo.** El frontend
+arma el perfil con el `rolNegocio` que devuelve `ms-usuarios`, no con el claim del
+token, y es el que decide a qué sección entra cada quien (`inicioDeSesion`). Si
+esas dos fuentes se desalinean, el backend autoriza cosas que la interfaz no
+muestra: el administrador, por ejemplo, podía hacer `GET /api/usuarios` (el
+`SecurityConfig` lee el token) sin poder entrar nunca a `/admin` (el guard del
+frontend leía la base). Por eso el rol de negocio se resuelve una sola vez, al
+auto-registrar la cuenta.
 
 ### Estados de una cuenta
 
@@ -149,7 +170,6 @@ el BFF (`backend/bff-web`), que cumple cuatro funciones:
 | `keycloak` | 8080 | Sí |
 | `postgres` | 5432 | Sí |
 | `pgadmin` | 5050 | Sí |
-| `minio` | 9000 (API) · 9001 (consola) | Solo con `STORAGE_TIPO=s3` (comentado en el compose) |
 | `bff-web` | 9001 | Sí |
 | `ms-usuarios` | 8081 | Solo `127.0.0.1` |
 | `ms-profesionales` | 8082 | Solo `127.0.0.1` |
@@ -179,7 +199,7 @@ ms-solicitudes → ms-profesionales:8082   (valida disponibilidad al crear)
 | Spring Security | 4.1.1 (OAuth2 Resource Server) |
 | Jackson | 4.x — se importa como `tools.jackson.*` (paquete nuevo) |
 | JPA / Hibernate | 7.4.5.Final |
-| Base de datos | PostgreSQL 16 (producción) · H2 en memoria (tests y dev local) |
+| Base de datos | PostgreSQL 16 (producción) · H2 en memoria (dev local) |
 
 Cada microservicio es un proyecto Maven independiente con su propio `mvnw`
 (wrapper). **No hay reactor raíz**: se compilan por separado.
@@ -192,12 +212,10 @@ Cada microservicio es un proyecto Maven independiente con su propio `mvnw`
 | Angular Material / CDK | 22.1.7 |
 | TypeScript | ~6.0.2 |
 | Zone.js | ~0.16.0 |
-| Vitest | ^4.0.8 |
 | Gestor de paquetes | npm 11.19.0 |
 
 Angular 22 usa el builder `@angular/build:application` y **signals** en lugar de
-RxJS para el estado de los componentes. El testing corre sobre
-`@angular/build:unit-test` (Vitest + jsdom).
+RxJS para el estado de los componentes.
 
 ### Infraestructura
 
@@ -215,7 +233,8 @@ RxJS para el estado de los componentes. El testing corre sobre
 
 ```
 .
-├── README.md                      Resumen operativo (deploy, credenciales, uso)
+├── README.md                      Resumen: qué hace, stack, deploy local
+├── MANUAL.md                      Manual de uso y operación
 ├── ESPECIFICACION.md              Este documento
 ├── docker-compose.yml             Orquestación de los 8 servicios
 ├── .env                           Variables reales (NO versionado)
@@ -231,9 +250,10 @@ RxJS para el estado de los componentes. El testing corre sobre
 │   └── src/app/
 │       ├── core/                  Services, guards, models, utils
 │       ├── shared/                Navbar, tabbar, footer, avatar, icon, confirm
-│       ├── home/ directory/ request/ my-requests/    Flujo del cliente
-│       ├── activation/ account/                        Flujo del profesional
-│       └── admin/                  Shell + 4 pantallas de administración
+│       ├── home/ request/ my-requests/             Flujo del cliente
+│       ├── activation/ account/                    Flujo del profesional
+│       ├── admin/                 Shell + 4 listados y 2 altas del panel
+│       └── legal/                 Términos, FAQ y el modal de aceptación
 │
 ├── keycloak/import/               Realm `vincula-up` (JSON de importación)
 ├── nginx/                         Config + certificados TLS
@@ -257,7 +277,7 @@ RxJS para el estado de los componentes. El testing corre sobre
 
 ---
 
-## 6. API del BFF: los 40 endpoints
+## 6. API del BFF: los 45 endpoints
 
 Todos cuelgan de `/api`. El BFF expone 40 operaciones agrupadas en siete
 familias. La columna **Rol** refleja la regla real de `SecurityConfig.java`;
@@ -273,7 +293,7 @@ familias. La columna **Rol** refleja la regla real de `SecurityConfig.java`;
 | POST | `/api/profesionales` | ADMIN | Alta de profesional |
 | POST | `/api/profesionales/alta` | ADMIN | Alta en un paso: usuario invitado + perfil pendiente |
 | PUT | `/api/profesionales/{id}` | ADMIN | Edición del padrón |
-| PATCH | `/api/profesionales/{id}/suspender` | ADMIN | Baja lógica |
+| PATCH | `/api/profesionales/{id}/suspender` | ADMIN | Baja lógica. En la interfaz se llama **desactivar** |
 | PATCH | `/api/profesionales/{id}/reactivar` | ADMIN | Levanta la suspensión |
 | PUT | `/api/profesionales/{id}/disponibilidad` | PROFESIONAL | Horarios semanales |
 | GET | `/api/profesionales/{id}/disponibilidad` | Autenticado | Lee horarios |
@@ -285,7 +305,7 @@ familias. La columna **Rol** refleja la regla real de `SecurityConfig.java`;
 |---|---|---|---|
 | POST | `/api/solicitudes` | CLIENTE | Crea la solicitud (valida disponibilidad y GPS) |
 | GET | `/api/solicitudes/mias` | Autenticado | Solicitudes del actor (cliente o profesional) |
-| GET | `/api/solicitudes/panel` | ADMIN | Indicadores de demanda y embudo |
+| GET | `/api/solicitudes/panel` | ADMIN | Indicadores de demanda y recorrido de las solicitudes |
 | PATCH | `/api/solicitudes/{id}/aceptar` | PROFESIONAL | Acepta el turno |
 | PATCH | `/api/solicitudes/{id}/rechazar` | PROFESIONAL | Rechaza con motivo |
 | PATCH | `/api/solicitudes/{id}/completar` | CLIENTE o PROFESIONAL | Marca el trabajo como terminado |
@@ -313,7 +333,7 @@ familias. La columna **Rol** refleja la regla real de `SecurityConfig.java`;
 | POST | `/api/usuarios` | ADMIN | Crea usuario |
 | PATCH | `/api/usuarios/{id}` | ADMIN | Edita usuario |
 | PATCH | `/api/usuarios/yo` | Autenticado | Actualiza el perfil propio |
-| PATCH | `/api/usuarios/{id}/suspender` | ADMIN | Suspende la cuenta |
+| PATCH | `/api/usuarios/{id}/suspender` | ADMIN | Desactiva la cuenta (estado SUSPENDIDO) |
 | PATCH | `/api/usuarios/{id}/reactivar` | ADMIN | Reactiva la cuenta |
 | DELETE | `/api/usuarios/{id}` | ADMIN | Baja lógica |
 
@@ -337,7 +357,9 @@ familias. La columna **Rol** refleja la regla real de `SecurityConfig.java`;
 
 | Método | Ruta | Rol | Descripción |
 |---|---|---|---|
-| POST | `/api/fotos` | Autenticado | Sube una foto al almacenamiento de objetos, devuelve la URL pública |
+| POST | `/api/fotos` | Autenticado | Sube una foto al volumen y devuelve su **clave** (no hay URL pública) |
+| GET | `/api/usuarios/{id}/foto` | Autenticado + rol | Devuelve la foto de un usuario si el rol la tiene permitida ([§10.4](#104-quién-ve-la-foto-de-quién)) |
+| PATCH | `/api/terminos/aceptar` | Autenticado | Registra la aceptación de los términos; **el id sale del token**, nunca del cuerpo ([§8.5](#85-aceptación-de-los-términos-y-condiciones)) |
 | GET | `/api/gps` | — | Geocodificación de una dirección |
 | GET | `/actuator/health` | — | Health check (sin prefijo `/api`) |
 
@@ -429,10 +451,14 @@ calificación por solicitud), `puntaje` (Integer, 1-5), `comentario` (String),
 
 ### 7.6 Nota sobre los datos duplicados
 
-`Usuario.fotoUrl` y `Profesional.fotoUrl` existen ambos. `ms-usuarios` guarda la
-foto general de la persona y `ms-profesionales` la que se muestra en el padrón.
-No hay FK entre microservicios: la consistencia se resuelve en el BFF, que al
-enriquecer el listado busca el usuario y lo omite si no responde.
+`Usuario.fotoUrl` y `Profesional.fotoUrl` existen ambos, y los dos guardan la
+**clave** del archivo, no una URL: la foto se pide por
+`GET /api/usuarios/{id}/foto` ([§10.4](#104-quién-ve-la-foto-de-quién)).
+`ms-usuarios` guarda la foto general de la persona y `ms-profesionales` la que se
+muestra en el padrón. No hay FK entre microservicios: la consistencia se resuelve
+en el BFF, que al enriquecer el listado busca el usuario y lo omite si no
+responde. Los listados devuelven `tieneFoto` (un booleano) y nunca la clave, para
+que no quede una ruta con la que pedirle la foto a cualquiera.
 
 
 ## 8. Autenticación y autorización
@@ -484,13 +510,13 @@ especificidad. Resumen:
 | Ámbito | Reglas |
 |---|---|
 | Público | `GET /api/profesionales`, `GET /api/calificaciones`, `GET /api/especialidades`, `GET /api/gps`, `GET /actuator/health`, `OPTIONS /**` |
-| ADMIN | Listar/crear/editar/borrar usuarios, alta y edición de profesionales, suspender/reactivar, CRUD de especialidades, `GET /api/solicitudes/panel`, `GET /api/usuarios/por-email` |
+| ADMIN | Listar/crear/editar/borrar usuarios, alta y edición de profesionales, desactivar/reactivar, CRUD de especialidades, `GET /api/solicitudes/panel`, `GET /api/usuarios/por-email` |
 | PROFESIONAL | `POST /api/profesionales/activar`, `mi-perfil`, `vincular`, `PUT .../disponibilidad`, `GET /api/mi-reputacion`, aceptar y rechazar solicitudes |
 | CLIENTE | `POST /api/solicitudes`, `POST /api/solicitudes/{id}/calificacion` |
 | Cualquiera de los dos | `PATCH .../completar`, `PATCH .../cancelar` |
 | Solo autenticado | `/api/solicitudes/mias`, mensajes, leer calificación, ver disponibilidad ajena, ficha de la contraparte |
 
-**No hay borrado físico del padrón**: la baja es lógica (suspender), para
+**No hay borrado físico del padrón**: la baja es lógica (desactivar), para
 conservar el historial de solicitudes.
 
 Además del RBAC por ruta, el BFF corta a las cuentas `SUSPENDIDO` en
@@ -521,7 +547,59 @@ apartado. La secuencia real es:
 desde el padrón. Un profesional dado de alta no puede convertirse en admin por
 este camino.
 
-### 8.5 Configuración del realm
+**La otra mitad: qué pasa cuando la fila no existe.** El paso 2 assumes que el
+administrador ya dio de alta al profesional. Si alguien entra y no hay fila, el
+rol sale del token ([§2](#2-roles-del-mvp)). Esto cubre el caso del
+**administrador institucional**: su cuenta la crea el administrador de Keycloak,
+no el padrón, así que si el auto-alta no respetara el token quedaría trancado
+—nada en la aplicación crea un `ADMIN`— y el panel `/admin` sería inalcanzable
+aunque el backend lo autorizara.
+
+`SEMBRAR_DEMO=true` siembra las tres cuentas de prueba (`cliente@`,
+`profesional@`, `admin@`) con su rol ya asignado, así el padrón y el panel
+funcionan desde el primer arranque ([§16-bis](#16-bis-datos-de-demostración)).
+
+### 8.5 Aceptación de los términos y condiciones
+
+El alta de cuentas la hace Keycloak, así que la aceptación se pide **después** del
+primer ingreso, no en un formulario propio.
+
+**Dónde se guarda.** Dos columnas en `usuarios`:
+
+| Columna | Qué guarda |
+|---|---|
+| `terminos_version` | La versión del documento que aceptó (máx. 32 caracteres) |
+| `terminos_aceptado_en` | Cuándo |
+
+Ambas nullable, igual que `estado`: las cuentas anteriores quedan como "no aceptó"
+y el sistema se los pide. El texto vive en el frontend (`legal/terminos/terminos.ts`),
+que es lo único que define qué versión está vigente.
+
+**El flujo:**
+
+1. La app llama a `GET /api/usuarios/yo` (que ya hacía) y lee los tres campos.
+2. Si la versión guardada no es la vigente, `terminosPendientes` es `true`.
+3. Aparece un modal montado en `app.html`, **sin botón de cerrar**.
+4. Al marcar el casillero, `PATCH /api/terminos/aceptar` guarda versión y fecha.
+
+**Por qué es un modal y no un guard.** Es una capa sobre toda la aplicación, no
+una pantalla: escribir una URL no lo esquiva, y tampoco navegar. La única forma de
+salir es aceptar. Mientras el backend no responde, `terminosPendientes` devuelve
+`true`: se prefiere bloquear de más un instante antes que dejar pasar a alguien
+que no aceptó.
+
+**El id sale del token.** El endpoint no acepta un id en el cuerpo; si lo
+aceptara, cualquiera con su propia sesión podría registrar la aceptación en la
+cuenta de otro.
+
+**Si falla el registro, el modal no se cierra.** El estado solo cambia a aceptado
+cuando la llamada volvió bien.
+
+**Limitación conocida:** el realm tiene `verifyEmail: false`. Quien se registre
+con el correo de un prerregistro queda vinculado a ese prerregistro y se activa
+como profesional ([§16](#16-deuda-técnica-conocida)).
+
+### 8.6 Configuración del realm
 
 `keycloak/import/vincula-up-realm.json`:
 
@@ -529,16 +607,33 @@ este camino.
 |---|---|
 | `realm` | `vincula-up` |
 | `registrationAllowed` | `true` (auto-registro de clientes) |
+| `registrationEmailAsUsername` | `true` — **el registro pide solo el correo**, que además queda como nombre de usuario interno |
+| `loginWithEmailAllowed` | `true` — se accede con el email, sin nombre de usuario aparte |
+| `duplicateEmailsAllowed` | `false` |
 | `resetPasswordAllowed` | `true` (requiere SMTP configurado) |
 | `verifyEmail` | `false` |
 | `sslRequired` | `none` (el TLS lo termina nginx) |
 | Roles de realm | `CLIENTE`, `PROFESIONAL`, `ADMIN` |
 
+> **Por qué `registrationEmailAsUsername`.** La aplicación se identifica por
+> correo, y el email es además la identidad con la que el backend vincula la
+> cuenta. Pedir un "nombre de usuario" aparte obligaba a inventarse un alias que
+> nadie recordaba, y terminaba siendo el correo otra vez pero escrito distinto
+> (`juan.perez` vs `juan.perez@gmail.com`), que es justamente la forma de romper
+> el vínculo. Con esta opción, Keycloak oculta el campo del formulario y usa el
+> correo como `username` interno: el identificador técnico sigue existiendo
+> (Keycloak lo necesita para todo) pero la persona nunca lo ve ni lo escribe.
+>
+> No obliga a migrar nada: las cuentas de demostración del import ya tienen
+> `username` igual a `email`. Para aplicar el cambio sobre un realm que ya está
+> corriendo, `scripts/{linux-macos,windows}/keycloak-bootstrap.*` lo actualizan de
+> forma idempotente ([§14.1](#141-keycloak-bootstrap-sh--ps1)).
+
 **Clientes:**
 
 | Client | Tipo | Uso |
 |---|---|---|
-| `vincula-up-public` | Público | App Angular. PKCE S256 obligatorio, redirect URIs para `localhost`, `:4200` y `vincula-up.local`, `directAccessGrantsEnabled` (lo usa el smoke test) |
+| `vincula-up-public` | Público | App Angular. PKCE S256 obligatorio, redirect URIs para `localhost`, `:4200` y `vincula-up.local`, `directAccessGrantsEnabled` (lo usa la verificación de la API con `curl`) |
 | `vincula-up-admin` | Confidencial | Service account del BFF para promover roles. Sin `standardFlowEnabled` ni `directAccessGrantsEnabled` |
 
 > **El realm se importa solo la primera vez.** Como Keycloak persiste en
@@ -596,22 +691,45 @@ Shell propio (`/admin`) con 4 pantallas:
 
 | Pantalla | Qué hace |
 |---|---|
-| **Resumen** | Indicadores de demanda y embudo, sobre datos reales de `GET /api/solicitudes/panel` |
-| **Profesionales** | Padrón completo, alta de preregistros, edición, suspensión y reactivación |
+| **Resumen** | Indicadores de demanda y recorrido de las solicitudes, sobre datos reales de `GET /api/solicitudes/panel` |
+| **Profesionales** | Padrón completo, alta de preregistros y detalle |
 | **Categorías** | CRUD de especialidades |
-| **Clientes** | Listado y gestión del acceso de clientes (suspender/reactivar) |
+| **Clientes** | Listado y detalle con edición de datos y gestión del acceso |
 
 El alta de un profesional usa `POST /api/profesionales/alta`, que en un solo
 paso crea el usuario invitado y su perfil pendiente (ver
 [§8.4](#84-promoción-de-rol-del-profesional-invitado)).
 
-**Sobre la pantalla `/directorio`.** Existe y compila, pero su ruta exige rol
-`ADMIN` (`app.routes.ts:21`) y **no forma parte del flujo del cliente**: quien
-busca y elige profesional lo hace en el paso 4 de `/solicitar`, que consume el
-mismo endpoint público `GET /api/profesionales`. Es una decisión consciente, no
-un bug: la pantalla quedó obsoleta respecto del diseño final, donde el cliente
-nunca ve un padrón suelto sino un flujo guiado. La ruta `/api/profesionales`
-sigue siendo pública, que es lo que garantiza que el cliente pueda buscar.
+**El flujo de las pantallas de detalle: entrar a consultar, y adentro
+modificar.** Las dos listas (profesionales y clientes) muestran **una sola acción
+por fila: "Consultar"**. El detalle que se abre tiene, en orden:
+
+1. **Consultar** — los datos, solo lectura.
+2. **Modificar** — los campos editables (legajo y especialidades en el padrón;
+   nombre, apellido y teléfono en el cliente). El email no se edita: es la
+   identidad con la que la persona accede a su cuenta.
+3. **Acceso** — al pie, separado con un borde y aire, el botón de **desactivar** o
+   **reactivar**, que siempre pide confirmación.
+
+**Por qué las acciones sensibles están adentro.** En una lista, un botón rojo
+junto a cada nombre queda a un clic de distancia y se aprieta sin querer. Meterlo
+en el detalle obliga a abrir la ficha de esa persona concreta: el que va a
+desactivar a alguien ya sabe a quién.
+
+**Una sola palabra para la misma acción.** Los dos paneles usan
+desactivar/reactivar (el de clientes ya lo decía; el de profesionales decía
+"suspender"). "Suspender" suena más técnico y cuesta más entender sin contexto. El
+estado interno sigue siendo `SUSPENDIDO` y el endpoint `/suspender`: eso es la
+API, no la interfaz.
+
+**No se expone "eliminar".** Existe `DELETE /api/usuarios/{id}` y borra de verdad,
+con historial de solicitudes y calificaciones colgando. Con ese historial, un
+borrado accidental no se recupera, así que la interfaz no lo ofrece.
+
+**Sobre el directorio.** El cliente no ve un padrón suelto: busca y elige
+profesional en el paso 4 de `/solicitar`, un flujo guiado que consume el mismo
+endpoint público `GET /api/profesionales`. Esa ruta sigue siendo pública, que es
+lo que garantiza que el cliente pueda buscar sin sesión.
 
 ---
 
@@ -625,10 +743,10 @@ sigue siendo pública, que es lo que garantiza que el cliente pueda buscar.
 
 **Hay una sola implementación**, en el `GeocodingClient` de `ms-solicitudes`.
 El BFF expone el endpoint público y proxea a `GET /solicitudes/geocodificar`
-mediante `BackendGateway.geocodificar()`. Antes había dos copias —68 líneas en
-el controlador del BFF con timeout de 8 s y otra en el microservicio con 5 s— sin
-caché ni rate limiting. La ruta pública no cambió, así que el frontend no se
-enteró de nada.
+mediante `BackendGateway.geocodificar()`. La duplicación de la lógica, con
+timeouts distintos entre el controlador y el microservicio, hacía imposible saber
+cuál de los dos rigiera el resultado: una implementación única con caché y rate
+limiting hace que el comportamiento sea predecible.
 
 **Respuesta** (siempre 200, con campos duplicados por compatibilidad):
 
@@ -664,7 +782,7 @@ aplicación (no es cifrado de disco de Postgres). Afecta a:
 | `ms-profesionales` | `profesionales.zona_cobertura_lat`, `profesionales.zona_cobertura_lng` |
 
 **Cómo funciona.** `CifradorUbicaciones` cifra al escribir y descifra al leer, de
-forma transparente para services, DTOs y tests. Como las entidades no son beans de
+forma transparente para services y DTOs. Como las entidades no son beans de
 Spring, el cifrado se inyecta con un holder estático que el propio `CifradorUbicaciones`
 registra en un `@PostConstruct`. El resultado es `base64(iv || cifrado)`, con el
 IV aleatorio de 12 bytes al principio: dos coordenadas iguales producen textos
@@ -699,54 +817,79 @@ fallar.
 
 ### 10.3 Almacenamiento de fotos
 
-Las fotos **no se guardan en PostgreSQL**: viven fuera de la base y ahí solo se conserva la URL.
+Las fotos **no se guardan en PostgreSQL**: viven fuera de la base, en el volumen
+Docker `fotos_data`, y ahí solo se conserva la **clave** del archivo
+(`perfiles/<uuid>.jpg`).
 
 **Flujo completo:**
 
 ```
 1. El usuario elige una imagen → previsualización local (data URL, no se envía)
 2. El frontend sube el archivo con POST /api/fotos (multipart/form-data)
-3. El BFF valida tipo y tamaño, lo sube al bucket y devuelve { url, key }
-4. El frontend manda esa URL a /api/profesionales/activar o /api/usuarios/yo
-5. El microservicio guarda la URL (512 caracteres)
+3. El BFF valida tipo y tamaño, lo escribe en el volumen y devuelve { key }
+4. El frontend manda esa clave a /api/profesionales/activar o /api/usuarios/yo
+5. El microservicio guarda la clave (512 caracteres)
 ```
 
 **Por qué el BFF y no cada microservicio:** evita duplicar el cliente de
 almacenamiento en dos servicios, y el BFF ya es quien valida sesión y rol. Los
-servicios de dominio solo reciben la URL: nunca ven el archivo.
+servicios de dominio solo reciben la clave: nunca ven el archivo.
 
-**Dos implementaciones detrás de la misma interfaz (`FotoStorage`), elegidas con
-`STORAGE_TIPO`:**
+**Una sola implementación (`FotoStorageLocal`).** No hay bucket ni servicio de
+objetos: el stack no usa ninguno. La interfaz `FotoStorage` queda con un método
+de escritura y uno de lectura, lo que deja el punto de extensión si alguna vez
+hacía falta otro backend.
 
-| Tipo | Dónde viven las fotos | Cuándo usarlo |
-|---|---|---|
-| `local` (default) | Volumen Docker `fotos_data`, que nginx sirve en `/fotos/` | Desarrollo y demo: no depende de ningún servicio extra |
-| `s3` | Bucket compatible con S3 (MinIO o Cloudflare R2) | Cuando haya un bucket disponible: sobrevive a que se borre el contenedor |
+### 10.4 Quién ve la foto de quién
 
-Con `local` el BFF escribe en `STORAGE_LOCAL_DIR` (`/data/fotos`) y devuelve una
-URL relativa a `/fotos/`, que es donde nginx monta el mismo volumen. Las fotos
-quedan disponibles aunque el contenedor se recree, porque viven en el volumen.
+Las fotos de perfil **no son públicas**. No existe ninguna URL de foto: el
+frontend nunca recibe una ruta, solo el `usuarioId` del dueño y un booleano
+`tieneFoto`. La imagen se pide a `GET /api/usuarios/{id}/foto`, que exige sesión
+y aplica esta matriz antes de devolver los bytes:
 
-Con `s3` el bucket sirve las URLs directamente y el endpoint de lectura del BFF
-no interviene. La URL es absoluta.
+| mi rol \ foto del otro | `CLIENTE` | `PROFESIONAL` | `ADMIN` |
+|---|---|---|---|
+| **`CLIENTE`** | no | sí | no |
+| **`PROFESIONAL`** | sí | no | no |
+| **`ADMIN`** | sí | sí | no |
 
-**Por qué existe la alternativa S3.** La API de MinIO y R2 es la misma, así que
-`FotoStorageS3` sirve para las dos: migrar a Cloudflare R2 es cambiar
-`STORAGE_TIPO=s3`, `STORAGE_ENDPOINT` y las credenciales, sin tocar código. Queda
-implementada y lista, aunque hoy el stack arranque con `local` porque la imagen
-de MinIO no se puede descargar en la red actual.
+Más la **propia**, que siempre se ve. Traducido: un cliente ve las fotos de los
+profesionales (los elige y agenda con ellos), un profesional ve las de los
+clientes (coordinan el turno) y el administrador ve las de ambos, pero nadie ve
+las de su propio rol ni las de otro administrador.
 
-**Límites (comunes a los dos):** 2 MB por imagen (`STORAGE_MAX_BYTES`) y solo
-JPEG, PNG o WebP — SVG queda excluido a propósito, porque es XML ejecutable. Las
-claves se generan con `UUID` y usan el prefijo `perfiles/`: usar el nombre
-original permitiría colisiones y rutas manipulables con `../`. `nginx` sube
-`client_max_body_size` a 3 m: ya no necesita el margen que exigía el base64.
+**Por qué el BFF y no nginx.** nginx puede servir un volumen como estático, con
+`Cache-Control: public` y 30 días de caché: cualquiera con la URL descargaría la
+foto de cualquiera y un proxy compartido la guardaría. Por eso `nginx` **no monta**
+el volumen `fotos_data`; el BFF es el único que lo lee. Responde con
+`Cache-Control: private, no-cache` más un
+`ETag`, así el navegador revalida en vez de re-descargar y nada queda en cachés
+compartidos.
+
+**Por qué `403` y no `404`.** "No existe" y "no te corresponde" son respuestas
+distintas a la misma pregunta y distinguen cuentas que existen de las que no. Se
+acepta el costo: los identificadores son UUID, así que no se adivinan, y no se
+filtra ningún dato sensible — solo que ese rol no puede ver esa foto.
+
+**En el frontend.** Un `<img src>` no manda el header `Authorization`, así que la
+imagen no puede pedirse con la etiqueta. El `FotoService` la pide con
+`HttpClient`, cachea los blobs por usuario y devuelve una URL `blob:`. El
+`vu-avatar` es el único lugar que lo usa: recibe `usuarioId` + `tieneFoto` en vez
+de una URL, así que las ocho pantallas que muestran fotos no cambian al pasar de
+URL a endpoint.
+
+**Límites:** 2 MB por imagen (`STORAGE_MAX_BYTES`) y solo JPEG, PNG o WebP — SVG
+queda excluido a propósito, porque es XML ejecutable. Las claves se generan con
+`UUID` y usan el prefijo `perfiles/`: usar el nombre original permitiría
+colisiones y rutas manipulables con `../` (la lectura normaliza el path y
+rechaza el que salga del volumen). `nginx` sube `client_max_body_size` a 3 m: ya
+no necesita el margen que exigía el base64.
 
 **Eliminación de datos:** las fotos que estaban en base 64 en versiones previas se
-descartaron. El esquema se recrea limpio con `docker compose down -v`; no hay
-migración de datos.
-
-### 10.4 Privacidad de la dirección del cliente
+descartaron. Las filas que guardaban la URL pública completa
+(`/fotos/perfiles/x.jpg`) se normalizan quitando el prefijo; el BFF acepta ambas
+formas, así que una base existente no necesita migración.
+### 10.5 Privacidad de la dirección del cliente
 
 El domicilio del cliente **no se le muestra al profesional hasta que acepta el turno**.
 
@@ -802,7 +945,7 @@ Se leen del archivo `.env` en la raíz (ignorado por git). Copiar
 | `KEYCLOAK_REALM` | `vincula-up` | Nombre del realm |
 | `KEYCLOAK_ADMIN_BASE_URL` | `http://keycloak:8080` | Base para el service account |
 | `KEYCLOAK_ADMIN_CLIENT_ID` | `vincula-up-admin` | Client de servicio |
-| `KEYCLOAK_ADMIN_CLIENT_SECRET` | `vincula-up-admin-secret` | Secret del client de servicio |
+| `KEYCLOAK_ADMIN_CLIENT_SECRET` | `vincula-up-admin-secret` | Secret del client de servicio. Vacío en `.env.example`: rige el default de demo, que es público |
 
 ### SMTP (recuperación de contraseña)
 
@@ -828,20 +971,20 @@ Se leen del archivo `.env` en la raíz (ignorado por git). Copiar
 
 ### Almacenamiento de fotos
 
+### Almacenamiento de fotos
+
 | Variable | Default | Descripción |
 |---|---|---|
-| `STORAGE_TIPO` | `local` | `local` (volumen en disco) o `s3` (MinIO / Cloudflare R2) |
-| `STORAGE_LOCAL_DIR` | `/data/fotos` | Solo con `local`: directorio donde escribe el BFF |
-| `STORAGE_PUBLIC_URL` | `/fotos` | Base de las URLs. Con `local` es la ruta que sirve nginx; con `s3`, la URL pública del bucket |
-| `STORAGE_PREFIX` | `perfiles` | Prefijo de la clave dentro del almacenamiento |
+| `STORAGE_LOCAL_DIR` | `/data/fotos` | Directorio del volumen donde escribe y lee el BFF |
+| `STORAGE_PREFIX` | `perfiles` | Prefijo de la clave dentro del volumen |
 | `STORAGE_MAX_BYTES` | `2097152` | Máximo por imagen (2 MB) |
 
-Solo con `STORAGE_TIPO=s3`: `STORAGE_ENDPOINT`, `STORAGE_ACCESS_KEY`,
-`STORAGE_SECRET_KEY`, `STORAGE_BUCKET` (y `MINIO_ROOT_USER` /
-`MINIO_ROOT_PASSWORD` si se autohospeda MinIO).
+No hay más variables: el almacenamiento es un volumen en disco y las fotos se
+sirven por el BFF ([§10.4](#104-quién-ve-la-foto-de-quién)), así que no hay
+endpoint, credenciales ni bucket que configurar.
 
-Para migrar a Cloudflare R2: `STORAGE_TIPO=s3` y
-`STORAGE_ENDPOINT=https://<account>.r2.cloudflarestorage.com` con las
+> `STORAGE_LOCAL_DIR` no se define en el `.env`: la fija `docker-compose.yml`
+> en `/data/fotos`, que es donde está montado el volumen.
 credenciales de la cuenta. El código no cambia.
 
 ### Cifrado de ubicaciones
@@ -1077,21 +1220,38 @@ cierra el flujo de alta de un profesional.
 
 **El flujo completo:**
 
-1. El **administrador** da de alta al profesional desde el panel
+1. El **administrador** da de alta el profesional desde el panel
    (`POST /api/profesionales/alta`), con sus datos, legajo y especialidad. Esto
    crea la cuenta en `ms-usuarios` **sin cuenta de Keycloak**: es una invitación.
 2. El BFF envía un correo al profesional (`NotificacionService`) con el legajo, la
-   especialidad y un enlace directo a `/activar-perfil`.
+   especialidad y los pasos numerados para activar el perfil.
 3. El **profesional** se registra en Keycloak con ese mismo correo. Al primer
    ingreso, `ms-usuarios` lo reconoce por email y conserva su rol `PROFESIONAL`
-   (un email no prerregistrado nace como `CLIENTE`).
+   (un correo no prerregistrado nace con el rol del token; ver
+   [§8.4](#84-promoción-de-rol-del-profesional-invitado)).
 4. El BFF promueve el rol en Keycloak (`KeycloakAdminService`) para que el
    siguiente token ya traiga `PROFESIONAL`.
 5. El profesional **activa su perfil** (foto, zona de cobertura y horarios).
 
-> **El correo es best-effort**: si el SMTP no está configurado o el servidor
-> rechaza el mensaje, el prerregistro queda guardado y el fallo queda en el log
-> del BFF. Dar de alta a un profesional nunca falla porque no salió un correo.
+**El correo no habla de la implementación.** Decirle a un profesional "se registra
+en Keycloak" o "el prerregistro se vincula por email" le da información que no
+necesita. El texto va en términos del servicio, y lo importante es que explique
+el paso que más se confunde: **entrar no alcanza, hace falta tener cuenta con ese
+mismo correo**. El correo se repite en el cuerpo por eso.
+
+**El prerregistro solo acepta correos sin cuenta.** Si el correo ya tiene una
+sesión —alguien se registró y usó esa dirección— el alta se rechaza con `409` y el
+mensaje *"Ese correo ya está en uso. Elegí otro para el prerregistro."* El
+criterio es `keycloakId`: si viene vacío es una invitación anterior del mismo
+administrador y se puede completar; si viene lleno, hay una persona real detrás.
+
+> **El correo es best-effort, pero el panel lo dice.** Si el SMTP no está
+> configurado o el servidor rechaza el mensaje, el prerregistro queda guardado y
+> el fallo queda en el log: dar de alta a un profesional nunca falla porque no salió
+> un correo. Para que el administrador no asuma que el profesional se enteró,
+> `avisarPrerregistro` devuelve si el mensaje salió y la respuesta del alta trae
+> `correoEnviado`: el panel dice *"Le enviamos las instrucciones por correo"* o,
+> si no salió, *"Avisale por otra vía"*.
 
 **Configuración:** reusa el mismo SMTP que Keycloak (`KEYCLOAK_SMTP_*`), así que
 no hay credenciales duplicadas. `APP_URL` es la base del enlace del correo; si
@@ -1105,91 +1265,68 @@ se despliega en otro dominio, hay que cambiarla.
 
 ## 15. Estado real del MVP
 
-Estado verificado durante el desarrollo el 2026-09-28.
-
-### 15.1 Verificación
-
-| Componente | Resultado |
-|---|---|
-| `ms-usuarios` | 11 tests, 0 fallos |
-| `ms-profesionales` | 13 tests, 0 fallos (incluye 8 del cifrado) |
-| `ms-solicitudes` | 34 tests, 0 fallos (incluye 9 de geocodificación y zona) |
-| `bff-web` | 30 tests, 0 fallos (incluye 5 de privacidad de la dirección) |
-| **Backend** | **88 tests, 0 fallos** |
-| **Frontend** | **165 tests pasan, 5 skipped** (20 archivos) |
-| Build de producción Angular | OK, 384 kB |
-
-> ℹ️ **Esta suite se retiró del repositorio** antes de la entrega: la escritura y la
-> ejecución de los tests quedan a cargo del área de QA previa al despliegue. Lo
-> que sí permanece en el repo es el **andamiaje** para recibirlos sin cambios:
-> las dependencias `<scope>test</scope>` en los cuatro `pom.xml`, el target
-> `test` de `angular.json` y `tsconfig.spec.json`. Ver [README §Tests](README.md#tests).
-
-### 15.2 Qué está completo
+### 15.1 Qué está completo
 
 - Ciclo de vida completo de la solicitud, con validación de transiciones.
 - Autenticación real contra Keycloak (OIDC + PKCE), sin atajos de desarrollo.
-- RBAC de 27 reglas, aplicado en el BFF y validado con tests.
+- RBAC de 27 reglas, aplicado en el BFF.
 - Los tres roles recorren su flujo completo contra backend real.
 - Geolocalización real (Nominatim) con degradación controlada.
 - Datos semilla para que la demo arranque sin carga manual.
+- Fotos de perfil privadas, con control de visibilidad por rol
+  ([§10.4](#104-quién-ve-la-foto-de-quién)).
+- Términos y condiciones y preguntas frecuentes
+  ([Anexo A](#anexo-a-términos-y-datos) y [Anexo B](#anexo-b-preguntas-frecuentes)).
+- Aceptación obligatoria de los términos al primer ingreso, con versión y fecha
+  registradas ([§8.5](#85-aceptación-de-los-términos-y-condiciones)).
+- Tema claro y oscuro ([Anexo C](#anexo-c-tema-claro-y-oscuro)).
+- Mapas reales (Leaflet + OpenStreetMap) en la activación del perfil
+  ([§17.7](#177-el-mapa-es-real-no-un-dibujo)).
 
-### 15.3 Lo que no está
+### 15.2 Lo que no está
 
 | Brecha | Detalle |
 |---|---|
-| **Sin CI** | No hay `.github/`. Nada corre los tests automáticamente |
-| **Sin tests de integración reales** | Los tests del BFF usan `@MockitoBean` sobre H2: no se ejercita la cadena completa con Postgres y Keycloak reales. La cobertura de esa cadena queda para la validación de QA previa al despliegue |
-| **Cobertura backend asimétrica** | `ProfesionalService` tiene 4 tests; `SolicitudService` tiene 15. Faltan casos de borde |
+| **Sin CI** | No hay `.github/`. Nada verifica que el código compile |
+| **Sin suite automatizada** | La verificación de la cadena completa (Postgres + Keycloak reales) queda para la validación de QA previa al despliegue |
 
 ---
 
 ## 16. Deuda técnica conocida
 
-Pendientes identificados durante la consolidación documental. No bloquean la
-demo, pero conviene tenerlos fichados.
+Pendientes conocidos. No bloquean la demo, pero conviene tenerlos fichados.
 
 ### 16.1 Prioridad alta
 
 | # | Deuda | Impacto |
 |---|---|---|
 | 1 | **Sin CI** | Nada garantiza que el código compile. Un cambio roto se descubre en la máquina de quien lo hizo |
-| 2 | **Sin tests** | La suite se retiró del repo: la escritura y la ejecución quedan a cargo de QA antes del despliegue. El andamiaje sigue en su lugar (dependencias `<scope>test</scope>` en los cuatro `pom.xml`, target `test` de `angular.json`, `tsconfig.spec.json`) |
-| 3 | **`ddl-auto=update` como esquema** | Sin migraciones versionadas no hay forma de reproducir una base ni de revertir un cambio de modelo. Correr el stack con `JPA_DDL_AUTO=validate` falla: no hay esquema que valide |
-| 4 | **Secret del client de servicio sin rotar** | `KEYCLOAK_ADMIN_CLIENT_SECRET` quedó **vacío** en `.env.example` a propósito (no se publica un secreto usable). Hay que generar uno con `openssl rand -hex 24` y cargarlo en el `.env` y en Keycloak (Clients → `vincula-up-admin`). **Mientras esté vacío, la promoción de rol del profesional invitado no funciona** |
-| 5 | **`webOrigins: ["*"]`** en el client público | Permitido en demo; en producción conviene restringirlo a los orígenes reales |
+| 2 | **`ddl-auto=update` como esquema** | Sin migraciones versionadas no hay forma de reproducir una base ni de revertir un cambio de modelo. Correr el stack con `JPA_DDL_AUTO=validate` falla: no hay esquema que valide |
+| 3 | **Secret del client de servicio sin rotar** | `.env.example` deja `KEYCLOAK_ADMIN_CLIENT_SECRET` **vacío** a propósito, pero con el vacío **rige el default de demo** `vincula-up-admin-secret`, que es **público** (está en `docker-compose.yml` y en el JSON del realm). El stack arranca y la promoción de rol funciona, pero con un secreto que cualquiera puede leer en el repositorio: quien lo tenga puede pedir un token de servicio y promover cuentas a PROFESIONAL. Se cierra rotando (`openssl rand -hex 24`), poniendo el valor en `.env` y **re-corriendo el bootstrap**, que es lo único que lo copia a Keycloak: el import del realm **no** resuelve `${env.*}` (verificado en Keycloak 26.3.3, ver `keycloak/import/README.md`). Después hay que recrear `bff-web` |
+| 4 | **`webOrigins: ["*"]`** en el client público | Permitido en demo; en producción conviene restringirlo a los orígenes reales |
 
 ### 16.2 Prioridad media
 
 | # | Deuda | Impacto |
 |---|---|---|
-| 6 | **`verifyEmail: false`** | Un profesional puede activar su perfil con el email de otro, porque nadie confirma que la dirección sea suya. Cerrarlo requiere `verifyEmail: true` en el realm **y** `docker compose down -v`; además rompe las cuentas `@vincula-up.local` de prueba, que no son deliverables |
-| 7 | **H2 por defecto en desarrollo** | Sin `DATABASE_URL`, los datos se pierden al reiniciar y el comportamiento difiere de producción |
-| 8 | **Tests de integración incompletos** | Sin suite, un cambio en el contrato entre microservicios no lo detecta nada. Hoy se verificó a mano: con `SEMBRAR_DEMO=true` la siembra cubre los cuatro estados del ciclo |
-| 9 | **CORS con lista de orígenes fija** | `SecurityConfig.java` enumera los orígenes. Agregar un dominio es tocar código |
-| 10 | **Geocodificación puede resolver a otra ciudad** | Nominatim a veces devuelve un lugar homónimo: una dirección de Concepción del Uruguay terminó en Entre Ríos, Argentina. Es un comportamiento del servicio público, no del código; convendría validar el país del resultado |
+| 5 | **`verifyEmail: false`** | Un profesional puede activar su perfil con el email de otro, porque nadie confirma que la dirección sea suya. Cerrarlo requiere `verifyEmail: true` en el realm **y** `docker compose down -v`; además rompe las cuentas `@vincula-up.local` de prueba, que no son entregables |
+| 6 | **H2 por defecto en desarrollo** | Sin `DATABASE_URL`, los datos se pierden al reiniciar y el comportamiento difiere de producción |
+| 7 | **CORS con lista de orígenes fija** | `SecurityConfig.java` enumera los orígenes. Agregar un dominio es tocar código |
+| 8 | **Geocodificación puede resolver a otra ciudad** | Nominatim a veces devuelve un lugar homónimo: una dirección de Concepción del Uruguay terminó en Entre Ríos, Argentina. Es un comportamiento del servicio público, no del código; convendría validar el país del resultado |
 
 ### 16.3 Higiene del repositorio
 
-Resuelto el 2026-09-28:
+El repositorio está limpio:
 
-- ~~`node_modules/` versionado~~ → desindexado (1025 archivos, el 77% del repo).
-  El índice pasó de 1326 a 289 archivos.
-- ~~Logs de crash de la JVM (`hs_err_pid*.log`, `replay_pid*.log`)~~ → fuera del índice y agregados a `.gitignore`.
-- ~~`out.html`~~ → fuera del índice y agregado a `.gitignore`.
-- ~~Documentación duplicada y contradictoria~~ → consolidada en este archivo y en `README.md`.
-- ~~Prototipo Next.js de v0~~ → eliminado del repositorio; sigue desplegado en https://v0-vincula-up.vercel.app/.
-
-- ~~La dirección se veía antes de tiempo~~ → resuelto: el profesional ve la zona y un punto redondeado mientras está pendiente; el domicilio se revela al aceptar (§10.4).
-- ~~Fotos en base 64~~ → resuelto: los archivos viven en MinIO y la base guarda solo la URL.
-- ~~Geocodificación duplicada~~ → resuelto: una sola implementación en `ms-solicitudes`, con caché.
-- ~~Coordenadas en claro~~ → resuelto: cifrado AES-256-GCM en reposo.
-
-Pendiente:
-
-- (ninguno de higiene del repositorio: los `.gitignore` boilerplate de
-  `backend/*/` y el del frontend se absorbieron en el `.gitignore` de la raíz
-  el 2026-09-29, junto con los `.gitattributes` duplicados.)
+- `node_modules/` no está versionado; lo cubre el `.gitignore` de la raíz.
+- Los logs de crash de la JVM (`hs_err_pid*.log`, `replay_pid*.log`) y los
+  archivos de salida del build están fuera del índice y en `.gitignore`.
+- Hay un solo `.gitignore` y un solo `.gitattributes`, ambos en la raíz: los que
+  existían por microservicio se absorbieron.
+- La documentación vive en este archivo, en el `README.md` y en el `MANUAL.md`. No
+  hay copias ni documentos contradictorios.
+- El prototipo Next.js de v0 no está en el repo. Sigue desplegado en
+  https://v0-vincula-up.vercel.app/ y es la referencia de diseño.
 
 ---
 
@@ -1199,23 +1336,30 @@ Con `SEMBRAR_DEMO=true` (por defecto) cada base nueva se siembra al arrancar:
 
 | Qué | Dónde | Contenido |
 |---|---|---|
+| 3 cuentas de prueba | `ms-usuarios` | `cliente@` (CLIENTE), `profesional@` (PROFESIONAL) y `admin@` (ADMIN), con el `keycloakId` fijo del realm |
 | 6 especialidades | `ms-profesionales` | Electricidad, plomería, refrigeración, electrodomésticos, pintura, cerrajería |
-| 1 profesional | `ms-profesionales` | Luciano Benítez, legajo `P-2001`, activado, con foto local y disponibilidad de lunes a sábado |
+| 1 profesional | `ms-profesionales` | Luciano Benítez, legajo `P-2001`, activado, con disponibilidad de lunes a sábado |
 | 4 solicitudes | `ms-solicitudes` | 1 pendiente, 1 aceptada con 2 mensajes, 1 completada y calificada, 1 rechazada |
 
 La siembra es **idempotente** (si ya hay datos no inserta nada) y
 **best-effort** (un fallo se registra y el servicio arranca igual: un inicializador
 que tumba el contenedor dejaría toda la API en 502).
 
-**Los usuarios no se siembran**: los crea Keycloak al registrarse, y la fila en
-`ms-usuarios` aparece recién en el **primer ingreso**. Por eso las solicitudes
-solo se siembran después de que alguien haya entrado una vez con `cliente@` y
-con `profesional@`; si no, el inicializador lo avisa por log con el mensaje
-*"No se siembran solicitudes: falta la cuenta de…"*.
+**Por qué ahora sí se siembran los usuarios.** El rol de negocio que guía al
+frontend sale de `ms-usuarios` ([§2](#2-roles-del-mvp)), así que sin fila toda
+cuenta nueva nace `CLIENTE`: el `admin@` quedaba sin rol administrativo y el
+`profesional@` sin el suyo, y ambos entraban a `/solicitudes`. Las tres cuentas
+del realm se siembran con su rol ya asignado, y el `id` lo genera la base (no hay
+un UUID fijo que hardcodear), así que `ProfesionalDataInitializer` resuelve el de
+Luciano por email con una consulta SQL, con el `keycloakId` como respaldo si
+`ms-usuarios` todavía no sembró.
 
-> Esto se debe a que los identificadores de usuario los genera la base y no hay
-> un UUID fijo que hardcodear. El inicializador los resuelve por email con una
-> consulta SQL, ya que los tres microservicios comparten la misma base.
+Las solicitudes siguen necesitando que existan esas dos cuentas, y el
+inicializador lo avisa por log con el mensaje *"No se siembran solicitudes: falta
+la cuenta de…"*.
+
+> Los tres microservicios comparten la misma base, así que es ahí donde el
+> inicializador de profesionales resuelve el id de usuario por email.
 
 Para una base limpia: `SEMBRAR_DEMO=false` en el `.env`, más
 `docker compose down -v && docker compose up --build` (el volumen hay que
@@ -1243,6 +1387,11 @@ Esta sección conserva los tokens de diseño con los que se implementó la SPA.
 | `--navy` | `#1E4B7A` | Burbuja de mensaje propio, botón abrir chat |
 | `--surface-highlight` | `#F3F5F1` | Tags, chips, burbuja de mensaje entrante |
 
+**Estos son los tokens del tema claro.** El tema oscuro no los redefine: los
+*pisa* en un bloque `[data-tema='oscuro']`, así que la lista de arriba sigue
+describiendo la identidad visual. El detalle del segundo tema está en el
+[Anexo C](#anexo-c-tema-claro-y-oscuro).
+
 ### 17.2 Tipografía
 
 | Nivel | Familia | Peso | Desktop | Mobile |
@@ -1262,7 +1411,83 @@ Esta sección conserva los tokens de diseño con los que se implementó la SPA.
 - Sombras orgánicas: `0 2px 8px rgba(30, 41, 38, 0.04)`
 - Modales: `0 16px 40px rgba(30, 41, 38, 0.14)`
 
-### 17.4 Criterio
+### 17.4 Botones: qué hace cada variante y cómo se mueve
+
+Las cinco variantes de `.vu-btn` se distinguen por **relleno, no por tamaño**, y
+todas son accionables. La regla que hace que ninguna se pierda: **todo botón tiene
+fondo o borde**. La variante `quiet` es la única transparente, y por eso lleva
+`border-color: var(--line)`: sin ese borde, sobre el papel claro o dentro de una
+tarjeta blanca, el texto queda como una palabra suelta y no se sabe que se puede
+apretar.
+
+| Variante | Aspecto | Cuándo |
+|---|---|---|
+| `vu-btn--ink` | Relleno oscuro, texto claro | Acción principal de la pantalla |
+| `vu-btn--coral` | Relleno coral | Acción que crea algo nuevo |
+| `vu-btn--outline` | Fondo transparente, borde | Acciones secundarias en grupo |
+| `vu-btn--quiet` | Borde tenue, sin relleno | Cancelar, cerrar, acciones terciarias |
+| `vu-btn--danger` | Relleno de alerta | Borrado y acciones irreversibles |
+
+**El hover solo cambia color, nunca mueve nada.** La transición es de
+`background-color`, `border-color` y `color`; no incluye `transform`. Un botón que
+se levanta con `translateY(-2px)` empuja el contenido de abajo en superficies
+chicas —la tarjeta de "solicitud enviada", los avisos de error— y el texto parece
+bailar dentro del botón. Un hover que mueve píxeles se nota en los elementos
+vecinos, y en un formulario lleno de campos eso se lee como salto. La respuesta al
+puntero tiene que ser "esto cambió de color", no "esto se movió".
+
+Los hovers de los controles que no son botones (días, categorías, sugerencias)
+mantienen su excepción: cambian el color del borde, que en una tarjeta no empuja
+nada porque la tarjeta no cambia de tamaño.
+
+### 17.5 Etiquetas de los botones
+
+Los rótulos dicen la **acción**, no la aspiración. Tres reglas:
+
+| Rótulo | Regla | Ejemplos |
+|---|---|---|
+| `Nuevo` / `Nueva` | Abre un formulario de alta | "Nueva solicitud", "Nuevo profesional", "Nueva categoría" |
+| `Guardar` | Confirma el envío de un formulario | "Guardar", "Guardando..." mientras espera |
+| Verbo de la acción | Cuando no es alta ni guardado | "Desactivar", "Eliminar", "Confirmar esta ubicación" |
+
+Una etiqueta como "Guardar preregistro" repite el nombre de la entidad que la
+pantalla ya dice en el título, y "Crear nueva solicitud" repite la palabra
+"nueva" que el botón ya tiene en el ícono `+`. Queda el verbo solo.
+
+### 17.6 Los formularios de alta no van sobre el listado
+
+El alta de un profesional (`/admin/profesionales/nuevo`) y de una categoría
+(`/admin/categorias/nueva`) son **pantallas propias**, no un panel que se abre
+encima de la grilla: con la lista cargada, el formulario quedaría arriba de veinte
+tarjetas y habría que scrollear para verlo. Además, el `+` del botón sugiere
+"agregar a la lista", no "ir a otra pantalla". La pantalla de alta tiene su
+encabezado, su "Volver" y un botón `Cancelar`, y al guardar devuelve a la lista
+con el aviso ya redactado (vía `navigate(..., { state })`).
+
+### 17.7 El mapa es real, no un dibujo
+
+La activación del perfil muestra un **Leaflet de verdad** con tiles de
+OpenStreetMap. Un dibujo con gradientes que imite un mapa se lee como un mapa y no
+tiene nada que ver con la dirección elegida.
+
+Hay dos mapas en el paso 2, con propósitos distintos:
+
+- **Vista de referencia** (`#zone-map`): solo lectura, sin arrastre ni zoom con
+  rueda. Muestra dónde quedó el punto para que el profesional se ubique.
+- **Modal "Ajustar en el mapa"** (`#activation-map`): interactivo, con búsqueda de
+  dirección, GPS y confirmación.
+
+El de referencia va en solo lectura a propósito: si se pudiera arrastrar el
+marcador ahí, competiría con el input de texto de arriba y nadie sabría cuál de
+los dos manda. El punto se ajusta en un solo lugar.
+
+**Las tiles en tema oscuro.** OpenStreetMap no publica un tema oscuro, así que el
+cuadrado blanco se invierte con un filtro sobre `.leaflet-tile-pane`
+(`invert` + `hue-rotate(180deg)`), que además devuelve los colores a su tono: sin
+el `hue-rotate`, el verde de los parques salía violeta. El marcador y los controles
+quedan fuera del filtro porque son nuestros y sí deben quedar en color de marca.
+
+### 17.8 Criterio
 
 La interfaz debe transmitir **calidez, seriedad universitaria y claridad técnica
 editorial**. No debe parecer una app corporativa genérica azul, ni una red social
@@ -1272,22 +1497,144 @@ que exige atención: estados y errores.
 Los valores viven en `src/styles.css` como custom properties, de modo que la
 implementación Angular y la maqueta comparten el mismo vocabulario visual.
 
----
-
-*Fin de la especificación. Para el resumen operativo ver [`README.md`](README.md).*
-
-| **Sin E2E de frontend** | Los 162 tests prueban componentes con stubs, no contra el BFF andando |
-| **Chat sin refresco** | Los mensajes se cargan al abrir el chat; no hay WebSocket, SSE ni polling. El receptor no los ve sin reabrir |
-| **La descripción puede filtrar la dirección** | El cliente escribe texto libre; si pone la dirección ahí, el profesional la ve. Solo previevable desde el formulario |
-| **Sin notificaciones** | Nadie recibe un email al aceptar o rechazar un turno |
-| **Estado `VENCIDA` muerto** | Está en el enum pero nadie lo asigna, y no hay `@Scheduled` en el proyecto. Una solicitud abandonada queda `PENDIENTE` para siempre |
-| **`UBICACIONES_CLAVE` por definir** | Si falta, las coordenadas se guardan en claro (con aviso en el log). Hay que definirla antes de un despliegue real |
-| **Sin borrado de objetos huérfanos** | Si un usuario sube una foto y no completa el perfil, el archivo queda en el bucket sin referencia en la base |
-| **`JPA_DDL_AUTO=update`** | El esquema se deduce del modelo en cada arranque. Aceptable en demo; en producción hace falta Flyway o Liquibase |
-| **Keycloak en `start-dev`** | Sin optimizaciones de arranque ni clustering. Suficiente para demo, no para producción |
-| **Sin tests de la pantalla `/directorio`** | Quedó obsoleta (ver §9.3) |
+**Todo color que no sea un acento pasa por un token.** Cuando se agregan pantallas
+o estados, el color se declara en `styles.css` (o se reutiliza uno existente) y
+no en el CSS del componente. Es la condición para que el tema oscuro siga siendo
+correcto: si un color queda escrito a mano, el bloque oscuro no lo alcanza y
+aparece un parche del color anterior. La verificación es mecánica, y está en el
+[MANUAL §Tema claro y oscuro](MANUAL.md#tema-claro-y-oscuro).
 
 ---
 
+## Anexo A. Términos y datos
+
+Ruta `/terminos`. Es a la vez los términos y la política de datos y cookies.
+
+**Por qué están en un solo documento.** La política de cookies no está aparte a
+propósito: la aplicación **no tiene cookies publicitarias, de analítica ni de
+terceros**, así que un documento propio prometería una privacidad que el usuario
+tendría que ir a buscar. Todo junto, con el pie del sitio apuntando directo a la
+sección de datos.
+
+**Las ocho secciones:**
+
+1. Qué es Vincula-UP
+2. Qué hace cada rol
+3. **Tus datos y el almacenamiento en tu navegador**
+4. Cómo entra un profesional al padrón
+5. Responsabilidad y alcance
+6. Cancelaciones y calificación
+7. Fotos de perfil
+8. Cambios en estos términos
+
+Debajo, el contacto (`vinculaup@gmail.com`) y la fecha de vigencia.
+
+La sección 3 dice, en términos llanos: que no hay cookies de seguimiento ni
+terceros y por eso no hay cartel de consentimiento; cuáles son las de sesión de
+autenticación; que el token vive en `localStorage` **con la limitación escrita**;
+qué datos se guardan; que la dirección exacta no se ve hasta que el profesional
+acepta; y la matriz de quién ve la foto de quién.
+
+**Cómo se mantiene.** El contenido vive como datos (`legal-doc.ts`) y la versión
+en `VERSION_TERMINOS`, que es la que compara el modal contra lo que hay guardado
+([§8.5](#85-aceptación-de-los-términos-y-condiciones)). Si se edita el texto, hay que **subir la
+versión** o el sistema no vuelve a pedir la aceptación.
+
+**Contacto:** `vinculaup@gmail.com`.
+
 ---
+
+## Anexo B. Preguntas frecuentes
+
+Ruta `/preguntas-frecuentes`. Catorce preguntas agrupadas por momento de uso:
+
+| Grupo | Preguntas |
+|---|---|
+| Cuenta | Crear una cuenta · Olvidé la contraseña |
+| Tus datos | Quién ve mis datos · Quién ve mi foto · Qué ve el profesional de mi dirección |
+| Turnos | Cómo pido un servicio · Cancelar · Cómo funciona la calificación |
+| Trabajar en la red | Entrar al padrón · Qué falta para activar el perfil · Zonas y horarios |
+| Privacidad y ayuda | Cookies y rastreo · A quién escribo |
+
+Cada pregunta es una sección con `<details>` nativo: se abre y cierra sin
+JavaScript y funciona con teclado y lector de pantalla, que es justo lo que un
+`div` con click no da.
+
+Comparten el componente `legal-page` con los términos: mismo formato de índice
+lateral fijo en desktop y mismos tokens, así que el tema oscuro las revierte sin
+tocar estos archivos.
+
+---
+
+## Anexo C. Tema claro y oscuro
+
+**Cómo se decide.** Tres estados en `TemaService`: `claro`, `oscuro` y `sistema`.
+La primera visita usa `sistema` (respeta `prefers-color-scheme`); desde ahí en
+adelante manda la elección, guardada en `localStorage` bajo `vincula-up-tema`. Si
+queda en `sistema`, sigue en vivo los cambios del ajuste del sistema con la app
+abierta.
+
+**Cómo se aplica.** Como atributo `data-tema` en `<html>`, que es lo que lee el
+bloque `[data-tema='oscuro']` de `styles.css`.
+
+**Por qué hay un script aparte en `index.html`.** Angular arranca después de que
+se pinte el primer fotograma, así que aplicar el tema desde el servicio dejaría
+un destello blanco en cada recarga para quien está en oscuro. El script inline
+corre **antes** y pone el atributo. Está escrito a mano y no importado de un
+archivo justamente porque un import de módulos llega tarde. **Tiene que coincidir
+con `TemaService`: misma clave, mismos valores.**
+
+**Los colores viven centralizados.** Los ~100 colores que usan los componentes
+están declarados como tokens en `styles.css`. Si un color queda escrito a mano en
+el CSS de un componente, el bloque `[data-tema='oscuro']` no lo alcanza y aparece
+un parche del color anterior en medio de la pantalla.
+
+| Familia | Tokens |
+|---|---|
+| Superficies | `--surface-input`, `-subtle`, `-tint`, `-sunken`, `-strong`, `--line-strong` |
+| Alertas | `--alert-{error,success,warning,info,neutral}-{bg,ink,border}` |
+| Sombras | `--shadow-color` y `--shadow-strength`, que multiplican a los cuatro tokens `--shadow-*` |
+| Sobre acento | `--on-accent`, `--deco-line` |
+| Sobre color sólido | `--on-solid` — tinta sobre coral, esmeralda o navy; siempre blanca, no se invierte |
+| Superficie oscura de marca | `--band-dark`, `--band-dark-hover`, `--band-ink`, `--band-ink-soft`, `--band-muted`, `--band-accent` |
+| Barra inferior | `--tabbar-h` — alto de la barra fija de móvil; el pie reserva ese espacio |
+| Velos | `--scrim` (fondo de los modales), `--bar-translucent` |
+
+**Lo que deliberadamente no se tocó:** los acentos (`coral`, `emerald`, `amber`,
+`navy`). Ya tienen contraste suficiente sobre fondo oscuro y son la identidad de
+la marca. Quedó fuera del sistema de tokens un solo color: el rojo del botón de
+peligro, que es un acento.
+
+**Las superficies que no cambian con el tema.** Los tokens `--band-*` y
+`--on-solid` se declaran una sola vez en `:root` y el bloque `[data-tema='oscuro']`
+no los toca. No es una excepción: son superficies cuyo color no depende del tema.
+
+La regla que hay que respetar es que **un token de tinta no se usa como fondo**.
+`--ink` es tinta, y por lo tanto se invierte: pasa a `#e8edea` en el tema oscuro. Si
+se lo usa de fondo, en oscuro el bloque queda claro, y si encima lleva tinta clara
+queda ilegible. Los tres casos donde se usa una superficie oscura fija son el botón
+primario `.vu-btn--ink`, la banda "Para egresados" de la portada y la burbuja
+propia del chat. El caso más llamativo era el botón primario: con `--ink` como
+fondo y `--surface-strong` en el hover, en tema oscuro el botón pasaba de blanco a
+casi negro al pasar el mouse, con la tinta oscura encima: **1.11:1** de contraste.
+Ahora es `#1e2926` con texto blanco en los dos temas (15:1).
+
+**La barra inferior de móvil.** Es `position: fixed` y ocupa el ancho de la
+pantalla, así que tapa lo que haya debajo. Su alto vive en `--tabbar-h` y lo
+comparten la barra, que lo aplica, y el pie, que reserva ese espacio a partir del
+mismo token. Si el número estuviera duplicado en los dos archivos, cualquier cambio
+en uno volvería a tapar el pie.
+
+**Las sombras son el caso que más delata.** Sobre fondo claro, una sombra verde
+al 3,5% casi no se ve. Sobre oscuro, directamente no se ve y las tarjetas quedan
+planas. Por eso el tema oscuro lleva `--shadow-strength: 2.6` y el color de sombra
+en negro puro.
+
+**Dónde está el botón:** en la navbar, antes del menú de usuario, para que también
+esté disponible sin sesión — cambiar el tema no pide iniciar sesión.
+
+---
+
+*Fin de la especificación. Para el resumen ver [`README.md`](README.md), y para el
+uso y la operación, [`MANUAL.md`](MANUAL.md).*
 

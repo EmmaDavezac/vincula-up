@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { catchError, forkJoin, map, of } from 'rxjs';
 import {
 	AdminAviso,
@@ -23,6 +23,7 @@ import { ApiService } from '../../core/services/api.service';
 import { VuAvatar } from '../../shared/avatar/avatar';
 import { VuConfirm } from '../../shared/confirm/confirm';
 import { VuIcon } from '../../shared/icon/icon';
+import { VuSkeletonList } from '../../shared/skeleton-list/skeleton-list';
 
 /** Modo del modal: sólo consultar, o consultar y editar a la vez. */
 type ModalModo = 'consulta' | 'edicion';
@@ -34,12 +35,13 @@ type ModalModo = 'consulta' | 'edicion';
  */
 @Component({
 	selector: 'app-admin-professionals',
-	imports: [FormsModule, RouterLink, VuAvatar, VuConfirm, VuIcon],
+	imports: [FormsModule, RouterLink, VuAvatar, VuConfirm, VuIcon, VuSkeletonList],
 	templateUrl: './admin-professionals.html',
 	styleUrl: './admin-professionals.css',
 })
 export class AdminProfessionals {
 	private readonly api = inject(ApiService);
+	private readonly router = inject(Router);
 
 	readonly professionals = signal<AdminProfessional[]>([]);
 	readonly specialties = signal<AdminSpecialty[]>([]);
@@ -111,72 +113,21 @@ export class AdminProfessionals {
 
 	// ── Preregistros ──────────────────────────────────────────────────────
 
-	readonly formOpen = signal(false);
-	readonly submitting = signal(false);
-	readonly form = {
-		nombre: '',
-		apellido: '',
-		email: '',
-		telefono: '',
-		legajo: '',
-		especialidadIds: [] as string[],
-	};
-
-	toggleForm(): void {
-		this.formOpen.update((open) => !open);
-		this.aviso.set({ texto: '', tipo: 'info' });
+	/*
+	 * El alta de un profesional se hace en otra pantalla (`/admin/profesionales/nuevo`),
+	 * así que el listado ya no abre un formulario encima de la grilla. Lo que queda
+	 * acá es leer el mensaje que esa pantalla deja al volver con `navigate(..., { state })`.
+	 */
+	constructor() {
+		this.leerAvisoDeAlta();
+		this.cargar();
 	}
 
-	toggleSpecialty(id: string): void {
-		this.form.especialidadIds = alternarId(this.form.especialidadIds, id);
-	}
-
-	/** Da de alta al profesional invitado: queda a la espera de que active su perfil. */
-	createProfessionalInvite(): void {
-		if (!this.form.nombre.trim() || !this.form.apellido.trim() || !this.form.email.trim()) {
-			this.aviso.set(avisoError('Completá nombre, apellido y email del profesional.'));
-			return;
-		}
-		if (!this.form.legajo.trim()) {
-			this.aviso.set(avisoError('Completá el legajo del profesional.'));
-			return;
-		}
-		if (this.form.especialidadIds.length === 0) {
-			this.aviso.set(avisoError('Elegí al menos una especialidad.'));
-			return;
-		}
-
-		this.submitting.set(true);
-		this.api.createProfessionalInvite({
-			nombre: this.form.nombre.trim(),
-			apellido: this.form.apellido.trim(),
-			email: this.form.email.trim(),
-			telefono: this.form.telefono.trim(),
-			legajo: this.form.legajo.trim(),
-			especialidadIds: this.form.especialidadIds,
-		}).pipe(
-			catchError((error) => {
-				this.aviso.set(avisoError(this.api.describeError(error, 'No se pudo dar de alta el profesional.')));
-				return of(null);
-			}),
-		).subscribe((result) => {
-			this.submitting.set(false);
-			if (result) {
-				this.aviso.set(
-					avisoExito(
-						`Preregistro de ${this.form.email.trim()} guardado: el profesional se registra en Keycloak con ese email y activa su perfil.`,
-					),
-				);
-				this.form.nombre = '';
-				this.form.apellido = '';
-				this.form.email = '';
-				this.form.telefono = '';
-				this.form.legajo = '';
-				this.form.especialidadIds = [];
-				this.formOpen.set(false);
-				this.cargar();
-			}
-		});
+	private leerAvisoDeAlta(): void {
+		const state = this.router.getCurrentNavigation()?.extras.state;
+		const mensaje = state?.['mensaje'] as string | undefined;
+		if (!mensaje) return;
+		this.aviso.set(state?.['exito'] === false ? avisoError(mensaje) : avisoExito(mensaje));
 	}
 
 	// ── Carga ─────────────────────────────────────────────────────────────
@@ -316,53 +267,57 @@ export class AdminProfessionals {
 
 	readonly busyId = signal<string | null>(null);
 
-	constructor() {
-		this.cargar();
-	}
-
-	/** Baja lógica del padrón: se pide confirmación porque saca al profesional del directorio. */
-	suspend(profesional: AdminProfessional): void {
+	/**
+	 * Baja lógica del padrón: se pide confirmación porque saca al profesional del
+	 * directorio.
+	 *
+	 * <p>El panel usa "desactivar" y no "suspender" en los dos listados (clientes y
+	 * profesionales) para que sea la misma palabra para la misma acción. El estado
+	 * que devuelve la API sigue siendo SUSPENDIDO.
+	 */
+	desactivar(profesional: AdminProfessional): void {
 		this.confirmacion.set({
-			titulo: 'Suspender al profesional',
-			mensaje: `¿Querés suspender a ${this.nombre(profesional)}?`,
+			titulo: 'Desactivar al profesional',
+			mensaje: `¿Querés desactivar a ${this.nombre(profesional)}?`,
 			detalle:
-				'Deja de aparecer en el directorio y no puede recibir solicitudes nuevas. No se borra nada: conserva su historial, y más adelante podés levantar la suspensión.',
-			confirmar: 'Suspender',
+				'Deja de aparecer en el directorio y no puede recibir solicitudes nuevas. No se borra nada: conserva su historial, y más adelante podés reactivarlo.',
+			confirmar: 'Desactivar',
 			peligro: true,
 			icono: 'pause',
-			ejecutar: () => this.ejecutarSuspension(profesional),
+			ejecutar: () => this.ejecutarDesactivacion(profesional),
 		});
 	}
 
-	private ejecutarSuspension(profesional: AdminProfessional): void {
+	private ejecutarDesactivacion(profesional: AdminProfessional): void {
 		this.busyId.set(profesional.id);
 		this.api.suspendProfessional(profesional.id).pipe(
 			map(() => true),
 			catchError((error) => {
 				this.busyId.set(null);
-				this.aviso.set(avisoError(this.api.describeError(error, 'No se pudo suspender al profesional.')));
+				this.aviso.set(avisoError(this.api.describeError(error, 'No se pudo desactivar al profesional.')));
 				return of(false);
 			}),
 		).subscribe((ok) => {
 			this.busyId.set(null);
 			if (ok) {
-				// El backend devuelve SUSPENDIDO: la suspensión no activa perfiles.
+				// El backend devuelve SUSPENDIDO: desactivar no activa perfiles.
 				this.actualizarEstado(profesional.id, 'SUSPENDIDO');
+				this.reflejarEnModal(profesional.id, 'SUSPENDIDO');
 				this.aviso.set(
-					avisoExito(`${this.nombre(profesional)} quedó suspendido y ya no recibe solicitudes.`),
+					avisoExito(`${this.nombre(profesional)} quedó desactivado y ya no recibe solicitudes.`),
 				);
 			}
 		});
 	}
 
-	/** Levantar laSuspensión también se confirma: devuelve acceso al directorio. */
-	reactivate(profesional: AdminProfessional): void {
+	/** Reactivar también se confirma: devuelve el acceso al directorio. */
+	reactivar(profesional: AdminProfessional): void {
 		this.confirmacion.set({
-			titulo: 'Levantar la suspensión',
+			titulo: 'Reactivar la cuenta',
 			mensaje: `¿Querés volver a habilitar a ${this.nombre(profesional)}?`,
 			detalle:
 				'Vuelve a aparecer en el directorio. Si todavía no completó su activación, queda como preregistro hasta que la termine.',
-			confirmar: 'Levantar suspensión',
+			confirmar: 'Reactivar',
 			icono: 'play',
 			ejecutar: () => this.ejecutarReactivacion(profesional),
 		});
@@ -374,15 +329,16 @@ export class AdminProfessionals {
 			map((result) => (result as { estado?: string } | null)?.estado ?? 'CARGADO'),
 			catchError((error) => {
 				this.busyId.set(null);
-				this.aviso.set(avisoError(this.api.describeError(error, 'No se pudo levantar la suspensión.')));
+				this.aviso.set(avisoError(this.api.describeError(error, 'No se pudo reactivar la cuenta.')));
 				return of(null);
 			}),
 		).subscribe((estado) => {
 			this.busyId.set(null);
 			if (estado) {
-				// El backend devuelve CARGADO (no ACTIVO): levantar el baneo no activa perfiles.
+				// El backend devuelve CARGADO (no ACTIVO): reactivar no activa perfiles.
 				this.actualizarEstado(profesional.id, estado);
-				this.aviso.set(avisoExito(`La suspensión de ${this.nombre(profesional)} quedó levantada.`));
+				this.reflejarEnModal(profesional.id, estado);
+				this.aviso.set(avisoExito(`${this.nombre(profesional)} quedó reactivado.`));
 				this.cargar();
 			}
 		});
@@ -390,6 +346,21 @@ export class AdminProfessionals {
 
 	private actualizarEstado(id: string, estado: string): void {
 		this.professionals.update((items) => items.map((item) => (item.id === id ? { ...item, estado } : item)));
+	}
+
+	/**
+	 * El detalle abierto muestra una copia del profesional: si se cambia el estado
+	 * desde adentro del modal, se lo actualiza para que el botón no quede
+	 * ofreciendo una acción que ya no corresponde.
+	 */
+	private reflejarEnModal(id: string, estado: string): void {
+		this.modal.update((abierto) => {
+			if (!abierto || abierto.profesional.id !== id) {
+				return abierto;
+			}
+			const actualizado = this.professionals().find((item) => item.id === id) ?? abierto.profesional;
+			return { ...abierto, profesional: { ...actualizado, estado } };
+		});
 	}
 
 	// ── Presentación ──────────────────────────────────────────────────────
@@ -414,11 +385,22 @@ export class AdminProfessionals {
 	}
 
 	/**
-	 * Foto que se muestra: la de la cuenta (la que la persona sube y actualiza).
-	 * La del padrón queda de respaldo para perfiles cargados antes de la cuenta.
+	 * Usuario dueño de la foto que se muestra: el de la cuenta (la que la persona
+	 * sube y actualiza desde "Mi cuenta"). El `vu-avatar` pide la imagen por este
+	 * id y el backend decide si el rol que mira puede verla.
 	 */
-	foto(profesional: AdminProfessional): string | null {
-		return this.cuenta(profesional)?.fotoUrl ?? profesional.fotoUrl ?? null;
+	usuarioIdFoto(profesional: AdminProfessional): string {
+		return this.cuenta(profesional)?.id ?? profesional.usuarioId;
+	}
+
+	/**
+	 * Si se muestra foto: la de la cuenta si la tiene, si no la del padrón, que es
+	 * el respaldo de los perfiles cargados antes de que existiera la cuenta.
+	 */
+	tieneFoto(profesional: AdminProfessional): boolean {
+		const cuenta = this.cuenta(profesional);
+		if (cuenta?.tieneFoto) return true;
+		return profesional.tieneFoto === true;
 	}
 
 	/** Todavía no creó su cuenta en Keycloak: la invitación sigue pendiente. */
@@ -427,12 +409,13 @@ export class AdminProfessionals {
 		return cuenta ? cuenta.keycloakId == null : (profesional.estado ?? '').toUpperCase() === 'CARGADO';
 	}
 
-	estaSuspendido(profesional: AdminProfessional): boolean {
+	/** El profesional está desactivado: no entra al directorio ni recibe solicitudes. */
+	estaDesactivado(profesional: AdminProfessional): boolean {
 		return (profesional.estado ?? '').toUpperCase() === 'SUSPENDIDO';
 	}
 
-	/** Sólo se ofrece suspensión a los perfiles que ya pueden operar. */
-	puedeSuspenderse(profesional: AdminProfessional): boolean {
+	/** Sólo se ofrece desactivar a los perfiles que ya pueden operar. */
+	puedeDesactivarse(profesional: AdminProfessional): boolean {
 		const estado = (profesional.estado ?? '').toUpperCase();
 		return estado === 'ACTIVO' || estado === 'CARGADO';
 	}

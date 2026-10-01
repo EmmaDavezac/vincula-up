@@ -52,7 +52,7 @@
 }
 
 .error {
-	color: #8e3027;
+	color: var(--alert-info-ink-2);
 	font-size: 0.875rem;
 	margin: 0.75rem 0 0;
 }
@@ -83,11 +83,11 @@
 
 .avatar-edit-hint {
 	align-items: center;
-	background: var(--ink);
+	background: var(--band-dark);
 	border: 2px solid var(--surface-card);
 	border-radius: 999px;
 	bottom: 0;
-	color: #fff;
+	color: var(--band-ink);
 	display: flex;
 	height: 1.75rem;
 	justify-content: center;
@@ -243,13 +243,10 @@ cámara abre el selector) y, al competir por el ancho con el nombre y el email e
 	gap: 1.25rem;
 }
 
-.skeleton-avatar,
-.skeleton-lines span {
-	background: var(--surface-highlight);
-	border-radius: 0.75rem;
-	animation: skeleton-pulse 1.4s ease-in-out infinite;
-}
-
+/*
+	El pulso y el fondo salen de la clase global `.vu-skeleton` (styles.css): la
+	misma que usan los skeletons de los listados, así no hay dos keyframes.
+*/
 .skeleton-avatar {
 	border-radius: 999px;
 	height: 5.25rem;
@@ -275,17 +272,6 @@ cámara abre el selector) y, al competir por el ancho con el nombre y el email e
 	width: 35%;
 }
 
-@keyframes skeleton-pulse {
-	0%,
-	100% {
-		opacity: 1;
-	}
-
-	50% {
-		opacity: 0.5;
-	}
-}
-
 /* ── Tu reputación (rol profesional) ──────────────────────────────────── */
 
 .reputation__score {
@@ -297,7 +283,7 @@ margin-top: 1rem;
 }
 
 .reputation__stars {
-color: #c38a25;
+color: var(--alert-warning-ink-2);
 letter-spacing: 0.1em;
 }
 
@@ -331,7 +317,7 @@ gap: 0.5rem;
 }
 
 .reputation__item-stars {
-color: #c38a25;
+color: var(--alert-warning-ink-2);
 letter-spacing: 0.08em;
 }
 
