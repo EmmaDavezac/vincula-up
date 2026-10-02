@@ -34,6 +34,7 @@
     {
       "clientId": "vincula-up-public",
       "name": "Vincula-UP Public Client",
+      "description": "Client público del frontend (PKCE S256, sin secreto). El redirectUris incluye https://* para que los túneles de Cloudflare de demo funcionen sin reconfigurar el client cada vez que cloudflared genera una URL nueva: Keycloak sólo matchea comodines al final del patrón, así que https://*.trycloudflare.com/* NO funcionaría. En producción reemplazar https://* por el dominio real.",
       "enabled": true,
       "publicClient": true,
       "standardFlowEnabled": true,
@@ -45,7 +46,8 @@
         "http://localhost:4200/*",
         "https://vincula-up.local/*",
         "http://127.0.0.1/*",
-        "http://127.0.0.1:4200/*"
+        "http://127.0.0.1:4200/*",
+        "https://*"
       ],
       "webOrigins": [
         "*"

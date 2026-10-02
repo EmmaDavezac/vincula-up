@@ -1304,15 +1304,17 @@ Pendientes conocidos. No bloquean la demo, pero conviene tenerlos fichados.
 | 2 | **`ddl-auto=update` como esquema** | Sin migraciones versionadas no hay forma de reproducir una base ni de revertir un cambio de modelo. Correr el stack con `JPA_DDL_AUTO=validate` falla: no hay esquema que valide |
 | 3 | **Secret del client de servicio sin rotar** | `.env.example` deja `KEYCLOAK_ADMIN_CLIENT_SECRET` **vacío** a propósito, pero con el vacío **rige el default de demo** `vincula-up-admin-secret`, que es **público** (está en `docker-compose.yml` y en el JSON del realm). El stack arranca y la promoción de rol funciona, pero con un secreto que cualquiera puede leer en el repositorio: quien lo tenga puede pedir un token de servicio y promover cuentas a PROFESIONAL. Se cierra rotando (`openssl rand -hex 24`), poniendo el valor en `.env` y **re-corriendo el bootstrap**, que es lo único que lo copia a Keycloak: el import del realm **no** resuelve `${env.*}` (verificado en Keycloak 26.3.3, ver `keycloak/import/README.md`). Después hay que recrear `bff-web` |
 | 4 | **`webOrigins: ["*"]`** en el client público | Permitido en demo; en producción conviene restringirlo a los orígenes reales |
+| 5 | **`redirectUris: ["https://*"]`** en el client público | Agregado para que los túneles de Cloudflare funcionen sin reconfigurar el client cada vez que `cloudflared` genera una URL nueva: Keycloak sólo matchea comodines **al final** del patrón, así que `https://*.trycloudflare.com/*` nunca matchearía (el soporte de comodines de host sigue sin mergear). `https://*` es un prefijo y matchea **cualquier** origen https, no sólo los de Cloudflare. Cerrado en producción reemplazando ese patrón por el dominio real. Mitiga que el client sea público con PKCE S256: sin el `code_verifier` el código no se cambia por tokens |
+| 6 | **`KC_HOSTNAME` vacío (hostname dinámico)** | Con `KC_HOSTNAME_STRICT=false` y sin hostname fijo, Keycloak resuelve el host desde el request, que es lo que hace que el túnel funcione. El mismo mecanismo documenta que un atacante podría manipular el `Host` para falsificar los enlaces de recuperación de contraseña. Cerrado fijando `KEYCLOAK_HOSTNAME` en `.env` al dominio propio y con un proxy delante que no acepte `Host` arbitrarios |
 
 ### 16.2 Prioridad media
 
 | # | Deuda | Impacto |
 |---|---|---|
-| 5 | **`verifyEmail: false`** | Un profesional puede activar su perfil con el email de otro, porque nadie confirma que la dirección sea suya. Cerrarlo requiere `verifyEmail: true` en el realm **y** `docker compose down -v`; además rompe las cuentas `@vincula-up.local` de prueba, que no son entregables |
-| 6 | **H2 por defecto en desarrollo** | Sin `DATABASE_URL`, los datos se pierden al reiniciar y el comportamiento difiere de producción |
-| 7 | **CORS con lista de orígenes fija** | `SecurityConfig.java` enumera los orígenes. Agregar un dominio es tocar código |
-| 8 | **Geocodificación puede resolver a otra ciudad** | Nominatim a veces devuelve un lugar homónimo: una dirección de Concepción del Uruguay terminó en Entre Ríos, Argentina. Es un comportamiento del servicio público, no del código; convendría validar el país del resultado |
+| 7 | **`verifyEmail: false`** | Un profesional puede activar su perfil con el email de otro, porque nadie confirma que la dirección sea suya. Cerrarlo requiere `verifyEmail: true` en el realm **y** `docker compose down -v`; además rompe las cuentas `@vincula-up.local` de prueba, que no son entregables |
+| 8 | **H2 por defecto en desarrollo** | Sin `DATABASE_URL`, los datos se pierden al reiniciar y el comportamiento difiere de producción |
+| 9 | **CORS con lista de orígenes fija** | `SecurityConfig.java` enumera los orígenes. Agregar un dominio es tocar código |
+| 10 | **Geocodificación puede resolver a otra ciudad** | Nominatim a veces devuelve un lugar homónimo: una dirección de Concepción del Uruguay terminó en Entre Ríos, Argentina. Es un comportamiento del servicio público, no del código; convendría validar el país del resultado |
 
 ### 16.3 Higiene del repositorio
 

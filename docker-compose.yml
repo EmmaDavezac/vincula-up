@@ -57,7 +57,14 @@ services:
       KC_DB_URL: ${DATABASE_URL:-jdbc:postgresql://postgres:5432/vinculaup}
       KC_DB_USERNAME: ${DATABASE_USERNAME:-postgres}
       KC_DB_PASSWORD: ${DATABASE_PASSWORD:-postgres}
-      KC_HOSTNAME: ${KEYCLOAK_HOSTNAME:-vincula-up.local}
+      # Hostname con el que se publica Keycloak. Sin los dos puntos (${VAR-}, no
+      # ${VAR:-}) para que un valor VACÍO en el .env se respete en vez de caer al
+      # default: con KC_HOSTNAME vacío, y KC_HOSTNAME_STRICT=false, Keycloak resuelve
+      # el hostname desde el request, así que las URLs que genera (issuer, enlaces del
+      # login) salen con el host por el que realmente se entró. Eso es lo que hace
+      # que funcione en el túnel de Cloudflare, cuyo hostname cambia cada vez. Ver
+      # KC_HOSTNAME_STRICT y los riesgos #4, #5 y #6 de ESPECIFICACION.md.
+      KC_HOSTNAME: ${KEYCLOAK_HOSTNAME-}
       KC_HTTP_ENABLED: "true"
       KC_HOSTNAME_STRICT: "false"
       KC_HOSTNAME_STRICT_HTTPS: "false"

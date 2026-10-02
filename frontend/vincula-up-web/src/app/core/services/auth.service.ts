@@ -704,12 +704,17 @@ export class AuthService {
 
   private getKeycloakUrl(): string {
     if (typeof window !== 'undefined') {
-      if (window.location.hostname === 'vincula-up.local') {
-        return window.location.origin;
+      const { hostname } = window.location;
+      // En desarrollo la app corre en `ng serve` (puerto 4200) sin nada por delante,
+      // así que se habla directo con Keycloak. En cualquier otro host la sirve nginx,
+      // que hace de proxy de /realms/, /js/, /resources/ y /login-actions/ hacia
+      // Keycloak: usar el mismo origen deja todo el flujo OIDC en el mismo sitio
+      // (sin CORS ni mixed content) y hace que funcione en los túneles de
+      // Cloudflare, cuyo hostname cambia cada vez que se levanta cloudflared.
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return `http://${hostname}:8080`;
       }
-      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        return `http://${window.location.hostname}:8080`;
-      }
+      return window.location.origin;
     }
     return environment.keycloakUrl;
   }
