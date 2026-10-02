@@ -663,10 +663,19 @@ public class ApiController {
         return gateway.buscarUsuarioPorId(id);
     }
 
+    /**
+     * Crea la solicitud del cliente.
+     * <p>
+     * El {@code clienteId} se toma del token y se sobrescribe el que venga en el
+     * cuerpo: sin esto un cliente podría abrir un turno en nombre de otro usuario
+     * (por ejemplo del administrador) y ese turno aparecería en su bandeja. Es el
+     * mismo criterio que aplica {@link #identityBody} en el resto de la API.
+     */
     @PostMapping("/solicitudes")
     @ResponseStatus(HttpStatus.CREATED)
     public JsonNode crearSolicitud(@RequestBody JsonNode body) {
-        return gateway.crearSolicitud(body);
+        JsonNode user = authenticatedUser();
+        return gateway.crearSolicitud(identityBody(body, user, "clienteId"));
     }
 
     @GetMapping("/usuarios/por-keycloak")

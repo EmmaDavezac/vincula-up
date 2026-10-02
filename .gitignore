@@ -4,6 +4,9 @@ dist/
 .angular/
 .sass-cache/
 
+# Documentacion de referencia
+/Docs
+
 # Build de Java
 **/target/
 # `build/` también (lo ignoraban los .gitignore por módulo). Las excepciones
