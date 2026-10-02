@@ -143,6 +143,50 @@ veinte tarjetas.
 > coincidir en Keycloak y en el BFF: ver
 > [El secreto del client de servicio](#el-secreto-del-client-de-servicio).
 
+### El correo (SMTP)
+
+**Está configurado y verificado.** Con la configuración actual Keycloak envía
+los correos del sitio: el de **recuperación de contraseña** y el de **aviso de
+prerregistro** al profesional que el administrador da de alta en el panel.
+
+> Verificado el **2 de octubre de 2026** con un envío real: se disparó el flujo
+> de "¿Olvidó su contraseña?" desde la pantalla de ingreso y el correo llegó a la
+> casilla, sin errores de SMTP en los logs de Keycloak.
+
+**Para verificar que sale de verdad.** No hay forma de probarlo desde la
+interfaz sin romper nada: la forma limpia es usar el propio login.
+
+1. Entrá a `https://vincula-up.local/ingresar`.
+2. Tocá **"¿Olvidó su contraseña?"**.
+3. Escribí un email existente (por ejemplo `cliente@vincula-up.local`).
+4. Revisá la casilla de esa dirección: debería llegar un mail con el enlace.
+
+> Keycloak **no dice si el email existe** (esa es la conducta correcta: no
+> conviene filtrar qué correos están registrados). Si no llega nada, el problema
+> es el SMTP, no el email que pusiste.
+
+**También se puede mirar desde la consola** de Keycloak: *Realm settings →
+Email* muestra el host, el puerto y el usuario configurados.
+
+**Si dejás de recibir correos.** Lo más probable es que Google haya revocado la
+contraseña de aplicación. Se genera otra en *Cuenta Google → Seguridad →
+Verificación en 2 pasos → Contraseñas de aplicación*, se pega en
+`KEYCLOAK_SMTP_PASSWORD` en el `.env` y se vuelve a correr el bootstrap:
+
+```bash
+./scripts/linux-macos/keycloak-bootstrap.sh
+# o, en Windows:
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\keycloak-bootstrap.ps1
+```
+
+> El bootstrap es idempotente: se puede correr las veces que haga falta. Es
+> **obligatorio** después de cambiar esa variable, porque el script es el único
+> camino del `.env` a Keycloak (ver
+> [El secreto del client de servicio](#el-secreto-del-client-de-servicio)).
+>
+> La contraseña no está en el repositorio: vive solo en el `.env` local, que
+> está en `.gitignore`.
+
 ### BFF API (para depurar)
 
 No se navega: expone JSON y pide token. Se consulta con `curl`:

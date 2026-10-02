@@ -960,6 +960,39 @@ Se leen del archivo `.env` en la raíz (ignorado por git). Copiar
 | `KEYCLOAK_SMTP_FROM` | — | Remitente |
 | `KEYCLOAK_SMTP_FROM_DISPLAY_NAME` | `Vincula-UP` | Nombre visible del remitente |
 
+**Estado: configurado y verificado.** El correo saliente está operativo sobre
+Gmail, con una **contraseña de aplicación** vigente en
+`KEYCLOAK_SMTP_PASSWORD`. La verificación se hizo el **2 de octubre de 2026** con
+un envío real desde el flujo de "¿Olvidó su contraseña?" de la pantalla de
+ingresar: el correo llegó a la casilla y Keycloak no registró errores de SMTP.
+Con eso quedan habilitados los tres correos que manda el sistema:
+
+| Correo | Quién lo dispara |
+|---|---|
+| Recuperación de contraseña (`resetPasswordAllowed`) | La persona desde "¿Olvidó su contraseña?" del login |
+| Aviso de prerregistro | El alta de un profesional en el panel (`POST /api/profesionales/alta`) |
+| Enlace de activación | El mismo aviso, con la `APP_URL` del `.env` |
+
+> **El valor nunca se versiona.** La contraseña vive solo en el `.env` local, que
+> está en `.gitignore` y no se sube al repositorio. Las tablas de arriba y el
+> `.env.example` documentan la variable, nunca su contenido.
+>
+> **Cómo se rota.** Google puede revocar una contraseña de aplicación por cuenta
+> propia (o el dueño de la cuenta la elimina). Cuando pasa hay que generar otra
+> en *Cuenta Google → Seguridad → Verificación en 2 pasos → Contraseñas de
+> aplicación*, pegarla en `KEYCLOAK_SMTP_PASSWORD` y **volver a correr el
+> bootstrap**, que es el único camino del `.env` a Keycloak:
+>
+> ```bash
+> ./scripts/linux-macos/keycloak-bootstrap.sh
+> # o, en Windows:
+> powershell -ExecutionPolicy Bypass -File .\scripts\windows\keycloak-bootstrap.ps1
+> ```
+>
+> El script es idempotente y avisa si encuentra la variable vacía. Sin ella el
+> reseteo de contraseña sigue habilitado en el realm, pero Keycloak no puede
+> enviar el correo: el resultado es que nadie recibe el mensaje.
+
 > **Cómo llega el SMTP a Keycloak.** El realm importado usa
 > `${env.KEYCLOAK_SMTP_*:}` (sintaxis de Keycloak), que se resuelve contra el
 > **entorno del contenedor**, no contra el `.env` del host. Por eso
