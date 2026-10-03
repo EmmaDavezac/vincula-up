@@ -137,17 +137,18 @@ veinte tarjetas.
 | **Roles** | `CLIENTE`, `PROFESIONAL`, `ADMIN` |
 | **Realm settings → Email** | Configuración de SMTP para recuperar contraseñas |
 
-> El primer ingreso de un profesional invitado lo **promueve** de `CLIENTE` a
-> `PROFESIONAL` automáticamente (si el email estaba prerregistrado en el padrón).
-> Esa promoción necesita el **secreto del client de servicio**, que tiene que
-> coincidir en Keycloak y en el BFF: ver
+> Las cuentas de profesional **las crea el administrador**, con el rol
+> `PROFESIONAL` ya asignado y una contraseña temporal. La promoción automática
+> de `CLIENTE` a `PROFESIONAL` sigue existiendo sólo para los prerregistros
+> antiguos, y para eso necesita el **secreto del client de servicio**, que tiene
+> que coincidir en Keycloak y en el BFF: ver
 > [El secreto del client de servicio](#el-secreto-del-client-de-servicio).
 
 ### El correo (SMTP)
 
 **Está configurado y verificado.** Con la configuración actual Keycloak envía
 los correos del sitio: el de **recuperación de contraseña** y el de **aviso de
-prerregistro** al profesional que el administrador da de alta en el panel.
+alta** al profesional que el administrador da de alta en el panel.
 
 > Verificado el **2 de octubre de 2026** con un envío real: se disparó el flujo
 > de "¿Olvidó su contraseña?" desde la pantalla de ingreso y el correo llegó a la
@@ -226,13 +227,13 @@ HTML se ve más sospechoso, no menos.
 | | Qué es | Dónde se cambia |
 |---|---|---|
 | **Correos de Keycloak** (recuperar contraseña, verificar correo) | Tema `vincula-up`: la cabecera y el pie son uno solo para todos. Los textos están aparte, así que cambiar una palabra no rompe el diseño. | Textos: `keycloak/themes/vincula-up/email/messages/messages_es.properties`. Maqueta: `keycloak/themes/vincula-up/email/html/template.ftl` |
-| **Aviso de prerregistro** (lo manda el BFF) | Misma marca, textos propios. | `backend/bff-web/src/main/resources/correos/prerregistro.html` |
+| **Aviso de alta** (lo manda el BFF) | Misma marca, textos propios. | `backend/bff-web/src/main/resources/correos/prerregistro.html` |
 
 El contacto y la URL que se imprimen en el pie salen de
 `keycloak/themes/vincula-up/email/theme.properties` (`vinculaUpContacto` y
 `vinculaUpAppUrl`).
 
-> **El aviso de prerregistro es el único que escribe el BFF**, y su maqueta se
+> **El aviso de alta es el único que escribe el BFF**, y su maqueta se
 > copia a `/app/correos/` dentro del contenedor en vez de ir en el jar: dentro del
 > empaquetado de Spring Boot el recurso no se dejaba resolver. Por eso la ruta
 > está en `MAIL_PLANTILLA`. Si se renombra el archivo hay que actualizar los tres

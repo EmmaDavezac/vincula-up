@@ -143,6 +143,21 @@ public class UsuarioService {
                 .toList();
     }
 
+    /**
+     * Vincula una invitación del padrón con su cuenta de Keycloak ya creada.
+     * <p>
+     * En el alta el BFF crea la cuenta Keycloak del profesional y después avisa acá
+     * para guardar el vínculo, sin esperar a que la persona entre por primera vez.
+     */
+    public UsuarioResponse vincularKeycloak(UUID id, UUID keycloakId) {
+        if (keycloakId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Falta el id de Keycloak");
+        }
+        Usuario usuario = findUsuario(id);
+        usuario.setKeycloakId(keycloakId);
+        return toResponse(usuario);
+    }
+
     public UsuarioResponse actualizar(UUID id, ActualizarUsuarioRequest request) {
         // Un PATCH que no trae ningún cambio efectivo (todo nulo o en blanco,
         // sin pedido de quitar la foto) es un error del cliente, no un guardado.

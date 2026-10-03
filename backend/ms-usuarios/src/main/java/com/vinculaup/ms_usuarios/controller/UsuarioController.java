@@ -4,6 +4,7 @@ import com.vinculaup.ms_usuarios.dto.AceptarTerminosRequest;
 import com.vinculaup.ms_usuarios.dto.ActualizarUsuarioRequest;
 import com.vinculaup.ms_usuarios.dto.CrearUsuarioRequest;
 import com.vinculaup.ms_usuarios.dto.UsuarioResponse;
+import com.vinculaup.ms_usuarios.dto.VincularKeycloakRequest;
 import com.vinculaup.ms_usuarios.entity.EstadoUsuario;
 import com.vinculaup.ms_usuarios.service.UsuarioService;
 import jakarta.validation.Valid;
@@ -63,6 +64,12 @@ public class UsuarioController {
     @GetMapping("/{id}")
     public UsuarioResponse buscarPorId(@PathVariable UUID id) {
         return service.buscarPorId(id);
+    }
+
+    /** Vincula una invitación del padrón con su cuenta de Keycloak (lo usa el BFF en el alta). */
+    @PatchMapping("/{id}/keycloak")
+    public UsuarioResponse vincularKeycloak(@PathVariable UUID id, @RequestBody VincularKeycloakRequest request) {
+        return service.vincularKeycloak(id, request.keycloakId());
     }
 
     /** Baneo administrativo: deja la cuenta suspendida (reversible). */

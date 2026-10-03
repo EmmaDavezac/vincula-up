@@ -95,8 +95,8 @@ export class AdminProfessionalNew {
 
 		const email = this.form.email.trim();
 
-		// Un solo endpoint: el backend guarda el prerregistro, crea el perfil
-		// pendiente de activación y manda el aviso, y devuelve si el correo salió.
+		// Un solo endpoint: el backend crea la cuenta con contraseña temporal, el
+		// perfil pendiente de activación y manda el acceso; devuelve si el correo salió.
 		this.api.createProfessionalInvite({
 			nombre: this.form.nombre.trim(),
 			apellido: this.form.apellido.trim(),
@@ -125,16 +125,19 @@ export class AdminProfessionalNew {
 	/**
 	 * Aviso del alta, en términos del servicio.
 	 *
-	 * <p>No nombra con qué sistema se guarda el prerregistro ni cómo se vincula: el
-	 * administrador necesita saber si quedó guardado y si el profesional fue
+	 * <p>No nombra con qué sistema se guarda la cuenta ni cómo se vincula: el
+	 * administrador necesita saber si quedó dada de alta y si el profesional fue
 	 * avisado, nada más. El caso importante es el segundo: si el correo no salió,
-	 * decir solo "guardado" hace creer que el profesional ya se enteró.
+	 * el panel le muestra la contraseña temporal para que se la pase por otra vía.
 	 */
-	private mensajeDeAlta(result: { correoEnviado?: boolean } | null, email: string): string {
-		const base = `Preregistro de ${email} guardado`;
+	private mensajeDeAlta(result: { correoEnviado?: boolean; passwordTemporal?: string } | null, email: string): string {
+		const base = `Profesional ${email} dado de alta`;
 		if (result?.correoEnviado) {
-			return `${base}. Le enviamos las instrucciones por correo.`;
+			return `${base}. Le enviamos por correo su contraseña temporal y los pasos para activar su perfil.`;
 		}
-		return `${base}, pero no se pudo enviar el aviso por correo. Avisale por otra vía.`;
+		const clave = result?.passwordTemporal
+			? ` Pasale esta contraseña temporal: ${result.passwordTemporal} (debe cambiarla al entrar).`
+			: ' Avisale por otra vía.';
+		return `${base}, pero no se pudo enviar el correo.${clave}`;
 	}
 }

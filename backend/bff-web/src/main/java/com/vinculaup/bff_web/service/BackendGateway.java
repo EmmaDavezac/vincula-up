@@ -54,6 +54,13 @@ public class BackendGateway {
     public JsonNode actualizarProfesional(UUID id, JsonNode body) { return put(profesionales, "/profesionales/{id}", body, id); }
     public JsonNode crearUsuario(JsonNode body) { return post(usuarios, "/usuarios", body); }
     public JsonNode actualizarUsuario(UUID id, JsonNode body) { return patch(usuarios, "/usuarios/{id}", body, id); }
+
+    /** Vincula una invitación del padrón con la cuenta de Keycloak recién creada. */
+    public JsonNode vincularKeycloakUsuario(UUID usuarioId, UUID keycloakId) {
+        var body = tools.jackson.databind.json.JsonMapper.builder().build().createObjectNode();
+        body.put("keycloakId", keycloakId.toString());
+        return patch(usuarios, "/usuarios/{id}/keycloak", body, usuarioId);
+    }
     public void eliminarUsuario(UUID id) { delete(usuarios, "/usuarios/{id}", id); }
 
     private void delete(RestClient client, String path, UUID id) {

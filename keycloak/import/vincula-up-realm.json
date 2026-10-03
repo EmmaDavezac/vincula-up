@@ -60,7 +60,7 @@
     {
       "clientId": "vincula-up-admin",
       "name": "Vincula-UP Admin Service Account",
-      "description": "Client de servicio del BFF: promueve a PROFESIONAL al profesional invitado que se auto-registra en Keycloak con el email cargado por el administrador.",
+      "description": "Client de servicio del BFF: crea la cuenta del profesional con una contraseña temporal y le asigna el rol PROFESIONAL en el alta, y promueve a PROFESIONAL a los prerregistros antiguos que se auto-registraban.",
       "enabled": true,
       "publicClient": false,
       "secret": "vincula-up-admin-secret",

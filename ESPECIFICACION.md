@@ -80,9 +80,10 @@ sentidos:
   Es seguro porque el registro abierto del realm asigna
   `default-roles-vincula-up` → `CLIENTE`: un auto-registrado nunca nace
   `PROFESIONAL` ni `ADMIN` por esa vía.
-- **`ms-usuarios` → Keycloak:** un profesional invitado por el administrador se
-  auto-registra en Keycloak y nace ahí con rol `CLIENTE`; el BFF lo promueve a
-  `PROFESIONAL` en su primer login (ver [§8.4](#84-promoción-de-rol-del-profesional-invitado)).
+- **`ms-usuarios` → Keycloak:** al dar de alta a un profesional, el BFF crea su
+  cuenta en Keycloak con rol `PROFESIONAL` y una contraseña temporal; el
+  profesional sólo activa su perfil (ver
+  [§8.4](#84-alta-del-profesional-sin-auto-registro)).
 
 **Por qué el frontend y el backend tienen que mirar lo mismo.** El frontend
 arma el perfil con el `rolNegocio` que devuelve `ms-usuarios`, no con el claim del
@@ -291,7 +292,7 @@ familias. La columna **Rol** refleja la regla real de `SecurityConfig.java`;
 | GET | `/api/profesionales/{id}` | Autenticado | Ficha de un profesional |
 | GET | `/api/profesionales/mi-perfil` | PROFESIONAL | Perfil propio |
 | POST | `/api/profesionales` | ADMIN | Alta de profesional |
-| POST | `/api/profesionales/alta` | ADMIN | Alta en un paso: usuario invitado + perfil pendiente |
+| POST | `/api/profesionales/alta` | ADMIN | Alta en un paso: cuenta de Keycloak con contraseña temporal + usuario + perfil pendiente |
 | PUT | `/api/profesionales/{id}` | ADMIN | Edición del padrón |
 | PATCH | `/api/profesionales/{id}/suspender` | ADMIN | Baja lógica. En la interfaz se llama **desactivar** |
 | PATCH | `/api/profesionales/{id}/reactivar` | ADMIN | Levanta la suspensión |
@@ -523,37 +524,46 @@ Además del RBAC por ruta, el BFF corta a las cuentas `SUSPENDIDO` en
 `requireActive()` antes de ejecutar cualquier operación de negocio, y resuelve la
 identidad del actor desde el token (ver [§3](#el-bff-y-por-qué-existe)).
 
-### 8.4 Promoción de rol del profesional invitado
+### 8.4 Alta del profesional sin auto-registro
 
 Este es el punto más delicado del modelo de roles, y merece su propio
 apartado. La secuencia real es:
 
 1. El **admin** da de alta un profesional con `POST /api/profesionales/alta`.
-2. El BFF crea en `ms-usuarios` un usuario con `rolNegocio = PROFESIONAL` y
-   `keycloakId = **nulo**` (es una invitación: la cuenta de Keycloak aún no existe).
-3. El profesional se **auto-registra** en Keycloak con ese email. Keycloak le
-   asigna el rol por defecto `CLIENTE`, porque el realm no puede saber que el
-   BFF lo dio de alta como profesional.
-4. En su primer login, el BFF detecta la discrepancia: `rolNegocio` dice
-   `PROFESIONAL` pero el token dice `CLIENTE`.
-5. `sincronizarRolProfesional()` (`ApiController.java:59-67`) llama a
-   `keycloakAdmin.promoverAProfesional()`, que usa el **client de servicio**
-   `vincula-up-admin` (`manage-users`, `view-users`, `query-users`, `view-realm`)
-   para promover el rol en Keycloak.
-6. El siguiente token ya trae `PROFESIONAL` y el profesional puede activar su perfil.
+2. El BFF crea la cuenta en **Keycloak** (usuario = correo) con el rol
+   `PROFESIONAL` y una **contraseña temporal** (`temporary = true` +
+   `UPDATE_PASSWORD`): el profesional **no se registra**, ya tiene cuenta.
+3. El BFF registra el usuario en `ms-usuarios` (`rolNegocio = PROFESIONAL`, ya
+   vinculado a su `keycloakId`) y el perfil `CARGADO` en `ms-profesionales`.
+4. El BFF manda por correo el usuario y la contraseña temporal. Esa contraseña
+   **no vence**: si el profesional entra una semana, un mes o un año después, el
+   primer login le exige cambiarla (`UPDATE_PASSWORD`) y recién ahí entra.
+5. El profesional **activa su perfil** (foto, zona de cobertura y horarios).
 
-**Restricción de seguridad:** la promoción solo ocurre de `CLIENTE` a
+**Por qué una contraseña temporal y no un enlace con vencimiento.** El enlace de
+un correo de Keycloak (`execute-actions-email`) caduca —por defecto a las 12
+horas— y obligaría a reenviarlo. La contraseña temporal, en cambio, espera lo que
+haga falta y se invalida sola en el primer ingreso: es la opción más tolerante
+para el caso real, donde el profesional puede tardar meses en activar.
+
+**Restricción de seguridad:** la asignación de rol sólo puede ser `CLIENTE` →
 `PROFESIONAL`. **Nunca otorga `ADMIN`**: el rol administrativo no se propaga
-desde el padrón. Un profesional dado de alta no puede convertirse en admin por
-este camino.
+desde el padrón.
 
-**La otra mitad: qué pasa cuando la fila no existe.** El paso 2 assumes que el
-administrador ya dio de alta al profesional. Si alguien entra y no hay fila, el
-rol sale del token ([§2](#2-roles-del-mvp)). Esto cubre el caso del
-**administrador institucional**: su cuenta la crea el administrador de Keycloak,
-no el padrón, así que si el auto-alta no respetara el token quedaría trancado
-—nada en la aplicación crea un `ADMIN`— y el panel `/admin` sería inalcanzable
-aunque el backend lo autorizara.
+**Qué pasa con los prerregistros antiguos.** Antes el profesional se
+auto-registraba en Keycloak y el BFF lo promovía en su primer login
+(`keycloakAdmin.promoverAProfesional()`). Ese camino se conserva como red de
+seguridad para las cuentas que hayan quedado en ese estado:
+`sincronizarRolProfesional()` (`ApiController.java`) sigue promoviendo
+`CLIENTE → PROFESIONAL` si la fila del padrón dice `PROFESIONAL` y el token
+todavía dice `CLIENTE`. Tampoco otorga `ADMIN`.
+
+**La otra mitad: qué pasa cuando la fila no existe.** Si alguien entra y no hay
+fila en el padrón, el rol sale del token ([§2](#2-roles-del-mvp)). Esto cubre el
+caso del **administrador institucional**: su cuenta la crea el administrador de
+Keycloak, no el padrón, así que si el auto-alta no respetara el token quedaría
+trancado —nada en la aplicación crea un `ADMIN`— y el panel `/admin` sería
+inalcanzable aunque el backend lo autorizara.
 
 `SEMBRAR_DEMO=true` siembra las tres cuentas de prueba (`cliente@`,
 `profesional@`, `admin@`) con su rol ya asignado, así el padrón y el panel
@@ -595,9 +605,11 @@ cuenta de otro.
 **Si falla el registro, el modal no se cierra.** El estado solo cambia a aceptado
 cuando la llamada volvió bien.
 
-**Limitación conocida:** el realm tiene `verifyEmail: false`. Quien se registre
-con el correo de un prerregistro queda vinculado a ese prerregistro y se activa
-como profesional ([§16](#16-deuda-técnica-conocida)).
+**Limitación conocida:** el realm tiene `verifyEmail: false`. Quien se
+auto-registra con un correo que ya tiene fila de negocio queda vinculado a esa
+fila y toma su rol. Con el alta nueva eso casi no puede pasar (la cuenta de
+Keycloak ya existe, así que no hay segunda auto-registración), pero sí con las
+cuentas antiguas ([§16](#16-deuda-técnica-conocida)).
 
 ### 8.6 Configuración del realm
 
@@ -692,13 +704,14 @@ Shell propio (`/admin`) con 4 pantallas:
 | Pantalla | Qué hace |
 |---|---|
 | **Resumen** | Indicadores de demanda y recorrido de las solicitudes, sobre datos reales de `GET /api/solicitudes/panel` |
-| **Profesionales** | Padrón completo, alta de preregistros y detalle |
+| **Profesionales** | Padrón completo, alta de profesionales y detalle |
 | **Categorías** | CRUD de especialidades |
 | **Clientes** | Listado y detalle con edición de datos y gestión del acceso |
 
 El alta de un profesional usa `POST /api/profesionales/alta`, que en un solo
-paso crea el usuario invitado y su perfil pendiente (ver
-[§8.4](#84-promoción-de-rol-del-profesional-invitado)).
+paso crea la cuenta de Keycloak con contraseña temporal, el usuario de negocio y
+su perfil pendiente (ver
+[§8.4](#84-alta-del-profesional-sin-auto-registro)).
 
 **El flujo de las pantallas de detalle: entrar a consultar, y adentro
 modificar.** Las dos listas (profesionales y clientes) muestran **una sola acción
@@ -985,7 +998,7 @@ contacto.
 Los dos correos del sistema (el de Keycloak y el del BFF) salen con la misma
 identidad visual que la web. No es decoración: un correo pelado que le llega a
 alguien que no conoce el proyecto es indistinguible de un phishing, y en el aviso
-de prerregistro eso es justo lo que hay que evitar.
+de alta eso es justo lo que hay que evitar.
 
 | | |
 |---|---|
@@ -1030,7 +1043,7 @@ correo se está mandando, así que cambiar una palabra no puede romper la maquet
 >    login sí viene; con las de correo no. Por eso el contacto y la URL se leen
 >    de `theme.properties` (vía `properties`) y no de atributos del realm.
 
-**El aviso de prerregistro** lo escribe el BFF (`NotificacionService`), no
+**El aviso de alta** lo escribe el BFF (`NotificacionService`), no
 Keycloak, y su maqueta está en
 `backend/bff-web/src/main/resources/correos/prerregistro.html`.
 
@@ -1062,7 +1075,7 @@ para comprobar que el tema renderiza y que el `Reply-To` sale efectivamente.
 | Correo | Quién lo dispara |
 |---|---|
 | Recuperación de contraseña (`resetPasswordAllowed`) | La persona desde "¿Olvidó su contraseña?" del login |
-| Aviso de prerregistro | El alta de un profesional en el panel (`POST /api/profesionales/alta`) |
+| Aviso de alta | El alta de un profesional en el panel (`POST /api/profesionales/alta`) |
 > **El valor nunca se versiona.** La contraseña vive solo en el `.env` local, que
 > está en `.gitignore` y no se sube al repositorio. Las tablas de arriba y el
 > `.env.example` documentan la variable, nunca su contenido.
@@ -1181,7 +1194,13 @@ fallo de seed mande el contenedor a un bucle de reinicios con 502 en toda la app
 
 **No siembra usuarios.** Los gestiona exclusivamente Keycloak: en el primer
 login, `GET /api/usuarios/por-keycloak` crea el registro de negocio a partir de
-los claims del token.
+los claims del token. El alta administrativa, en cambio, sí escribe acá.
+
+**Vincular una cuenta ya creada.** Cuando el BFF da de alta a un profesional y
+la fila de invitación ya existe (un prerregistro anterior), no crea una fila
+nueva: la vincula con `PATCH /api/usuarios/{id}/keycloak`
+(`VincularKeycloakRequest`, campo `keycloakId`). Así el alta no duplica usuarios
+ni pierde el legajo ya asignado.
 
 ### 12.4 Migraciones best-effort al arrancar
 
@@ -1359,45 +1378,47 @@ microservicio con `mvnw.cmd spring-boot:run` y un perfil JVM liviano
 memoria. Los servicios usan **H2 en memoria**: los datos se pierden al reiniciar.
 El frontend se levanta aparte con `npm start` en otra terminal.
 
-### 14.5 Aviso de prerregistro por correo
+### 14.5 Aviso de alta por correo
 
 No es un script: es parte del BFF, pero se documenta acá porque es el paso que
 cierra el flujo de alta de un profesional.
 
 **El flujo completo:**
 
-1. El **administrador** da de alta el profesional desde el panel
-   (`POST /api/profesionales/alta`), con sus datos, legajo y especialidad. Esto
-   crea la cuenta en `ms-usuarios` **sin cuenta de Keycloak**: es una invitación.
-2. El BFF envía un correo al profesional (`NotificacionService`) con el legajo, la
-   especialidad y los pasos numerados para activar el perfil.
-3. El **profesional** se registra en Keycloak con ese mismo correo. Al primer
-   ingreso, `ms-usuarios` lo reconoce por email y conserva su rol `PROFESIONAL`
-   (un correo no prerregistrado nace con el rol del token; ver
-   [§8.4](#84-promoción-de-rol-del-profesional-invitado)).
-4. El BFF promueve el rol en Keycloak (`KeycloakAdminService`) para que el
-   siguiente token ya traiga `PROFESIONAL`.
-5. El profesional **activa su perfil** (foto, zona de cobertura y horarios).
+1. El **administrador** da de alta al profesional desde el panel
+   (`POST /api/profesionales/alta`), con sus datos, legajo y especialidad. El BFF
+   **crea la cuenta en Keycloak** (usuario = correo) con una **contraseña
+   temporal** y el rol `PROFESIONAL`, y registra el usuario de negocio y el perfil
+   pendiente.
+2. El BFF envía un correo al profesional (`NotificacionService`) con su usuario,
+   su contraseña temporal, el legajo, la especialidad y los pasos numerados para
+   activar el perfil. **El profesional no se registra**: entra con esos datos.
+3. Al primer ingreso, Keycloak le exige **cambiar la contraseña**
+   (`UPDATE_PASSWORD`); recién ahí entra a la aplicación. Esa contraseña no vence
+   en el tiempo.
+4. El profesional **activa su perfil** (foto, zona de cobertura y horarios).
 
 **El correo no habla de la implementación.** Decirle a un profesional "se registra
 en Keycloak" o "el prerregistro se vincula por email" le da información que no
 necesita. El texto va en términos del servicio, y lo importante es que explique
-el paso que más se confunde: **entrar no alcanza, hace falta tener cuenta con ese
-mismo correo**. El correo se repite en el cuerpo por eso.
+los dos pasos que más se confunden: **se entra con la contraseña temporal que
+llega por correo, y esa contraseña hay que cambiarla en el primer ingreso**.
 
-**El prerregistro solo acepta correos sin cuenta.** Si el correo ya tiene una
-sesión —alguien se registró y usó esa dirección— el alta se rechaza con `409` y el
-mensaje *"Ese correo ya está en uso. Elegí otro para el prerregistro."* El
-criterio es `keycloakId`: si viene vacío es una invitación anterior del mismo
-administrador y se puede completar; si viene lleno, hay una persona real detrás.
+**El alta solo acepta correos sin cuenta.** Si el correo ya tiene una sesión
+—alguien se registró y usó esa dirección— el alta se rechaza con `409` y el
+mensaje *"Ese correo ya está en uso. Elegí otro."* El criterio son dos: que la fila
+de `usuarios` venga con `keycloakId` lleno, y que la cuenta no exista ya en
+Keycloak. Si la fila existe pero viene vacía, es un prerregistro anterior del
+mismo administrador: se completa en lugar de duplicarse (ver [§12.3](#123-ms-usuarios)).
 
 > **El correo es best-effort, pero el panel lo dice.** Si el SMTP no está
-> configurado o el servidor rechaza el mensaje, el prerregistro queda guardado y
-> el fallo queda en el log: dar de alta a un profesional nunca falla porque no salió
-> un correo. Para que el administrador no asuma que el profesional se enteró,
-> `avisarPrerregistro` devuelve si el mensaje salió y la respuesta del alta trae
-> `correoEnviado`: el panel dice *"Le enviamos las instrucciones por correo"* o,
-> si no salió, *"Avisale por otra vía"*.
+> configurado o el servidor rechaza el mensaje, la cuenta queda creada y el fallo
+> queda en el log: dar de alta a un profesional nunca falla porque no salió un
+> correo. Para que el administrador no asuma que el profesional se enteró,
+> `avisarAltaProfesional` devuelve si el mensaje salió y la respuesta del alta
+> trae `correoEnviado` **y** `passwordTemporal`: el panel dice *"Le enviamos por
+> correo su contraseña temporal"* o, si no salió, muestra esa contraseña para que
+> el administrador la pase por otra vía.
 
 **Configuración:** reusa el mismo SMTP que Keycloak (`KEYCLOAK_SMTP_*`), así que
 no hay credenciales duplicadas. `APP_URL` es la base del enlace del correo; si
@@ -1457,10 +1478,12 @@ Pendientes conocidos. No bloquean la demo, pero conviene tenerlos fichados.
 
 | # | Deuda | Impacto |
 |---|---|---|
-| 7 | **`verifyEmail: false`** | Un profesional puede activar su perfil con el email de otro, porque nadie confirma que la dirección sea suya. Cerrarlo requiere `verifyEmail: true` en el realm **y** `docker compose down -v`; además rompe las cuentas `@vincula-up.local` de prueba, que no son entregables |
+| 7 | **`verifyEmail: false`** | Nadie confirma que la dirección sea suya. Con el alta nueva el profesional no se auto-registra, así que el riesgo queda sobre todo en los clientes que se registran solos. Cerrarlo requiere `verifyEmail: true` en el realm **y** `docker compose down -v`; además rompe las cuentas `@vincula-up.local` de prueba, que no son entregables |
 | 8 | **H2 por defecto en desarrollo** | Sin `DATABASE_URL`, los datos se pierden al reiniciar y el comportamiento difiere de producción |
 | 9 | **CORS con lista de orígenes fija** | `SecurityConfig.java` enumera los orígenes. Agregar un dominio es tocar código |
 | 10 | **Geocodificación puede resolver a otra ciudad** | Nominatim a veces devuelve un lugar homónimo: una dirección de Concepción del Uruguay terminó en Entre Ríos, Argentina. Es un comportamiento del servicio público, no del código; convendría validar el país del resultado |
+| 11 | **Sin reenvío de la invitación** | Si el profesional pierde la contraseña temporal antes de entrar, no hay acción para emitir una nueva (`resetearContrasenaTemporal` está prevista pero **no implementada** en `KeycloakAdminService`) y hay que hacerlo desde la consola de Keycloak o dar de alta de nuevo |
+| 12 | **La contraseña temporal siempre sale en la respuesta** | `POST /api/profesionales/alta` devuelve `passwordTemporal` aunque el correo haya salido bien, para que el panel pueda mostrarlo si el aviso falla. Cualquiera con el token de admin que lea la respuesta (o un log con el body) tiene esa clave |
 
 ### 16.3 Higiene del repositorio
 
@@ -1598,7 +1621,7 @@ Los rótulos dicen la **acción**, no la aspiración. Tres reglas:
 | `Guardar` | Confirma el envío de un formulario | "Guardar", "Guardando..." mientras espera |
 | Verbo de la acción | Cuando no es alta ni guardado | "Desactivar", "Eliminar", "Confirmar esta ubicación" |
 
-Una etiqueta como "Guardar preregistro" repite el nombre de la entidad que la
+Una etiqueta como "Crear prerregistro" repite el nombre de la entidad que la
 pantalla ya dice en el título, y "Crear nueva solicitud" repite la palabra
 "nueva" que el botón ya tiene en el ícono `+`. Queda el verbo solo.
 

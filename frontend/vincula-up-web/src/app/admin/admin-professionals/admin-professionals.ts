@@ -403,7 +403,11 @@ export class AdminProfessionals {
 		return profesional.tieneFoto === true;
 	}
 
-	/** Todavía no creó su cuenta en Keycloak: la invitación sigue pendiente. */
+	/**
+	 * La cuenta de Keycloak todavía no quedó vinculada: o es un prerregistro
+	 * antiguo, o el alta se cortó a mitad. El caso de `CARGADO` cubre el detalle
+	 * que se abre sin fila de usuario.
+	 */
 	invitacionPendiente(profesional: AdminProfessional): boolean {
 		const cuenta = this.cuenta(profesional);
 		return cuenta ? cuenta.keycloakId == null : (profesional.estado ?? '').toUpperCase() === 'CARGADO';

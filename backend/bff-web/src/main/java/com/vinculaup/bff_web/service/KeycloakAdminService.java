@@ -3,6 +3,7 @@ package com.vinculaup.bff_web.service;
 import tools.jackson.databind.JsonNode;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -18,18 +19,18 @@ import org.springframework.web.client.RestClient;
 /**
  * Administración mínima de identidades en Keycloak a través de la Admin API.
  * <p>
- * El flujo de profesionales es una invitación: el administrador precarga los
- * datos en ms-usuarios (sin cuenta Keycloak) y el profesional <b>se registra
- * solo</b> en Keycloak con ese email. Al entrar por primera vez el padrón lo
- * reconoce como profesional, pero el token todavía dice CLIENTE, por lo que
- * acá le otorgamos el rol PROFESIONAL en Keycloak: el rol sigue viviendo en un
- * único lugar (Keycloak) y el BFF no necesita autorizar por su cuenta.
+ * El alta de un profesional la hace el administrador: el BFF crea la cuenta acá
+ * con una <b>contraseña temporal</b> y le asigna el rol PROFESIONAL, de modo que
+ * el profesional <b>sólo tenga que activar su perfil</b> (no se registra solo).
+ * El rol sigue viviendo en un único lugar (Keycloak) y el BFF no necesita
+ * autorizar por su cuenta.
  * <p>
- * Nunca otorga ADMIN: la promoción automática sólo puede ser CLIENTE →
+ * Nunca otorga ADMIN: la asignación automática sólo puede ser CLIENTE →
  * PROFESIONAL, así un error de datos en el padrón no escala privilegios.
  * <p>
  * Todas las operaciones son best-effort: si Keycloak no responde se registra un
- * warning y el flujo continúa (la promoción se reintenta en el próximo login).
+ * warning y el flujo continúa. La promoción de un prerregistro antiguo (el que se
+ * registraba solo) se reintenta en el próximo login.
  */
 @Service
 public class KeycloakAdminService {
@@ -81,10 +82,26 @@ public class KeycloakAdminService {
     /**
      * Promueve la cuenta auto-registrada de un profesional: otorga PROFESIONAL y
      * retira CLIENTE para que el token nuevo traiga un único rol de negocio.
+     * <p>
+     * Se mantiene para los prerregistros antiguos (los que se registraban solos en
+     * Keycloak antes de que el alta creara la cuenta). En el flujo actual el rol ya
+     * se asigna al crear el usuario, así que esto sólo actúa como red de seguridad.
      *
      * @return {@code true} cuando la sincronización se aplicó en Keycloak.
      */
     public boolean promoverAProfesional(UUID keycloakUserId) {
+        return asignarRolProfesional(keycloakUserId);
+    }
+
+    /**
+     * Otorga el rol PROFESIONAL en Keycloak y retira CLIENTE si lo tuviera.
+     * <p>
+     * Nunca otorga ADMIN: la asignación sólo puede ser CLIENTE → PROFESIONAL, así
+     * un error de datos en el padrón no escala privilegios.
+     *
+     * @return {@code true} cuando el rol quedó aplicado en Keycloak.
+     */
+    public boolean asignarRolProfesional(UUID keycloakUserId) {
         if (!habilitado() || keycloakUserId == null) {
             return false;
         }
@@ -95,7 +112,7 @@ public class KeycloakAdminService {
         try {
             JsonNode rolProfesional = buscarRol(ROL_PROFESIONAL, token.get());
             if (rolProfesional == null || !rolProfesional.hasNonNull("id")) {
-                log.warn("El rol {} no existe en el realm {}: no se pudo promover al usuario {}",
+                log.warn("El rol {} no existe en el realm {}: no se pudo asignar al usuario {}",
                         ROL_PROFESIONAL, realm, keycloakUserId);
                 return false;
             }
@@ -108,8 +125,108 @@ public class KeycloakAdminService {
             log.info("Rol {} otorgado en Keycloak al usuario {}", ROL_PROFESIONAL, keycloakUserId);
             return true;
         } catch (RuntimeException ex) {
-            log.warn("No se pudo promover al usuario {} en Keycloak: {}", keycloakUserId, ex.getMessage());
+            log.warn("No se pudo asignar el rol {} al usuario {}: {}", ROL_PROFESIONAL, keycloakUserId, ex.getMessage());
             return false;
+        }
+    }
+
+    /**
+     * Crea la cuenta del profesional con una contraseña temporal y la acción
+     * pendiente de cambiarla en el primer ingreso. Devuelve el id de Keycloak
+     * (extraído del {@code Location} del alta) o {@code null} si no se pudo.
+     * <p>
+     * El correo es además el {@code username}: el realm usa
+     * {@code registrationEmailAsUsername}, así que la persona entra con su correo.
+     * {@code emailVerified} va en {@code true} porque la dirección la carga el
+     * administrador; el realm no verifica correos, así que sin eso quedaría como no
+     * confirmada.
+     */
+    public UUID crearUsuarioConContrasenaTemporal(String email, String nombre, String apellido, String passwordTemporal) {
+        if (!habilitado() || email == null || email.isBlank()
+                || passwordTemporal == null || passwordTemporal.isBlank()) {
+            return null;
+        }
+        Optional<String> token = token();
+        if (token.isEmpty()) {
+            return null;
+        }
+        try {
+            var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
+            var cuerpo = mapper.createObjectNode();
+            cuerpo.put("username", email.trim().toLowerCase(Locale.ROOT));
+            cuerpo.put("email", email.trim());
+            cuerpo.put("firstName", nombre == null ? "" : nombre.trim());
+            cuerpo.put("lastName", apellido == null ? "" : apellido.trim());
+            cuerpo.put("enabled", true);
+            cuerpo.put("emailVerified", true);
+            cuerpo.putArray("requiredActions").add("UPDATE_PASSWORD");
+            var credencial = cuerpo.putArray("credentials").addObject();
+            credencial.put("type", "password");
+            credencial.put("value", passwordTemporal);
+            credencial.put("temporary", true);
+
+            var respuesta = client.post()
+                    .uri("/admin/realms/{realm}/users", realm)
+                    .header(AUTHORIZATION, bearer(token.get()))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(cuerpo)
+                    .retrieve()
+                    .toBodilessEntity();
+            String location = respuesta.getHeaders().getFirst("Location");
+            if (location == null || location.isBlank()) {
+                log.warn("Keycloak no devolvió la ubicación de la cuenta creada para {}", email);
+                return null;
+            }
+            return UUID.fromString(location.substring(location.lastIndexOf('/') + 1));
+        } catch (RuntimeException ex) {
+            log.warn("No se pudo crear la cuenta de Keycloak para {}: {}", email, ex.getMessage());
+            return null;
+        }
+    }
+
+    /** ¿Existe ya una cuenta en Keycloak con ese correo? (para rechazar duplicados). */
+    public boolean existeUsuarioPorEmail(String email) {
+        if (!habilitado() || email == null || email.isBlank()) {
+            return false;
+        }
+        Optional<String> token = token();
+        if (token.isEmpty()) {
+            return false;
+        }
+        try {
+            JsonNode usuarios = client.get()
+                    .uri(uriBuilder -> uriBuilder.path("/admin/realms/{realm}/users")
+                            .queryParam("email", email.trim())
+                            .queryParam("exact", "true")
+                            .build(realm))
+                    .header(AUTHORIZATION, bearer(token.get()))
+                    .retrieve()
+                    .body(JsonNode.class);
+            return usuarios != null && usuarios.isArray() && !usuarios.isEmpty();
+        } catch (RuntimeException ex) {
+            // Ante la duda no se bloquea el alta: ms-usuarios igual rechaza el email duplicado.
+            log.warn("No se pudo consultar en Keycloak si existe {}: {}", email, ex.getMessage());
+            return false;
+        }
+    }
+
+    /** Baja la cuenta en Keycloak (rollback de un alta que no llegó a completarse). */
+    public void eliminarUsuario(UUID keycloakUserId) {
+        if (!habilitado() || keycloakUserId == null) {
+            return;
+        }
+        Optional<String> token = token();
+        if (token.isEmpty()) {
+            return;
+        }
+        try {
+            client.delete()
+                    .uri("/admin/realms/{realm}/users/{id}", realm, keycloakUserId)
+                    .header(AUTHORIZATION, bearer(token.get()))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RuntimeException ex) {
+            log.warn("No se pudo eliminar la cuenta de Keycloak {}: {}", keycloakUserId, ex.getMessage());
         }
     }
 

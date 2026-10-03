@@ -57,10 +57,13 @@ public class ApiController {
     }
 
     /**
-     * El profesional invitado se auto-registra en Keycloak con el email que cargó
-     * el administrador: ms-usuarios lo reconoce como PROFESIONAL (por email) pero
-     * su token todavía dice CLIENTE. Acá se promueve el rol en Keycloak para que
-     * el próximo token lo traiga y pueda activar su perfil.
+     * Camino de compatibilidad con los prerregistros antiguos: esos profesionales
+     * se auto-registraban en Keycloak con el email que cargó el administrador y el
+     * rol nacía CLIENTE, aunque ms-usuarios ya los reconozca como PROFESIONAL. Acá
+     * se promueve el rol en Keycloak para que el próximo token lo traiga.
+     * <p>
+     * Con el alta nueva la cuenta ya nace con PROFESIONAL, así que esto no tiene
+     * nada que hacer.
      * <p>
      * Sólo promueve CLIENTE → PROFESIONAL: nunca otorga ADMIN desde el padrón.
      */
@@ -448,13 +451,17 @@ public class ApiController {
     public JsonNode crearUsuario(@RequestBody JsonNode body) { return gateway.crearUsuario(body); }
 
     /**
-     * Alta administrativa de un profesional en un solo paso: crea el usuario
-     * <b>invitado</b> en ms-usuarios (todavía sin cuenta Keycloak) y su perfil
-     * profesional pendiente de activación.
+     * Alta administrativa de un profesional en un solo paso.
      * <p>
-     * Si el email ya existe (por ejemplo una invitación previa) se reutiliza ese
-     * usuario; si la creación del perfil falla y el usuario se acababa de crear,
-     * se elimina para no dejar invitaciones huérfanas.
+     * El administrador carga los datos y el BFF deja todo listo para que el
+     * profesional <b>solo tenga que activar su perfil</b>: crea la cuenta en
+     * Keycloak con una <b>contraseña temporal</b> (que se le exige cambiar en el
+     * primer ingreso) y el rol PROFESIONAL, registra el usuario de negocio y su
+     * perfil pendiente, y le envía por correo el acceso.
+     * <p>
+     * La contraseña temporal no vence: el profesional puede entrar mucho después y
+     * el sistema igual lo obliga a definir una propia. Si el alta falla después de
+     * crear la cuenta de Keycloak, se revierte todo para no dejar cuentas huérfanas.
      */
     @PostMapping("/profesionales/alta")
     @ResponseStatus(HttpStatus.CREATED)
@@ -472,56 +479,74 @@ public class ApiController {
         var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
 
         JsonNode usuario = gateway.buscarUsuarioPorEmail(email);
-        // El prerregistro es para alguien que todavía no tiene cuenta. Si el correo
-        // ya tiene una sesión, hay una persona real detrás de esa dirección: al
-        // registrarse con ese mismo mail se quedaría con este prerregistro y su
-        // legajo sin haberlo pedido, así que se rechaza y se pide otro correo.
-        //
-        // El criterio es `keycloakId`: si viene vacío es una invitación anterior del
-        // mismo administrador (todavía sin cuenta, o sin perfil, así que se puede
-        // completar). Si viene lleno, alguien ya usó esa cuenta.
+        // El alta es para alguien que todavía no tiene cuenta. Si el correo ya tiene
+        // una cuenta con sesión (`keycloakId`), hay una persona real detrás: se
+        // rechaza. Si viene vacío, es una invitación previa del mismo administrador
+        // que todavía no se vinculó, así que se puede completar.
         if (usuario != null && !usuario.path("keycloakId").asText("").isBlank()) {
             throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT,
-                    "Ese correo ya está en uso. Elegí otro para el prerregistro.");
+                    "Ese correo ya está en uso. Elegí otro.");
         }
-        boolean usuarioNuevo = false;
-        if (usuario == null) {
-            var usuarioBody = mapper.createObjectNode();
-            usuarioBody.put("nombre", object.path("nombre").asText(""));
-            usuarioBody.put("apellido", object.path("apellido").asText(""));
-            usuarioBody.put("email", email);
-            usuarioBody.put("telefono", object.path("telefono").asText(""));
-            usuarioBody.put("rolNegocio", "PROFESIONAL");
-            usuario = gateway.crearUsuario(usuarioBody);
-            usuarioNuevo = true;
+        // Y si Keycloak ya tiene la cuenta, tampoco se puede volver a crear.
+        if (keycloakAdmin.existeUsuarioPorEmail(email)) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT,
+                    "Ese correo ya está en uso. Elegí otro.");
         }
 
-        var perfilBody = mapper.createObjectNode();
-        perfilBody.put("usuarioId", usuario.path("id").asText());
-        perfilBody.put("legajo", legajo);
-        var especialidades = mapper.createArrayNode();
-        for (JsonNode especialidadId : object.path("especialidadIds")) {
-            especialidades.add(especialidadId.asText());
+        // 1) Cuenta de Keycloak con contraseña temporal y rol PROFESIONAL.
+        String passwordTemporal = com.vinculaup.bff_web.service.PasswordTemporal.generar();
+        UUID keycloakId = keycloakAdmin.crearUsuarioConContrasenaTemporal(
+                email, object.path("nombre").asText(""), object.path("apellido").asText(""), passwordTemporal);
+        if (keycloakId == null) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "No se pudo crear la cuenta del profesional. Intentá de nuevo.");
         }
-        perfilBody.set("especialidadIds", especialidades);
+        keycloakAdmin.asignarRolProfesional(keycloakId);
 
+        boolean usuarioNuevo = usuario == null;
         try {
+            // 2) Usuario de negocio, ya vinculado a la cuenta de Keycloak.
+            if (usuarioNuevo) {
+                var usuarioBody = mapper.createObjectNode();
+                usuarioBody.put("nombre", object.path("nombre").asText(""));
+                usuarioBody.put("apellido", object.path("apellido").asText(""));
+                usuarioBody.put("email", email);
+                usuarioBody.put("telefono", object.path("telefono").asText(""));
+                usuarioBody.put("rolNegocio", "PROFESIONAL");
+                usuarioBody.put("keycloakId", keycloakId.toString());
+                usuario = gateway.crearUsuario(usuarioBody);
+            } else {
+                usuario = gateway.vincularKeycloakUsuario(UUID.fromString(usuario.path("id").asText()), keycloakId);
+            }
+
+            // 3) Perfil profesional pendiente de activación.
+            var perfilBody = mapper.createObjectNode();
+            perfilBody.put("usuarioId", usuario.path("id").asText());
+            perfilBody.put("legajo", legajo);
+            var especialidades = mapper.createArrayNode();
+            for (JsonNode especialidadId : object.path("especialidadIds")) {
+                especialidades.add(especialidadId.asText());
+            }
+            perfilBody.set("especialidadIds", especialidades);
             JsonNode perfil = gateway.crearProfesional(perfilBody);
-            // Aviso best-effort: si el correo no sale, el prerregistro ya quedó
-            // guardado y el administrador puede avisar por otra vía. Se le devuelve
-            // el resultado para que el panel no dé por hecho que el mail llegó.
-            boolean correoEnviado = notificar.avisarPreregistro(
-                    email,
-                    nombreCompleto(object),
-                    legajo,
-                    primeraEspecialidad(perfil));
+
+            // 4) Aviso por correo con el acceso. Es best-effort: si el correo no
+            //    sale, la respuesta trae la contraseña temporal para que el panel se
+            //    la muestre al administrador y la pase por otra vía.
+            boolean correoEnviado = notificar.avisarAltaProfesional(
+                    email, nombreCompleto(object), legajo, primeraEspecialidad(perfil), passwordTemporal);
+
             var respuesta = mapper.createObjectNode();
             respuesta.set("usuario", usuario);
             respuesta.set("profesional", perfil);
             respuesta.put("correoEnviado", correoEnviado);
+            respuesta.put("passwordTemporal", passwordTemporal);
             return respuesta;
         } catch (RuntimeException ex) {
-            if (usuarioNuevo) {
+            // La cuenta de Keycloak se creó en esta misma petición: se revierte
+            // siempre. El usuario de negocio sólo si lo creamos nosotros.
+            keycloakAdmin.eliminarUsuario(keycloakId);
+            if (usuarioNuevo && usuario != null) {
                 try {
                     gateway.eliminarUsuario(UUID.fromString(usuario.path("id").asText()));
                 } catch (RuntimeException rollback) {
