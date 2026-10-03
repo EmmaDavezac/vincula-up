@@ -187,6 +187,76 @@ powershell -ExecutionPolicy Bypass -File .\scripts\windows\keycloak-bootstrap.ps
 > La contraseña no está en el repositorio: vive solo en el `.env` local, que
 > está en `.gitignore`.
 
+#### A dónde llegan las respuestas
+
+El **From** y el **Reply-To** están separados a propósito, y no es un detalle:
+
+| | Qué es | Valor actual |
+|---|---|---|
+| **From** | Quién envía. **Tiene que ser la cuenta autenticada en el SMTP**: el servidor rechaza que se envíe "en nombre de" otra dirección. | `lucianodavezac@gmail.com` |
+| **Reply-To** | A dónde caen las respuestas. **Puede ser cualquier dirección**, sin autenticarla. | `vinculaup@gmail.com` |
+
+Así se envía desde una casilla personal y **las respuestas del profesional caen
+en la casilla institucional**, que es la misma que aparece en los términos y las
+preguntas frecuentes.
+
+Las dos variables del `.env`:
+
+```bash
+KEYCLOAK_SMTP_REPLY_TO=vinculaup@gmail.com   # a dónde llegan las respuestas
+KEYCLOAK_CONTACTO=vinculaup@gmail.com        # casilla que se muestra en el pie
+```
+
+> **Si las dejás vacías** el `Reply-To` cae al `From` (el comportamiento anterior)
+> y el pie no muestra contacto. No rompen nada, pero se pierde lo de que las
+> respuestas lleguen a la institución.
+
+#### Cómo son los correos
+
+Los dos usan la misma marca: cabecera coral con el logo, ancho de 600 px, tablas
+en vez de flex, estilos en línea y una regla de modo oscuro. El nombre
+"Vincula-UP" va **escrito y no solo como imagen**, porque los clientes de correo
+bloquean las imágenes remotas por defecto y un correo cuya única marca es un logo
+bloqueado se ve vacío.
+
+Cada uno va en **dos versiones**: HTML y texto plano. El texto plano no es
+adorno: los filtros antispam lo leen antes que el HTML, y un correo que solo trae
+HTML se ve más sospechoso, no menos.
+
+| | Qué es | Dónde se cambia |
+|---|---|---|
+| **Correos de Keycloak** (recuperar contraseña, verificar correo) | Tema `vincula-up`: la cabecera y el pie son uno solo para todos. Los textos están aparte, así que cambiar una palabra no rompe el diseño. | Textos: `keycloak/themes/vincula-up/email/messages/messages_es.properties`. Maqueta: `keycloak/themes/vincula-up/email/html/template.ftl` |
+| **Aviso de prerregistro** (lo manda el BFF) | Misma marca, textos propios. | `backend/bff-web/src/main/resources/correos/prerregistro.html` |
+
+El contacto y la URL que se imprimen en el pie salen de
+`keycloak/themes/vincula-up/email/theme.properties` (`vinculaUpContacto` y
+`vinculaUpAppUrl`).
+
+> **El aviso de prerregistro es el único que escribe el BFF**, y su maqueta se
+> copia a `/app/correos/` dentro del contenedor en vez de ir en el jar: dentro del
+> empaquetado de Spring Boot el recurso no se dejaba resolver. Por eso la ruta
+> está en `MAIL_PLANTILLA`. Si se renombra el archivo hay que actualizar los tres
+> lugares donde aparece la ruta; para eso está el script:
+>
+> ```bash
+> python3 scripts/arreglar-ruta-plantilla.py
+> ```
+
+> **Una trampa de Keycloak:** en las plantillas de correo no se puede usar
+> `${algo?html}`. Keycloak 26 compila FreeMarker con el auto-escape prendido y lo
+> rechaza con un `ParseException` que corta **todo** el envío. Se escribe
+> `${algo}` y nada más. Está anotado en el propio `template.ftl`.
+
+**Para regenerar el logo.** El PNG del correo sale de la misma geometría que el
+favicon, y con un script:
+
+```bash
+python3 scripts/generate-logo.py
+```
+
+Si cambia la marca hay que correr ese script **y** rehacer `favicon.svg`,
+`favicon.ico` y `apple-touch-icon.png`.
+
 ### BFF API (para depurar)
 
 No se navega: expone JSON y pide token. Se consulta con `curl`:

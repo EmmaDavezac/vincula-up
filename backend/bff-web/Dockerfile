@@ -40,5 +40,11 @@ WORKDIR /app
 # Se copia solo el .jar ya empaquetado desde la etapa de compilacion.
 COPY --from=build /workspace/target/*.jar /app/app.jar
 
+# Las maquetas de los correos van aparte, como archivos del disco y no dentro
+# del jar: es la parte que más se edita, y así se puede cambiar montando un
+# volumen encima de esta carpeta, sin recompilar. (Dentro del jar empaquetado el
+# recurso no se dejaba resolver desde el código.)
+COPY --from=build /workspace/src/main/resources/correos /app/correos
+
 EXPOSE 9001
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

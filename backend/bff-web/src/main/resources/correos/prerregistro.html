@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<!--
+  Correo de aviso de prerregistro: el que manda el BFF cuando el administrador
+  da de alta a un profesional en el padrón.
+
+  Por qué es un archivo y no una cadena en Java: porque es diseño, no lógica.
+  Se edita, se relee y se compara con git sin tocar código ni recompilar.
+  Los colores son los tokens de frontend/vincula-up-web/src/styles.css.
+
+  Marcadores que reemplaza NotificacionService:
+    {{SALUDO}}   nombre del profesional, ya escapado ("Luciano, ")
+    {{DATOS}}    filas <tr> con legajo y especialidad
+    {{EMAIL}}    el correo con el que tiene que registrarse
+    {{APP_URL}}  base pública de la app
+    {{CONTACTO}} frase del pie con la casilla institucional (puede ir vacía)
+
+  Reglas a respetar al editar:
+  · Tablas, no flex ni grid: Outlook no los soporta.
+  · Estilos en línea, porque muchos clientes ignoran las hojas de estilo. El
+    único <style> es el del modo oscuro y usa clases .vu-*: quien no lo
+    soporta ve los colores claros que ya trae en línea.
+  · "Vincula-UP" va escrito y no solo como imagen: los clientes bloquean las
+    imágenes remotas por defecto y sin texto el correo se ve vacío.
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>Vincula-UP</title>
+<style>
+  @media (prefers-color-scheme: dark) {
+    .vu-fondo   { background-color: #161d1f !important; }
+    .vu-tarjeta { background-color: #1d2422 !important; }
+    .vu-texto   { color: #e8edea !important; }
+    .vu-tenue   { color: #9aa8a2 !important; }
+    .vu-borde   { border-color: #33403b !important; }
+    .vu-banda   { background-color: #c34f3d !important; }
+    .vu-dato    { background-color: #242b28 !important; }
+  }
+</style>
+</head>
+<body class="vu-fondo" style="margin:0; padding:0; background-color:#f3f5f1;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="vu-fondo" style="background-color:#f3f5f1;">
+<tr><td align="center" style="padding:24px 12px;">
+
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="vu-tarjeta" style="width:600px; max-width:600px; background-color:#fffdf8; border:1px solid #d8d8ce; border-radius:10px;">
+
+  <!-- Cabecera -->
+  <tr><td class="vu-banda" style="background-color:#e35f43; border-radius:10px 10px 0 0; padding:24px 32px;">
+    <img src="{{APP_URL}}/logo-cuadrado.png" width="40" height="40" alt="Vincula-UP" style="display:block; border:0; width:40px; height:40px; margin:0 auto 10px auto;">
+    <div class="vu-texto" style="color:#ffffff; font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:20px; font-weight:600; text-align:center; line-height:1.3;">Vincula-UP</div>
+    <div style="color:#fbe6e0; font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:12px; text-align:center; line-height:1.5; margin-top:2px;">Red técnica con respaldo universitario</div>
+  </td></tr>
+
+  <!-- Cuerpo -->
+  <tr><td class="vu-texto" style="color:#1e2926; font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:15px; line-height:1.65; padding:32px;">
+
+    <p style="margin:0 0 16px 0;">Hola {{SALUDO}}</p>
+
+    <p style="margin:0 0 16px 0;">Ya tenés tu lugar en la <strong>red técnica de oficios</strong> de la Universidad Popular de Concepción del Uruguay. Estos son los datos de tu prerregistro:</p>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="vu-dato vu-borde" style="background-color:#f3f5f1; border:1px solid #d8d8ce; border-radius:8px; margin:0 0 24px 0;">
+      <tr><td style="padding:16px 18px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">{{DATOS}}</table>
+      </td></tr>
+    </table>
+
+    <p style="margin:0 0 12px 0;">Para aparecer en el padrón y recibir solicitudes te falta <strong>activar tu perfil</strong>. Son tres pasos:</p>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;">
+      <tr><td width="28" style="padding:5px 0; vertical-align:top;" class="vu-texto"><strong style="color:#1e2926;">1.</strong></td><td style="padding:5px 0;">Entrá en <a href="{{APP_URL}}/activar-perfil" style="color:#c34f3d;">{{APP_URL}}/activar-perfil</a></td></tr>
+      <tr><td width="28" style="padding:5px 0; vertical-align:top;" class="vu-texto"><strong style="color:#1e2926;">2.</strong></td><td style="padding:5px 0;">Iniciá sesión. Si todavía no tenés cuenta, creála con este correo: <strong class="vu-texto" style="color:#1e2926;">{{EMAIL}}</strong></td></tr>
+      <tr><td width="28" style="padding:5px 0; vertical-align:top;" class="vu-texto"><strong style="color:#1e2926;">3.</strong></td><td style="padding:5px 0;">Completá tu perfil: foto, zona de cobertura y horarios.</td></tr>
+    </table>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="vu-dato" style="background-color:#f3f5f1; border-left:3px solid #e35f43; border-radius:0 4px 4px 0; margin:0 0 24px 0;">
+      <tr><td style="padding:14px 16px;">
+        <p class="vu-texto" style="color:#1e2926; font-size:13px; line-height:1.6; margin:0;">Usá <strong>exactamente</strong> esa dirección: es con la que encontramos tu prerregistro.</p>
+      </td></tr>
+    </table>
+
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0;">
+      <tr><td align="center" bgcolor="#e35f43" style="border-radius:6px;">
+        <a href="{{APP_URL}}/activar-perfil" style="display:inline-block; padding:13px 28px; font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:15px; font-weight:600; color:#ffffff; text-decoration:none; border-radius:6px;">Activar mi perfil</a>
+      </td></tr>
+    </table>
+
+    <p class="vu-tenue" style="color:#67716c; font-size:12px; line-height:1.6; margin:12px 0 0 0;">Si el botón no funciona, copiá esta dirección en el navegador:<br>
+      <a href="{{APP_URL}}/activar-perfil" style="color:#c34f3d; word-break:break-all;">{{APP_URL}}/activar-perfil</a></p>
+
+  </td></tr>
+
+  <!-- Pie -->
+  <tr><td class="vu-borde vu-dato" style="background-color:#f3f5f1; border-top:1px solid #d8d8ce; border-radius:0 0 10px 10px; padding:20px 32px;">
+    <p class="vu-texto" style="color:#1e2926; font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:12px; line-height:1.6; margin:0;">
+      <strong>Vincula-UP</strong> · Universidad Popular de Concepción del Uruguay
+    </p>
+    <p class="vu-tenue" style="color:#67716c; font-size:12px; line-height:1.6; margin:4px 0 0 0;">
+      Recibiste este mensaje porque la Universidad Popular te dio de alta en la red. {{CONTACTO}}
+    </p>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>

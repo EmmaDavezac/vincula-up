@@ -87,10 +87,22 @@ services:
       KEYCLOAK_SMTP_PASSWORD: ${KEYCLOAK_SMTP_PASSWORD:-}
       KEYCLOAK_SMTP_FROM: ${KEYCLOAK_SMTP_FROM:-}
       KEYCLOAK_SMTP_FROM_DISPLAY_NAME: ${KEYCLOAK_SMTP_FROM_DISPLAY_NAME:-Vincula-UP}
+      # A dónde llegan las respuestas. Es opcional: si queda vacía se usa
+      # KEYCLOAK_SMTP_FROM, que es el comportamiento anterior. Permite que
+      # el From sea una casilla personal (Gmail no deja enviar como otra)
+      # y las respuestas caigan en la casilla institucional.
+      KEYCLOAK_SMTP_REPLY_TO: ${KEYCLOAK_SMTP_REPLY_TO:-}
+      # Contacto que se muestra en el pie de los correos (tema de correo).
+      KEYCLOAK_CONTACTO: ${KEYCLOAK_CONTACTO:-}
     ports:
       - "8080:8080"
     volumes:
       - ./keycloak/import:/opt/keycloak/data/import:ro
+      # Tema de correo con la marca. Se monta en el directorio de temas, que
+      # la imagen deja vacío a propósito para esto. El que trae la marca es
+      # el que dibuja la cabecera y el pie de TODOS los correos; los textos
+      # están en email/messages/messages_es.properties.
+      - ./keycloak/themes/vincula-up:/opt/keycloak/themes/vincula-up:ro
 
   postgres:
     image: postgres:16
@@ -248,6 +260,14 @@ services:
       KEYCLOAK_SMTP_STARTTLS: ${KEYCLOAK_SMTP_STARTTLS:-true}
       KEYCLOAK_SMTP_FROM: ${KEYCLOAK_SMTP_FROM:-}
       KEYCLOAK_SMTP_FROM_DISPLAY_NAME: ${KEYCLOAK_SMTP_FROM_DISPLAY_NAME:-Vincula-UP}
+      # Dónde está la maqueta HTML del aviso de prerregistro. Es una ruta de
+      # archivo, no un classpath: dentro del jar empaquetado el recurso no se
+      # resuelve, así que el Dockerfile la copia aparte a /app.
+      MAIL_PLANTILLA: /app/correos/prerregistro.html
+      # A dónde llegan las respuestas y qué casilla se muestra en el pie. Son
+      # opcionales: vacías, el Reply-To cae al From (que es la casilla que envía).
+      KEYCLOAK_SMTP_REPLY_TO: ${KEYCLOAK_SMTP_REPLY_TO:-}
+      KEYCLOAK_CONTACTO: ${KEYCLOAK_CONTACTO:-}
       # Enlace que va en el correo para que el profesional active su perfil.
       APP_URL: ${APP_URL:-https://vincula-up.local}
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
