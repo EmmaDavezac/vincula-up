@@ -278,7 +278,7 @@ export class AuthService {
       .pipe(
         switchMap((token) => this.maybeUseToken(token)),
         catchError((error: HttpErrorResponse) => {
-          this.loginError.set(this.describeError(error, 'No se pudo completar el login con Keycloak.'));
+          this.loginError.set(this.describeError(error, 'No se pudo completar el inicio de sesión.'));
           return of(false);
         }),
       )
@@ -301,7 +301,7 @@ export class AuthService {
     try {
       const claims = this.decodeToken(token.access_token);
       if (!claims || !claims.sub || !claims.role) {
-        this.loginError.set('La respuesta de Keycloak no incluye el rol necesario para Vincula-UP.');
+        this.loginError.set('La respuesta de autenticación no incluye el rol necesario para Vincula-UP.');
         return of(false);
       }
 
@@ -341,7 +341,7 @@ export class AuthService {
         }),
       );
     } catch {
-      this.loginError.set('No se pudo procesar la respuesta real de Keycloak.');
+      this.loginError.set('No se pudo procesar la respuesta del servidor de autenticación.');
       return of(false);
     }
   }

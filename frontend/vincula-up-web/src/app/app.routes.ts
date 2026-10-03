@@ -69,7 +69,7 @@ export const routes: Routes = [
 		loadComponent: () => import('./access-page').then((module) => module.AccessPage),
 		data: {
 			title: 'No tenes permiso para entrar aca',
-			message: 'Inicia sesión con tu cuenta Keycloak o volve al inicio para continuar.',
+			message: 'Iniciá sesión con tu cuenta o volvé al inicio para continuar.',
 		},
 		title: 'Vincula-UP | Acceso restringido',
 	},
