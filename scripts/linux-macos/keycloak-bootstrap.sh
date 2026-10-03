@@ -162,12 +162,17 @@ kcadm add-roles -r "$REALM" \
 echo "==> Configurando SMTP del realm $REALM (recupero de contraseña)"
 echo "    Lee KEYCLOAK_SMTP_* del entorno (.env). Sin password, el reseteo"
 echo "    queda habilitado en el realm pero Keycloak no puede enviar emails."
+# El Reply-To es aparte del From a propósito: el From tiene que ser la cuenta
+# autenticada en el SMTP (Gmail no deja enviar como otra), pero las respuestas
+# pueden caer en la casilla institucional. Si KEYCLOAK_SMTP_REPLY_TO está vacía
+# se usa el From, que es el comportamiento anterior.
+SMTP_REPLY_TO="${KEYCLOAK_SMTP_REPLY_TO:-${KEYCLOAK_SMTP_FROM:-}}"
 kcadm update "realms/$REALM" \
   -s "smtpServer.host=${KEYCLOAK_SMTP_HOST:-smtp.gmail.com}" \
   -s "smtpServer.port=${KEYCLOAK_SMTP_PORT:-587}" \
   -s "smtpServer.from=${KEYCLOAK_SMTP_FROM:-}" \
   -s "smtpServer.fromDisplayName=${KEYCLOAK_SMTP_FROM_DISPLAY_NAME:-Vincula-UP}" \
-  -s "smtpServer.replyTo=${KEYCLOAK_SMTP_FROM:-}" \
+  -s "smtpServer.replyTo=${SMTP_REPLY_TO}" \
   -s "smtpServer.starttls=${KEYCLOAK_SMTP_STARTTLS:-true}" \
   -s "smtpServer.auth=${KEYCLOAK_SMTP_AUTH:-true}" \
   -s "smtpServer.user=${KEYCLOAK_SMTP_USER:-}" \
@@ -178,6 +183,18 @@ if [ -n "${KEYCLOAK_SMTP_PASSWORD:-}" ]; then
 else
   echo "    (sin KEYCLOAK_SMTP_PASSWORD: se omite el test de conexión)"
 fi
+echo "    Reply-To: $SMTP_REPLY_TO"
+
+echo "==> Activando el tema de correo con la marca (vincula-up)"
+# El tema vive montado en /opt/keycloak/themes/vincula-up (ver docker-compose.yml)
+# y es el que dibuja la cabecera y el pie de los correos. El import del realm
+# no alcanza porque solo corre la primera vez que se crea el realm.
+#
+# El contacto y la URL que aparecen en el pie NO se configuran acá: el contexto
+# de las plantillas de correo de Keycloak no expone el realm, así que los
+# atributos del realm se ignoran. Se cambian en
+# keycloak/themes/vincula-up/email/theme.properties.
+kcadm update "realms/$REALM" -s "emailTheme=vincula-up"
 
 echo
 echo "Listo."

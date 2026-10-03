@@ -957,22 +957,112 @@ Se leen del archivo `.env` en la raíz (ignorado por git). Copiar
 | `KEYCLOAK_SMTP_AUTH` | `true` | Autenticación SMTP |
 | `KEYCLOAK_SMTP_USER` | — | Usuario (con Gmail: una dirección) |
 | `KEYCLOAK_SMTP_PASSWORD` | — | **Contraseña de aplicación**, no la de la cuenta |
-| `KEYCLOAK_SMTP_FROM` | — | Remitente |
+| `KEYCLOAK_SMTP_FROM` | — | Remitente (`From`) |
 | `KEYCLOAK_SMTP_FROM_DISPLAY_NAME` | `Vincula-UP` | Nombre visible del remitente |
+| `KEYCLOAK_SMTP_REPLY_TO` | — (cae al `From`) | **A dónde llegan las respuestas** |
+| `KEYCLOAK_CONTACTO` | — (cae al Reply-To) | Casilla que se muestra en el pie del correo |
+| `MAIL_PLANTILLA` | `/app/correos/prerregistro.html` | Ruta de la maqueta HTML del aviso |
 
-**Estado: configurado y verificado.** El correo saliente está operativo sobre
-Gmail, con una **contraseña de aplicación** vigente en
-`KEYCLOAK_SMTP_PASSWORD`. La verificación se hizo el **2 de octubre de 2026** con
-un envío real desde el flujo de "¿Olvidó su contraseña?" de la pantalla de
-ingresar: el correo llegó a la casilla y Keycloak no registró errores de SMTP.
-Con eso quedan habilitados los tres correos que manda el sistema:
+### El From y el Reply-To van separados
+
+No es duplicación: son dos cosas distintas, y separarlas es lo que permite que
+las respuestas lleguen a la casilla institucional.
+
+| | Qué es | Por qué |
+|---|---|---|
+| `From` | Quién envía | **Tiene que ser la cuenta autenticada en el SMTP.** El servidor rechaza que se envíe en nombre de otra dirección, así que con Gmail obliga a usar la casilla propia. |
+| `Reply-To` | A dónde caen las respuestas | **Puede ser cualquier dirección** y no necesita autenticarse: es solo una etiqueta del encabezado. |
+
+Con las dos separadas, el aviso sale de `lucianodavezac@gmail.com` —la cuenta con
+contraseña de aplicación— pero **cualquier respuesta del profesional cae en
+`vinculaup@gmail.com`**, la misma casilla que se publica en los términos y las
+preguntas frecuentes. `KEYCLOAK_CONTACTO` es el texto que se imprime en el pie, y
+ambos son opcionales: vacíos, el `Reply-To` cae al `From` y el pie no muestra
+contacto.
+
+### Los correos llevan la marca de la aplicación
+
+Los dos correos del sistema (el de Keycloak y el del BFF) salen con la misma
+identidad visual que la web. No es decoración: un correo pelado que le llega a
+alguien que no conoce el proyecto es indistinguible de un phishing, y en el aviso
+de prerregistro eso es justo lo que hay que evitar.
+
+| | |
+|---|---|
+| Ancho | 600 px, con tarjeta de fondo y cabecera coral de la marca |
+| Colores | Los tokens de `src/styles.css`: `--coral #e35f43`, `--ink #1e2926`, `--muted #67716c`, `--line #d8d8ce` |
+| Modo oscuro | Una regla de `prefers-color-scheme` con clases `.vu-*` |
+| Estructura | **Tablas y estilos en línea**, no flex ni grid: Outlook no los soporta |
+| Versiones | **Siempre HTML + texto plano.** El texto plano no es adorno: los filtros antispam lo leen antes que el HTML, y un correo solo-HTML se ve más sospechoso |
+
+> **El nombre "Vincula-UP" va escrito, no solo como imagen.** Los clientes de
+> correo bloquean las imágenes remotas por defecto: si la única marca fuera el
+> logo, sin imágenes el correo se vería vacío.
+
+### Dónde vive cada cosa
+
+**Los correos de Keycloak** (recuperación de contraseña, verificación, cambio de
+correo, bienvenida, enlace vencido) usan un tema propio:
+
+```
+keycloak/themes/vincula-up/
+├── theme.properties                      parent=keycloak
+└── email/
+    ├── theme.properties                  + contacto y URL que lee el pie
+    ├── html/template.ftl                 cabecera, ancho y pie (UNO para todos)
+    └── messages/messages_es.properties   los textos de cada correo
+```
+
+Se monta en el contenedor (`./keycloak/themes/vincula-up` →
+`/opt/keycloak/themes/vincula-up:ro`) y se activa con `emailTheme=vincula-up`, que
+aplica `keycloak-bootstrap.*` por la misma razón que el SMTP: el import del realm
+solo corre la primera vez que se crea.
+
+El diseño está separado de los textos a propósito: `template.ftl` no sabe qué
+correo se está mandando, así que cambiar una palabra no puede romper la maqueta.
+
+> **Dos restricciones del motor que cortan todo el envío si no se respetan:**
+>
+> 1. **Nada de `${algo?html}`.** Keycloak 26 compila las plantillas con el
+>    auto-escape de FreeMarker prendido y rechaza ese operador con un
+>    `ParseException` que cancela el envío. Se escribe `${algo}`.
+> 2. **El contexto de las plantillas de correo no expone `realm`.** Con las del
+>    login sí viene; con las de correo no. Por eso el contacto y la URL se leen
+>    de `theme.properties` (vía `properties`) y no de atributos del realm.
+
+**El aviso de prerregistro** lo escribe el BFF (`NotificacionService`), no
+Keycloak, y su maqueta está en
+`backend/bff-web/src/main/resources/correos/prerregistro.html`.
+
+> **Por qué ese archivo va en el disco y no en el jar.** El `Dockerfile` lo copia
+> aparte a `/app/correos/` y la ruta se pasa por `MAIL_PLANTILLA`. Dentro del jar
+> empaquetado de Spring Boot el recurso quedaba en `BOOT-INF/classes/` pero ni
+> `ClassPathResource` ni `@Value("classpath:...")` lo resolvían, y el correo salía
+> con el texto de repuesto. Además, así la maqueta se cambia montando un volumen
+> encima, sin recompilar.
+>
+> El aviso sale en **multipart**: el `MimeMessageHelper` tiene que crearse con el
+> `true` de multipart, o `setText(texto, html)` falla con *"Not in multipart
+> mode"*. Y es best-effort: si la maqueta no se puede leer, manda texto plano en
+> lugar de romper el alta del profesional.
+
+**El logo** (`logo-cuadrado.png`, 256×256) lo genera
+`scripts/generate-logo.py` desde la misma geometría del `favicon.svg`, sin
+dependencias: solo `zlib` y `struct` de la biblioteca estándar. Si cambia la
+marca hay que correr ese script y rehacer también los tres favicons.
+
+### Estado: configurado y verificado
+
+El correo saliente está operativo sobre Gmail, con una **contraseña de
+aplicación** vigente en `KEYCLOAK_SMTP_PASSWORD`. La verificación se hizo el
+**2 de octubre de 2026** con envíos reales desde el flujo de "¿Olvidó tu
+contraseña?" y desde el alta de un profesional, **capturando el MIME generado**
+para comprobar que el tema renderiza y que el `Reply-To` sale efectivamente.
 
 | Correo | Quién lo dispara |
 |---|---|
 | Recuperación de contraseña (`resetPasswordAllowed`) | La persona desde "¿Olvidó su contraseña?" del login |
 | Aviso de prerregistro | El alta de un profesional en el panel (`POST /api/profesionales/alta`) |
-| Enlace de activación | El mismo aviso, con la `APP_URL` del `.env` |
-
 > **El valor nunca se versiona.** La contraseña vive solo en el `.env` local, que
 > está en `.gitignore` y no se sube al repositorio. Las tablas de arriba y el
 > `.env.example` documentan la variable, nunca su contenido.
@@ -992,6 +1082,29 @@ Con eso quedan habilitados los tres correos que manda el sistema:
 > El script es idempotente y avisa si encuentra la variable vacía. Sin ella el
 > reseteo de contraseña sigue habilitado en el realm, pero Keycloak no puede
 > enviar el correo: el resultado es que nadie recibe el mensaje.
+
+### Lo que la maqueta NO arregla
+
+Enviar desde una casilla personal y con enlaces a `.local` **se sigue viendo
+como un ejercicio local**, por más cuidada que esté la maqueta. Lo que mejora es
+todo lo que depende del código —que el mensaje se vea de una institución y no
+genérico, en español, con instrucciones claras y con las respuestas cayendo en la
+casilla correcta—, pero el mayor factor de confianza de un correo sigue siendo
+**mandar desde un dominio propio con SPF, DKIM y DMARC**: un remitente que dice
+"Vincula-UP" desde una casilla `@gmail.com` personal tiene exactamente la forma de
+un phishing, y ninguna plantilla lo arregla.
+
+Hoy eso está bien porque el uso es local. Para una salida real hacen falta un
+dominio y un servicio de correo transaccional; queda anotado en la deuda técnica
+(§16). Cuando se haga, el cambio es de `.env` y no de código:
+
+```bash
+KEYCLOAK_SMTP_USER=vinculaup@midominio.com
+KEYCLOAK_SMTP_FROM=vinculaup@midominio.com
+KEYCLOAK_SMTP_PASSWORD=clave-del-servicio
+KEYCLOAK_SMTP_REPLY_TO=vinculaup@midominio.com
+KEYCLOAK_CONTACTO=vinculaup@midominio.com
+```
 
 > **Cómo llega el SMTP a Keycloak.** El realm importado usa
 > `${env.KEYCLOAK_SMTP_*:}` (sintaxis de Keycloak), que se resuelve contra el

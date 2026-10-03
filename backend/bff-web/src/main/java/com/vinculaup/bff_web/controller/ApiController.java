@@ -510,7 +510,7 @@ public class ApiController {
             // Aviso best-effort: si el correo no sale, el prerregistro ya quedó
             // guardado y el administrador puede avisar por otra vía. Se le devuelve
             // el resultado para que el panel no dé por hecho que el mail llegó.
-            boolean correoEnviado = notificar.avisarPrerregistro(
+            boolean correoEnviado = notificar.avisarPreregistro(
                     email,
                     nombreCompleto(object),
                     legajo,
