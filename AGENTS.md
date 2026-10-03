@@ -1,6 +1,6 @@
 # Guía para Agentes de IA (AGENTS.md)
 
-Este documento define las reglas de comportamiento, directivas de Git y convenciones que **cualquier agente de IA** (Antigravity, Cursor, Claude Code, Copilot, Windsurf, etc.) debe seguir estrictamente al interactuar con este repositorio.
+Este documento define las reglas de comportamiento, directivas de Git y convenciones que **cualquier agente de IA** (Antigravity, Cursor, Claude Code, Copilot, Windsurf, etc.) debe seguir strictly al interactuar con este repositorio.
 
 ---
 
@@ -46,7 +46,58 @@ Cada vez que el usuario solicite implementar, modificar o corregir algo:
 
 ---
 
-## 2. Contexto General del Proyecto
+## 2. Registro de Walkthroughs y Actualización de Especificaciones (MANDATORIO)
+
+Cada vez que se complete una tarea, funcionalidad o corrección relevante:
+
+1. **Registrar el Walkthrough:**
+   - Documenta el trabajo realizado en [`WALKTHROUGH.md`](file:///home/emma/Desktop/vincula-up/WALKTHROUGH.md) agregando una entrada al final o en la sección correspondiente.
+   - Incluye: Fecha, Tarea/Objetivo, Cambios principales realizados, Archivos modificados y Pasos de verificación/ejecución.
+
+2. **Actualizar Especificaciones Técnicas y Documentación (MANDATORIO):**
+   - **`ESPECIFICACION.md`:** Debe mantenerse **siempre actualizado**. Cada vez que una tarea o refactorización modifique rutas/endpoints, contratos de API, modelos de datos, flujos de autenticación, reglas de negocio o variables de entorno, es obligatorio reflejar y actualizar los cambios correspondientes en [`ESPECIFICACION.md`](file:///home/emma/Desktop/vincula-up/ESPECIFICACION.md).
+   - Si aplica, actualiza también cualquier otra especificación o documentación técnica existente en la carpeta `docs/`.
+
+---
+
+## 3. Verificación Automática y Compilación (MANDATORIO)
+
+> ⚠️ **REGLA ESTRICTA**: NUNCA des por finalizada una tarea ni afirmes que un cambio funciona sin haber ejecutado primero la compilación o pruebas de verificación.
+
+- **Backend (Spring Boot / Java):** Verifica que el microservicio afectado (o el BFF) compile limpiamente mediante su wrapper de Maven:
+  ```bash
+  ./mvnw clean compile  # (o ./mvnw test)
+  ```
+- **Frontend (Angular 22):** Verifica que la SPA compile sin errores de TypeScript ni de plantillas:
+  ```bash
+  npm run build
+  ```
+
+---
+
+## 4. Convenciones de Arquitectura y Código
+
+- **Backend (Java 21 · Spring Boot):**
+  - Mantener la separación de responsabilidades: `Controller` (BFF/Endpoints) ➔ `Service` (Lógica de negocio) ➔ `Repository/Client` (Persistencia / Comunicación entre microservicios).
+  - Usar DTOs explícitos para contratos de API y evitar exponer entidades JPA directamente.
+  - La identidad del usuario **siempre se obtiene del token JWT** en el BFF (nunca confíes en IDs enviados en el body).
+- **Frontend (Angular 22):**
+  - Usar **Components Standalone** y gestión de estado reactiva moderna mediante **Signals** (evitar RxJS donde Signals sea más simple y directo).
+  - Mantener los servicios HTTP centralizados en `core/services/`.
+
+---
+
+## 5. Manejo Estricto de Secretos y Entorno
+
+- **Variables de Entorno (`.env`):**
+  - NUNCA incluyas valores del `.env` en los commits ni expongas contraseñas / claves reales en la documentación o código público.
+  - Si agregas una nueva variable de entorno requerida, regístrala siempre en `.env.example` con un valor de demostración/dummy y documenta su propósito en [`ESPECIFICACION.md`](file:///home/emma/Desktop/vincula-up/ESPECIFICACION.md).
+- **Infraestructura (`docker-compose.yml`):**
+  - No alteres los nombres de servicio, redes o puertos publicados a menos que la tarea lo requiera explícitamente.
+
+---
+
+## 6. Contexto General del Proyecto
 
 - **Nombre:** Vincula-UP
 - **Backend:** Java 21 · Spring Boot (microservicios detrás de un BFF).
