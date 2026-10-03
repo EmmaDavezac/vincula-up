@@ -271,10 +271,7 @@ export class AdminProfessionals {
 	 * quién ponerle la clave, así que ahí no se ofrece el reenvío.
 	 */
 	puedeReenviarse(profesional: AdminProfessional): boolean {
-		if ((profesional.estado ?? '').toUpperCase() !== 'CARGADO') {
-			return false;
-		}
-		return !this.invitacionPendiente(profesional);
+		return (profesional.estado ?? '').toUpperCase() === 'CARGADO';
 	}
 
 	/**

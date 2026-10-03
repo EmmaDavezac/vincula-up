@@ -29,3 +29,9 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
     - Obligación de actualizar [WALKTHROUGH.md](file:///home/emma/Desktop/vincula-up/WALKTHROUGH.md) y [ESPECIFICACION.md](file:///home/emma/Desktop/vincula-up/ESPECIFICACION.md).
   - Se creó y estructuró el historial centralizado en [WALKTHROUGH.md](file:///home/emma/Desktop/vincula-up/WALKTHROUGH.md).
 - **Verificación:** Documentos revisados y validados.
+
+### [2026-10-03] - Corrección de visibilidad para botón "Reenviar invitación" a profesionales
+- **Objetivo:** Permitir que los administradores puedan ver y accionar el botón "Reenviar invitación" para profesionales en estado `CARGADO` (preregistro/alta previa).
+- **Cambios realizados:**
+  - Modificado [admin-professionals.ts](file:///home/emma/Desktop/vincula-up/frontend/vincula-up-web/src/app/admin/admin-professionals/admin-professionals.ts) para corregir el método `puedeReenviarse`, asegurando que no descarte perfiles en estado `CARGADO` que ya cuentan con usuario/email asignado en el sistema.
+- **Verificación:** Compilación limpia del frontend Angular mediante `npm run build`.
