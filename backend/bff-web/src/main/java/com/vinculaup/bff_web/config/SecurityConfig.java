@@ -67,6 +67,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.DELETE, "/api/especialidades/*", "/api/usuarios/*").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/profesionales").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/profesionales/alta").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/profesionales/*/reenviar-invitacion").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/api/profesionales/*/suspender").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/api/profesionales/*/reactivar").hasRole("ADMIN")
                 // Cualquier rol: es la aceptación de los términos, que se le pide a

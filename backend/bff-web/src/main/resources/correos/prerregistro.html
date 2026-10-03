@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
-  Correo de aviso de prerregistro: el que manda el BFF cuando el administrador
-  da de alta a un profesional en el padrón.
+  Correo de alta: el que manda el BFF cuando el administrador da de alta a un
+  profesional, con su contraseña temporal y los pasos de activación.
 
   Por qué es un archivo y no una cadena en Java: porque es diseño, no lógica.
   Se edita, se relee y se compara con git sin tocar código ni recompilar.
@@ -9,8 +9,9 @@
 
   Marcadores que reemplaza NotificacionService:
     {{SALUDO}}   nombre del profesional, ya escapado ("Luciano, ")
-    {{DATOS}}    filas <tr> con legajo y especialidad
-    {{EMAIL}}    el correo con el que tiene que registrarse
+    {{DATOS}}    filas <tr> con legajo, especialidad y contraseña temporal
+    {{EMAIL}}    el correo con el que entra (es su nombre de usuario)
+    {{PASSWORD}} contraseña temporal que deberá cambiar en el primer ingreso
     {{APP_URL}}  base pública de la app
     {{CONTACTO}} frase del pie con la casilla institucional (puede ir vacía)
 
@@ -59,7 +60,7 @@
 
     <p style="margin:0 0 16px 0;">Hola {{SALUDO}}</p>
 
-    <p style="margin:0 0 16px 0;">Ya tenés tu lugar en la <strong>red técnica de oficios</strong> de la Universidad Popular de Concepción del Uruguay. Estos son los datos de tu prerregistro:</p>
+    <p style="margin:0 0 16px 0;">Ya tenés tu lugar en la <strong>red técnica de oficios</strong> de la Universidad Popular de Concepción del Uruguay. Te creamos la cuenta para que no tengas que registrarte. Estos son tus datos de acceso:</p>
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="vu-dato vu-borde" style="background-color:#f3f5f1; border:1px solid #d8d8ce; border-radius:8px; margin:0 0 24px 0;">
       <tr><td style="padding:16px 18px;">
@@ -71,13 +72,13 @@
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;">
       <tr><td width="28" style="padding:5px 0; vertical-align:top;" class="vu-texto"><strong style="color:#1e2926;">1.</strong></td><td style="padding:5px 0;">Entrá en <a href="{{APP_URL}}/activar-perfil" style="color:#c34f3d;">{{APP_URL}}/activar-perfil</a></td></tr>
-      <tr><td width="28" style="padding:5px 0; vertical-align:top;" class="vu-texto"><strong style="color:#1e2926;">2.</strong></td><td style="padding:5px 0;">Iniciá sesión. Si todavía no tenés cuenta, creála con este correo: <strong class="vu-texto" style="color:#1e2926;">{{EMAIL}}</strong></td></tr>
+      <tr><td width="28" style="padding:5px 0; vertical-align:top;" class="vu-texto"><strong style="color:#1e2926;">2.</strong></td><td style="padding:5px 0;">Iniciá sesión con tu correo (<strong class="vu-texto" style="color:#1e2926;">{{EMAIL}}</strong>) y la contraseña temporal de arriba. El sistema te va a pedir que la cambies por una propia.</td></tr>
       <tr><td width="28" style="padding:5px 0; vertical-align:top;" class="vu-texto"><strong style="color:#1e2926;">3.</strong></td><td style="padding:5px 0;">Completá tu perfil: foto, zona de cobertura y horarios.</td></tr>
     </table>
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="vu-dato" style="background-color:#f3f5f1; border-left:3px solid #e35f43; border-radius:0 4px 4px 0; margin:0 0 24px 0;">
       <tr><td style="padding:14px 16px;">
-        <p class="vu-texto" style="color:#1e2926; font-size:13px; line-height:1.6; margin:0;">Usá <strong>exactamente</strong> esa dirección: es con la que encontramos tu prerregistro.</p>
+        <p class="vu-texto" style="color:#1e2926; font-size:13px; line-height:1.6; margin:0;">La contraseña de arriba es <strong>temporal</strong>: definí una propia en el primer ingreso. No vence, podés usarla cuando puedas.</p>
       </td></tr>
     </table>
 

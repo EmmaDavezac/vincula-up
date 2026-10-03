@@ -12,19 +12,19 @@ import org.springframework.stereotype.Service;
 /**
  * Avisos por correo al profesional.
  * <p>
- * Hoy el único aviso es el de prerregistro: el administrador da de alta a un
- * profesional en el padrón y ese correo le avisa que ya tiene un lugar en la red
- * y cómo activar su perfil. Reutiliza el mismo SMTP que Keycloak (para el
+ * Hoy el único aviso es el de alta: el administrador da de alta a un profesional
+ * y ese correo le entrega el acceso (su correo y una contraseña temporal) y los
+ * pasos para activar su perfil. Reutiliza el mismo SMTP que Keycloak (para el
  * reseteo de contraseña), de modo que no hay credenciales duplicadas.
  * <p>
  * Es best-effort, igual que la promoción de roles: si el SMTP no está
- * configurado o el servidor rechaza el mensaje, el prerregistro queda guardado
+ * configurado o el servidor rechaza el mensaje, la cuenta queda creada igual
  * y se registra el motivo en el log. Dar de alta a un profesional no puede
  * fallar porque un correo no salió.
  * <p>
  * <b>Por qué sale en HTML y no solo en texto plano.</b> Un correo pelado, sin
  * marca y sin formato, se lee como un mensaje automático cualquiera, y en el
- * caso del prerregistro eso es justo lo que más importa: el profesional no
+ * caso del alta eso es justo lo que más importa: el profesional no
  * sabe si es real o si es phishing. El HTML usa la misma paleta que la
  * aplicación y la maqueta vive en {@code prerregistro.html}, al lado de este
  * archivo, para poder editar el diseño sin tocar el código.
@@ -76,54 +76,59 @@ public class NotificacionService {
     }
 
     /**
-     * Avisa al profesional que el administrador lo prerregistró.
+     * Avisa al profesional que el administrador le creó la cuenta.
      * <p>
      * El texto va en términos del servicio y no de la implementación: el
-     * profesional no tiene por qué saber con qué sistema se guarda su
-     * prerregistro, y decirlo le da información que no necesita.
+     * profesional no tiene por qué saber con qué sistema se administra su cuenta,
+     * y decirlo le da información que no necesita.
      * <p>
-     * Lo importante es que el correo explique el paso que más se confunde:
-     * entrar no alcanza, hace falta tener cuenta <b>con ese mismo correo</b>.
-     * Es la clave con la que se lo encuentra, y por eso el correo se repite.
+     * Lo importante es que el correo entregue el acceso sin pedirle que se
+     * registre: ya tiene cuenta, con una contraseña temporal que el sistema le
+     * exige cambiar en el primer ingreso. Por eso el correo la incluye y explica
+     * que no vence.
      *
-     * @param email        correo del profesional (es el que usó el administrador
-     *                     al cargarlo en el padrón)
-     * @param nombre       nombre con el que se lo ve en la aplicación
-     * @param legajo       legajo asignado en el padrón
-     * @param especialidad nombre de la especialidad elegida
+     * @param email            correo del profesional (es el que usó el administrador
+     *                         al cargarlo en el padrón y su nombre de usuario)
+     * @param nombre           nombre con el que se lo ve en la aplicación
+     * @param legajo           legajo asignado en el padrón
+     * @param especialidad     nombre de la especialidad elegida
+     * @param passwordTemporal contraseña de un solo uso que deberá cambiar al entrar
      * @return {@code true} si el correo salió. Es best-effort: si no se pudo
-     *         enviar, el prerregistro queda igual y se le avisa al
-     *         administrador.
+     *         enviar, la cuenta queda igual y el panel le muestra la contraseña al
+     *         administrador para que la pase por otra vía.
      */
-    public boolean avisarPreregistro(String email, String nombre, String legajo, String especialidad) {
+    public boolean avisarAltaProfesional(String email, String nombre, String legajo, String especialidad, String passwordTemporal) {
         if (email == null || email.isBlank()) {
-            log.warn("No se pudo avisar el prerregistro: el profesional no tiene email");
+            log.warn("No se pudo avisar el alta: el profesional no tiene email");
             return false;
         }
         String saludo = (nombre == null || nombre.isBlank()) ? "" : nombre.strip() + ", ";
-        return enviar(email, "Vincula-UP · Tu prerregistro como profesional",
-                cuerpoTextoPlano(saludo, email, legajo, especialidad),
-                cuerpoHtml(saludo, email, legajo, especialidad));
+        return enviar(email, "Vincula-UP · Tu cuenta de profesional está lista",
+                cuerpoTextoPlano(saludo, email, legajo, especialidad, passwordTemporal),
+                cuerpoHtml(saludo, email, legajo, especialidad, passwordTemporal));
     }
+
     /**
      * Versión en texto plano del mismo aviso.
      */
-    private String cuerpoTextoPlano(String saludo, String email, String legajo, String especialidad) {
+    private String cuerpoTextoPlano(String saludo, String email, String legajo, String especialidad, String passwordTemporal) {
         StringBuilder cuerpo = new StringBuilder();
         cuerpo.append("Hola ").append(saludo).append("\n\n")
                 .append("Ya tenés tu lugar en la red técnica de oficios de la Universidad Popular de Concepción del Uruguay.\n\n")
-                .append("Tu prerregistro:\n")
+                .append("Creamos tu cuenta para que no tengas que registrarte. Tus datos de acceso:\n")
                 .append("  · Legajo: ").append(legajo).append('\n');
         if (especialidad != null && !especialidad.isBlank()) {
             cuerpo.append("  · Especialidad: ").append(especialidad).append('\n');
         }
-        cuerpo.append('\n')
-                .append("Para aparecer en el padrón y recibir solicitudes te falta activar tu perfil.\n\n")
+        cuerpo.append("  · Correo: ").append(email).append('\n')
+                .append("  · Contraseña temporal: ").append(passwordTemporal).append('\n')
+                .append('\n')
+                .append("Para aparecer en el padrón y recibir solicitudes te falta activar tu perfil. Son tres pasos:\n\n")
                 .append("  1. Entrá en ").append(appUrl).append("/activar-perfil\n")
-                .append("  2. Iniciá sesión. Si todavía no tenés una cuenta, creala con este correo:\n")
-                .append("     ").append(email).append('\n')
+                .append("  2. Iniciá sesión con tu correo y la contraseña temporal de arriba.\n")
+                .append("     El sistema te va a pedir que la cambies por una propia.\n")
                 .append("  3. Completá tu perfil: foto, zona de cobertura y horarios.\n\n")
-                .append("Usá exactamente esa dirección: es con la que encontramos tu prerregistro.\n\n")
+                .append("Por seguridad, definí tu contraseña propia en el primer ingreso.\n\n")
                 .append("--\n")
                 .append("Vincula-UP · Universidad Popular de Concepción del Uruguay\n");
         if (!contacto.isEmpty()) {
@@ -133,19 +138,21 @@ public class NotificacionService {
     }
 
     /**
-     * Versión HTML del aviso: carga la plantilla y le coloca los datos del
-     * prerregistro.
+     * Versión HTML del aviso: carga la plantilla y le coloca los datos del alta.
      */
-    private String cuerpoHtml(String saludo, String email, String legajo, String especialidad) {
+    private String cuerpoHtml(String saludo, String email, String legajo, String especialidad, String passwordTemporal) {
         if (plantilla == null || plantilla.isBlank()) {
             // Sin maqueta, mejor un correo de texto legible que uno vacío.
-            return "<html><body><p>Vincula-UP: tu prerregistro quedó registrado. "
-                    + "Entrá en " + escapar(appUrl) + "/activar-perfil para activarlo.</p></body></html>";
+            return "<html><body><p>Vincula-UP: creamos tu cuenta de profesional. "
+                    + "Entrá en " + escapar(appUrl) + "/activar-perfil con el correo " + escapar(email)
+                    + " y la contraseña temporal " + escapar(passwordTemporal)
+                    + " (te vamos a pedir cambiarla), y activá tu perfil.</p></body></html>";
         }
         return plantilla
                 .replace("{{SALUDO}}", escapar(saludo))
-                .replace("{{DATOS}}", filasDatos(legajo, especialidad))
+                .replace("{{DATOS}}", filasDatos(legajo, especialidad, passwordTemporal))
                 .replace("{{EMAIL}}", escapar(email))
+                .replace("{{PASSWORD}}", escapar(passwordTemporal))
                 .replace("{{APP_URL}}", escapar(appUrl))
                 .replace("{{CONTACTO}}", lineaContacto());
     }
@@ -155,7 +162,7 @@ public class NotificacionService {
      * no en la plantilla porque depende de los datos: la especialidad puede o
      * no venir.
      */
-    private String filasDatos(String legajo, String especialidad) {
+    private String filasDatos(String legajo, String especialidad, String passwordTemporal) {
         StringBuilder filas = new StringBuilder();
         filas.append("<tr><td style=\"padding:4px 0;\">Legajo</td>")
                 .append("<td align=\"right\" style=\"padding:4px 0;\"><strong>")
@@ -165,6 +172,9 @@ public class NotificacionService {
                     .append("<td align=\"right\" style=\"padding:4px 0;\"><strong>")
                     .append(escapar(especialidad)).append("</strong></td></tr>");
         }
+        filas.append("<tr><td style=\"padding:4px 0;\">Contraseña temporal</td>")
+                .append("<td align=\"right\" style=\"padding:4px 0;\"><strong>")
+                .append(escapar(passwordTemporal)).append("</strong></td></tr>");
         return filas.toString();
     }
 
