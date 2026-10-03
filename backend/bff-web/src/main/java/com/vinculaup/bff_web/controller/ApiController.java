@@ -488,7 +488,7 @@ public class ApiController {
                     "Ese correo ya está en uso. Elegí otro.");
         }
         // Y si Keycloak ya tiene la cuenta, tampoco se puede volver a crear.
-        if (keycloakAdmin.existeUsuarioPorEmail(email)) {
+        if (keycloakAdmin.buscarUsuarioPorEmail(email).isPresent()) {
             throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT,
                     "Ese correo ya está en uso. Elegí otro.");
         }
@@ -564,6 +564,84 @@ public class ApiController {
     public ResponseEntity<JsonNode> buscarUsuarioPorEmail(@RequestParam String email) {
         JsonNode usuario = gateway.buscarUsuarioPorEmail(email);
         return usuario == null ? ResponseEntity.noContent().build() : ResponseEntity.ok(usuario);
+    }
+
+    /**
+     * Reenvía la invitación a un profesional que perdió su contraseña temporal
+     * antes de entrar por primera vez. Emite una clave nueva, la pone como
+     * temporal en Keycloak (vuelve a exigir el cambio al entrar) y avisa por
+     * correo con los mismos pasos del alta.
+     * <p>
+     * Best-effort como el alta: si el correo no sale, la respuesta trae igual
+     * la contraseña para que el panel se la muestre al administrador y la pase
+     * por otra vía. Sólo funciona antes del primer ingreso: si la persona ya
+     * entró y definió su propia clave, ese acceso no se toca.
+     */
+    @PostMapping("/profesionales/{id}/reenviar-invitacion")
+    public JsonNode reenviarInvitacion(@PathVariable UUID id) {
+        var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
+
+        JsonNode perfil = gateway.buscarProfesionalPorIdOUsuario(id);
+        if (perfil == null || !perfil.isObject() || !perfil.hasNonNull("usuarioId")) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Profesional no encontrado");
+        }
+        UUID usuarioId;
+        try {
+            usuarioId = UUID.fromString(perfil.get("usuarioId").asText());
+        } catch (IllegalArgumentException ex) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Profesional no encontrado");
+        }
+        JsonNode usuario = gateway.buscarUsuarioPorId(usuarioId);
+        if (usuario == null || !usuario.isObject()) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Profesional no encontrado");
+        }
+        String keycloakIdTexto = usuario.path("keycloakId").asText("").trim();
+        if (keycloakIdTexto.isEmpty()) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT,
+                    "Ese profesional todavía no tiene cuenta: dalo de alta de nuevo.");
+        }
+        UUID keycloakId;
+        try {
+            keycloakId = UUID.fromString(keycloakIdTexto);
+        } catch (IllegalArgumentException ex) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT,
+                    "La cuenta vinculada no es válida: dalo de alta de nuevo.");
+        }
+
+        String email = usuario.path("email").asText("").trim();
+        if (email.isEmpty()) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT,
+                    "Ese profesional no tiene correo para avisarle.");
+        }
+        // Si la cuenta de Keycloak se perdió por fuera (consola, otro alta), no
+        // hay a quién ponerle la clave: mejor fallar claro que dejar un 200 falso.
+        if (keycloakAdmin.buscarUsuarioPorEmail(email).map(cuenta -> !cuenta.equals(keycloakId)).orElse(true)) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT,
+                    "La cuenta ya no existe: dalo de alta de nuevo.");
+        }
+        // Si ya entró y definió su propia clave, el acceso es suyo: reenviar le
+        // rompería el ingreso. Sólo se reemite antes del primer acceso.
+        if (Boolean.FALSE.equals(keycloakAdmin.tieneAccionPendiente(keycloakId, "UPDATE_PASSWORD"))) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT,
+                    "Ese profesional ya activó su cuenta: no hace falta reenviar la invitación.");
+        }
+
+        String passwordTemporal = com.vinculaup.bff_web.service.PasswordTemporal.generar();
+        if (!keycloakAdmin.resetearContrasenaTemporal(keycloakId, passwordTemporal)) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "No se pudo reemitir la invitación. Intentá de nuevo.");
+        }
+        String nombre = (usuario.path("nombre").asText("") + " " + usuario.path("apellido").asText("")).trim();
+        boolean correoEnviado = notificar.avisarAltaProfesional(
+                email, nombre, perfil.path("legajo").asText(""), primeraEspecialidad(perfil), passwordTemporal);
+
+        var respuesta = mapper.createObjectNode();
+        respuesta.put("correoEnviado", correoEnviado);
+        respuesta.put("passwordTemporal", passwordTemporal);
+        return respuesta;
     }
 
     /**

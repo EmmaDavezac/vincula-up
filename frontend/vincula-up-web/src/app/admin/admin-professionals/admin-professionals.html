@@ -87,6 +87,17 @@
 							<vu-icon name="eye" [size]="14" />
 							Consultar
 						</button>
+						@if (puedeReenviarse(professional)) {
+							<button
+								type="button"
+								class="vu-btn vu-btn--quiet vu-btn--sm"
+								(click)="reenviarInvitacion(professional)"
+								[disabled]="busyId() === professional.id"
+							>
+								<vu-icon name="mail" [size]="14" />
+								{{ busyId() === professional.id ? 'Reenviando...' : 'Reenviar invitación' }}
+							</button>
+						}
 					</div>
 				</article>
 			}
@@ -237,6 +248,21 @@
 					</p>
 				}
 			</div>
+
+				@if (puedeReenviarse(abierto.profesional)) {
+					<button
+						type="button"
+						class="vu-btn vu-btn--outline vu-btn--block"
+						(click)="reenviarInvitacion(abierto.profesional)"
+						[disabled]="busyId() === abierto.profesional.id"
+					>
+						<vu-icon name="mail" [size]="14" />
+						{{ busyId() === abierto.profesional.id ? 'Reenviando invitación...' : 'Reenviar invitación' }}
+					</button>
+					<p class="admin-professionals__modal-hint">
+						Emite una contraseña temporal nueva y se la envía por correo. La anterior deja de servir.
+					</p>
+				}
 
 			@if (abierto.modo !== 'edicion') {
 				<button type="button" class="vu-btn vu-btn--outline vu-btn--block" (click)="cerrarDetalle()">Cerrar</button>

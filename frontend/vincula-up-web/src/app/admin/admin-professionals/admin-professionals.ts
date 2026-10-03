@@ -265,6 +265,59 @@ export class AdminProfessionals {
 
 	// ── Estado y baja ─────────────────────────────────────────────────────
 
+	/**
+	 * El profesional todavía no activó su perfil: el padrón lo muestra
+	 * pendiente (CARGADO) y ya tiene cuenta vinculada. Sin cuenta no hay a
+	 * quién ponerle la clave, así que ahí no se ofrece el reenvío.
+	 */
+	puedeReenviarse(profesional: AdminProfessional): boolean {
+		if ((profesional.estado ?? '').toUpperCase() !== 'CARGADO') {
+			return false;
+		}
+		return !this.invitacionPendiente(profesional);
+	}
+
+	/**
+	 * Reenvío de la invitación: pide confirmación porque la clave anterior
+	 * deja de servir en cuanto se emite la nueva.
+	 */
+	reenviarInvitacion(profesional: AdminProfessional): void {
+		if (!this.puedeReenviarse(profesional)) {
+			return;
+		}
+		this.confirmacion.set({
+			titulo: 'Reenviar la invitación',
+			mensaje: `¿Querés emitir una contraseña nueva para ${this.nombre(profesional)}?`,
+			detalle:
+				'La contraseña anterior deja de servir y el profesional recibe la nueva por correo con los pasos para activar su perfil.',
+			confirmar: 'Reenviar invitación',
+			icono: 'mail',
+			ejecutar: () => this.ejecutarReenvio(profesional),
+		});
+	}
+
+	private ejecutarReenvio(profesional: AdminProfessional): void {
+		this.busyId.set(profesional.id);
+		this.api.reenviarInvitacion(profesional.id).pipe(
+			catchError((error) => {
+				this.busyId.set(null);
+				this.aviso.set(avisoError(this.api.describeError(error, 'No se pudo reenviar la invitación.')));
+				return of(null);
+			}),
+		).subscribe((resultado) => {
+			this.busyId.set(null);
+			if (!resultado) return;
+			const clave = resultado.passwordTemporal
+				? ` Nueva contraseña temporal: ${resultado.passwordTemporal} (debe cambiarla al entrar).`
+				: '';
+			this.aviso.set(
+				resultado.correoEnviado
+					? avisoExito(`Le enviamos por correo la contraseña nueva a ${this.nombre(profesional)}.`)
+					: avisoError(`No se pudo enviar el correo a ${this.nombre(profesional)}.${clave}`),
+			);
+		});
+	}
+
 	readonly busyId = signal<string | null>(null);
 
 	/**

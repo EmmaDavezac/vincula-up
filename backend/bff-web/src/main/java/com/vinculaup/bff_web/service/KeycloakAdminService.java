@@ -184,14 +184,14 @@ public class KeycloakAdminService {
         }
     }
 
-    /** ¿Existe ya una cuenta en Keycloak con ese correo? (para rechazar duplicados). */
-    public boolean existeUsuarioPorEmail(String email) {
+    /** Id de la cuenta de Keycloak con ese correo, si existe (busqueda exacta). */
+    public Optional<UUID> buscarUsuarioPorEmail(String email) {
         if (!habilitado() || email == null || email.isBlank()) {
-            return false;
+            return Optional.empty();
         }
         Optional<String> token = token();
         if (token.isEmpty()) {
-            return false;
+            return Optional.empty();
         }
         try {
             JsonNode usuarios = client.get()
@@ -202,10 +202,96 @@ public class KeycloakAdminService {
                     .header(AUTHORIZATION, bearer(token.get()))
                     .retrieve()
                     .body(JsonNode.class);
-            return usuarios != null && usuarios.isArray() && !usuarios.isEmpty();
+            if (usuarios == null || !usuarios.isArray() || usuarios.isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.of(UUID.fromString(usuarios.get(0).path("id").asText()));
         } catch (RuntimeException ex) {
             // Ante la duda no se bloquea el alta: ms-usuarios igual rechaza el email duplicado.
             log.warn("No se pudo consultar en Keycloak si existe {}: {}", email, ex.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * ¿La cuenta tiene una acción requerida pendiente (por ejemplo
+     * {@code UPDATE_PASSWORD})? Devuelve {@code null} cuando no se pudo leer la
+     * cuenta, para no confundir un fallo de red con "ya activó".
+     */
+    public Boolean tieneAccionPendiente(UUID keycloakUserId, String accion) {
+        if (!habilitado() || keycloakUserId == null || accion == null || accion.isBlank()) {
+            return null;
+        }
+        Optional<String> token = token();
+        if (token.isEmpty()) {
+            return null;
+        }
+        try {
+            JsonNode cuenta = client.get()
+                    .uri("/admin/realms/{realm}/users/{id}", realm, keycloakUserId)
+                    .header(AUTHORIZATION, bearer(token.get()))
+                    .retrieve()
+                    .body(JsonNode.class);
+            if (cuenta == null || !cuenta.isObject()) {
+                return null;
+            }
+            for (JsonNode pendiente : cuenta.path("requiredActions")) {
+                if (accion.equalsIgnoreCase(pendiente.asText(""))) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (RuntimeException ex) {
+            log.warn("No se pudo leer las acciones pendientes de {}: {}", keycloakUserId, ex.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Emite la contraseña temporal recibida para una cuenta existente.
+     * <p>
+     * Es el "reenviar invitación" del panel: deja la clave como temporal con
+     * {@code UPDATE_PASSWORD} pendiente. La contraseña la genera el controlador
+     * (igual que en el alta), así este servicio sólo la aplica y la confirma.
+     *
+     * @return {@code true} si la clave quedó aplicada en Keycloak.
+     */
+    public boolean resetearContrasenaTemporal(UUID keycloakUserId, String passwordTemporal) {
+        if (!habilitado() || keycloakUserId == null
+                || passwordTemporal == null || passwordTemporal.isBlank()) {
+            return false;
+        }
+        Optional<String> token = token();
+        if (token.isEmpty()) {
+            return false;
+        }
+        try {
+            var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
+            var credencial = mapper.createObjectNode();
+            credencial.put("type", "password");
+            credencial.put("value", passwordTemporal);
+            credencial.put("temporary", true);
+            client.put()
+                    .uri("/admin/realms/{realm}/users/{id}/reset-password", realm, keycloakUserId)
+                    .header(AUTHORIZATION, bearer(token.get()))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(credencial)
+                    .retrieve()
+                    .toBodilessEntity();
+            var cuerpo = mapper.createObjectNode();
+            cuerpo.putArray("requiredActions").add("UPDATE_PASSWORD");
+            client.put()
+                    .uri("/admin/realms/{realm}/users/{id}", realm, keycloakUserId)
+                    .header(AUTHORIZATION, bearer(token.get()))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(cuerpo)
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("Contraseña temporal reemitida en Keycloak para el usuario {}", keycloakUserId);
+            return true;
+        } catch (RuntimeException ex) {
+            log.warn("No se pudo reemitir la contraseña temporal para {}: {}",
+                    keycloakUserId, ex.getMessage());
             return false;
         }
     }
