@@ -134,63 +134,61 @@
 			<!-- ── Paso 2: Zona y GPS ── -->
 			@if (step() === 2) {
 				<div class="activation__card">
-					<label class="vu-label">
-						Domicilio o ubicación <span class="vu-required">obligatorio</span>
-						<input
-							id="zone-query-input"
-							name="zoneQuery"
-							class="vu-input zone__input"
-							[ngModel]="zoneQuery()"
-							(ngModelChange)="onZoneQueryChange($event)"
-							(blur)="hideSuggestionsLater()"
-							placeholder="Ingresá tu domicilio o ubicación"
-							autocomplete="off"
-						/>
-					</label>
-
 					@if (locationError()) {
-						<p class="activation__error" role="alert">{{ locationError() }}</p>
+						<p class="vu-alert vu-alert--error" role="alert">{{ locationError() }}</p>
 					}
 
-					@if (locationSuggestionOpen() && locationSuggestions().length) {
-						<ul class="zone__suggestions">
-							@for (item of locationSuggestions(); track item.displayName) {
-								<li>
-									<button type="button" (click)="selectSuggestion(item)">{{ item.displayName }}</button>
-								</li>
-							}
-						</ul>
-					}
+					<p class="location-field__label">
+						<span>¿Dónde tenés tu domicilio o base? <span class="vu-required">obligatorio</span></span>
+					</p>
+					<div class="location-field">
+						<div class="location-field__row">
+							<div class="vu-field-with-icon location-field__input">
+								<vu-icon name="search" [size]="17" class="vu-field-icon" />
+								<span class="vu-sr-only">Buscar domicilio o ubicación</span>
+								<input
+									id="zone-query-input"
+									name="zoneQuery"
+									class="vu-input vu-input--search"
+									[ngModel]="zoneQuery()"
+									(ngModelChange)="onZoneQueryChange($event)"
+									(blur)="hideSuggestionsLater()"
+									placeholder="Ingresá una calle, altura y ciudad"
+									autocomplete="off"
+								/>
+							</div>
+							<button
+								type="button"
+								class="location-gps"
+								[class.is-active]="validatedLocation()"
+								(click)="detectDeviceGps()"
+								[attr.aria-label]="validatedLocation() ? 'Mi ubicación: ' + validatedLocation()?.displayName : 'Usar mi ubicación'"
+								[title]="validatedLocation()?.displayName || 'Usar mi ubicación'"
+							>
+								<vu-icon name="navigation" [size]="18" class="location-gps__icon" />
+								<span class="location-gps__label">Mi ubicación</span>
+							</button>
+						</div>
 
-					<!--
-						Antes esto era un `<div class="vu-map">`: tres `linear-gradient`
-						y un pin de CSS que imitaban un mapa sin serlo. Ahora es un
-						Leaflet real, en modo lectura: muestra dónde quedó el punto
-						elegido y sirve de referencia, mientras el ajuste fino se hace
-						en el modal de abajo.
-					-->
-					<div id="zone-map" class="zone__map" role="application" aria-label="Vista de la zona de cobertura elegida"></div>
-
-					<div class="zone__tools">
-						<button type="button" class="vu-btn vu-btn--outline vu-btn--block" (click)="openMapPicker()">
-							<vu-icon name="map-pin" [size]="16" />
-							Ajustar en el mapa
-						</button>
-						<button type="button" class="vu-btn vu-btn--outline vu-btn--block" (click)="detectDeviceGps()">
-							<vu-icon name="navigation" [size]="16" />
-							Usar mi ubicación
-						</button>
-						<button type="button" class="vu-btn vu-btn--quiet vu-btn--block" (click)="validateCurrentZone()">
-							{{ validatingLocation() ? 'Verificando...' : 'Verificar la dirección escrita' }}
-						</button>
+						@if (locationSuggestionOpen() && locationSuggestions().length) {
+							<ul class="suggestions">
+								@for (item of locationSuggestions(); track item.displayName) {
+									<li>
+										<button type="button" (click)="selectSuggestion(item)">{{ item.displayName }}</button>
+									</li>
+								}
+							</ul>
+						}
 					</div>
 
-					@if (validatedLocation()) {
-						<p class="zone__ok">
-							<vu-icon name="map-pin" [size]="18" />
-							Ubicación lista para tu perfil
+					<!-- Mapa interactivo Leaflet alineado al estilo de solicitud -->
+					<div class="step-map">
+						<div id="zone-map" class="zone__map" role="application" aria-label="Vista de la zona de cobertura elegida"></div>
+						<p class="step-map__caption">
+							<vu-icon name="map-pin" [size]="14" />
+							Arrastrá el marcador en el mapa para ajustar el punto exacto de tu base.
 						</p>
-					}
+					</div>
 
 					<div class="zone__radius">
 						<div class="zone__radius-head">
@@ -211,6 +209,8 @@
 							<span>50 km</span>
 						</div>
 					</div>
+
+					<p class="privacy-note">Tu zona de cobertura define a qué solicitudes de clientes podés acceder y responder.</p>
 				</div>
 			}
 

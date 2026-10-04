@@ -117,31 +117,32 @@ export class Activation {
     if (!this.zoneMapInstance) {
       this.zoneMapInstance = L.map('zone-map', {
         attributionControl: true,
-        dragging: false,
-        doubleClickZoom: false,
-        keyboard: false,
-        scrollWheelZoom: false,
-        zoomControl: false,
-      }).setView([loc.lat, loc.lng], 13);
+        dragging: true,
+        doubleClickZoom: true,
+        keyboard: true,
+        scrollWheelZoom: true,
+        zoomControl: true,
+      }).setView([loc.lat, loc.lng], 14);
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '© OpenStreetMap contributors',
       }).addTo(this.zoneMapInstance);
 
-      // `L.circleMarker` y no `L.marker`: el marcador clásico de Leaflet es una
-      // imagen que se rompe si no se resuelve la ruta de sus PNG, y acá no hay
-      // bundler resolviendo nada. El color va como atributo SVG, así que no
-      // puede leer el token `--coral`: se copia su valor (#e35f43).
-      this.zoneMapMarker = L.circleMarker([loc.lat, loc.lng], {
-        color: '#e35f43',
-        fillColor: '#e35f43',
-        fillOpacity: 0.9,
-        radius: 9,
-        weight: 2,
-      }).addTo(this.zoneMapInstance);
+      this.zoneMapMarker = L.marker([loc.lat, loc.lng], { draggable: true }).addTo(this.zoneMapInstance);
+
+      this.zoneMapMarker.on('dragend', (e: any) => {
+        const p = e.target.getLatLng();
+        this.validatedLocation.set({ lat: p.lat, lng: p.lng, displayName: '' });
+      });
+
+      this.zoneMapInstance.on('click', (e: any) => {
+        const { lat, lng } = e.latlng;
+        this.zoneMapMarker?.setLatLng([lat, lng]);
+        this.validatedLocation.set({ lat, lng, displayName: '' });
+      });
     } else {
-      this.zoneMapInstance.setView([loc.lat, loc.lng], 13);
+      this.zoneMapInstance.setView([loc.lat, loc.lng], 14);
       this.zoneMapMarker?.setLatLng([loc.lat, loc.lng]);
     }
 
