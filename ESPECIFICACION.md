@@ -653,6 +653,17 @@ cuentas antiguas ([§16](#16-deuda-técnica-conocida)).
 > `scripts/linux-macos/keycloak-bootstrap.sh` (o `.ps1` en Windows) — ver
 > [§14](#14-scripts-operativos).
 
+> **Los textos del import van cortos: 255 caracteres es el techo.** Las columnas
+> de texto de Keycloak 26.x en Postgres son `varchar(255)`. Si un campo del JSON
+> (por ejemplo el `description` de un client) lo supera, el import **falla
+> entero** con `ERROR: value too long for type character varying(255)`,
+> Keycloak aborta la transacción, no arranca y entra en un **loop de reinicios**
+> (`restartCount` creciendo, `exitCode=1` en los logs del contenedor). El síntoma
+> desde el host es que `http://localhost:8080` reinicia la conexión y el BFF se
+> queda sin issuer. La explicación larga de por qué `https://*` está en los
+> `redirectUris` vive en `keycloak/import/README.md`, no en el `description` del
+> client. Detalle en [§16.1](#161-prioridad-alta).
+
 ---
 
 ## 9. Los tres flujos completos
@@ -1473,17 +1484,18 @@ Pendientes conocidos. No bloquean la demo, pero conviene tenerlos fichados.
 | 4 | **`webOrigins: ["*"]`** en el client público | Permitido en demo; en producción conviene restringirlo a los orígenes reales |
 | 5 | **`redirectUris: ["https://*"]`** en el client público | Agregado para que los túneles de Cloudflare funcionen sin reconfigurar el client cada vez que `cloudflared` genera una URL nueva: Keycloak sólo matchea comodines **al final** del patrón, así que `https://*.trycloudflare.com/*` nunca matchearía (el soporte de comodines de host sigue sin mergear). `https://*` es un prefijo y matchea **cualquier** origen https, no sólo los de Cloudflare. Cerrado en producción reemplazando ese patrón por el dominio real. Mitiga que el client sea público con PKCE S256: sin el `code_verifier` el código no se cambia por tokens |
 | 6 | **`KC_HOSTNAME` vacío (hostname dinámico)** | Con `KC_HOSTNAME_STRICT=false` y sin hostname fijo, Keycloak resuelve el host desde el request, que es lo que hace que el túnel funcione. El mismo mecanismo documenta que un atacante podría manipular el `Host` para falsificar los enlaces de recuperación de contraseña. Cerrado fijando `KEYCLOAK_HOSTNAME` en `.env` al dominio propio y con un proxy delante que no acepte `Host` arbitrarios |
+| 7 | **Textos del import sin control de longitud** | Las columnas de texto de Keycloak 26.x en Postgres son `varchar(255)`. Un `description` de 377 caracteres en `keycloak/import/vincula-up-realm.json` hizo fallar el import entero (`value too long for type character varying(255)`), con Keycloak en loop de reinicios y el BFF sin issuer. Hoy está corregido (231 caracteres), pero el JSON no tiene ninguna validación que lo impida: cualquier texto nuevo que pase de 255 rompe el arranque del stack de la misma forma. Mitigable con un check en CI que recorra el JSON y valide la longitud de cada string |
 
 ### 16.2 Prioridad media
 
 | # | Deuda | Impacto |
 |---|---|---|
-| 7 | **`verifyEmail: false`** | Nadie confirma que la dirección sea suya. Con el alta nueva el profesional no se auto-registra, así que el riesgo queda sobre todo en los clientes que se registran solos. Cerrarlo requiere `verifyEmail: true` en el realm **y** `docker compose down -v`; además rompe las cuentas `@vincula-up.local` de prueba, que no son entregables |
-| 8 | **H2 por defecto en desarrollo** | Sin `DATABASE_URL`, los datos se pierden al reiniciar y el comportamiento difiere de producción |
-| 9 | **CORS con lista de orígenes fija** | `SecurityConfig.java` enumera los orígenes. Agregar un dominio es tocar código |
-| 10 | **Geocodificación puede resolver a otra ciudad** | Nominatim a veces devuelve un lugar homónimo: una dirección de Concepción del Uruguay terminó en Entre Ríos, Argentina. Es un comportamiento del servicio público, no del código; convendría validar el país del resultado |
-| 11 | **Sin reenvío de la invitación** | Si el profesional pierde la contraseña temporal antes de entrar, no hay acción para emitir una nueva (`resetearContrasenaTemporal` está prevista pero **no implementada** en `KeycloakAdminService`) y hay que hacerlo desde la consola de Keycloak o dar de alta de nuevo |
-| 12 | **La contraseña temporal siempre sale en la respuesta** | `POST /api/profesionales/alta` devuelve `passwordTemporal` aunque el correo haya salido bien, para que el panel pueda mostrarlo si el aviso falla. Cualquiera con el token de admin que lea la respuesta (o un log con el body) tiene esa clave |
+| 8 | **`verifyEmail: false`** | Nadie confirma que la dirección sea suya. Con el alta nueva el profesional no se auto-registra, así que el riesgo queda sobre todo en los clientes que se registran solos. Cerrarlo requiere `verifyEmail: true` en el realm **y** `docker compose down -v`; además rompe las cuentas `@vincula-up.local` de prueba, que no son entregables |
+| 9 | **H2 por defecto en desarrollo** | Sin `DATABASE_URL`, los datos se pierden al reiniciar y el comportamiento difiere de producción |
+| 10 | **CORS con lista de orígenes fija** | `SecurityConfig.java` enumera los orígenes. Agregar un dominio es tocar código |
+| 11 | **Geocodificación puede resolver a otra ciudad** | Nominatim a veces devuelve un lugar homónimo: una dirección de Concepción del Uruguay terminó en Entre Ríos, Argentina. Es un comportamiento del servicio público, no del código; convendría validar el país del resultado |
+| 12 | **Sin reenvío de la invitación** | Si el profesional pierde la contraseña temporal antes de entrar, no hay acción para emitir una nueva (`resetearContrasenaTemporal` está prevista pero **no implementada** en `KeycloakAdminService`) y hay que hacerlo desde la consola de Keycloak o dar de alta de nuevo |
+| 13 | **La contraseña temporal siempre sale en la respuesta** | `POST /api/profesionales/alta` devuelve `passwordTemporal` aunque el correo haya salido bien, para que el panel pueda mostrarlo si el aviso falla. Cualquiera con el token de admin que lea la respuesta (o un log con el body) tiene esa clave |
 
 ### 16.3 Higiene del repositorio
 
