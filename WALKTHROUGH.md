@@ -50,3 +50,31 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
     - Obligación de actualizar [WALKTHROUGH.md](file:///home/emma/Desktop/vincula-up/WALKTHROUGH.md) y [ESPECIFICACION.md](file:///home/emma/Desktop/vincula-up/ESPECIFICACION.md).
   - Se creó y estructuró el historial centralizado en [WALKTHROUGH.md](file:///home/emma/Desktop/vincula-up/WALKTHROUGH.md).
 - **Verificación:** Documentos revisados y validados.
+
+### [2026-10-21] - feat: Alinear arquitectura con DACS (OpenFeign, OAuth2 Resource Server, puertos expuestos, sin pgAdmin)
+- **Objetivo:** Acercar Vincula-up a la plantilla DACS: reemplazar RestClient por OpenFeign con `FeignAuthInterceptor` que reenvía el header `Authorization`; agregar `spring-boot-starter-oauth2-resource-server` con `SecurityConfig` y `JwtDecoder` en cada microservicio para que validen el JWT por su cuenta; exponer puertos de ms-* en `docker-compose` (ya no solo `127.0.0.1`); eliminar pgAdmin porque no es necesario.
+- **Cambios realizados:**
+  - `docker-compose.yml`: eliminado servicio `pgadmin` y volumen `pgadmin_data`; puertos de `ms-usuarios` (8081), `ms-profesionales` (8082), `ms-solicitudes` (8083) pasan de `127.0.0.1:PORT:PORT` a `PORT:PORT` (expuestos en toda la red); comentario del mapa de puertos actualizado.
+  - `.env.example`: eliminadas variables `PGADMIN_DEFAULT_EMAIL`/`PGADMIN_DEFAULT_PASSWORD`; agregada `KEYCLOAK_JWK_SET_URI` para validación JWT en microservicios.
+  - `backend/ms-usuarios/pom.xml`: agregada dependencia `spring-boot-starter-oauth2-resource-server`.
+  - `backend/ms-profesionales/pom.xml`: agregada dependencia `spring-boot-starter-oauth2-resource-server`.
+  - `backend/ms-solicitudes/pom.xml`: agregadas dependencias `spring-boot-starter-oauth2-resource-server` y `spring-cloud-starter-openfeign` + BOM `spring-cloud-dependencies 2025.0.0`.
+  - `backend/bff-web/pom.xml`: agregada dependencia `spring-cloud-starter-openfeign` + BOM `spring-cloud-dependencies 2025.0.0`.
+  - `backend/ms-usuarios/src/main/resources/application.properties`: agregados `spring.security.oauth2.resourceserver.jwt.issuer-uri` y `jwk-set-uri`.
+  - `backend/ms-profesionales/src/main/resources/application.properties`: idem.
+  - `backend/ms-solicitudes/src/main/resources/application.properties`: idem.
+  - `backend/ms-usuarios/src/main/java/com/vinculaup/ms_usuarios/config/SecurityConfig.java`: NUEVO — OAuth2 Resource Server con `JwtDecoder` (Nimbus + JWK set URI), validador de issuer, conversor de roles desde claims de Keycloak, CORS.
+  - `backend/ms-profesionales/src/main/java/com/vinculaup/ms_profesionales/config/SecurityConfig.java`: NUEVO — idem.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/config/SecurityConfig.java`: NUEVO — idem.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/client/FeignAuthInterceptor.java`: NUEVO — `RequestInterceptor` de Feign que copia `Authorization` del `RequestContextHolder` al `RequestTemplate`.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/client/FeignAuthInterceptor.java`: NUEVO — idem.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/client/UsuariosClient.java`: NUEVO — interfaz Feign para ms-usuarios (`JsonNode`).
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/client/ProfesionalesClient.java`: NUEVO — interfaz Feign para ms-profesionales (`JsonNode`).
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/client/SolicitudesClient.java`: NUEVO — interfaz Feign para ms-solicitudes (`JsonNode`) + mensajes, calificaciones, reputación.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/client/ProfesionalesClient.java`: Reemplazado de clase `@Component` con `RestClient` a interfaz `@FeignClient` que delega a ms-profesionales.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/BffWebApplication.java`: agregada anotación `@EnableFeignClients`.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/MsSolicitudesApplication.java`: agregada anotación `@EnableFeignClients`.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/BackendGateway.java`: Reescrito para usar los clientes Feign (`UsuariosClient`, `ProfesionalesClient`, `SolicitudesClient`) en lugar de `RestClient`; manejo de errores vía `FeignException` → `ResponseStatusException`.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/controller/ApiController.java`: línea 117, eliminado `.getBody()` de `gateway.obtenerMiPerfil(...)` (ahora devuelve `JsonNode` directamente).
+  - `ESPECIFICACION.md`: tabla de puertos (quitada fila pgAdmin, ms-* expuestos en red interna), sección 13 (quitado pgAdmin, renumerada TLS a 13.1), línea 936 (ms-* validan JWT por su cuenta), índice actualizado.
+- **Verificación:** No hay Maven ni Docker disponibles en este entorno para ejecutar `./mvnw clean compile` ni `docker compose build`. Se revisó manualmente la consistencia de imports, firmas de métodos y llamadas entre `BackendGateway`, clientes Feign y `ApiController`.

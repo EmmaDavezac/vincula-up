@@ -28,7 +28,7 @@
     - [10.1 Geocodificación](#101-geocodificación) · [10.2 Cifrado de ubicaciones](#102-cifrado-de-ubicaciones) · [10.3 Almacenamiento de fotos](#103-almacenamiento-de-fotos) · [10.4 Quién ve la foto de quién](#104-quién-ve-la-foto-de-quién) · [10.5 Privacidad de la dirección](#105-privacidad-de-la-dirección-del-cliente)
 11. [Variables de entorno](#11-variables-de-entorno)
 12. [Datos de arranque](#12-datos-de-arranque)
-13. [Infraestructura: pgAdmin, TLS, Nginx](#13-infraestructura-pgadmin-tls-nginx)
+13. [Infraestructura: TLS, Nginx](#13-infraestructura-tls-nginx)
 14. [Scripts operativos](#14-scripts-operativos)
 15. [Estado real del MVP](#15-estado-real-del-mvp)
 16. [Deuda técnica conocida](#16-deuda-técnica-conocida)
@@ -170,15 +170,15 @@ el BFF (`backend/bff-web`), que cumple cuatro funciones:
 | `nginx` | 80 / 443 | Sí (todas las interfaces) |
 | `keycloak` | 8080 | Sí |
 | `postgres` | 5432 | Sí |
-| `pgadmin` | 5050 | Sí |
 | `bff-web` | 9001 | Sí |
-| `ms-usuarios` | 8081 | Solo `127.0.0.1` |
-| `ms-profesionales` | 8082 | Solo `127.0.0.1` |
-| `ms-solicitudes` | 8083 | Solo `127.0.0.1` |
+| `ms-usuarios` | 8081 | Sí (red interna) |
+| `ms-profesionales` | 8082 | Sí (red interna) |
+| `ms-solicitudes` | 8083 | Sí (red interna) |
 
-Los tres microservicios de dominio se publican únicamente en `127.0.0.1` a
-propósito: no implementan autenticación propia, así que no deben quedar
-alcanzables desde la red. Toda entrada del exterior pasa por nginx → BFF.
+Los tres microservicios de dominio se publican en la red interna de Docker
+porque cada uno valida el JWT de Keycloak por su cuenta (oauth2-resource-server).
+Toda entrada del exterior pasa por nginx → BFF, pero los ms-* ya no confían
+ciegamente en el perímetro: rechazan peticiones sin token válido.
 
 ### Puertos entre servicios (red interna de Docker)
 
@@ -933,7 +933,7 @@ El domicilio del cliente **no se le muestra al profesional hasta que acepta el t
 **Lo que esto no cubre:**
 
 - La **descripción** que escribe el cliente es texto libre: si la persona escribe la dirección ahí, se ve. La prevención es aclarar en el formulario que describa el problema, no la ubicación.
-- `ms-solicitudes` sigue devolviendo la dirección exacta a quien le pregunte: el filtrado vive en el BFF. Los microservicios están publicados solo en `127.0.0.1` y sin autenticación, así que el alcance es un acceso local.
+- `ms-solicitudes` sigue devolviendo la dirección exacta a quien le pregunte: el filtrado vive en el BFF. Los microservicios validan el JWT de Keycloak por su cuenta (oauth2-resource-server), así que requieren token válido en cada petición.
 - Las coordenadas siguen **cifradas en reposo** en la base: el cifrado no cambia, lo que cambia es que la API devuelve un punto redondeado.
 
 ---
@@ -1218,24 +1218,9 @@ ni pierde el legajo ya asignado.
 Tres scripts `ALTER TABLE` defensivos, todos toleran el fallo:
 
 
-## 13. Infraestructura: pgAdmin, TLS, Nginx
+## 13. Infraestructura: TLS, Nginx
 
-### 13.1 pgAdmin
-
-Servicio activo en el stack, publicado en `http://localhost:5050`.
-
-| Campo | Valor |
-|---|---|
-| Email | `admin@vincula-up.com` (o `PGADMIN_DEFAULT_EMAIL`) |
-| Contraseña | `admin` (o `PGADMIN_DEFAULT_PASSWORD`) |
-| Servidor de BD | host `postgres`, puerto `5432`, base `vinculaup` |
-| Usuario / contraseña BD | `postgres` / `postgres` |
-
-Se conecta al host `postgres` de la red de Docker, no a `localhost`: desde
-dentro del contenedor, `localhost` es el propio pgAdmin. El volumen
-`pgadmin_data` conserva los servidores guardados entre reinicios.
-
-### 13.2 TLS
+### 13.1 TLS
 
 El repositorio incluye una CA y un certificado de servidor en `nginx/certs/`.
 Los navegadores modernos exigen **dos certificados separados**, y hay que

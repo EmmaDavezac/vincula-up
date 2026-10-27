@@ -14,20 +14,16 @@
 #  │ nginx            │ 80, 443  │ https://vincula-up.local          │ La aplicación   │
 #  │ bff-web          │ 9001     │ http://localhost:9001/api/...     │ La API          │
 #  │ keycloak         │ 8080     │ http://localhost:8080            │ Login + consola │
-#  │ pgadmin          │ 5050     │ http://localhost:5050            │ Consola de la BD│
 #  │ postgres         │ 5432     │ (no se abre en el navegador)     │ Base de datos   │
-#  │ ms-usuarios      │ 8081     │ (solo 127.0.0.1, sin interfaz)  │ Cuentas         │
-#  │ ms-profesionales │ 8082     │ (solo 127.0.0.1, sin interfaz)  │ Padrón          │
-#  │ ms-solicitudes   │ 8083     │ (solo 127.0.0.1, sin interfaz)  │ Solicitudes     │
+#  │ ms-usuarios      │ 8081     │ http://localhost:8081             │ Cuentas         │
+#  │ ms-profesionales │ 8082     │ http://localhost:8082             │ Padrón          │
+#  │ ms-solicitudes   │ 8083     │ http://localhost:8083             │ Solicitudes     │
 #  └──────────────────┴──────────┴───────────────────────────────────┴─────────────────┘
 #
-#  POR QUÉ LOS ms-* ESTÁN LIMITADOS A 127.0.0.1
-#  Los tres microservicios de dominio NO validan tokens ni aplican permisos: son
-#  internos. Publicar sus puertos en toda la red dejaría la base de datos
-#  accesible sin autenticación. Todo el tráfico del navegador entra por nginx y
-#  pasa por el bff-web, que sí valida el token de Keycloak. Por eso sus puertos
-#  se publican solo en el loopback: sirven para depurar desde la máquina, pero no
-#  son alcanzables desde la red.
+#  Los puertos de los ms-* se publican en toda la red porque cada microservicio
+#  valida el JWT de Keycloak por su cuenta (oauth2-resource-server). El BFF
+#  sigue siendo el único punto de entrada del navegador, pero los ms-* ya no
+#  confían ciegamente en el perímetro: rechazan peticiones sin token válido.
 #
 #  ── CONVENCIONES ───────────────────────────────────────────────────────────
 #  - container_name: todos empiezan con `vinculaup-` para no chocar con otras
@@ -143,7 +139,7 @@ services:
     ports:
       # Sólo accesible desde el host: ms-usuarios no expone autenticación propia,
       # así que no debe quedar publicado en la red. Toda entrada pasa por nginx/BFF.
-      - "127.0.0.1:8081:8081"
+      - "8081:8081"
     # La JVM tarda ~1 minuto en levantar: sin healthcheck el BFF/nginx arrancan antes
     # y devuelven 502 "Connection refused" durante ese lapso.
     healthcheck:
@@ -173,7 +169,7 @@ services:
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
       UBICACIONES_CLAVE: ${UBICACIONES_CLAVE:-}
     ports:
-      - "127.0.0.1:8082:8082"
+      - "8082:8082"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-m", "5", "http://localhost:8082/actuator/health"]
       interval: 5s
@@ -204,7 +200,7 @@ services:
       # lo que el otro cifró y las coordenadas quedan ilegibles.
       UBICACIONES_CLAVE: ${UBICACIONES_CLAVE:-}
     ports:
-      - "127.0.0.1:8083:8083"
+      - "8083:8083"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-m", "5", "http://localhost:8083/actuator/health"]
       interval: 5s
@@ -304,26 +300,8 @@ services:
       # servir las fotos como estático: sería una URL pública para cualquier
       # foto, sin sesión ni control de rol. Las entrega el BFF, que sí valida.
 
-  pgadmin:
-    image: dpage/pgadmin4:8.12
-    container_name: vinculaup-pgadmin
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-    environment:
-      # El .local no lo acepta pgAdmin 8.12: exige un TLD real (com, net, org).
-      # Es solo la credencial de la consola web de pgAdmin, no toca la app.
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@vincula-up.com}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
-    ports:
-      - "5050:80"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-
 volumes:
   postgres_data:
-  pgadmin_data:
   # Fotos de perfil. Solo lo monta el BFF, que las escribe al subirlas y las lee
   # cuando alguien pide GET /api/usuarios/{id}/foto. nginx NO lo monta a
   # propósito: si lo sirviera como estático, cualquiera con la URL vería la foto

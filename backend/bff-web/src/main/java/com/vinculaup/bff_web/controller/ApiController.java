@@ -114,7 +114,7 @@ public class ApiController {
         if (!"PROFESIONAL".equals(authenticatedRole())) {
             throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "Se requiere un perfil profesional");
         }
-        JsonNode profile = gateway.obtenerMiPerfil(userId(user), authenticatedSubject()).getBody();
+        JsonNode profile = gateway.obtenerMiPerfil(userId(user), authenticatedSubject());
         if (activeRequired && (profile == null || !"ACTIVO".equals(profile.path("estado").asText()))) {
             throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "El perfil profesional debe estar activo");
         }
