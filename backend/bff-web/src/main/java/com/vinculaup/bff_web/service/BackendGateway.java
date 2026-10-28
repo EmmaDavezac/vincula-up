@@ -12,6 +12,7 @@ import com.vinculaup.bff_web.client.SolicitudesClient;
 import com.vinculaup.bff_web.client.UsuariosClient;
 import feign.FeignException;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 import tools.jackson.databind.json.JsonMapper;
 
 @Service
@@ -53,7 +54,7 @@ public class BackendGateway {
     }
 
     public void eliminarEspecialidad(UUID id) {
-        ejecutarSinRespuesta(() -> profesionales.eliminarEspecialidad(id));
+        ejecutarSinRespuesta(() -> { profesionales.eliminarEspecialidad(id); return null; });
     }
 
     public JsonNode actualizarProfesional(UUID id, JsonNode body) {
@@ -76,7 +77,7 @@ public class BackendGateway {
     }
 
     public void eliminarUsuario(UUID id) {
-        ejecutarSinRespuesta(() -> usuarios.eliminar(id));
+        ejecutarSinRespuesta(() -> { usuarios.eliminar(id); return null; });
     }
 
     public JsonNode listarEspecialidades() {
@@ -133,7 +134,9 @@ public class BackendGateway {
         return ejecutar(() -> usuarios.buscarPorId(id));
     }
 
-    public JsonNode aceptarTerminos(UUID id, JsonNode body) {
+    public JsonNode aceptarTerminos(UUID id, String version) {
+        ObjectNode body = MAPPER.createObjectNode();
+        body.put("version", version);
         return ejecutar(() -> usuarios.aceptarTerminos(id, body));
     }
 
