@@ -86,3 +86,34 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
   - `backend/bff-web/src/main/java/com/vinculaup/bff_web/controller/ApiController.java`: línea 117, eliminado `.getBody()` de `gateway.obtenerMiPerfil(...)` (ahora devuelve `JsonNode` directamente).
   - `ESPECIFICACION.md`: tabla de puertos (quitada fila pgAdmin, ms-* expuestos en red interna), sección 13 (quitado pgAdmin, renumerada TLS a 13.1), línea 936 (ms-* validan JWT por su cuenta), índice actualizado.
 - **Verificación:** No hay Maven ni Docker disponibles en este entorno para ejecutar `./mvnw clean compile` ni `docker compose build`. Se revisó manualmente la consistencia de imports, firmas de métodos y llamadas entre `BackendGateway`, clientes Feign y `ApiController`.
+
+### [2026-10-28] - fix: corregir errores de compilación en bff-web y recuperar fix de Optional en ms-solicitudes
+- **Objetivo:** Que `docker compose build` pase para `ms-solicitudes` y `bff-web`, que estaban fallando en la etapa `mvn -DskipTests package`.
+- **Diagnóstico:**
+  - `ms-solicitudes`: `ProfesionalesClient.java` usaba `Optional` sin importar `java.util.Optional` (error heredado de `dev`).
+  - `bff-web`: 9 errores de compilación en `dev`: métodos `suspender`/`reactivar` duplicados en `UsuariosClient`, llamadas con argumentos incorrectos en `ApiController` (`activarProfesional`, `aceptarTerminos`, `actualizarDisponibilidad`, `geocodificar`), y lambdas `void` en `BackendGateway` (`ejecutarSinRespuesta`).
+- **Cambios realizados:**
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/client/ProfesionalesClient.java`: agregado `import java.util.Optional;` (cherry-pick de rama `fix/ms-solicitudes-import-optional`).
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/client/UsuariosClient.java`: eliminado bloque duplicado de `suspender`/`reactivar`.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/BackendGateway.java`: fix lambdas `() -> { ...; return null; }` en `eliminarEspecialidad`/`eliminarUsuario`; `aceptarTerminos(UUID, String)` crea `ObjectNode` internamente con `MAPPER`; agregado import `ObjectNode`.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/controller/ApiController.java`: `activarProfesional` pasa `UUID` del usuario como primer argumento; `aceptarTerminos` pasa `version` como `String`; `actualizarDisponibilidad` convierte `JsonNode` a `List<JsonNode>`; `geocodificar` convierte `JsonNode` a `Map<String, Object>`.
+- **Verificación:**
+  - `./mvnw -DskipTests clean compile` en `backend/ms-solicitudes` → `BUILD SUCCESS` (37 archivos).
+  - `./mvnw -DskipTests clean compile` en `backend/bff-web` → `BUILD SUCCESS` (14 archivos).
+  - Commits en rama `fix/bff-web-compilacion`: `f0515f9` (ms-solicitudes) y `9f4c226` (bff-web).
+  - `ESPECIFICACION.md`: no requiere cambios (no se alteran endpoints, contratos ni modelos).
+
+---
+
+### [2026-10-28] - fix: ms-solicitudes y bff-web no arrancan por SimpleDiscoveryClientAutoConfiguration incompatible con Spring Boot 4.1.1
+- **Objetivo:** Que `docker compose up` levante `ms-solicitudes` y `bff-web` sin fallar al arrancar (Restarting/Error).
+- **Diagnóstico:** Ambos servicios usan `spring-cloud-starter-openfeign` con `spring-cloud-dependencies 2025.0.0` sobre Spring Boot 4.1.1. Spring Cloud intenta cargar `SimpleDiscoveryClientAutoConfiguration`, que depende de `org.springframework.boot.autoconfigure.web.ServerProperties`, cuya clase no existe en Spring Boot 4.1.1 → `NoClassDefFoundError` → el contexto de Spring falla y el contenedor entra en loop de reinicios.
+- **Cambios realizados:**
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/MsSolicitudesApplication.java`: agregado `exclude = { SimpleDiscoveryClientAutoConfiguration.class }` en `@SpringBootApplication`.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/BffWebApplication.java`: idem.
+  - Justificación: el proyecto no usa service discovery (Feign con URLs directas desde `application.properties`: `${profesionales.url}`, `${usuarios.url}`, `${solicitudes.url}`), por lo que el auto-config de discovery de Spring Cloud no es necesario.
+- **Verificación:**
+  - `./mvnw -DskipTests clean compile` en `backend/ms-solicitudes` → `BUILD SUCCESS`.
+  - `./mvnw -DskipTests clean compile` en `backend/bff-web` → `BUILD SUCCESS`.
+  - Commit `a8edc97` en rama `fix/bff-web-compilacion` (2 archivos, 6 inserciones, 4 eliminaciones).
+  - `ESPECIFICACION.md`: no requiere cambios (no se alteran endpoints, contratos ni modelos).

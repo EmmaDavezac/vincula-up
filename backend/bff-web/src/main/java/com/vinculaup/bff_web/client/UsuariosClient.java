@@ -54,9 +54,4 @@ public interface UsuariosClient {
     @PatchMapping("/{id}")
     JsonNode actualizar(@PathVariable UUID id, @RequestBody JsonNode body);
 
-    @PatchMapping("/{id}/suspender")
-    JsonNode suspender(@PathVariable UUID id);
-
-    @PatchMapping("/{id}/reactivar")
-    JsonNode reactivar(@PathVariable UUID id);
 }

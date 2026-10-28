@@ -323,7 +323,7 @@ public class ApiController {
     public JsonNode activarProfesional(@RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
         professionalProfile(user, false);
-        JsonNode resultado = gateway.activarProfesional(identityBody(body, user, "usuarioId"));
+        JsonNode resultado = gateway.activarProfesional(UUID.fromString(user.path("id").asText()), identityBody(body, user, "usuarioId"));
         guardarFotoEnUsuario(body, user);
         return resultado;
     }
@@ -738,7 +738,9 @@ public class ApiController {
         if (!id.toString().equals(profile.path("id").asText())) {
             throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "El perfil no pertenece al usuario");
         }
-        return gateway.actualizarDisponibilidad(id, body);
+        List<JsonNode> disponibilidadList = new ArrayList<>();
+        body.forEach(disponibilidadList::add);
+        return gateway.actualizarDisponibilidad(id, disponibilidadList);
     }
 
     @GetMapping("/profesionales/{id}/disponibilidad")
@@ -1078,6 +1080,7 @@ public class ApiController {
      */
     @GetMapping("/gps")
     public Map<String, Object> obtenerUbicacionGps(@RequestParam(required = false, defaultValue = "") String direccion) {
-        return gateway.geocodificar(direccion);
+        return tools.jackson.databind.json.JsonMapper.builder().build()
+                .convertValue(gateway.geocodificar(direccion), Map.class);
     }
 }
