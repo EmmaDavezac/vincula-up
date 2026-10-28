@@ -132,3 +132,24 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
   - `./mvnw -DskipTests clean compile` en `backend/bff-web` → `BUILD SUCCESS`.
   - Commit `68e2d45` en rama `fix/spring-cloud-version` (2 archivos, 2 inserciones, 2 eliminaciones).
   - `ESPECIFICACION.md`: no requiere cambios (no se alteran endpoints, contratos ni modelos).
+
+---
+
+### [2026-10-28] - refactor: reemplazar Spring Cloud OpenFeign por RestClient (Spring Boot 4.x compatible)
+- **Objetivo:** Que `ms-solicitudes` y `bff-web` arranquen saludables en Docker sin `NoClassDefFoundError` ni fallos de compilación.
+- **Diagnóstico:** `spring-cloud-starter-openfeign` con `spring-cloud-dependencies` (2024.0.0 o 2025.0.0) es incompatible con Spring Boot 4.1.1. Spring Cloud intenta cargar `ServerProperties`, `SpringDataWebProperties` y otras clases que no existen en Spring Boot 4.x, provocando `NoClassDefFoundError` y `BeanCreationException` en `feignClientsConfiguration`. Ambos servicios entraban en loop de reinicios.
+- **Cambios realizados:**
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/client/ProfesionalesClient.java`: reemplazada interfaz `@FeignClient` por clase `@Component` con `RestClient` + `ClientHttpRequestFactory` personalizado para reenviar header `Authorization`.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/client/FeignAuthInterceptor.java`: eliminado (no aplica a `RestClient`).
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/MsSolicitudesApplication.java`: eliminado `@EnableFeignClients` y `exclude(SimpleDiscoveryClientAutoConfiguration)`.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/client/UsuariosClient.java`, `ProfesionalesClient.java`, `SolicitudesClient.java`: reemplazadas interfaces `@FeignClient` por clases `@Component` con `RestClient`.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/client/FeignAuthInterceptor.java`: eliminado.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/BffWebApplication.java`: eliminado `@EnableFeignClients` y `exclude(SimpleDiscoveryClientAutoConfiguration)`.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/BackendGateway.java`: `FeignException` → `RestClientException`/`HttpStatusCodeException`; `exception.status()` → `getStatusCode().value()`; `exception.contentUTF8()` → `getResponseBodyAsString()`.
+  - `backend/ms-solicitudes/pom.xml`, `backend/bff-web/pom.xml`: eliminados `spring-cloud-starter-openfeign` y `spring-cloud-dependencies` (BOM).
+- **Justificación:** el proyecto no usa service discovery, solo Feign como cliente HTTP con URLs directas desde `application.properties` (`${profesionales.url}`, `${usuarios.url}`, `${solicitudes.url}`). `RestClient` es nativo de Spring Boot 4.x y no requiere Spring Cloud.
+- **Verificación:**
+  - `./mvnw -DskipTests clean compile` en `backend/ms-solicitudes` → `BUILD SUCCESS` (36 archivos).
+  - `./mvnw -DskipTests clean compile` en `backend/bff-web` → `BUILD SUCCESS` (13 archivos).
+  - Commit `22c166e` en rama `dev` (15 archivos, 924 inserciones, 306 eliminaciones).
+  - `ESPECIFICACION.md`: no requiere cambios (no se alteran endpoints, contratos ni modelos).
