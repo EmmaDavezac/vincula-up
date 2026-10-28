@@ -117,3 +117,18 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
   - `./mvnw -DskipTests clean compile` en `backend/bff-web` → `BUILD SUCCESS`.
   - Commit `a8edc97` en rama `fix/bff-web-compilacion` (2 archivos, 6 inserciones, 4 eliminaciones).
   - `ESPECIFICACION.md`: no requiere cambios (no se alteran endpoints, contratos ni modelos).
+
+---
+
+### [2026-10-28] - fix: bajar spring-cloud-dependencies a 2024.0.0 compatible con Spring Boot 4.1.1
+- **Objetivo:** Que `ms-solicitudes` y `bff-web` arranquen saludables en Docker sin `NoClassDefFoundError` ni fallos en `feignClientsConfiguration`.
+- **Diagnóstico:** `spring-cloud-dependencies 2025.0.0` (Ilford) es incompatible con Spring Boot 4.1.1. Spring Cloud intenta cargar clases como `ServerProperties` y `SpringDataWebProperties` que no existen en Spring Boot 4.1.1, provocando `NoClassDefFoundError` y `BeanCreationException` en `feignClientsConfiguration`. Ambos servicios entran en loop de reinicios.
+- **Cambios realizados:**
+  - `backend/ms-solicitudes/pom.xml`: `spring-cloud-dependencies` de `2025.0.0` a `2024.0.0`.
+  - `backend/bff-web/pom.xml`: idem.
+  - Justificación: el proyecto no usa service discovery, solo Feign como cliente HTTP con URLs directas desde `application.properties`. Spring Cloud 2024.0.0 es compatible con Spring Boot 4.1.x.
+- **Verificación:**
+  - `./mvnw -DskipTests clean compile` en `backend/ms-solicitudes` → `BUILD SUCCESS`.
+  - `./mvnw -DskipTests clean compile` en `backend/bff-web` → `BUILD SUCCESS`.
+  - Commit `68e2d45` en rama `fix/spring-cloud-version` (2 archivos, 2 inserciones, 2 eliminaciones).
+  - `ESPECIFICACION.md`: no requiere cambios (no se alteran endpoints, contratos ni modelos).
