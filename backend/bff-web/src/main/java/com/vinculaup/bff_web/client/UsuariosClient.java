@@ -1,57 +1,148 @@
 package com.vinculaup.bff_web.client;
 
+import java.io.IOException;
+import java.net.URI;
 import java.util.UUID;
-import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.ClientHttpRequest;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import tools.jackson.databind.JsonNode;
 
-@FeignClient(name = "usuarios", url = "${usuarios.url}")
-public interface UsuariosClient {
+/**
+ * Cliente REST hacia ms-usuarios. Usa {@link RestClient} (nativo de Spring Boot 4.x)
+ * en lugar de OpenFeign, que no es compatible con Spring Boot 4.1.1.
+ * <p>
+ * Reenvía el encabezado {@code Authorization} (JWT de Keycloak) de la petición
+ * entrante hacia ms-usuarios, mediante un {@link ClientHttpRequestFactory} personalizado.
+ */
+@Component
+public class UsuariosClient {
 
-    @GetMapping
-    JsonNode listar(
-            @RequestParam(required = false) String rol,
-            @RequestParam(required = false) String estado);
+    private final RestClient restClient;
 
-    @PostMapping
-    JsonNode crear(@RequestBody JsonNode body);
+    public UsuariosClient(@Value("${usuarios.url}") String baseUrl) {
+        ClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory() {
+            @Override
+            public ClientHttpRequest createRequest(URI url, HttpMethod method) throws IOException {
+                ClientHttpRequest request = super.createRequest(url, method);
+                ServletRequestAttributes attrs =
+                        (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+                if (attrs != null) {
+                    String auth = attrs.getRequest().getHeader(HttpHeaders.AUTHORIZATION);
+                    if (auth != null && !auth.isBlank()) {
+                        request.getHeaders().add(HttpHeaders.AUTHORIZATION, auth);
+                    }
+                }
+                return request;
+            }
+        };
 
-    @GetMapping("/por-email")
-    JsonNode buscarPorEmail(@RequestParam String email);
+        this.restClient = RestClient.builder()
+                .baseUrl(baseUrl)
+                .requestFactory(requestFactory)
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+                .build();
+    }
 
-    @PatchMapping("/{id}/terminos")
-    JsonNode aceptarTerminos(@PathVariable UUID id, @RequestBody JsonNode body);
+    public JsonNode listar(String rol, String estado) {
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .queryParam(rol != null ? "rol" : null, rol)
+                        .queryParam(estado != null ? "estado" : null, estado)
+                        .build())
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
-    @GetMapping("/{id}")
-    JsonNode buscarPorId(@PathVariable UUID id);
+    public JsonNode crear(JsonNode body) {
+        return restClient.post()
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
-    @PatchMapping("/{id}/keycloak")
-    JsonNode vincularKeycloak(@PathVariable UUID id, @RequestBody JsonNode body);
+    public JsonNode buscarPorEmail(String email) {
+        return restClient.get()
+                .uri("/por-email?email={email}", email)
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
-    @PatchMapping("/{id}/suspender")
-    JsonNode suspender(@PathVariable UUID id);
+    public JsonNode aceptarTerminos(UUID id, JsonNode body) {
+        return restClient.patch()
+                .uri("/{id}/terminos", id)
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
-    @PatchMapping("/{id}/reactivar")
-    JsonNode reactivar(@PathVariable UUID id);
+    public JsonNode buscarPorId(UUID id) {
+        return restClient.get()
+                .uri("/{id}", id)
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
-    @GetMapping("/por-keycloak")
-    JsonNode buscarPorKeycloakId(
-            @RequestParam UUID keycloakId,
-            @RequestParam(required = false) String email,
-            @RequestParam(required = false) String nombre,
-            @RequestParam(required = false) String apellido,
-            @RequestParam(required = false) String rol);
+    public JsonNode vincularKeycloak(UUID id, JsonNode body) {
+        return restClient.patch()
+                .uri("/{id}/keycloak", id)
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
-    @DeleteMapping("/{id}")
-    void eliminar(@PathVariable UUID id);
+    public JsonNode suspender(UUID id) {
+        return restClient.patch()
+                .uri("/{id}/suspender", id)
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
-    @PatchMapping("/{id}")
-    JsonNode actualizar(@PathVariable UUID id, @RequestBody JsonNode body);
+    public JsonNode reactivar(UUID id) {
+        return restClient.patch()
+                .uri("/{id}/reactivar", id)
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
+    public JsonNode buscarPorKeycloakId(UUID keycloakId, String email, String nombre,
+            String apellido, String rol) {
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/por-keycloak")
+                        .queryParam("keycloakId", keycloakId)
+                        .queryParam("email", email)
+                        .queryParam("nombre", nombre)
+                        .queryParam("apellido", apellido)
+                        .queryParam("rol", rol)
+                        .build())
+                .retrieve()
+                .body(JsonNode.class);
+    }
+
+    public void eliminar(UUID id) {
+        restClient.delete()
+                .uri("/{id}", id)
+                .retrieve()
+                .toBodilessEntity();
+    }
+
+    public JsonNode actualizar(UUID id, JsonNode body) {
+        return restClient.patch()
+                .uri("/{id}", id)
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+    }
 }

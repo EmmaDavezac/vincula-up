@@ -1,80 +1,199 @@
 package com.vinculaup.bff_web.client;
 
+import java.io.IOException;
+import java.net.URI;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.ClientHttpRequest;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import tools.jackson.databind.JsonNode;
 
-@FeignClient(name = "profesionales", url = "${profesionales.url}")
-public interface ProfesionalesClient {
+/**
+ * Cliente REST hacia ms-profesionales. Usa {@link RestClient} (nativo de Spring Boot 4.x)
+ * en lugar de OpenFeign, que no es compatible con Spring Boot 4.1.1.
+ */
+@Component
+public class ProfesionalesClient {
 
-    @GetMapping
-    JsonNode listar(
-            @RequestParam(required = false) String estado,
-            @RequestParam(required = false) Boolean todos);
+    private final RestClient restClient;
 
-    @PostMapping
-    JsonNode crear(@RequestBody JsonNode body);
+    public ProfesionalesClient(@Value("${profesionales.url}") String baseUrl) {
+        ClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory() {
+            @Override
+            public ClientHttpRequest createRequest(URI url, HttpMethod method) throws IOException {
+                ClientHttpRequest request = super.createRequest(url, method);
+                ServletRequestAttributes attrs =
+                        (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+                if (attrs != null) {
+                    String auth = attrs.getRequest().getHeader(HttpHeaders.AUTHORIZATION);
+                    if (auth != null && !auth.isBlank()) {
+                        request.getHeaders().add(HttpHeaders.AUTHORIZATION, auth);
+                    }
+                }
+                return request;
+            }
+        };
 
-    @GetMapping("/{id}")
-    JsonNode buscarPorId(@PathVariable UUID id);
+        this.restClient = RestClient.builder()
+                .baseUrl(baseUrl)
+                .requestFactory(requestFactory)
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+                .build();
+    }
 
-    @GetMapping("/por-usuario")
-    JsonNode listarPorUsuarioIds(@RequestParam(required = false) List<UUID> usuarioIds);
+    public JsonNode listar(String estado, Boolean todos) {
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .queryParam(estado != null ? "estado" : null, estado)
+                        .queryParam(todos != null ? "todos" : null, todos)
+                        .build())
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
-    @GetMapping("/mi-perfil")
-    JsonNode miPerfil(
-            @RequestParam UUID usuarioId,
-            @RequestParam(required = false) UUID keycloakId);
+    public JsonNode crear(JsonNode body) {
+        return restClient.post()
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
-    @PostMapping("/vincular")
-    JsonNode vincular(@RequestBody JsonNode body);
+    public JsonNode buscarPorId(UUID id) {
+        return restClient.get()
+                .uri("/{id}", id)
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
-    @RequestMapping(value = "/activar", method = {RequestMethod.PATCH, RequestMethod.POST, RequestMethod.PUT})
-    JsonNode activarPorUsuario(@RequestBody JsonNode body);
+    public JsonNode listarPorUsuarioIds(List<UUID> usuarioIds) {
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/por-usuario")
+                        .queryParam("usuarioIds", usuarioIds)
+                        .build())
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
-    @PatchMapping("/{id}/activar")
-    JsonNode activar(@PathVariable UUID id, @RequestBody JsonNode body);
+    public JsonNode miPerfil(UUID usuarioId, UUID keycloakId) {
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/mi-perfil")
+                        .queryParam("usuarioId", usuarioId)
+                        .queryParam("keycloakId", keycloakId)
+                        .build())
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
-    @PatchMapping("/{id}/suspender")
-    JsonNode suspender(@PathVariable UUID id);
+    public JsonNode vincular(JsonNode body) {
+        return restClient.post()
+                .uri("/vincular")
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
-    @PatchMapping("/{id}/reactivar")
-    JsonNode reactivar(@PathVariable UUID id);
+    public JsonNode activarPorUsuario(JsonNode body) {
+        return restClient.patch()
+                .uri("/activar")
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
-    @GetMapping("/especialidades")
-    JsonNode listarEspecialidades();
+    public JsonNode activar(UUID id, JsonNode body) {
+        return restClient.patch()
+                .uri("/{id}/activar", id)
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
-    @PostMapping("/especialidades")
-    JsonNode crearEspecialidad(@RequestBody JsonNode body);
+    public JsonNode suspender(UUID id) {
+        return restClient.patch()
+                .uri("/{id}/suspender", id)
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
-    @PutMapping("/especialidades/{id}")
-    JsonNode actualizarEspecialidad(@PathVariable UUID id, @RequestBody JsonNode body);
+    public JsonNode reactivar(UUID id) {
+        return restClient.patch()
+                .uri("/{id}/reactivar", id)
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
-    @DeleteMapping("/especialidades/{id}")
-    void eliminarEspecialidad(@PathVariable UUID id);
+    public JsonNode listarEspecialidades() {
+        return restClient.get()
+                .uri("/especialidades")
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
-    @PutMapping("/profesionales/{id}")
-    JsonNode actualizarProfesional(@PathVariable UUID id, @RequestBody JsonNode body);
+    public JsonNode crearEspecialidad(JsonNode body) {
+        return restClient.post()
+                .uri("/especialidades")
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
-    @GetMapping("/profesionales/{profesionalId}/disponibilidad")
-    JsonNode listarDisponibilidad(@PathVariable UUID profesionalId);
+    public JsonNode actualizarEspecialidad(UUID id, JsonNode body) {
+        return restClient.put()
+                .uri("/especialidades/{id}", id)
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
-    @PutMapping("/profesionales/{profesionalId}/disponibilidad")
-    JsonNode reemplazarDisponibilidad(
-            @PathVariable UUID profesionalId,
-            @RequestBody List<JsonNode> requests);
+    public void eliminarEspecialidad(UUID id) {
+        restClient.delete()
+                .uri("/especialidades/{id}", id)
+                .retrieve()
+                .toBodilessEntity();
+    }
 
-    @PutMapping("/profesionales/{id}/disponibilidad")
-    JsonNode actualizarDisponibilidad(@PathVariable UUID id, @RequestBody List<JsonNode> requests);
+    public JsonNode actualizarProfesional(UUID id, JsonNode body) {
+        return restClient.put()
+                .uri("/profesionales/{id}", id)
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+    }
+
+    public JsonNode listarDisponibilidad(UUID profesionalId) {
+        return restClient.get()
+                .uri("/profesionales/{profesionalId}/disponibilidad", profesionalId)
+                .retrieve()
+                .body(JsonNode.class);
+    }
+
+    public JsonNode reemplazarDisponibilidad(UUID profesionalId, List<JsonNode> requests) {
+        return restClient.put()
+                .uri("/profesionales/{profesionalId}/disponibilidad", profesionalId)
+                .body(requests)
+                .retrieve()
+                .body(JsonNode.class);
+    }
+
+    public JsonNode actualizarDisponibilidad(UUID id, List<JsonNode> requests) {
+        return restClient.put()
+                .uri("/profesionales/{id}/disponibilidad", id)
+                .body(requests)
+                .retrieve()
+                .body(JsonNode.class);
+    }
+
 }

@@ -10,7 +10,8 @@ import org.springframework.web.server.ResponseStatusException;
 import com.vinculaup.bff_web.client.ProfesionalesClient;
 import com.vinculaup.bff_web.client.SolicitudesClient;
 import com.vinculaup.bff_web.client.UsuariosClient;
-import feign.FeignException;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.RestClientException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -189,7 +190,7 @@ public class BackendGateway {
     private <T> T ejecutar(FeignCallable<T> llamada) {
         try {
             return llamada.llamar();
-        } catch (FeignException exception) {
+        } catch (RestClientException exception) {
             throw unavailable(exception);
         }
     }
@@ -198,9 +199,16 @@ public class BackendGateway {
         ejecutar(llamada);
     }
 
-    private ResponseStatusException unavailable(FeignException exception) {
-        int status = exception.status();
-        String payload = exception.contentUTF8();
+    private ResponseStatusException unavailable(RestClientException exception) {
+        int status;
+        String payload;
+        if (exception instanceof HttpStatusCodeException httpStatusException) {
+            status = httpStatusException.getStatusCode().value();
+            payload = httpStatusException.getResponseBodyAsString();
+        } else {
+            status = HttpStatus.BAD_GATEWAY.value();
+            payload = exception.getMessage();
+        }
         log.warn("Servicio interno respondió {}: {}", status, payload);
         try {
             return new ResponseStatusException(
