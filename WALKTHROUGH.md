@@ -102,3 +102,18 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
   - `./mvnw -DskipTests clean compile` en `backend/bff-web` → `BUILD SUCCESS` (14 archivos).
   - Commits en rama `fix/bff-web-compilacion`: `f0515f9` (ms-solicitudes) y `9f4c226` (bff-web).
   - `ESPECIFICACION.md`: no requiere cambios (no se alteran endpoints, contratos ni modelos).
+
+---
+
+### [2026-10-28] - fix: ms-solicitudes y bff-web no arrancan por SimpleDiscoveryClientAutoConfiguration incompatible con Spring Boot 4.1.1
+- **Objetivo:** Que `docker compose up` levante `ms-solicitudes` y `bff-web` sin fallar al arrancar (Restarting/Error).
+- **Diagnóstico:** Ambos servicios usan `spring-cloud-starter-openfeign` con `spring-cloud-dependencies 2025.0.0` sobre Spring Boot 4.1.1. Spring Cloud intenta cargar `SimpleDiscoveryClientAutoConfiguration`, que depende de `org.springframework.boot.autoconfigure.web.ServerProperties`, cuya clase no existe en Spring Boot 4.1.1 → `NoClassDefFoundError` → el contexto de Spring falla y el contenedor entra en loop de reinicios.
+- **Cambios realizados:**
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/MsSolicitudesApplication.java`: agregado `exclude = { SimpleDiscoveryClientAutoConfiguration.class }` en `@SpringBootApplication`.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/BffWebApplication.java`: idem.
+  - Justificación: el proyecto no usa service discovery (Feign con URLs directas desde `application.properties`: `${profesionales.url}`, `${usuarios.url}`, `${solicitudes.url}`), por lo que el auto-config de discovery de Spring Cloud no es necesario.
+- **Verificación:**
+  - `./mvnw -DskipTests clean compile` en `backend/ms-solicitudes` → `BUILD SUCCESS`.
+  - `./mvnw -DskipTests clean compile` en `backend/bff-web` → `BUILD SUCCESS`.
+  - Commit `a8edc97` en rama `fix/bff-web-compilacion` (2 archivos, 6 inserciones, 4 eliminaciones).
+  - `ESPECIFICACION.md`: no requiere cambios (no se alteran endpoints, contratos ni modelos).
