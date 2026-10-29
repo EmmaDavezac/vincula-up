@@ -248,9 +248,17 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
 - **Objetivo:** Que los mapas de solicitudes recibidas (vista del profesional en `my-requests`) cambien a modo oscuro cuando la página lo hace, evitando el rectángulo blanco brillante del iframe embebido de OpenStreetMap sobre pantalla oscura.
 - **Cambios realizados:**
   - `frontend/vincula-up-web/src/app/my-requests/my-requests.css`:
-    - `.req-card__map` y `.req-card__map` bajo `[data-tema='oscuro']`: fondo `var(--surface-tint)` y borde `var(--line-strong)` que ya invierten con el tema.
-    - `.embedded-map`: `display: block` y filtro `invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92) saturate(0.75)` bajo `[data-tema='oscuro']`, igual que las tiles reales de Leaflet en `styles.css`, para que el iframe de OSM se vea oscuro con la app.
-    - El dibujo CSS alternativo (`.vu-map`) ya usaba tokens de tema (`--surface-tint`, `--line-strong`, `--on-accent`, `--deco-line`), por lo que no requería cambios.
-- **Verificación:** `npm run build` en `frontend/vincula-up-web` → `Application bundle generation complete` sin errores de TypeScript ni de plantillas.
+    - `.req-card__map`: fondo `var(--surface-tint)` (token que invierte con el tema).
+    - `.embedded-map`: `display: block`.
+    - `:host-context([data-tema='oscuro']) .req-card__map`: fondo y borde (`var(--line-strong)`) ajustados para oscuro.
+    - `:host-context([data-tema='oscuro']) .embedded-map`: filtro `invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92) saturate(0.75)`, igual que las tiles reales de Leaflet en `styles.css`, para que el iframe de OSM se vea oscuro con la app.
+    - El dibujo CSS alternativo (`.vu-map`) ya usaba tokens de tema (`--surface-tint`, `--line-strong`, `--on-accent`, `--deco-line`) definidos en `styles.css` (global, sin encapsulamiento), por lo que no requería cambios.
+- **Verificación:** `npm run build` en `frontend/vincula-up-web` → `Application bundle generation complete` sin errores. Se confirmó que Angular transforma `:host-context([data-tema='oscuro'])` en `[data-tema="oscuro"] [_nghost] .embedded-map[_ngcontent]`, que sí alcanza al `<html>` donde vive `data-tema`.
 - **Nota:** `ESPECIFICACION.md` no requiere cambios porque el ajuste es solo de presentación (CSS) y no altera rutas, contratos de API, modelos de datos, flujos de autenticación ni variables de entorno.
+
+### [2026-10-29] - fix: encapsulamiento de Angular en filtros de modo oscuro de mapas
+- **Diagnóstico:** El selector `[data-tema='oscuro'] .embedded-map` dentro del CSS de componente `my-requests.css` nunca coincidía. Angular (ViewEncapsulation `Emulated`) añade `_ngcontent` a los elementos del template, mientras que `data-tema` vive en `<html>` (fuera del componente). Por eso el filtro de inversión del iframe de OpenStreetMap no se aplicaba y el mapa seguía blanco en modo oscuro.
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/my-requests/my-requests.css`: se reemplazó `[data-tema='oscuro']` por `:host-context([data-tema='oscuro'])` en las reglas de modo oscuro de `.req-card__map` y `.embedded-map`, permitiendo que el selector suba desde `<html>` hasta el host del componente y luego al iframe.
+- **Verificación:** `npm run build` → OK. En el bundle compilado se confirma la regla `[data-tema="oscuro"] [_nghost-%COMP%] .embedded-map[_ngcontent-%COMP%]{filter:invert(1)...}`.
 

@@ -231,13 +231,18 @@
  * claro. Al aplicar el filtro sobre el elemento (como si fuera una imagen) se
  * invierten los colores del mapa cuando la app está en oscuro, evitando el
  * rectángulo blanco brillante en medio de la pantalla. Es el mismo filtro que
- * ya usan las tiles reales de Leaflet en styles.css. */
-[data-tema='oscuro'] .req-card__map {
+ * ya usan las tiles reales de Leaflet en styles.css.
+ *
+ * Nota: :host-context() es necesario porque data-tema vive en <html> (fuera
+ * del componente) y el encapsulamiento de Angular añade _ngcontent a los
+ * elementos del template, por lo que [data-tema='oscuro'] .embedded-map nunca
+ * coincidiría dentro de este CSS de componente. */
+:host-context([data-tema='oscuro']) .req-card__map {
 	background: var(--surface-tint);
 	border-color: var(--line-strong);
 }
 
-[data-tema='oscuro'] .embedded-map {
+:host-context([data-tema='oscuro']) .embedded-map {
 	filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92) saturate(0.75);
 }
 
