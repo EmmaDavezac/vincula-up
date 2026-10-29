@@ -229,3 +229,18 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
 
 
 
+
+---
+
+### [2026-10-29] - fix: soporte de método PATCH en clientes REST del BFF hacia ms-usuarios
+
+- **Objetivo:** Corregir el error `I/O error on PATCH request for "http://ms-usuarios:8081/usuarios/{id}/terminos": Invalid HTTP method: PATCH` que rompía `PATCH /api/terminos/aceptar` (aceptación de términos) y el resto de peticiones PATCH del BFF hacia `ms-usuarios`.
+- **Diagnóstico:** `HttpURLConnection` (usado por `SimpleClientHttpRequestFactory`) rechaza PATCH en este JDK 21 con `java.net.ProtocolException: Invalid HTTP method: PATCH`. Se reprodujo empíricamente. El parche previo en `UsuariosClient.java` (`method = HttpMethod.valueOf("PATCH")`) era un no-op que no corregía nada.
+- **Cambios realizados:**
+  - NUEVO `backend/bff-web/src/main/java/com/vinculaup/bff_web/config/JdkHttpClientRequestFactory.java`: `ClientHttpRequestFactory` basada en `java.net.http.HttpClient` (JDK 21) que soporta cualquier método HTTP, incluido PATCH, sin dependencias nuevas, y reenvía el encabezado `Authorization` (JWT de Keycloak) de la petición entrante.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/client/UsuariosClient.java`, `ProfesionalesClient.java`, `SolicitudesClient.java`: se inyecta `JdkHttpClientRequestFactory` en el constructor en lugar de construir un `SimpleClientHttpRequestFactory` con el parche no-op.
+- **Verificación:**
+  - `cd backend/bff-web && ./mvnw -o clean compile` → `BUILD SUCCESS` (14 archivos compilados).
+  - Commit `a62f3e6` en rama `fix/bff-patch-http-method-ms-usuarios` (4 archivos, solo el fix; los cambios previos de `frontend/`, `nginx/` y `package.json` quedan sin commitear al no pertenecer a esta tarea).
+- **Nota:** `ESPECIFICACION.md` no requiere cambios porque el fix es de implementación interna y no altera rutas, contratos de API, modelos de datos, flujos de autenticación ni variables de entorno.
+
