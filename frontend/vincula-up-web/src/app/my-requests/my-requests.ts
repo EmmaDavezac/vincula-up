@@ -14,6 +14,7 @@ import { VuAvatar } from '../shared/avatar/avatar';
 import { VuConfirm } from '../shared/confirm/confirm';
 import { VuIcon } from '../shared/icon/icon';
 import { VuSkeletonList } from '../shared/skeleton-list/skeleton-list';
+import { VuSpinner } from '../shared/spinner/spinner';
 
 interface MessageItem {
   id: string;
@@ -38,7 +39,7 @@ interface RatingItem {
 }
 
 @Component({
-	imports: [CommonModule, RouterLink, FormsModule, VuAvatar, VuConfirm, VuIcon, VuSkeletonList],
+	imports: [CommonModule, RouterLink, FormsModule, VuAvatar, VuConfirm, VuIcon, VuSkeletonList, VuSpinner],
 	selector: 'app-my-requests',
 	styleUrl: './my-requests.css',
 	templateUrl: './my-requests.html',
@@ -57,6 +58,7 @@ export class MyRequests {
    * estado vacío (que diría "todavía no tenés solicitudes" sin haber llegado nada).
    */
   readonly loading = signal(true);
+  /** El mapa embebido todavía está cargando sus tiles. */  readonly mapaCargando = signal(false);
 
   // Filtros de la lista
   readonly statusFilter = signal<'TODAS' | RequestStatus>('TODAS');
@@ -316,10 +318,16 @@ export class MyRequests {
   embeddedMapUrl(request: ServiceRequest): SafeResourceUrl | null {
     const coords = this.mapCoords(request);
     if (!coords) return null;
+    this.mapaCargando.set(true);
     const delta = 0.008;
     const bbox = `${coords.lng - delta}%2C${coords.lat - delta}%2C${coords.lng + delta}%2C${coords.lat + delta}`;
     const url = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${coords.lat}%2C${coords.lng}`;
     return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  }
+
+  /** Se dispara cuando el iframe termina de cargar sus tiles. */
+  onMapaLoad(): void {
+    this.mapaCargando.set(false);
   }
 
   isProfessional(): boolean {

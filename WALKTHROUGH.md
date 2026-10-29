@@ -262,3 +262,20 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
   - `frontend/vincula-up-web/src/app/my-requests/my-requests.css`: se reemplazó `[data-tema='oscuro']` por `:host-context([data-tema='oscuro'])` en las reglas de modo oscuro de `.req-card__map` y `.embedded-map`, permitiendo que el selector suba desde `<html>` hasta el host del componente y luego al iframe.
 - **Verificación:** `npm run build` → OK. En el bundle compilado se confirma la regla `[data-tema="oscuro"] [_nghost-%COMP%] .embedded-map[_ngcontent-%COMP%]{filter:invert(1)...}`.
 
+
+### [2026-10-29] - feat: spinner de carga para mapas, ubicación y cierre de sesión
+- **Objetivo:** Agregar animaciones/spinners de carga en tres puntos: (1) al cerrar sesión, (2) al cargar los mapas (iframe de OSM en `my-requests` y Leaflet en `request`), y (3) al detectar/ingresar la ubicación en el formulario de solicitud.
+- **Cambios realizados:**
+  - NUEVO `frontend/vincula-up-web/src/app/shared/spinner/spinner.ts` + `spinner.css`: componente `VuSpinner` standalone, reutilizable, con `prefers-reduced-motion` y tokens de tema (`--ink`).
+  - `frontend/vincula-up-web/src/app/shared/navbar/navbar.ts` + `navbar.html`:
+    - Signal `cerrandoSesion` activado en `confirmarCierreDeSesion()` antes de `auth.logout()`.
+    - Botón de cierre de sesión: muestra `<vu-spinner size="sm">` mientras `cerrandoSesion()`, y se deshabilita.
+  - `frontend/vincula-up-web/src/app/request/request.ts` + `request.html` + `request.css`:
+    - El texto "Cargando el mapa…" (`step-map__hint`) se reemplazó por `<vu-spinner>` centrado en un contenedor flex (`.step-map__hint--cargando`).
+    - El botón "Mi ubicación" muestra `<vu-spinner>` cuando `detectingGps()`, y se deshabilita.
+    - Se agregó `.location-field__gps-loading` con `<vu-spinner>` cuando `gpsLoading()` (verificación de dirección por texto).
+  - `frontend/vincula-up-web/src/app/my-requests/my-requests.ts` + `my-requests.html` + `my-requests.css`:
+    - Signal `mapaCargando` activado en `embeddedMapUrl()` y desactivado en `onMapaLoad()` (evento `(load)` del iframe).
+    - Overlay absoluto `.mapa-embed__spinner` con `<vu-spinner size="md">` y texto "Cargando mapa…" sobre el iframe, visible mientras `mapaCargando()`.
+    - `.mapa-embed-container` con `position: relative` para anclar el overlay.
+- **Verificación:** `npm run build` → `Application bundle generation complete` sin errores de TypeScript ni de plantillas.

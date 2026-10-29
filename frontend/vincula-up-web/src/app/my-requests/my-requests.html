@@ -132,8 +132,14 @@
 						-->
 						@if (isProfessional()) {
 							@if (embeddedMapUrl(request); as mapUrl) {
-								<div class="req-card__map">
-									<iframe class="embedded-map" title="Mapa de la ubicación: {{ request.address }}" [src]="mapUrl" loading="lazy"></iframe>
+								<div class="req-card__map mapa-embed-container" [class.mapa-embed--cargando]="mapaCargando()">
+									<iframe class="embedded-map" title="Mapa de la ubicación: {{ request.address }}" [src]="mapUrl" loading="lazy" (load)="onMapaLoad()"></iframe>
+									@if (mapaCargando()) {
+										<div class="mapa-embed__spinner">
+											<vu-spinner [etiqueta]="'Cargando mapa…'" [size]="'md'" />
+											<span class="mapa-embed__texto">Cargando mapa…</span>
+										</div>
+									}
 								</div>
 							} @else {
 								<!--

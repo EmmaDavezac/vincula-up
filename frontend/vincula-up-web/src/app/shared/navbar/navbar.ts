@@ -7,11 +7,12 @@ import { UserRole } from '../../core/models/user-profile';
 import { VuAvatar } from '../avatar/avatar';
 import { VuConfirm } from '../confirm/confirm';
 import { VuIcon } from '../icon/icon';
+import { VuSpinner } from '../spinner/spinner';
 
 @Component({
 	selector: 'app-navbar',
 	standalone: true,
-	imports: [RouterLink, RouterLinkActive, VuAvatar, VuConfirm, VuIcon],
+	imports: [RouterLink, RouterLinkActive, VuAvatar, VuConfirm, VuIcon, VuSpinner],
 	templateUrl: './navbar.html',
 	styleUrl: './navbar.css',
 })
@@ -43,9 +44,12 @@ export class NavbarComponent {
 	}
 
 	readonly confirmarSalida = signal(false);
+	/** Indica que el cierre de sesión está en curso: se muestra el spinner. */
+	readonly cerrandoSesion = signal(false);
 
 	confirmarCierreDeSesion(): void {
 		this.confirmarSalida.set(false);
+		this.cerrandoSesion.set(true);
 		this.auth.logout();
 	}
 
