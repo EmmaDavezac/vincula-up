@@ -1,49 +1,33 @@
 package com.vinculaup.bff_web.client;
 
-import java.io.IOException;
-import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.ClientHttpRequest;
-import org.springframework.http.client.ClientHttpRequestFactory;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
+
+import com.vinculaup.bff_web.config.JdkHttpClientRequestFactory;
+
 import tools.jackson.databind.JsonNode;
 
 /**
  * Cliente REST hacia ms-solicitudes. Usa {@link RestClient} (nativo de Spring Boot 4.x)
  * en lugar de OpenFeign, que no es compatible con Spring Boot 4.1.1.
+ * <p>
+ * Las peticiones hacia ms-solicitudes se envían mediante {@link JdkHttpClientRequestFactory},
+ * una fábrica basada en {@link java.net.http.HttpClient} que soporta el método PATCH
+ * y reenvía el encabezado {@code Authorization} (JWT de Keycloak) de la petición entrante.
  */
 @Component
 public class SolicitudesClient {
 
     private final RestClient restClient;
 
-    public SolicitudesClient(@Value("${solicitudes.url}") String baseUrl) {
-        ClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory() {
-            @Override
-            public ClientHttpRequest createRequest(URI url, HttpMethod method) throws IOException {
-                ClientHttpRequest request = super.createRequest(url, method);
-                ServletRequestAttributes attrs =
-                        (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-                if (attrs != null) {
-                    String auth = attrs.getRequest().getHeader(HttpHeaders.AUTHORIZATION);
-                    if (auth != null && !auth.isBlank()) {
-                        request.getHeaders().add(HttpHeaders.AUTHORIZATION, auth);
-                    }
-                }
-                return request;
-            }
-        };
-
+    public SolicitudesClient(@Value("${solicitudes.url}") String baseUrl,
+            JdkHttpClientRequestFactory requestFactory) {
         this.restClient = RestClient.builder()
                 .baseUrl(baseUrl)
                 .requestFactory(requestFactory)
