@@ -594,9 +594,11 @@ que es lo único que define qué versión está vigente.
 
 **Por qué es un modal y no un guard.** Es una capa sobre toda la aplicación, no
 una pantalla: escribir una URL no lo esquiva, y tampoco navegar. La única forma de
-salir es aceptar. Mientras el backend no responde, `terminosPendientes` devuelve
-`true`: se prefiere bloquear de más un instante antes que dejar pasar a alguien
-que no aceptó.
+salir es aceptar. Mientras el backend no responde, la aplicación muestra una capa de
+animación de inicio de sesión y verificación de credenciales (`app-auth-loading`):
+primero se consulta la cuenta (`GET /api/usuarios/yo`) de forma disimulada y, si
+los términos no están aceptados, se despliega el modal sin parpadeos para quienes ya
+los aceptaron.
 
 **El id sale del token.** El endpoint no acepta un id en el cuerpo; si lo
 aceptara, cualquiera con su propia sesión podría registrar la aceptación en la

@@ -1,52 +1,32 @@
 package com.vinculaup.bff_web.client;
 
-import java.io.IOException;
-import java.net.URI;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.ClientHttpRequest;
-import org.springframework.http.client.ClientHttpRequestFactory;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
+
+import com.vinculaup.bff_web.config.JdkHttpClientRequestFactory;
+
 import tools.jackson.databind.JsonNode;
 
 /**
  * Cliente REST hacia ms-usuarios. Usa {@link RestClient} (nativo de Spring Boot 4.x)
  * en lugar de OpenFeign, que no es compatible con Spring Boot 4.1.1.
  * <p>
- * Reenvía el encabezado {@code Authorization} (JWT de Keycloak) de la petición
- * entrante hacia ms-usuarios, mediante un {@link ClientHttpRequestFactory} personalizado.
+ * Las peticiones hacia ms-usuarios se envían mediante {@link JdkHttpClientRequestFactory},
+ * una fábrica basada en {@link java.net.http.HttpClient} que soporta el método PATCH
+ * y reenvía el encabezado {@code Authorization} (JWT de Keycloak) de la petición entrante.
  */
 @Component
 public class UsuariosClient {
 
     private final RestClient restClient;
 
-    public UsuariosClient(@Value("${usuarios.url}") String baseUrl) {
-        ClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory() {
-            @Override
-            public ClientHttpRequest createRequest(URI url, HttpMethod method) throws IOException {
-                ClientHttpRequest request = super.createRequest(url, method);
-                ServletRequestAttributes attrs =
-                        (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-                if (attrs != null) {
-                    String auth = attrs.getRequest().getHeader(HttpHeaders.AUTHORIZATION);
-                    if (auth != null && !auth.isBlank()) {
-                        request.getHeaders().add(HttpHeaders.AUTHORIZATION, auth);
-                    }
-                }
-                return request;
-            }
-        };
-
+    public UsuariosClient(@Value("${usuarios.url}") String baseUrl,
+            JdkHttpClientRequestFactory requestFactory) {
         this.restClient = RestClient.builder()
                 .baseUrl(baseUrl)
                 .requestFactory(requestFactory)
@@ -57,16 +37,23 @@ public class UsuariosClient {
 
     public JsonNode listar(String rol, String estado) {
         return restClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .queryParam(rol != null ? "rol" : null, rol)
-                        .queryParam(estado != null ? "estado" : null, estado)
-                        .build())
+                .uri(uriBuilder -> {
+                    var builder = uriBuilder.path("/usuarios");
+                    if (rol != null && !rol.isBlank()) {
+                        builder.queryParam("rol", rol);
+                    }
+                    if (estado != null && !estado.isBlank()) {
+                        builder.queryParam("estado", estado);
+                    }
+                    return builder.build();
+                })
                 .retrieve()
                 .body(JsonNode.class);
     }
 
     public JsonNode crear(JsonNode body) {
         return restClient.post()
+                .uri("/usuarios")
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);
@@ -74,14 +61,14 @@ public class UsuariosClient {
 
     public JsonNode buscarPorEmail(String email) {
         return restClient.get()
-                .uri("/por-email?email={email}", email)
+                .uri("/usuarios/por-email?email={email}", email)
                 .retrieve()
                 .body(JsonNode.class);
     }
 
     public JsonNode aceptarTerminos(UUID id, JsonNode body) {
         return restClient.patch()
-                .uri("/{id}/terminos", id)
+                .uri("/usuarios/{id}/terminos", id)
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);
@@ -89,14 +76,14 @@ public class UsuariosClient {
 
     public JsonNode buscarPorId(UUID id) {
         return restClient.get()
-                .uri("/{id}", id)
+                .uri("/usuarios/{id}", id)
                 .retrieve()
                 .body(JsonNode.class);
     }
 
     public JsonNode vincularKeycloak(UUID id, JsonNode body) {
         return restClient.patch()
-                .uri("/{id}/keycloak", id)
+                .uri("/usuarios/{id}/keycloak", id)
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);
@@ -104,14 +91,14 @@ public class UsuariosClient {
 
     public JsonNode suspender(UUID id) {
         return restClient.patch()
-                .uri("/{id}/suspender", id)
+                .uri("/usuarios/{id}/suspender", id)
                 .retrieve()
                 .body(JsonNode.class);
     }
 
     public JsonNode reactivar(UUID id) {
         return restClient.patch()
-                .uri("/{id}/reactivar", id)
+                .uri("/usuarios/{id}/reactivar", id)
                 .retrieve()
                 .body(JsonNode.class);
     }
@@ -119,28 +106,38 @@ public class UsuariosClient {
     public JsonNode buscarPorKeycloakId(UUID keycloakId, String email, String nombre,
             String apellido, String rol) {
         return restClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/por-keycloak")
-                        .queryParam("keycloakId", keycloakId)
-                        .queryParam("email", email)
-                        .queryParam("nombre", nombre)
-                        .queryParam("apellido", apellido)
-                        .queryParam("rol", rol)
-                        .build())
+                .uri(uriBuilder -> {
+                    var builder = uriBuilder
+                            .path("/usuarios/por-keycloak")
+                            .queryParam("keycloakId", keycloakId);
+                    if (email != null && !email.isBlank()) {
+                        builder.queryParam("email", email);
+                    }
+                    if (nombre != null && !nombre.isBlank()) {
+                        builder.queryParam("nombre", nombre);
+                    }
+                    if (apellido != null && !apellido.isBlank()) {
+                        builder.queryParam("apellido", apellido);
+                    }
+                    if (rol != null && !rol.isBlank()) {
+                        builder.queryParam("rol", rol);
+                    }
+                    return builder.build();
+                })
                 .retrieve()
                 .body(JsonNode.class);
     }
 
     public void eliminar(UUID id) {
         restClient.delete()
-                .uri("/{id}", id)
+                .uri("/usuarios/{id}", id)
                 .retrieve()
                 .toBodilessEntity();
     }
 
     public JsonNode actualizar(UUID id, JsonNode body) {
         return restClient.patch()
-                .uri("/{id}", id)
+                .uri("/usuarios/{id}", id)
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);

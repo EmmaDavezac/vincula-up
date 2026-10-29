@@ -5,9 +5,10 @@ import { NavbarComponent } from './shared/navbar/navbar';
 import { FooterComponent } from './shared/footer/footer';
 import { VuTabbar } from './shared/tabbar/tabbar';
 import { TerminosModal } from './legal/terminos-modal';
+import { AuthLoading } from './shared/auth-loading/auth-loading';
 
 @Component({
-  imports: [RouterOutlet, NavbarComponent, FooterComponent, VuTabbar, TerminosModal],
+  imports: [RouterOutlet, NavbarComponent, FooterComponent, VuTabbar, TerminosModal, AuthLoading],
   selector: 'app-root',
   styleUrl: './app.css',
   templateUrl: './app.html',

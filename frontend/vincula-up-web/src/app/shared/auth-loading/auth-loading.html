@@ -1,0 +1,25 @@
+@if (auth.cargandoAuth()) {
+	<div class="auth-loading" role="status" aria-live="polite">
+		<div class="auth-loading__card">
+			<div class="auth-loading__brand">
+				<span class="vu-brand-mark auth-loading__logo" aria-hidden="true">V</span>
+				<span class="vu-brand-name auth-loading__name">Vincula<em>-UP</em></span>
+			</div>
+
+			<div class="auth-loading__indicator">
+				<div class="auth-loading__spinner"></div>
+			</div>
+
+			<div class="auth-loading__content">
+				<h2 class="auth-loading__title">{{ auth.mensajeCarga() }}</h2>
+				<p class="auth-loading__subtitle">{{ auth.detalleCarga() }}</p>
+			</div>
+
+			<div class="auth-loading__badge">
+				<vu-icon name="lock" [size]="13" />
+				<span>Acceso seguro institucional</span>
+			</div>
+		</div>
+	</div>
+}
+

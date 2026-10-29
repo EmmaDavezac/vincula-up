@@ -1,49 +1,33 @@
 package com.vinculaup.bff_web.client;
 
-import java.io.IOException;
-import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.ClientHttpRequest;
-import org.springframework.http.client.ClientHttpRequestFactory;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
+
+import com.vinculaup.bff_web.config.JdkHttpClientRequestFactory;
+
 import tools.jackson.databind.JsonNode;
 
 /**
  * Cliente REST hacia ms-solicitudes. Usa {@link RestClient} (nativo de Spring Boot 4.x)
  * en lugar de OpenFeign, que no es compatible con Spring Boot 4.1.1.
+ * <p>
+ * Las peticiones hacia ms-solicitudes se envían mediante {@link JdkHttpClientRequestFactory},
+ * una fábrica basada en {@link java.net.http.HttpClient} que soporta el método PATCH
+ * y reenvía el encabezado {@code Authorization} (JWT de Keycloak) de la petición entrante.
  */
 @Component
 public class SolicitudesClient {
 
     private final RestClient restClient;
 
-    public SolicitudesClient(@Value("${solicitudes.url}") String baseUrl) {
-        ClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory() {
-            @Override
-            public ClientHttpRequest createRequest(URI url, HttpMethod method) throws IOException {
-                ClientHttpRequest request = super.createRequest(url, method);
-                ServletRequestAttributes attrs =
-                        (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-                if (attrs != null) {
-                    String auth = attrs.getRequest().getHeader(HttpHeaders.AUTHORIZATION);
-                    if (auth != null && !auth.isBlank()) {
-                        request.getHeaders().add(HttpHeaders.AUTHORIZATION, auth);
-                    }
-                }
-                return request;
-            }
-        };
-
+    public SolicitudesClient(@Value("${solicitudes.url}") String baseUrl,
+            JdkHttpClientRequestFactory requestFactory) {
         this.restClient = RestClient.builder()
                 .baseUrl(baseUrl)
                 .requestFactory(requestFactory)
@@ -54,16 +38,20 @@ public class SolicitudesClient {
 
     public JsonNode geocodificar(String direccion) {
         return restClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/geocodificar")
-                        .queryParam("direccion", direccion)
-                        .build())
+                .uri(uriBuilder -> {
+                    var builder = uriBuilder.path("/solicitudes/geocodificar");
+                    if (direccion != null && !direccion.isBlank()) {
+                        builder.queryParam("direccion", direccion);
+                    }
+                    return builder.build();
+                })
                 .retrieve()
                 .body(JsonNode.class);
     }
 
     public JsonNode crear(JsonNode body) {
         return restClient.post()
+                .uri("/solicitudes")
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);
@@ -71,27 +59,35 @@ public class SolicitudesClient {
 
     public JsonNode listarParaPanel() {
         return restClient.get()
-                .uri("/panel")
+                .uri("/solicitudes/panel")
                 .retrieve()
                 .body(JsonNode.class);
     }
 
     public JsonNode listarPropias(UUID usuarioId, List<UUID> aliasIds, String tipo, String rol) {
         return restClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/mias")
-                        .queryParam("usuarioId", usuarioId)
-                        .queryParam(aliasIds != null ? "aliasIds" : null, aliasIds)
-                        .queryParam(tipo != null ? "tipo" : null, tipo)
-                        .queryParam(rol != null ? "rol" : null, rol)
-                        .build())
+                .uri(uriBuilder -> {
+                    var builder = uriBuilder
+                            .path("/solicitudes/mias")
+                            .queryParam("usuarioId", usuarioId);
+                    if (aliasIds != null && !aliasIds.isEmpty()) {
+                        builder.queryParam("aliasIds", aliasIds);
+                    }
+                    if (tipo != null && !tipo.isBlank()) {
+                        builder.queryParam("tipo", tipo);
+                    }
+                    if (rol != null && !rol.isBlank()) {
+                        builder.queryParam("rol", rol);
+                    }
+                    return builder.build();
+                })
                 .retrieve()
                 .body(JsonNode.class);
     }
 
     public JsonNode aceptar(UUID id, JsonNode body) {
         return restClient.patch()
-                .uri("/{id}/aceptar", id)
+                .uri("/solicitudes/{id}/aceptar", id)
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);
@@ -99,7 +95,7 @@ public class SolicitudesClient {
 
     public JsonNode rechazar(UUID id, JsonNode body) {
         return restClient.patch()
-                .uri("/{id}/rechazar", id)
+                .uri("/solicitudes/{id}/rechazar", id)
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);
@@ -107,7 +103,7 @@ public class SolicitudesClient {
 
     public JsonNode completar(UUID id, JsonNode body) {
         return restClient.patch()
-                .uri("/{id}/completar", id)
+                .uri("/solicitudes/{id}/completar", id)
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);
@@ -115,7 +111,7 @@ public class SolicitudesClient {
 
     public JsonNode cancelar(UUID id, JsonNode body) {
         return restClient.patch()
-                .uri("/{id}/cancelar", id)
+                .uri("/solicitudes/{id}/cancelar", id)
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);
@@ -123,11 +119,15 @@ public class SolicitudesClient {
 
     public JsonNode listarMensajes(UUID solicitudId, UUID usuarioId, UUID keycloakId) {
         return restClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/solicitudes/{solicitudId}/mensajes")
-                        .queryParam("usuarioId", usuarioId)
-                        .queryParam(keycloakId != null ? "keycloakId" : null, keycloakId)
-                        .build(solicitudId))
+                .uri(uriBuilder -> {
+                    var builder = uriBuilder
+                            .path("/solicitudes/{solicitudId}/mensajes")
+                            .queryParam("usuarioId", usuarioId);
+                    if (keycloakId != null) {
+                        builder.queryParam("keycloakId", keycloakId);
+                    }
+                    return builder.build(solicitudId);
+                })
                 .retrieve()
                 .body(JsonNode.class);
     }
