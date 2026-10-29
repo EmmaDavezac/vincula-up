@@ -187,3 +187,24 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
   - `cd backend/bff-web && ./mvnw test` → `BUILD SUCCESS`.
   - `cd frontend/vincula-up-web && npm run build` → `Application bundle generation complete` (0 errores).
 
+---
+
+### [2026-10-29] - fix: verificar términos antes de renderizar modal y agregar animación de inicio de sesión
+
+- **Objetivo:** Evitar que el modal de aceptación de términos y condiciones parpadee o se renderice antes de verificar con el backend si el usuario ya los aceptó, incorporando una animación institucional para la verificación de credenciales de acceso y el inicio de sesión.
+- **Diagnóstico:**
+  - `AuthService.terminosPendientes` retornaba `true` cuando `!this.cuentaConsultada()`. Como resultado, al iniciar sesión o recargar la página, el modal aparecía inmediatamente durante unos milisegundos antes de que respondiera `GET /api/usuarios/yo`, cerrándose abruptamente si la cuenta ya los tenía aceptados.
+  - Además, durante el procesamiento del callback de Keycloak (`?code=...&state=...`) y la verificación de la cuenta no existía una capa de carga que disimulara la espera y acompañara al usuario en las fases de "Verificando credenciales de acceso" e "Iniciando sesión".
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/core/services/auth.service.ts`:
+    - Se ajustó `terminosPendientes` para retornar `false` mientras `!this.cuentaConsultada()`.
+    - Se agregaron las señales reactivas `estadoAuth`, `cargandoAuth`, `mensajeCarga` y `detalleCarga`, junto con `iniciarCargaAuth` y `finalizarCargaAuth` (con tiempo mínimo de 450ms para transiciones visuales suaves).
+    - Se integraron los estados de carga en el callback de Keycloak (`handleCodeCallback`), en la restauración de sesión al inicializar la app y en `loginDirect`.
+    - Se aseguró que `loadOwnPhoto()` siempre resuelva `cuentaConsultada` y finalice la carga de autenticación en `finalize`.
+  - `frontend/vincula-up-web/src/app/shared/auth-loading/auth-loading.ts` / `.html` / `.css`: Nuevo componente Standalone que despliega una capa a pantalla completa con el isotipo de Vincula-UP pulsante, un spinner circular acorde a la paleta institucional (`--coral`, `--line`, `--paper`, `--surface-card`) y los mensajes de estado contextuales.
+  - `frontend/vincula-up-web/src/app/app.ts` y `app.html`: Se registró y montó `<app-auth-loading />` en el layout raíz de la aplicación.
+  - `ESPECIFICACION.md` (§8.5): Se actualizó la sección de aceptación de términos para documentar la verificación previa disimulada con la animación de inicio de sesión.
+- **Verificación:**
+  - `cd frontend/vincula-up-web && npm run build` → `Application bundle generation complete` (0 errores).
+
+
