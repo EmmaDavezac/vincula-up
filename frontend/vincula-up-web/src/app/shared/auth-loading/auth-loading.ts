@@ -12,3 +12,4 @@ import { VuIcon } from '../icon/icon';
 export class AuthLoading {
 	readonly auth = inject(AuthService);
 }
+

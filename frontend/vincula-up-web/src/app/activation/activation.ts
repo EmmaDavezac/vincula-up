@@ -372,27 +372,59 @@ export class Activation {
 
     this.validatingLocation.set(true);
     this.locationError.set('');
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        this.api.getGpsPosition(`${lat}, ${lng}`).pipe(
-          catchError(() => of(null)),
-        ).subscribe((res) => {
-          this.validatingLocation.set(false);
-          const name = res?.address || `Coordenadas: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-          const loc: ValidatedLocation = { lat, lng, displayName: name };
-          this.validatedLocation.set(loc);
-          this.zoneQuery.set(name);
-          this.locationError.set('');
-          this.syncZoneMap();
-        });
-      },
-      () => {
+
+    const onExito = (lat: number, lng: number, fallbackName?: string, aviso = '') => {
+      this.api.getGpsPosition(`${lat.toFixed(5)}, ${lng.toFixed(5)}`).pipe(
+        catchError(() => of(null)),
+      ).subscribe((res) => {
         this.validatingLocation.set(false);
-        this.locationError.set('No se pudo obtener la ubicación GPS del dispositivo. Ingresala manualmente o usá el mapa.');
+        const name = res?.address || fallbackName || `Coordenadas: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        const loc: ValidatedLocation = { lat, lng, displayName: name };
+        this.validatedLocation.set(loc);
+        this.zoneQuery.set(name);
+        this.locationError.set(aviso);
+        this.syncZoneMap();
+      });
+    };
+
+    const intentarFallback = async (codigoError?: number) => {
+      if (codigoError === 1) {
+        this.validatingLocation.set(false);
+        this.locationError.set('Permiso de ubicación denegado. Ingresá la localidad manualmente o usá el mapa.');
+        return;
+      }
+
+      try {
+        const ipRes = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(3000) });
+        if (ipRes.ok) {
+          const ipData = (await ipRes.json()) as { latitude?: number; longitude?: number; city?: string; region?: string };
+          if (typeof ipData.latitude === 'number' && typeof ipData.longitude === 'number') {
+            const ciudad = [ipData.city, ipData.region].filter(Boolean).join(', ');
+            onExito(ipData.latitude, ipData.longitude, ciudad, 'Ubicación aproximada detectada por red.');
+            return;
+          }
+        }
+      } catch {
+        // Fallback institucional
+      }
+
+      onExito(-32.4833, -58.2318, 'Concepción del Uruguay, Entre Ríos', 'Dispositivo sin GPS. Fijamos la ubicación base en Concepción del Uruguay.');
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => onExito(pos.coords.latitude, pos.coords.longitude),
+      (err1) => {
+        if (err1.code === 1) {
+          void intentarFallback(1);
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => onExito(pos.coords.latitude, pos.coords.longitude),
+          (err2) => void intentarFallback(err2.code),
+          { timeout: 4000, maximumAge: 60000, enableHighAccuracy: true },
+        );
       },
-      { timeout: 8000, enableHighAccuracy: true },
+      { timeout: 6000, maximumAge: 300000, enableHighAccuracy: false },
     );
   }
 

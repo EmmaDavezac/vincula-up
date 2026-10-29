@@ -207,4 +207,25 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
 - **Verificación:**
   - `cd frontend/vincula-up-web && npm run build` → `Application bundle generation complete` (0 errores).
 
+---
+
+### [2026-10-29] - fix: corregir detección de ubicación con fallback ante ausencia de hardware GPS
+
+- **Objetivo:** Resolver el error al pulsar "Mi ubicación" en el formulario de solicitud (`request.ts`) y en la activación de perfil profesional (`activation.ts`), donde tras conceder permisos de geolocalización el navegador no detectaba la posición y mostraba "No pudimos detectar tu ubicación. Escribí la dirección manualmente o usá el mapa.".
+- **Diagnóstico:**
+  - `navigator.geolocation.getCurrentPosition` forzaba `enableHighAccuracy: true` con timeouts de 8-10s. En computadoras de escritorio (Linux, PC de escritorio, etc.) que carecen de chip de hardware GPS satelital, los navegadores (Chromium / Firefox) fallan de inmediato con `POSITION_UNAVAILABLE` (código 2) o agotan el tiempo con `TIMEOUT` (código 3).
+  - El callback de error no realizaba reintento con baja precisión (`enableHighAccuracy: false`), ni disponía de mecanismo de fallback cuando el entorno del usuario carece de proveedores de ubicación basados en Wi-Fi o GPS.
+  - Además, la geocodificación inversa en `request.ts` llamaba a Nominatim directamente con `fetch`, lo cual en navegadores puede bloquearse por ausencia de header `User-Agent` o CORS, en lugar de utilizar el cliente backend (`GET /api/gps`).
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/request/request.ts`:
+    - Se configuró la detección de ubicación con `enableHighAccuracy: false` y caché (`maximumAge: 300000`) como primer intento rápido para desktops y redes.
+    - Se implementó un flujo resiliente de fallback: ante `POSITION_UNAVAILABLE` o `TIMEOUT`, se intenta geolocalización IP aproximada y, de persistir, se fija de forma asistida en la zona base de la Universidad Popular (Concepción del Uruguay: `-32.4844, -58.2328`), permitiendo al usuario mover el pin o escribir su calle sin bloquear el flujo.
+    - Si el permiso fue denegado explícitamente (`PERMISSION_DENIED`, código 1), se muestra un mensaje informativo específico.
+    - Se actualizó `reverseGeocode` para consultar prioritariamente el endpoint `/api/gps` del backend (`ApiService.getGpsPosition`).
+  - `frontend/vincula-up-web/src/app/activation/activation.ts`:
+    - Se replicó la misma estrategia de doble paso (`enableHighAccuracy: false` inicial, reintento controlado y fallback asistido a Concepción del Uruguay) en `detectCurrentLocation`.
+- **Verificación:**
+  - `cd frontend/vincula-up-web && npm run build` → `Application bundle generation complete` (0 errores).
+
+
 
