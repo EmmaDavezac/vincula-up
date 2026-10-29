@@ -244,3 +244,13 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
   - Commit `a62f3e6` en rama `fix/bff-patch-http-method-ms-usuarios` (4 archivos, solo el fix; los cambios previos de `frontend/`, `nginx/` y `package.json` quedan sin commitear al no pertenecer a esta tarea).
 - **Nota:** `ESPECIFICACION.md` no requiere cambios porque el fix es de implementación interna y no altera rutas, contratos de API, modelos de datos, flujos de autenticación ni variables de entorno.
 
+### [2026-10-29] - feat: mapas de solicitudes recibidas en modo oscuro
+- **Objetivo:** Que los mapas de solicitudes recibidas (vista del profesional en `my-requests`) cambien a modo oscuro cuando la página lo hace, evitando el rectángulo blanco brillante del iframe embebido de OpenStreetMap sobre pantalla oscura.
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/my-requests/my-requests.css`:
+    - `.req-card__map` y `.req-card__map` bajo `[data-tema='oscuro']`: fondo `var(--surface-tint)` y borde `var(--line-strong)` que ya invierten con el tema.
+    - `.embedded-map`: `display: block` y filtro `invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92) saturate(0.75)` bajo `[data-tema='oscuro']`, igual que las tiles reales de Leaflet en `styles.css`, para que el iframe de OSM se vea oscuro con la app.
+    - El dibujo CSS alternativo (`.vu-map`) ya usaba tokens de tema (`--surface-tint`, `--line-strong`, `--on-accent`, `--deco-line`), por lo que no requería cambios.
+- **Verificación:** `npm run build` en `frontend/vincula-up-web` → `Application bundle generation complete` sin errores de TypeScript ni de plantillas.
+- **Nota:** `ESPECIFICACION.md` no requiere cambios porque el ajuste es solo de presentación (CSS) y no altera rutas, contratos de API, modelos de datos, flujos de autenticación ni variables de entorno.
+

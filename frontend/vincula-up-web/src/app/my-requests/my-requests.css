@@ -216,12 +216,29 @@
 	margin-top: 1.25rem;
 	overflow: hidden;
 	width: 100%;
+	background: var(--surface-tint);
 }
 
 .embedded-map {
 	border: 0;
 	height: 100%;
 	width: 100%;
+	display: block;
+}
+
+/* ── Mapa embebido (OpenStreetMap iframe) en modo oscuro ──
+ * OpenStreetMap no publica tiles oscuras, así que el iframe siempre se pinta
+ * claro. Al aplicar el filtro sobre el elemento (como si fuera una imagen) se
+ * invierten los colores del mapa cuando la app está en oscuro, evitando el
+ * rectángulo blanco brillante en medio de la pantalla. Es el mismo filtro que
+ * ya usan las tiles reales de Leaflet en styles.css. */
+[data-tema='oscuro'] .req-card__map {
+	background: var(--surface-tint);
+	border-color: var(--line-strong);
+}
+
+[data-tema='oscuro'] .embedded-map {
+	filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92) saturate(0.75);
 }
 
 .req-card__reason {
