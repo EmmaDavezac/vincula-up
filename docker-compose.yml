@@ -136,6 +136,8 @@ services:
       # Con false la base arranca vacia.
       SEMBRAR_DEMO: ${SEMBRAR_DEMO:-true}
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://keycloak:8080/realms/vincula-up}
+      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/vincula-up/protocol/openid-connect/certs}
     ports:
       # Sólo accesible desde el host: ms-usuarios no expone autenticación propia,
       # así que no debe quedar publicado en la red. Toda entrada pasa por nginx/BFF.
@@ -168,6 +170,8 @@ services:
       SEMBRAR_DEMO: ${SEMBRAR_DEMO:-true}
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
       UBICACIONES_CLAVE: ${UBICACIONES_CLAVE:-}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://keycloak:8080/realms/vincula-up}
+      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/vincula-up/protocol/openid-connect/certs}
     ports:
       - "8082:8082"
     healthcheck:
@@ -199,6 +203,8 @@ services:
       # Misma clave que en ms-profesionales: si difieren, cada servicio descifra
       # lo que el otro cifró y las coordenadas quedan ilegibles.
       UBICACIONES_CLAVE: ${UBICACIONES_CLAVE:-}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://keycloak:8080/realms/vincula-up}
+      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/vincula-up/protocol/openid-connect/certs}
     ports:
       - "8083:8083"
     healthcheck:

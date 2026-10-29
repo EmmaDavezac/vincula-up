@@ -135,6 +135,22 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
 
 ---
 
+### [2026-10-28] - fix: configurar KEYCLOAK_HOSTNAME para resolver error de source map en login
+
+- **Objetivo:** Resolver el error "Error de mapa de fuente: Error: request failed with status 404" que aparecía al intentar iniciar sesión, específicamente cuando el navegador intentaba cargar el mapa de fuentes (`patternfly.min.css.map`) de Keycloak.
+
+- **Diagnóstico:** La variable de entorno `KEYCLOAK_HOSTNAME` estaba vacía en el archivo `.env`. Cuando no está configurada, Keycloak intenta resolver el hostname desde el request entrante, lo que genera URLs incorrectas para los recursos (incluyendo los source maps CSS). El error ocurría porque el navegador solicitaba `patternfly.min.css.map` en `https://vincula-up.local/resources/...` pero Keycloak generaba la URL con un hostname incorrecto o inexistente.
+
+- **Cambios realizados:**
+  - `.env`: Agregado `KEYCLOAK_HOSTNAME=vincula-up.local` (línea 9)
+
+- **Justificación:** Con `KEYCLOAK_HOSTNAME` fijo en `vincula-up.local`, Keycloak genera URLs correctas para todos sus recursos estáticos incluidos los source maps. Esto es consistente con lo documentado en `ESPECIFICACION.md` (sección Keycloak, variable `KEYCLOAK_HOSTNAME` con valor `vincula-up.local`).
+
+- **Verificación:**
+  - Levantar el stack con `docker compose up --build`
+  - Acceder a `https://vincula-up.local` e iniciar sesión
+  - Verificar en las herramientas de desarrollo (Network) que las solicitudes a `patternfly.min.css.map` ya no retornan 404
+
 ### [2026-10-28] - refactor: reemplazar Spring Cloud OpenFeign por RestClient (Spring Boot 4.x compatible)
 - **Objetivo:** Que `ms-solicitudes` y `bff-web` arranquen saludables en Docker sin `NoClassDefFoundError` ni fallos de compilación.
 - **Diagnóstico:** `spring-cloud-starter-openfeign` con `spring-cloud-dependencies` (2024.0.0 o 2025.0.0) es incompatible con Spring Boot 4.1.1. Spring Cloud intenta cargar `ServerProperties`, `SpringDataWebProperties` y otras clases que no existen en Spring Boot 4.x, provocando `NoClassDefFoundError` y `BeanCreationException` en `feignClientsConfiguration`. Ambos servicios entraban en loop de reinicios.
@@ -153,3 +169,21 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
   - `./mvnw -DskipTests clean compile` en `backend/bff-web` → `BUILD SUCCESS` (13 archivos).
   - Commit `22c166e` en rama `dev` (15 archivos, 924 inserciones, 306 eliminaciones).
   - `ESPECIFICACION.md`: no requiere cambios (no se alteran endpoints, contratos ni modelos).
+
+---
+
+### [2026-10-29] - fix: corregir rutas downstream y parámetros nulos en RestClients del BFF
+
+- **Objetivo:** Resolver los errores 404 (en `/api/usuarios/por-keycloak`, `/api/usuarios/yo`, `/api/solicitudes/panel`) y 400 (en `/api/profesionales?todos=true`, `/api/usuarios?rol=CLIENTE`) reportados al consumir el BFF desde el frontend.
+- **Diagnóstico:**
+  - Tras la migración de OpenFeign a RestClient en `bff-web`, los métodos de `UsuariosClient`, `ProfesionalesClient` y `SolicitudesClient` llamaban a rutas relativas sin el prefijo del controller de destino (por ejemplo, `/por-keycloak` en vez de `/usuarios/por-keycloak`, `/panel` en vez de `/solicitudes/panel`, o sin URI en `crear` llamando a la raíz del microservicio). Al recibir la petición, los microservicios downstream devolvían 404 Not Found, lo cual era propagado por `BackendGateway` al cliente.
+  - Además, los métodos `listar` construían la URL mediante `uriBuilder.queryParam(param != null ? "param" : null, param)`. Al enviar parámetros opcionales nulos (como `estado == null` al consultar `todos=true`), `UriComponentsBuilder` lanzaba `IllegalArgumentException: Name must not be null`, que el `BffExceptionHandler` interceptaba y transformaba en HTTP 400 Bad Request.
+- **Cambios realizados:**
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/client/UsuariosClient.java`: Se agregaron los prefijos `/usuarios` en todas las rutas del cliente y se condicionó la inclusión de query params (`rol`, `estado`, `email`, `nombre`, `apellido`) para evitar claves nulas.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/client/ProfesionalesClient.java`: Se agregaron los prefijos `/profesionales` en todas las rutas y se aseguró la ruta `/profesionales` en `crear` y condicionales en `listar`, `listarPorUsuarioIds` y `miPerfil`.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/client/SolicitudesClient.java`: Se agregaron los prefijos `/solicitudes` en las rutas (`/solicitudes/geocodificar`, `/solicitudes`, `/solicitudes/panel`, `/solicitudes/mias`, `/solicitudes/{id}/*`) y se aseguraron condicionales para query params opcionales en `listarPropias` y `listarMensajes`.
+- **Verificación:**
+  - `cd backend/bff-web && ./mvnw clean compile` → `BUILD SUCCESS`.
+  - `cd backend/bff-web && ./mvnw test` → `BUILD SUCCESS`.
+  - `cd frontend/vincula-up-web && npm run build` → `Application bundle generation complete` (0 errores).
+

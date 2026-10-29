@@ -57,16 +57,23 @@ public class UsuariosClient {
 
     public JsonNode listar(String rol, String estado) {
         return restClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .queryParam(rol != null ? "rol" : null, rol)
-                        .queryParam(estado != null ? "estado" : null, estado)
-                        .build())
+                .uri(uriBuilder -> {
+                    var builder = uriBuilder.path("/usuarios");
+                    if (rol != null && !rol.isBlank()) {
+                        builder.queryParam("rol", rol);
+                    }
+                    if (estado != null && !estado.isBlank()) {
+                        builder.queryParam("estado", estado);
+                    }
+                    return builder.build();
+                })
                 .retrieve()
                 .body(JsonNode.class);
     }
 
     public JsonNode crear(JsonNode body) {
         return restClient.post()
+                .uri("/usuarios")
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);
@@ -74,14 +81,14 @@ public class UsuariosClient {
 
     public JsonNode buscarPorEmail(String email) {
         return restClient.get()
-                .uri("/por-email?email={email}", email)
+                .uri("/usuarios/por-email?email={email}", email)
                 .retrieve()
                 .body(JsonNode.class);
     }
 
     public JsonNode aceptarTerminos(UUID id, JsonNode body) {
         return restClient.patch()
-                .uri("/{id}/terminos", id)
+                .uri("/usuarios/{id}/terminos", id)
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);
@@ -89,14 +96,14 @@ public class UsuariosClient {
 
     public JsonNode buscarPorId(UUID id) {
         return restClient.get()
-                .uri("/{id}", id)
+                .uri("/usuarios/{id}", id)
                 .retrieve()
                 .body(JsonNode.class);
     }
 
     public JsonNode vincularKeycloak(UUID id, JsonNode body) {
         return restClient.patch()
-                .uri("/{id}/keycloak", id)
+                .uri("/usuarios/{id}/keycloak", id)
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);
@@ -104,14 +111,14 @@ public class UsuariosClient {
 
     public JsonNode suspender(UUID id) {
         return restClient.patch()
-                .uri("/{id}/suspender", id)
+                .uri("/usuarios/{id}/suspender", id)
                 .retrieve()
                 .body(JsonNode.class);
     }
 
     public JsonNode reactivar(UUID id) {
         return restClient.patch()
-                .uri("/{id}/reactivar", id)
+                .uri("/usuarios/{id}/reactivar", id)
                 .retrieve()
                 .body(JsonNode.class);
     }
@@ -119,28 +126,38 @@ public class UsuariosClient {
     public JsonNode buscarPorKeycloakId(UUID keycloakId, String email, String nombre,
             String apellido, String rol) {
         return restClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/por-keycloak")
-                        .queryParam("keycloakId", keycloakId)
-                        .queryParam("email", email)
-                        .queryParam("nombre", nombre)
-                        .queryParam("apellido", apellido)
-                        .queryParam("rol", rol)
-                        .build())
+                .uri(uriBuilder -> {
+                    var builder = uriBuilder
+                            .path("/usuarios/por-keycloak")
+                            .queryParam("keycloakId", keycloakId);
+                    if (email != null && !email.isBlank()) {
+                        builder.queryParam("email", email);
+                    }
+                    if (nombre != null && !nombre.isBlank()) {
+                        builder.queryParam("nombre", nombre);
+                    }
+                    if (apellido != null && !apellido.isBlank()) {
+                        builder.queryParam("apellido", apellido);
+                    }
+                    if (rol != null && !rol.isBlank()) {
+                        builder.queryParam("rol", rol);
+                    }
+                    return builder.build();
+                })
                 .retrieve()
                 .body(JsonNode.class);
     }
 
     public void eliminar(UUID id) {
         restClient.delete()
-                .uri("/{id}", id)
+                .uri("/usuarios/{id}", id)
                 .retrieve()
                 .toBodilessEntity();
     }
 
     public JsonNode actualizar(UUID id, JsonNode body) {
         return restClient.patch()
-                .uri("/{id}", id)
+                .uri("/usuarios/{id}", id)
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);

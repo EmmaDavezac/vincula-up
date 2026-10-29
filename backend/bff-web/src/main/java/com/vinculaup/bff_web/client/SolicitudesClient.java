@@ -54,16 +54,20 @@ public class SolicitudesClient {
 
     public JsonNode geocodificar(String direccion) {
         return restClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/geocodificar")
-                        .queryParam("direccion", direccion)
-                        .build())
+                .uri(uriBuilder -> {
+                    var builder = uriBuilder.path("/solicitudes/geocodificar");
+                    if (direccion != null && !direccion.isBlank()) {
+                        builder.queryParam("direccion", direccion);
+                    }
+                    return builder.build();
+                })
                 .retrieve()
                 .body(JsonNode.class);
     }
 
     public JsonNode crear(JsonNode body) {
         return restClient.post()
+                .uri("/solicitudes")
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);
@@ -71,27 +75,35 @@ public class SolicitudesClient {
 
     public JsonNode listarParaPanel() {
         return restClient.get()
-                .uri("/panel")
+                .uri("/solicitudes/panel")
                 .retrieve()
                 .body(JsonNode.class);
     }
 
     public JsonNode listarPropias(UUID usuarioId, List<UUID> aliasIds, String tipo, String rol) {
         return restClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/mias")
-                        .queryParam("usuarioId", usuarioId)
-                        .queryParam(aliasIds != null ? "aliasIds" : null, aliasIds)
-                        .queryParam(tipo != null ? "tipo" : null, tipo)
-                        .queryParam(rol != null ? "rol" : null, rol)
-                        .build())
+                .uri(uriBuilder -> {
+                    var builder = uriBuilder
+                            .path("/solicitudes/mias")
+                            .queryParam("usuarioId", usuarioId);
+                    if (aliasIds != null && !aliasIds.isEmpty()) {
+                        builder.queryParam("aliasIds", aliasIds);
+                    }
+                    if (tipo != null && !tipo.isBlank()) {
+                        builder.queryParam("tipo", tipo);
+                    }
+                    if (rol != null && !rol.isBlank()) {
+                        builder.queryParam("rol", rol);
+                    }
+                    return builder.build();
+                })
                 .retrieve()
                 .body(JsonNode.class);
     }
 
     public JsonNode aceptar(UUID id, JsonNode body) {
         return restClient.patch()
-                .uri("/{id}/aceptar", id)
+                .uri("/solicitudes/{id}/aceptar", id)
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);
@@ -99,7 +111,7 @@ public class SolicitudesClient {
 
     public JsonNode rechazar(UUID id, JsonNode body) {
         return restClient.patch()
-                .uri("/{id}/rechazar", id)
+                .uri("/solicitudes/{id}/rechazar", id)
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);
@@ -107,7 +119,7 @@ public class SolicitudesClient {
 
     public JsonNode completar(UUID id, JsonNode body) {
         return restClient.patch()
-                .uri("/{id}/completar", id)
+                .uri("/solicitudes/{id}/completar", id)
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);
@@ -115,7 +127,7 @@ public class SolicitudesClient {
 
     public JsonNode cancelar(UUID id, JsonNode body) {
         return restClient.patch()
-                .uri("/{id}/cancelar", id)
+                .uri("/solicitudes/{id}/cancelar", id)
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);
@@ -123,11 +135,15 @@ public class SolicitudesClient {
 
     public JsonNode listarMensajes(UUID solicitudId, UUID usuarioId, UUID keycloakId) {
         return restClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/solicitudes/{solicitudId}/mensajes")
-                        .queryParam("usuarioId", usuarioId)
-                        .queryParam(keycloakId != null ? "keycloakId" : null, keycloakId)
-                        .build(solicitudId))
+                .uri(uriBuilder -> {
+                    var builder = uriBuilder
+                            .path("/solicitudes/{solicitudId}/mensajes")
+                            .queryParam("usuarioId", usuarioId);
+                    if (keycloakId != null) {
+                        builder.queryParam("keycloakId", keycloakId);
+                    }
+                    return builder.build(solicitudId);
+                })
                 .retrieve()
                 .body(JsonNode.class);
     }
