@@ -57,7 +57,7 @@ import { ApiService } from '../core/services/api.service';
 
 					<button
 						type="button"
-						class="vu-btn vu-btn--ink vu-btn--pill vu-btn--block"
+						class="vu-btn vu-btn--ink vu-btn--block"
 						[disabled]="!aceptado() || guardando()"
 						(click)="aceptar()"
 					>

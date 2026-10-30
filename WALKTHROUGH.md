@@ -55,3 +55,15 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
   - En [activation.ts](file:///home/emma/Desktop/vincula-up/frontend/vincula-up-web/src/app/activation/activation.ts#L117-L146): Se habilitó la interactividad completa del mapa Leaflet (arrastrar el marcador `dragend` y hacer clic en el mapa para posicionarlo directamente).
   - En [activation.css](file:///home/emma/Desktop/vincula-up/frontend/vincula-up-web/src/app/activation/activation.css#L160-L220): Se importaron y alinearon los estilos CSS `.location-field`, `.location-gps`, `.step-map` y `.privacy-note`.
 - **Verificación:** Compilación exitosa del frontend Angular mediante `npm run build`.
+
+
+### [2026-10-30] - feat: guía visual, botones cuadrados y barra inferior móvil sólida
+- **Objetivo:** Establecer la guía visual de Vincula-UP y aplicar sus reglas: botones planos y cuadrados, diferenciación clara entre primario y secundario, modal de cerrar sesión cuadrado y barra inferior de móvil con fondo sólido (no transparente).
+- **Cambios realizados:**
+  - `GUÍA-VISUAL.md` (nuevo): paleta de colores completa (tokens y HEX, claro y oscuro), reglas de botones (planos, cuadrados, sin píldoras), diferenciación primario (`.vu-btn--ink` relleno) vs secundario (`.vu-btn--outline` borde) vs terciario (`.vu-btn--quiet`) vs crear (`.vu-btn--coral`) vs peligro (`.vu-btn--danger`), hover solo con cambio de color (sin `transform`), radios por componente, barra inferior móvil fondo sólido, tema claro/oscuro con tokens.
+  - `AGENTS.md`: nueva sección 7 "Guía visual obligatoria (MANDATORIO)" que referencia `GUÍA-VISUAL.md` y exige su cumplimiento a todo agente.
+  - `frontend/vincula-up-web/src/styles.css`: `.vu-btn` con `border-radius: 0` (cuadrado); `.vu-btn--pill` anulado (`border-radius: 0`); `.vu-tabbar` con `background: var(--paper)` (fondo sólido, no translúcido).
+  - `frontend/vincula-up-web/src/app/shared/confirm/confirm.html`: botón aceptar del modal `vu-confirm` quita `vu-btn--pill` (ahora cuadrado).
+  - Se elimina `vu-btn--pill` de todos los componentes que lo usaban: `terminos-modal.ts`, `admin-categories.html`, `admin-category-new.html`, `admin-professional-new.html`, `admin-professionals.html`, `my-requests.html`, `request.html`.
+- **Verificación:** `npm run build` compila limpiamente; no queda ningún `vu-btn--pill` en componentes.
+- **Especificación:** `ESPECIFICACION.md` §17 y Anexo C ya documentan los tokens y el tema; no requiere cambios estructurales (la guía visual consolida las mismas reglas).

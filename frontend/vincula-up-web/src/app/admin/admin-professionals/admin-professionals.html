@@ -15,7 +15,7 @@
 			}
 		</p>
 	</div>
-	<a class="vu-btn vu-btn--coral vu-btn--pill" routerLink="/admin/profesionales/nuevo">
+	<a class="vu-btn vu-btn--coral" routerLink="/admin/profesionales/nuevo">
 		<vu-icon name="plus" [size]="16" />
 		Nuevo profesional
 	</a>
@@ -203,7 +203,7 @@
 			</dl>
 
 			@if (abierto.modo === 'edicion') {
-				<button type="button" class="vu-btn vu-btn--ink vu-btn--pill vu-btn--block" (click)="guardarCambios()" [disabled]="savingEdit()">
+				<button type="button" class="vu-btn vu-btn--ink vu-btn--block" (click)="guardarCambios()" [disabled]="savingEdit()">
 					{{ savingEdit() ? 'Guardando...' : 'Guardar cambios' }}
 				</button>
 			}

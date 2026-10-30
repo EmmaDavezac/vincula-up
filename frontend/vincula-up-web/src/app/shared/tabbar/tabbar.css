@@ -7,7 +7,10 @@ El alto sale de `--tabbar-h`, que el pie también reserva. Sin ese espacio, la
 barra fija tapaba la última fila del pie en móvil.
 */
 .vu-tabbar {
-	background: var(--bar-translucent);
+	/* Guía visual: la barra inferior de móvil no es transparente. Fondo sólido
+	   (--paper) para que se lea como barra de navegación y no como velo sobre
+	   el contenido. */
+	background: var(--paper);
 	border-top: 1px solid var(--line);
 	bottom: 0;
 	box-shadow: 0 -4px 16px rgb(var(--shadow-color) / calc(0.08 * var(--shadow-strength)));
