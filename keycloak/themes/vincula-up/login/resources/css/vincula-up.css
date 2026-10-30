@@ -1,0 +1,643 @@
+/*
+ * Estética de Vincula-UP en las pantallas de acceso de Keycloak.
+ *
+ * Este archivo personaliza la experiencia visual del login, registro,
+ * recuperación y actualización de credenciales.
+ *
+ * Principios aplicados:
+ * 1. Todos los botones tienen forma estrictamente cuadrada uniforme (sin mezclar
+ *    botones redondos ni píldoras).
+ * 2. Inputs amplios, cómodos, con altura mínima confortable (3rem / 48px),
+ *    espaciado generoso, placeholders y textos de ayuda.
+ * 3. Botón de "ver contraseña" perfectamente integrado dentro del campo,
+ *    sin desfasajes, bordes dobles ni fondos residuales.
+ * 4. Clara jerarquía entre botón primario (coral sólido) y secundario (contorno sutil).
+ * 5. Soporte coherente para modo claro y modo oscuro.
+ */
+
+:root {
+	/* ── Color: los tokens del frontend ──────────────────────────────────── */
+	--vu-paper: #f6f3ec;         /* --paper */
+	--vu-card: #fffdf8;          /* --surface-card */
+	--vu-ink: #1e2926;           /* --ink */
+	--vu-muted: #67716c;         /* --muted */
+	--vu-line: #d8d8ce;          /* --line */
+	--vu-coral: #e35f43;         /* --coral */
+	--vu-coral-dark: #c34f3d;    /* --coral-dark */
+	--vu-surface-highlight: #f3f5f1;  /* --surface-highlight */
+	--vu-on-accent: #ffffff;     /* --on-accent */
+	--vu-on-accent-solid: #ffffff;
+
+	/* Alertas: fondo, tinta y borde */
+	--vu-error-bg: #fbebee;
+	--vu-error-ink: #b42318;
+	--vu-error-border: #f3cfd2;
+	--vu-ok-bg: #eaf5eb;
+	--vu-ok-ink: #225339;
+	--vu-ok-border: #a7e3c4;
+	--vu-warn-bg: #fef5e7;
+	--vu-warn-ink: #91621c;
+
+	/* ── Tipografía ──────────────────────────────────────────────────────── */
+	--vu-font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+		'Helvetica Neue', Arial, sans-serif;
+	--vu-font-serif: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
+
+	/* ── Sombras y geometrías: estrictamente cuadradas ────────────────────── */
+	--vu-shadow-md: 0 8px 30px rgb(30 41 38 / 0.06);
+
+	/*
+	 * REGLA ESTRICTA DE FORMA:
+	 * Todos los botones y campos comparten la misma geometría cuadrada (4px).
+	 * No se mezclan elementos redondos ni píldoras.
+	 */
+	--vu-radius-btn: 4px;
+	--vu-radius-input: 4px;
+	--vu-radius: 4px;
+	--vu-radius-card: 16px;
+}
+
+/*
+ * ── Fondo de la página ────────────────────────────────────────────────────
+ */
+.login-pf body {
+	background: var(--vu-paper);
+	background-image: none;
+	height: auto;
+	min-height: 100vh;
+}
+
+/* Ancho y estructura de la tarjeta */
+.pf-v5-c-login__container {
+	grid-template-columns: min(30rem, 100%);
+	padding: 2rem 1.25rem;
+}
+
+.pf-v5-c-login__main {
+	background: var(--vu-card);
+	border: 1px solid var(--vu-line);
+	border-radius: var(--vu-radius-card);
+	box-shadow: var(--vu-shadow-md);
+	color: var(--vu-ink);
+	overflow: hidden;
+}
+
+.pf-v5-c-login__main-header {
+	border-top: 4px solid var(--vu-coral);
+}
+
+/*
+ * ── Tipografía ────────────────────────────────────────────────────────────
+ */
+body {
+	font-family: var(--vu-font-sans);
+	-webkit-font-smoothing: antialiased;
+}
+
+.kc-page-title {
+	color: var(--vu-ink);
+	font-family: var(--vu-font-serif);
+	font-size: 2.125rem;
+	font-weight: 400;
+	letter-spacing: -0.04em;
+	line-height: 1.1;
+}
+
+@media (max-width: 480px) {
+	.kc-page-title {
+		font-size: 1.75rem;
+	}
+
+	.pf-v5-c-login__container {
+		padding: 1rem 0.75rem;
+	}
+}
+
+/*
+ * ── Cabecera con la marca ─────────────────────────────────────────────────
+ */
+.vu-header {
+	background: transparent;
+	padding: 2rem 1.5rem 1rem;
+	text-align: center;
+}
+
+.vu-brand {
+	align-items: center;
+	display: flex;
+	gap: 0.75rem;
+	justify-content: center;
+}
+
+.vu-brand-mark {
+	align-items: center;
+	background: var(--vu-coral);
+	border-radius: var(--vu-radius-btn);
+	color: var(--vu-on-accent-solid);
+	display: flex;
+	font-family: var(--vu-font-serif);
+	font-size: 1.5rem;
+	height: 2.5rem;
+	justify-content: center;
+	width: 2.5rem;
+}
+
+.vu-brand-name {
+	color: var(--vu-ink);
+	font-family: var(--vu-font-serif);
+	font-size: 1.4375rem;
+	letter-spacing: -0.03em;
+	line-height: 1.2;
+}
+
+.vu-brand-name em {
+	color: var(--vu-coral);
+	font-style: normal;
+}
+
+.vu-header__tagline {
+	color: var(--vu-muted);
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	margin: 0.75rem 0 0;
+}
+
+/*
+ * ── Pie Institucional ─────────────────────────────────────────────────────
+ */
+.kc-footer {
+	border-top: 1px solid var(--vu-line);
+	margin-top: 1.75rem;
+	padding: 1.25rem 1.5rem;
+	text-align: center;
+}
+
+.kc-footer__line {
+	color: var(--vu-ink);
+	font-size: 0.75rem;
+	line-height: 1.6;
+	margin: 0;
+}
+
+.kc-footer__line--muted {
+	color: var(--vu-muted);
+	margin-top: 0.25rem;
+}
+
+.kc-footer a,
+#kc-form a:not(.pf-v5-c-button),
+#kc-info a:not(.pf-v5-c-button) {
+	color: var(--vu-coral);
+	font-weight: 700;
+	text-decoration: none;
+}
+
+.kc-footer a:hover,
+#kc-form a:not(.pf-v5-c-button):hover,
+#kc-info a:not(.pf-v5-c-button):hover {
+	color: var(--vu-coral-dark);
+	text-decoration: underline;
+}
+
+/*
+ * ── Campos de Formulario e Inputs ─────────────────────────────────────────
+ * Los campos ahora tienen tamaño cómodo (altura 3rem / 48px), espaciado
+ * generoso, placeholders y textos de ayuda.
+ */
+
+.pf-v5-c-form__group {
+	margin-bottom: 1.25rem;
+}
+
+.pf-v5-c-login .pf-v5-c-form__label {
+	color: var(--vu-ink);
+	display: block;
+	font-size: 0.875rem;
+	font-weight: 700;
+	line-height: 1.3;
+	margin-bottom: 0.375rem;
+}
+
+.pf-v5-c-login .pf-v5-c-form__label-required,
+.pf-v5-c-login .kc-input-required {
+	color: var(--vu-coral);
+	margin-left: 0.25rem;
+}
+
+/* Envoltorio del campo */
+.pf-v5-c-login .pf-v5-c-form-control {
+	align-items: center;
+	background-color: var(--vu-on-accent);
+	border: 1px solid var(--vu-line);
+	border-radius: var(--vu-radius-input) !important;
+	box-shadow: none;
+	color: var(--vu-ink);
+	display: flex;
+	min-height: 3rem;
+	padding: 0 0.875rem;
+	position: relative;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+	width: 100%;
+}
+
+.pf-v5-c-login .pf-v5-c-form-control:hover {
+	border-color: var(--vu-muted);
+}
+
+.pf-v5-c-login .pf-v5-c-form-control:focus-within {
+	border-color: var(--vu-coral) !important;
+	box-shadow: 0 0 0 3px rgb(227 95 67 / 0.18) !important;
+}
+
+/* Input nativo dentro del wrapper */
+.pf-v5-c-login .pf-v5-c-form-control input,
+.pf-v5-c-login .pf-v5-c-form-control textarea,
+.pf-v5-c-login .pf-v5-c-form-control select {
+	background: transparent !important;
+	border: 0 !important;
+	box-shadow: none !important;
+	color: var(--vu-ink) !important;
+	font-family: var(--vu-font-sans);
+	font-size: 0.9375rem;
+	height: 100%;
+	line-height: 1.5;
+	margin: 0;
+	outline: none;
+	padding: 0.75rem 0;
+	width: 100%;
+}
+
+.pf-v5-c-login .pf-v5-c-form-control input:focus,
+.pf-v5-c-login .pf-v5-c-form-control input:focus-visible,
+.pf-v5-c-login .pf-v5-c-form-control textarea:focus,
+.pf-v5-c-login .pf-v5-c-form-control select:focus {
+	box-shadow: none !important;
+	outline: none !important;
+}
+
+/* Placeholder */
+.pf-v5-c-login .pf-v5-c-form-control input::placeholder,
+.pf-v5-c-login .pf-v5-c-form-control textarea::placeholder {
+	color: var(--vu-muted);
+	font-family: var(--vu-font-sans);
+	font-size: 0.875rem;
+	opacity: 0.75;
+}
+
+/* Desactivar pseudo-elementos residuales de PatternFly */
+.pf-v5-c-login .pf-v5-c-form-control::before,
+.pf-v5-c-login .pf-v5-c-form-control::after {
+	content: none !important;
+	display: none !important;
+}
+
+/* Campo con error */
+.pf-v5-c-login .pf-v5-c-form-control.pf-m-error,
+.pf-v5-c-login .pf-v5-c-input-group.pf-m-error {
+	border-color: var(--vu-error-border) !important;
+}
+
+.pf-v5-c-login .pf-v5-c-form-control.pf-m-error:focus-within,
+.pf-v5-c-login .pf-v5-c-input-group.pf-m-error:focus-within {
+	border-color: var(--vu-error-ink) !important;
+	box-shadow: 0 0 0 3px rgb(180 35 24 / 0.15) !important;
+}
+
+/* Textos de ayuda debajo de los campos */
+.pf-v5-c-login .kc-field-help-text,
+.pf-v5-c-login .pf-v5-c-form__helper-text {
+	border-bottom: none !important;
+	color: var(--vu-muted);
+	font-size: 0.8125rem;
+	line-height: 1.4;
+	margin-top: 0.375rem;
+}
+
+.pf-v5-c-login .kc-field-help-text span {
+	color: var(--vu-muted);
+}
+
+.pf-v5-c-login .kc-forgot-password-link {
+	margin-top: 0.25rem;
+}
+
+.pf-v5-c-login .kc-forgot-password-link a {
+	font-size: 0.8125rem;
+	font-weight: 600;
+}
+
+/* Mensajes de error específicos */
+.pf-v5-c-login .kc-feedback-text.pf-m-error,
+.pf-v5-c-login .pf-v5-c-helper-text__item.pf-m-error {
+	color: var(--vu-error-ink) !important;
+	font-size: 0.8125rem;
+	font-weight: 600;
+	line-height: 1.4;
+	margin-top: 0.375rem;
+}
+
+/*
+ * ── Botón "Ver Contraseña" (Input Group) ──────────────────────────────────
+ * Se unifica el input de contraseña con el botón del ojo en un único
+ * contenedor sin cortes visuales, bordes dobles ni saltos.
+ */
+
+.pf-v5-c-login .pf-v5-c-input-group {
+	align-items: stretch;
+	background-color: var(--vu-on-accent);
+	border: 1px solid var(--vu-line);
+	border-radius: var(--vu-radius-input) !important;
+	box-shadow: none;
+	display: flex;
+	min-height: 3rem;
+	overflow: hidden;
+	position: relative;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+	width: 100%;
+}
+
+.pf-v5-c-login .pf-v5-c-input-group:hover {
+	border-color: var(--vu-muted);
+}
+
+.pf-v5-c-login .pf-v5-c-input-group:focus-within {
+	border-color: var(--vu-coral) !important;
+	box-shadow: 0 0 0 3px rgb(227 95 67 / 0.18) !important;
+}
+
+.pf-v5-c-login .pf-v5-c-input-group .pf-v5-c-input-group__item.pf-m-fill {
+	align-items: center;
+	display: flex;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.pf-v5-c-login .pf-v5-c-input-group .pf-v5-c-form-control {
+	background: transparent !important;
+	border: none !important;
+	border-radius: 0 !important;
+	box-shadow: none !important;
+	height: 100%;
+	min-height: 3rem;
+	padding-left: 0.875rem;
+	padding-right: 0.25rem;
+	width: 100%;
+}
+
+.pf-v5-c-login .pf-v5-c-input-group .pf-v5-c-input-group__item:not(.pf-m-fill) {
+	align-items: center;
+	display: flex;
+}
+
+/* El botón del ojo */
+.pf-v5-c-login .pf-v5-c-button.pf-m-control,
+.pf-v5-c-login .kc-password-toggle-btn {
+	align-items: center;
+	background-color: transparent !important;
+	border: none !important;
+	border-radius: 0 !important;
+	box-shadow: none !important;
+	color: var(--vu-muted) !important;
+	cursor: pointer;
+	display: inline-flex;
+	font-size: 1.125rem;
+	height: 100%;
+	justify-content: center;
+	margin: 0;
+	min-height: 3rem;
+	padding: 0 1rem !important;
+	transition: color 0.15s ease;
+}
+
+.pf-v5-c-login .pf-v5-c-button.pf-m-control::before,
+.pf-v5-c-login .pf-v5-c-button.pf-m-control::after,
+.pf-v5-c-login .kc-password-toggle-btn::before,
+.pf-v5-c-login .kc-password-toggle-btn::after {
+	content: none !important;
+	display: none !important;
+}
+
+.pf-v5-c-login .pf-v5-c-button.pf-m-control:hover,
+.pf-v5-c-login .pf-v5-c-button.pf-m-control:focus,
+.pf-v5-c-login .kc-password-toggle-btn:hover,
+.pf-v5-c-login .kc-password-toggle-btn:focus {
+	background-color: transparent !important;
+	color: var(--vu-coral) !important;
+	outline: none !important;
+}
+
+/*
+ * ── Botones: Principio Primario y Secundario (Forma Cuadrada) ─────────────
+ * REGLA: Todos los botones usan `border-radius: 4px !important`.
+ * Ningún botón es redondo ni píldora.
+ */
+
+.pf-v5-c-login .pf-v5-c-button {
+	align-items: center;
+	border-radius: var(--vu-radius-btn) !important;
+	cursor: pointer;
+	display: inline-flex;
+	font-family: var(--vu-font-sans);
+	font-size: 0.9375rem;
+	font-weight: 700;
+	justify-content: center;
+	line-height: 1.2;
+	min-height: 3rem;
+	padding: 0.8125rem 1.25rem;
+	text-align: center;
+	text-decoration: none;
+	transition:
+		background-color 0.15s ease,
+		border-color 0.15s ease,
+		color 0.15s ease,
+		box-shadow 0.15s ease;
+	white-space: nowrap;
+}
+
+.pf-v5-c-login .pf-v5-c-button::before,
+.pf-v5-c-login .pf-v5-c-button::after {
+	border-radius: var(--vu-radius-btn) !important;
+}
+
+/* ── Botón Primario ──────────────────────────────────────────────────────── */
+.pf-v5-c-login .pf-v5-c-button.pf-m-primary,
+.pf-v5-c-login input[type="submit"].pf-m-primary,
+.pf-v5-c-login button[type="submit"].pf-m-primary,
+.pf-v5-c-login #kc-login,
+.pf-v5-c-login #kc-submit,
+.pf-v5-c-login #kc-form-buttons button.pf-m-primary {
+	background-color: var(--vu-coral) !important;
+	border: 1px solid var(--vu-coral) !important;
+	color: var(--vu-on-accent-solid) !important;
+	font-weight: 700;
+}
+
+.pf-v5-c-login .pf-v5-c-button.pf-m-primary:hover,
+.pf-v5-c-login input[type="submit"].pf-m-primary:hover,
+.pf-v5-c-login button[type="submit"].pf-m-primary:hover,
+.pf-v5-c-login #kc-login:hover,
+.pf-v5-c-login #kc-submit:hover {
+	background-color: var(--vu-coral-dark) !important;
+	border-color: var(--vu-coral-dark) !important;
+	color: var(--vu-on-accent-solid) !important;
+}
+
+.pf-v5-c-login .pf-v5-c-button.pf-m-primary:focus-visible,
+.pf-v5-c-login #kc-login:focus-visible,
+.pf-v5-c-login #kc-submit:focus-visible {
+	outline: 2px solid var(--vu-coral);
+	outline-offset: 2px;
+}
+
+/* ── Botón Secundario ────────────────────────────────────────────────────── */
+.pf-v5-c-login .pf-v5-c-button.pf-m-secondary,
+.pf-v5-c-login a.pf-v5-c-button.pf-m-secondary,
+.pf-v5-c-login .kc-register-btn,
+.pf-v5-c-login #kc-back-to-login {
+	background-color: transparent !important;
+	border: 1px solid var(--vu-line) !important;
+	color: var(--vu-ink) !important;
+	font-weight: 600;
+}
+
+.pf-v5-c-login .pf-v5-c-button.pf-m-secondary:hover,
+.pf-v5-c-login a.pf-v5-c-button.pf-m-secondary:hover,
+.pf-v5-c-login .kc-register-btn:hover,
+.pf-v5-c-login #kc-back-to-login:hover {
+	background-color: var(--vu-surface-highlight) !important;
+	border-color: var(--vu-muted) !important;
+	color: var(--vu-ink) !important;
+	text-decoration: none;
+}
+
+.pf-v5-c-login .pf-v5-c-button.pf-m-secondary:focus-visible,
+.pf-v5-c-login .kc-register-btn:focus-visible,
+.pf-v5-c-login #kc-back-to-login:focus-visible {
+	outline: 2px solid var(--vu-coral);
+	outline-offset: 2px;
+}
+
+/* Botón en bloque (ancho completo) */
+.pf-v5-c-login .pf-m-block {
+	box-sizing: border-box;
+	display: flex !important;
+	width: 100% !important;
+}
+
+/* Stack de acciones del formulario */
+.pf-v5-c-login .kc-button-stack,
+.pf-v5-c-login .pf-v5-c-form__actions {
+	display: flex !important;
+	flex-direction: column !important;
+	gap: 0.75rem !important;
+	margin-top: 1.25rem !important;
+	width: 100% !important;
+}
+
+/* Área de registro en el pie del login */
+.pf-v5-c-login #kc-registration-container {
+	border-top: 1px solid var(--vu-line);
+	margin-top: 1.5rem;
+	padding-top: 1.25rem;
+	width: 100%;
+}
+
+.pf-v5-c-login #kc-registration {
+	align-items: center;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	width: 100%;
+}
+
+.pf-v5-c-login .kc-registration-text {
+	color: var(--vu-muted);
+	font-size: 0.875rem;
+}
+
+.pf-v5-c-login .kc-reset-instruction {
+	color: var(--vu-muted);
+	display: block;
+	font-size: 0.875rem;
+	line-height: 1.5;
+	margin-top: 1rem;
+	text-align: center;
+}
+
+/* Checkbox */
+.pf-v5-c-login .pf-v5-c-check__input {
+	accent-color: var(--vu-coral);
+	border-radius: var(--vu-radius-btn) !important;
+}
+
+.pf-v5-c-login .pf-v5-c-check__label {
+	color: var(--vu-ink);
+	font-size: 0.875rem;
+}
+
+/*
+ * ── Alertas (Geometría cuadrada) ──────────────────────────────────────────
+ */
+.pf-v5-c-login .pf-v5-c-alert {
+	border-radius: var(--vu-radius-btn) !important;
+	font-size: 0.875rem;
+	gap: 0.5rem;
+	line-height: 1.5;
+	margin-bottom: 1.25rem;
+}
+
+.pf-v5-c-login .pf-v5-c-alert.pf-m-danger {
+	background-color: var(--vu-error-bg);
+	border: 1px solid var(--vu-error-border);
+	color: var(--vu-error-ink);
+}
+
+.pf-v5-c-login .pf-v5-c-alert.pf-m-success {
+	background-color: var(--vu-ok-bg);
+	border: 1px solid var(--vu-ok-border);
+	color: var(--vu-ok-ink);
+}
+
+.pf-v5-c-login .pf-v5-c-alert.pf-m-warning {
+	background-color: var(--vu-warn-bg);
+	border: 1px solid var(--vu-warn-bg);
+	color: var(--vu-warn-ink);
+}
+
+.pf-v5-c-login .pf-v5-c-alert.pf-m-info {
+	background-color: var(--vu-surface-highlight);
+	border: 1px solid var(--vu-line);
+	color: var(--vu-ink);
+}
+
+.pf-v5-c-login .pf-v5-c-alert__icon {
+	color: currentcolor;
+}
+
+/*
+ * ── Modo Oscuro ───────────────────────────────────────────────────────────
+ */
+.pf-v5-theme-dark {
+	--vu-paper: #14181a;
+	--vu-card: #1d2422;
+	--vu-ink: #e8edea;
+	--vu-muted: #9aa8a2;
+	--vu-line: #333d39;
+	--vu-surface-highlight: #242b28;
+	--vu-on-accent: #171d1f;
+
+	--vu-error-bg: #2e1a1c;
+	--vu-error-ink: #f0928a;
+	--vu-error-border: #54302f;
+	--vu-ok-bg: #16281d;
+	--vu-ok-ink: #7fc79c;
+	--vu-ok-border: #2c4a37;
+	--vu-warn-bg: #2c2313;
+	--vu-warn-ink: #e3b567;
+
+	--vu-shadow-md: 0 8px 30px rgb(0 0 0 / 0.55);
+}
+
+.pf-v5-theme-dark .vu-brand-mark {
+	color: var(--vu-on-accent-solid);
+}

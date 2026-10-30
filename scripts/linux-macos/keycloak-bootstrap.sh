@@ -196,6 +196,12 @@ echo "==> Activando el tema de correo con la marca (vincula-up)"
 # keycloak/themes/vincula-up/email/theme.properties.
 kcadm update "realms/$REALM" -s "emailTheme=vincula-up"
 
+echo "==> Activando el tema de login con la marca (vincula-up)"
+# El tema de login vive en keycloak/themes/vincula-up/login/ (montado por
+# docker-compose en /opt/keycloak/themes/vincula-up:ro). Se aplica aquí porque
+# el import del realm solo corre la primera vez que se crea el realm.
+kcadm update "realms/$REALM" -s "loginTheme=vincula-up"
+
 echo
 echo "Listo."
 echo "  Client de servicio : $ADMIN_CLIENT_ID"

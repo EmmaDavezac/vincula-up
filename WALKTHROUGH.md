@@ -66,3 +66,14 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
   - `frontend/vincula-up-web/src/app/shared/navbar/navbar.html`: se ocultan las acciones "Ingresar" y "Crear cuenta" del navbar cuando `enLogin()` es true, para no duplicar lo que ya muestra la vista de login.
 - **Verificación:** `npm run build` compila limpiamente; `app.html` sigue inyectando `<app-navbar />` y `<app-footer />` alrededor de `<router-outlet />` para todas las rutas incluidas `/ingresar`.
 - **Especificación:** `ESPECIFICACION.md` no requiere cambios (ajuste de presentación/CSS sin modificar rutas, contratos de API ni flujos de autenticación).
+
+
+### [2026-10-30] - fix: restaurar tema de login de Keycloak y activar loginTheme
+- **Objetivo:** Que las pantallas de acceso de Keycloak (login, registro, recuperación de contraseña) usen el tema `vincula-up` en lugar del tema por defecto (que causaba 404 de `patternfly.min.css` y estética de fábrica).
+- **Causa:** El directorio `keycloak/themes/vincula-up/login/` existía en la rama `feat/autodeteccion-ubicacion-y-debounce-direccion` pero nunca se mergeó a `dev`, por eso `dev` carecía del tema de login y el realm usaba el de fábrica.
+- **Cambios realizados:**
+  - Restaurado `keycloak/themes/vincula-up/login/` desde el historial (plantillas `.ftl`, `resources/css/vincula-up.css`, `resources/img/favicon.svg`, `messages/messages_es.properties`, `theme.properties`).
+  - `scripts/linux-macos/keycloak-bootstrap.sh`: agregado `kcadm update realms/$REALM -s "loginTheme=vincula-up"` (al igual que `emailTheme`, el import del realm solo corre la primera vez, así que se aplica por este script).
+  - `docker-compose.yml` ya monta `./keycloak/themes/vincula-up → /opt/keycloak/themes/vincula-up:ro`, por lo que los archivos restaurados se ven en el contenedor sin tocar el compose.
+- **Verificación:** `npm run build` compila limpiamente. Para aplicar el tema en un entorno ya levantado: `./scripts/linux-macos/keycloak-bootstrap.sh` + `docker compose restart keycloak`.
+- **Especificación:** `ESPECIFICACION.md` §17/Anexo C ya documenta el tema de acceso; no requiere cambios.
