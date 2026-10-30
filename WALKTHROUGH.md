@@ -353,3 +353,45 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
   - Chequeo estático del CSS: llaves balanceadas, ninguna variable `var(--vu-*)` sin definir y sin usar, y los 8 colores coinciden exactamente con los de `src/styles.css`.
   - `bash -n scripts/linux-macos/keycloak-bootstrap.sh` y JSON del realm válido.
   - **Nota:** no se ejecutó `npm run build` porque la tarea no toca el frontend Angular.
+
+### [2026-10-30] - Rediseño de formularios Keycloak: inputs amplios, placeholders, ayuda, jerarquía primario/secundario y botones cuadrados uniformes
+- **Objetivo:** Perfeccionar la experiencia de usuario y el diseño en todas las pantallas de acceso de Keycloak (ingreso, registro, recuperación y actualización de contraseña), asegurando inputs de tamaño confortable, placeholders y textos de ayuda, clara jerarquía entre botones primarios y secundarios, botón de "ver contraseña" integrado sin bordes residuales y botones estrictamente cuadrados uniformes en todas las páginas.
+- **Cambios realizados:**
+  - `keycloak/themes/vincula-up/login/messages/messages_es.properties`:
+    - Incorporadas traducciones y textos rioplatenses para títulos, botones y estados ("Crear cuenta", "Volver a iniciar sesión", "¿Ya tenés cuenta? Iniciar sesión", "Enviar instrucciones", "Guardar contraseña").
+    - Nuevos placeholders (`emailPlaceholder`, `passwordPlaceholder`, `passwordNewPlaceholder`, `passwordConfirmPlaceholder`, `firstNamePlaceholder`, `lastNamePlaceholder`).
+    - Textos de ayuda explicativos para login, registro, recuperación y validación de contraseñas.
+  - `keycloak/themes/vincula-up/login/field.ftl`:
+    - Macro `input`: inyección de placeholders automáticos y renderizado de texto de ayuda contextual (`.kc-field-help-text`).
+    - Macro `password`: inyección de placeholders y ayuda, e integración del botón toggle de visualización dentro del mismo contenedor del campo.
+  - `keycloak/themes/vincula-up/login/buttons.ftl`:
+    - Estandarización de `actionGroup` y botones con layout en pila vertical (`.kc-button-stack`) y ancho completo (`pf-m-block`).
+  - `keycloak/themes/vincula-up/login/login.ftl`:
+    - Placeholders y textos de ayuda en correo y contraseña.
+    - Botón primario prominente en coral ("Ingresar") y botón secundario con contorno ("Crear cuenta") en la sección inferior.
+  - `keycloak/themes/vincula-up/login/login-reset-password.ftl`:
+    - Campo de email con placeholder y texto de ayuda.
+    - Botón primario "Enviar instrucciones" y botón secundario "Volver a iniciar sesión".
+  - `keycloak/themes/vincula-up/login/register.ftl`:
+    - Campos de contraseña con placeholders y textos explicativos de requisitos.
+    - Botón primario "Crear cuenta" y botón secundario "¿Ya tenés cuenta? Iniciar sesión".
+  - `keycloak/themes/vincula-up/login/user-profile-commons.ftl`:
+    - Macro `inputTag`: placeholders y textos de ayuda para `firstName`, `lastName` y `email`.
+  - `keycloak/themes/vincula-up/login/login-update-password.ftl`:
+    - Campos de nueva contraseña y confirmación con placeholders, textos de ayuda y botones de ojo integrados.
+    - Botón primario "Guardar contraseña" y secundario "Cancelar".
+  - `keycloak/themes/vincula-up/login/resources/css/vincula-up.css`:
+    - **Geometría cuadrada estricta:** `--vu-radius-btn: 4px` y `--vu-radius-input: 4px` aplicados a todos los botones e inputs (`border-radius: var(--vu-radius-btn) !important;`). Se eliminaron mezclas de bordes redondos o píldoras.
+    - **Inputs amplios y cómodos:** `min-height: 3rem` (48px), padding equilibrado, tipografía `0.9375rem`, y anillo de foco coral (`border-color: var(--vu-coral) !important; box-shadow: 0 0 0 3px rgb(227 95 67 / 0.18)`).
+    - **Botón "ver contraseña" integrado:** `.pf-v5-c-input-group` unifica el input y el botón en un solo borde; se eliminaron pseudo-elementos `::after` y `::before` de PatternFly y bordes residuales del botón de control.
+    - **Jerarquía de botones:** Botones primarios en fondo coral sólido y texto blanco; botones secundarios con fondo transparente, borde sutil (`--vu-line`), texto en tinta y hover en `--vu-surface-highlight`.
+    - **Compatibilidad con modo oscuro:** tokens mapeados para mantener el mismo contraste y confort visual en `.pf-v5-theme-dark`.
+  - `ESPECIFICACION.md`: Actualizada la sección §8.6 y la subsección del tema de login con el árbol de archivos y directivas de diseño.
+- **Verificación:**
+  - Reinicio del contenedor `vinculaup-keycloak` (`docker compose restart keycloak`) y verificación de logs (`Keycloak 26.3.3 started`).
+  - Verificación de renderizado HTML vía cURL en login, registro y restablecimiento de contraseña:
+    - Presencia de atributos `placeholder` y bloques `.kc-field-help-text`.
+    - Botones primarios (`pf-m-primary`) y secundarios (`pf-m-secondary`).
+    - Input groups de contraseña con botones de visibilidad `kc-password-toggle-btn`.
+  - Verificación de entrega de recursos CSS `vincula-up.css` con código HTTP 200 a través del proxy inverso nginx.
+  - Ejecución de `npm run build` en el frontend Angular (`vincula-up-web`) finalizada con éxito (0 errores).

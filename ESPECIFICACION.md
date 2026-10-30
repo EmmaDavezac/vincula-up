@@ -1094,9 +1094,16 @@ keycloak/themes/vincula-up/
     ├── theme.properties                  parent=keycloak.v2 + styles + URL de la app
     ├── template.ftl                      <title>, favicon y cabecera con la marca
     ├── footer.ftl                        pie institucional (extensión oficial de KC)
-    ├── messages/messages_es.properties   los textos, en voseo
+    ├── buttons.ftl                       estandarización de grupos de acción primarios/secundarios
+    ├── field.ftl                         macros input y password con placeholders y ayuda integrada
+    ├── login.ftl                         pantalla de ingreso con botón primario y secundario de registro
+    ├── register.ftl                      registro con campos de ayuda y botón de inicio de sesión
+    ├── login-reset-password.ftl          recuperación con botón de envío e inicio de sesión secundario
+    ├── login-update-password.ftl         actualización de clave con validaciones y botón guardar
+    ├── user-profile-commons.ftl          renderizado de perfil con placeholders y textos guía
+    ├── messages/messages_es.properties   los textos, placeholders y etiquetas de botones en voseo
     └── resources/
-        ├── css/vincula-up.css            toda la estética
+        ├── css/vincula-up.css            toda la estética (geometría cuadrada, inputs 3rem, jerarquía de botones)
         └── img/favicon.svg               el ícono de la pestaña
 ```
 
@@ -1110,6 +1117,10 @@ propiedad del tema (`vinculaUpAppUrl`).
 | Colores | Los tokens de `src/styles.css`, con prefijo `--vu-` y el nombre del token de origen al lado |
 | Tipografía | La misma división del app: serif para los títulos, sans para el cuerpo |
 | Modo oscuro | `.pf-v5-theme-dark`, que Keycloak activa con `prefers-color-scheme`, con los valores del [Anexo C](#anexo-c-tema-claro-y-oscuro) |
+| Forma de botones | Cuadrada uniforme en todas las pantallas (`border-radius: 4px`), sin mezclar píldoras ni elementos redondos |
+| Jerarquía de botones | Primario en coral sólido (`--vu-coral`) con texto blanco y secundario con contorno sutil (`--vu-line`) y fondo transparente |
+| Inputs y campos | Altura cómoda (`min-height: 3rem`), padding amplio, placeholders nativos y textos de ayuda descriptivos (`.kc-field-help-text`) |
+| Ver contraseña | Botón del ojo integrado dentro del contenedor unificado del campo, anulando pseudo-elementos residuales de PatternFly |
 
 > **Por qué `parent=keycloak.v2` en el tipo `login` y `parent=keycloak` en la
 > raíz.** El `theme.properties` de la raíz aplica a todos los tipos del tema y lo
