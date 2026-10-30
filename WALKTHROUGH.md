@@ -288,3 +288,10 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
     - Se agregó un `effect` (`_mapaLoadEffect`) que activa `mapaCargando` observando `filteredRequests()` y `isProfessional()`: se dispara asíncronamente después de la detección, sin crear ciclo.
     - Importado `effect` desde `@angular/core`.
 - **Verificación:** `npm run build` → `Application bundle generation complete` sin errores.
+
+### [2026-10-30] - fix: cachear SafeResourceUrl para evitar ciclo NG0600
+- **Diagnóstico:** Aun con el `effect`, el `@if (embeddedMapUrl(request); as mapUrl)` sigue llamando al método en cada detección de cambios. Aunque el `effect` no activa signals constantemente, `bypassSecurityTrustResourceUrl()` crea un **nuevo `SafeResourceUrl`** en cada llamada (aunque el string interno sea idéntico), lo que hace que Angular vea un "cambio" en `[src]` del iframe → dispara más detección → ciclo NG0600.
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`: `embeddedMapUrl()` ahora cachea el `SafeResourceUrl` en un `Map` (`_urlCache`) usando `lat,lng` como clave, retornando siempre el mismo objeto para las mismas coordenadas. El `@if` y `[src]` del iframe ya no ven cambios falsos.
+- **Verificación:** `npm run build` → `Application bundle generation complete`. El cache (`_urlCache`) está presente en el bundle (`chunk-3sA7-ta_.js`).
+- **Nota:** `ESPECIFICACION.md` no requiere cambios (presentación/CSS).
