@@ -48,13 +48,18 @@
 			-->
 			<button
 				type="button"
-				class="theme-toggle"
+				role="switch"
+				class="theme-toggle theme-toggle--slide"
+				[class.theme-toggle--oscuro]="tema.oscuro()"
 				(click)="tema.alternar()"
 				[attr.aria-label]="tema.etiqueta()"
-				[attr.aria-pressed]="tema.oscuro()"
+				[attr.aria-checked]="tema.oscuro()"
 				[title]="tema.etiqueta()"
 			>
-				<vu-icon [name]="tema.oscuro() ? 'sun' : 'moon'" [size]="17" />
+				<span class="theme-toggle__thumb"></span>
+				<span class="theme-toggle__icon">
+					<vu-icon [name]="tema.oscuro() ? 'sun' : 'moon'" [size]="17" />
+				</span>
 			</button>
 
 			@if (auth.currentUser(); as user) {

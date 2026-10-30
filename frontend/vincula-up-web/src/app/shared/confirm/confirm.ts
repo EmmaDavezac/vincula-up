@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, HostListener, afterNextRender, inject, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, HostListener, OnDestroy, afterNextRender, inject, input, output } from '@angular/core';
 import { VuIcon, VuIconName } from '../icon/icon';
 
 /**
@@ -19,7 +19,7 @@ import { VuIcon, VuIconName } from '../icon/icon';
 	templateUrl: './confirm.html',
 	styleUrl: './confirm.css',
 })
-export class VuConfirm {
+export class VuConfirm implements OnDestroy {
 	/** Encabezado de la pregunta. */
 	readonly titulo = input.required<string>();
 	/** Qué va a pasar, en una frase. */
@@ -43,7 +43,14 @@ export class VuConfirm {
 	private readonly host = inject(ElementRef) as ElementRef<HTMLElement>;
 
 	constructor() {
-		afterNextRender(() => this.enfocar());
+		afterNextRender(() => {
+			this.enfocar();
+			this.bloquearScroll();
+		});
+	}
+
+	ngOnDestroy(): void {
+		this.restaurarScroll();
 	}
 
 	/**
@@ -59,7 +66,19 @@ export class VuConfirm {
 	@HostListener('document:keydown.escape')
 	cerrar(): void {
 		if (!this.cargando()) {
+			this.restaurarScroll();
 			this.cancelado.emit();
 		}
+	}
+
+	private bloquearScroll(): void {
+		// Evita que el fondo se scrollee mientras el modal está abierto.
+		document.documentElement.style.overflow = 'hidden';
+		document.body.style.overflow = 'hidden';
+	}
+
+	private restaurarScroll(): void {
+		document.documentElement.style.overflow = '';
+		document.body.style.overflow = '';
 	}
 }

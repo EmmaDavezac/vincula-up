@@ -67,3 +67,14 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
   - Se elimina `vu-btn--pill` de todos los componentes que lo usaban: `terminos-modal.ts`, `admin-categories.html`, `admin-category-new.html`, `admin-professional-new.html`, `admin-professionals.html`, `my-requests.html`, `request.html`.
 - **Verificación:** `npm run build` compila limpiamente; no queda ningún `vu-btn--pill` en componentes.
 - **Especificación:** `ESPECIFICACION.md` §17 y Anexo C ya documentan los tokens y el tema; no requiere cambios estructurales (la guía visual consolida las mismas reglas).
+
+
+### [2026-10-30] - fix: scroll lock en modal cerrar sesión, z-index sobre mapa, tema como slide
+- **Objetivo:** Que al abrir el modal de cerrar sesión (vu-confirm) se desactive el scroll del fondo; que el modal quede por encima de los popups del mapa de solicitar; y que el botón de cambiar tema del navbar sea un toggle slide en vez de botón circular. Todo respetando botones cuadrados.
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/shared/confirm/confirm.ts`: bloquea `overflow: hidden` en `<html>` y `<body>` al abrir el modal (afterNextRender) y lo restaura en `cerrar()` (Escape) y `ngOnDestroy()`.
+  - `frontend/vincula-up-web/src/app/shared/confirm/confirm.css`: sube `z-index` del overlay de confirmación de `70` a `1000` para que quede por encima de los popups de Leaflet (~600).
+  - `frontend/vincula-up-web/src/app/shared/navbar/navbar.html`: el botón de tema ahora es `<button role="switch" class="theme-toggle theme-toggle--slide">` con palanca `.theme-toggle__thumb` e ícono sol/luna.
+  - `frontend/vincula-up-web/src/app/shared/navbar/navbar.css`: estilos de slide (track `border-radius: 999px`, thumb circular con `transform: translateX()`, transición suave, estados claro/oscuro).
+- **Verificación:** `npm run build` compila limpiamente; no queda `vu-btn--pill` en componentes.
+- **Especificación:** no requiere cambios (reglas de presentación/interacción, sin modificar rutas, contratos de API ni flujos de autenticación).
