@@ -528,6 +528,26 @@ flex con `justify-content: center` sobre un ancho fijo, que sí centra.
 	text-align: center;
 }
 
+.step-map__hint--cargando {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 2rem 0.75rem;
+}
+
+/* Spinner sobre el campo de dirección mientras se verifica. */
+.location-field__gps-loading {
+	align-items: center;
+	color: var(--muted);
+	display: flex;
+	flex-direction: column;
+	font-size: 0.8125rem;
+	gap: 0.5rem;
+	margin: 0 0 0.75rem;
+	text-align: center;
+}
+
 .step-map__caption {
 	align-items: center;
 	background: var(--surface-highlight);

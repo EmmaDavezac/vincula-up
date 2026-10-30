@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -14,6 +14,7 @@ import { VuAvatar } from '../shared/avatar/avatar';
 import { VuConfirm } from '../shared/confirm/confirm';
 import { VuIcon } from '../shared/icon/icon';
 import { VuSkeletonList } from '../shared/skeleton-list/skeleton-list';
+import { VuSpinner } from '../shared/spinner/spinner';
 
 interface MessageItem {
   id: string;
@@ -38,7 +39,7 @@ interface RatingItem {
 }
 
 @Component({
-	imports: [CommonModule, RouterLink, FormsModule, VuAvatar, VuConfirm, VuIcon, VuSkeletonList],
+	imports: [CommonModule, RouterLink, FormsModule, VuAvatar, VuConfirm, VuIcon, VuSkeletonList, VuSpinner],
 	selector: 'app-my-requests',
 	styleUrl: './my-requests.css',
 	templateUrl: './my-requests.html',
@@ -49,6 +50,9 @@ export class MyRequests {
   private readonly requestService = inject(RequestService);
   private readonly sanitizer = inject(DomSanitizer);
 
+  /** Cache de URLs de mapa: evita crear SafeResourceUrl en cada detección de cambios (ciclo NG0600). */
+  private readonly _urlCache = new Map<string, SafeResourceUrl>();
+
   readonly requests = this.requestService.myRequests;
   readonly errorMessage = signal('');
   readonly successMessage = signal('');
@@ -57,6 +61,23 @@ export class MyRequests {
    * estado vacío (que diría "todavía no tenés solicitudes" sin haber llegado nada).
    */
   readonly loading = signal(true);
+  /** El mapa embebido todavía está cargando sus tiles. */
+  readonly mapaCargando = signal(false);
+
+  /**
+   * Activa el spinner de carga del mapa cuando hay solicitudes profesionales
+   * con coordenadas visibles. Se usa un `effect` (no un método de template) para
+   * evitar el ciclo de detección de cambios NG0600: `embeddedMapUrl` se evalúa en
+   * cada cambio, así que no puede activar signals por sí mismo.
+   */
+  private readonly _mapaLoadEffect = effect(() => {
+    if (this.isProfessional()) {
+      const tieneMapa = this.filteredRequests().some((r) => this.mapCoords(r) != null);
+      if (tieneMapa) {
+        this.mapaCargando.set(true);
+      }
+    }
+  });
 
   // Filtros de la lista
   readonly statusFilter = signal<'TODAS' | RequestStatus>('TODAS');
@@ -316,10 +337,20 @@ export class MyRequests {
   embeddedMapUrl(request: ServiceRequest): SafeResourceUrl | null {
     const coords = this.mapCoords(request);
     if (!coords) return null;
+    const key = `${coords.lat},${coords.lng}`;
+    const cached = this._urlCache.get(key);
+    if (cached) return cached;
     const delta = 0.008;
     const bbox = `${coords.lng - delta}%2C${coords.lat - delta}%2C${coords.lng + delta}%2C${coords.lat + delta}`;
     const url = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${coords.lat}%2C${coords.lng}`;
-    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+    const safe = this.sanitizer.bypassSecurityTrustResourceUrl(url);
+    this._urlCache.set(key, safe);
+    return safe;
+  }
+
+  /** Se dispara cuando el iframe termina de cargar sus tiles. */
+  onMapaLoad(): void {
+    this.mapaCargando.set(false);
   }
 
   isProfessional(): boolean {

@@ -244,3 +244,67 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
   - Commit `a62f3e6` en rama `fix/bff-patch-http-method-ms-usuarios` (4 archivos, solo el fix; los cambios previos de `frontend/`, `nginx/` y `package.json` quedan sin commitear al no pertenecer a esta tarea).
 - **Nota:** `ESPECIFICACION.md` no requiere cambios porque el fix es de implementación interna y no altera rutas, contratos de API, modelos de datos, flujos de autenticación ni variables de entorno.
 
+### [2026-10-29] - feat: mapas de solicitudes recibidas en modo oscuro
+- **Objetivo:** Que los mapas de solicitudes recibidas (vista del profesional en `my-requests`) cambien a modo oscuro cuando la página lo hace, evitando el rectángulo blanco brillante del iframe embebido de OpenStreetMap sobre pantalla oscura.
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/my-requests/my-requests.css`:
+    - `.req-card__map`: fondo `var(--surface-tint)` (token que invierte con el tema).
+    - `.embedded-map`: `display: block`.
+    - `:host-context([data-tema='oscuro']) .req-card__map`: fondo y borde (`var(--line-strong)`) ajustados para oscuro.
+    - `:host-context([data-tema='oscuro']) .embedded-map`: filtro `invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92) saturate(0.75)`, igual que las tiles reales de Leaflet en `styles.css`, para que el iframe de OSM se vea oscuro con la app.
+    - El dibujo CSS alternativo (`.vu-map`) ya usaba tokens de tema (`--surface-tint`, `--line-strong`, `--on-accent`, `--deco-line`) definidos en `styles.css` (global, sin encapsulamiento), por lo que no requería cambios.
+- **Verificación:** `npm run build` en `frontend/vincula-up-web` → `Application bundle generation complete` sin errores. Se confirmó que Angular transforma `:host-context([data-tema='oscuro'])` en `[data-tema="oscuro"] [_nghost] .embedded-map[_ngcontent]`, que sí alcanza al `<html>` donde vive `data-tema`.
+- **Nota:** `ESPECIFICACION.md` no requiere cambios porque el ajuste es solo de presentación (CSS) y no altera rutas, contratos de API, modelos de datos, flujos de autenticación ni variables de entorno.
+
+### [2026-10-29] - fix: encapsulamiento de Angular en filtros de modo oscuro de mapas
+- **Diagnóstico:** El selector `[data-tema='oscuro'] .embedded-map` dentro del CSS de componente `my-requests.css` nunca coincidía. Angular (ViewEncapsulation `Emulated`) añade `_ngcontent` a los elementos del template, mientras que `data-tema` vive en `<html>` (fuera del componente). Por eso el filtro de inversión del iframe de OpenStreetMap no se aplicaba y el mapa seguía blanco en modo oscuro.
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/my-requests/my-requests.css`: se reemplazó `[data-tema='oscuro']` por `:host-context([data-tema='oscuro'])` en las reglas de modo oscuro de `.req-card__map` y `.embedded-map`, permitiendo que el selector suba desde `<html>` hasta el host del componente y luego al iframe.
+- **Verificación:** `npm run build` → OK. En el bundle compilado se confirma la regla `[data-tema="oscuro"] [_nghost-%COMP%] .embedded-map[_ngcontent-%COMP%]{filter:invert(1)...}`.
+
+
+### [2026-10-29] - feat: spinner de carga para mapas, ubicación y cierre de sesión
+- **Objetivo:** Agregar animaciones/spinners de carga en tres puntos: (1) al cerrar sesión, (2) al cargar los mapas (iframe de OSM en `my-requests` y Leaflet en `request`), y (3) al detectar/ingresar la ubicación en el formulario de solicitud.
+- **Cambios realizados:**
+  - NUEVO `frontend/vincula-up-web/src/app/shared/spinner/spinner.ts` + `spinner.css`: componente `VuSpinner` standalone, reutilizable, con `prefers-reduced-motion` y tokens de tema (`--ink`).
+  - `frontend/vincula-up-web/src/app/shared/navbar/navbar.ts` + `navbar.html`:
+    - Signal `cerrandoSesion` activado en `confirmarCierreDeSesion()` antes de `auth.logout()`.
+    - Botón de cierre de sesión: muestra `<vu-spinner size="sm">` mientras `cerrandoSesion()`, y se deshabilita.
+  - `frontend/vincula-up-web/src/app/request/request.ts` + `request.html` + `request.css`:
+    - El texto "Cargando el mapa…" (`step-map__hint`) se reemplazó por `<vu-spinner>` centrado en un contenedor flex (`.step-map__hint--cargando`).
+    - El botón "Mi ubicación" muestra `<vu-spinner>` cuando `detectingGps()`, y se deshabilita.
+    - Se agregó `.location-field__gps-loading` con `<vu-spinner>` cuando `gpsLoading()` (verificación de dirección por texto).
+  - `frontend/vincula-up-web/src/app/my-requests/my-requests.ts` + `my-requests.html` + `my-requests.css`:
+    - Signal `mapaCargando` activado en `embeddedMapUrl()` y desactivado en `onMapaLoad()` (evento `(load)` del iframe).
+    - Overlay absoluto `.mapa-embed__spinner` con `<vu-spinner size="md">` y texto "Cargando mapa…" sobre el iframe, visible mientras `mapaCargando()`.
+    - `.mapa-embed-container` con `position: relative` para anclar el overlay.
+- **Verificación:** `npm run build` → `Application bundle generation complete` sin errores de TypeScript ni de plantillas.
+
+### [2026-10-29] - fix: evitar ciclo NG0600 moviendo mapaCargando a effect
+- **Diagnóstico:** Activar `this.mapaCargando.set(true)` dentro de `embeddedMapUrl()` (un método llamado desde `@if` en el template en cada detección de cambios) provocó un **ciclo de detección infinito** (NG0600) en `my-requests`, bloqueando la página.
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`:
+    - Se eliminó `this.mapaCargando.set(true)` de `embeddedMapUrl()`.
+    - Se agregó un `effect` (`_mapaLoadEffect`) que activa `mapaCargando` observando `filteredRequests()` y `isProfessional()`: se dispara asíncronamente después de la detección, sin crear ciclo.
+    - Importado `effect` desde `@angular/core`.
+- **Verificación:** `npm run build` → `Application bundle generation complete` sin errores.
+
+### [2026-10-30] - fix: cachear SafeResourceUrl para evitar ciclo NG0600
+- **Diagnóstico:** Aun con el `effect`, el `@if (embeddedMapUrl(request); as mapUrl)` sigue llamando al método en cada detección de cambios. Aunque el `effect` no activa signals constantemente, `bypassSecurityTrustResourceUrl()` crea un **nuevo `SafeResourceUrl`** en cada llamada (aunque el string interno sea idéntico), lo que hace que Angular vea un "cambio" en `[src]` del iframe → dispara más detección → ciclo NG0600.
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`: `embeddedMapUrl()` ahora cachea el `SafeResourceUrl` en un `Map` (`_urlCache`) usando `lat,lng` como clave, retornando siempre el mismo objeto para las mismas coordenadas. El `@if` y `[src]` del iframe ya no ven cambios falsos.
+- **Verificación:** `npm run build` → `Application bundle generation complete`. El cache (`_urlCache`) está presente en el bundle (`chunk-3sA7-ta_.js`).
+- **Nota:** `ESPECIFICACION.md` no requiere cambios (presentación/CSS).
+
+### [2026-10-30] - feat: intercambio de estilos de ingresar/crear cuenta en navbar
+- **Objetivo:** Que "Ingresar" sea el botón primario (`vu-btn--ink`) y "Crear cuenta" el enlace secundario (`.auth-action--link`), invirtiendo el orden anterior.
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/shared/navbar/navbar.html`:
+    - "Crear cuenta": `<a>` con `auth.registerWithKeycloak()` y clase `auth-action--link` (enlace secundario).
+    - "Ingresar": `<button>` con `auth.loginWithKeycloak()` y clases `vu-btn vu-btn--ink auth-action--cta` (botón primario).
+  - `frontend/vincula-up-web/src/app/shared/navbar/navbar.css`:
+    - Eliminada la regla `@media (max-width: 479px) { .auth-action--link { display: none } }` que ocultaba "Crear cuenta" en móvil. Ahora "Crear cuenta" es visible en todos los tamaños.
+    - `.auth-action--cta` (botón "Ingresar") permanece oculto en mobile (≤1024px) porque en mobile "Ingresar" viene del `tabbar` (barra inferior).
+    - Eliminada la clase `.auth-action--desktop` sin usar.
+- **Verificación:** `npm run build` → `Application bundle generation complete` sin errores. 2 files changed, 9 insertions(+), 28 deletions(-).
+- **Nota:** `ESPECIFICACION.md` no requiere cambios (presentación/CSS).

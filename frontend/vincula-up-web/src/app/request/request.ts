@@ -12,6 +12,7 @@ import { emptyServiceRequest } from '../core/models/service-request';
 import { VuAvatar } from '../shared/avatar/avatar';
 import { VuIcon } from '../shared/icon/icon';
 import { VuSkeletonList } from '../shared/skeleton-list/skeleton-list';
+import { VuSpinner } from '../shared/spinner/spinner';
 
 /**
  * Flujo de pasos del prototipo: ubicación → especialidad → día y horario →
@@ -56,7 +57,7 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 }
 
 @Component({
-	imports: [CommonModule, FormsModule, RouterLink, DecimalPipe, VuAvatar, VuIcon, VuSkeletonList],
+	imports: [CommonModule, FormsModule, RouterLink, DecimalPipe, VuAvatar, VuIcon, VuSkeletonList, VuSpinner],
 	selector: 'app-request',
 	styleUrl: './request.css',
 	templateUrl: './request.html',

@@ -46,7 +46,13 @@
 								}
 
 							<!-- 1) Dirección: el campo va primero, con el GPS como botón compacto al lado. -->
-					<p class="location-field__label">
+					@if (gpsLoading()) {
+<div class="location-field__gps-loading">
+<vu-spinner [etiqueta]="'Verificando dirección…'" [size]="'sm'" />
+Verificando dirección…
+</div>
+}
+<p class="location-field__label">
 						<span>¿Dónde necesitás el servicio? <span class="vu-required">obligatorio</span></span>
 					</p>
 							<div class="location-field">
@@ -74,7 +80,11 @@
 										[attr.aria-label]="address() ? 'Mi ubicación: ' + address() : 'Usar mi ubicación'"
 										[title]="address() || 'Usar mi ubicación'"
 									>
-										<vu-icon name="navigation" [size]="18" class="location-gps__icon" />
+										@if (detectingGps()) {
+<vu-spinner [etiqueta]="'Detectando ubicación…'" [size]="'sm'" />
+} @else {
+<vu-icon name="navigation" [size]="18" class="location-gps__icon" />
+}
 										<span class="location-gps__label">Mi ubicación</span>
 									</button>
 								</div>
@@ -94,7 +104,10 @@
 							<div class="step-map">
 								<div id="mapa-paso" class="step-map__canvas"></div>
 								@if (!mapaListo()) {
-									<p class="step-map__hint">Cargando el mapa...</p>
+									<div class="step-map__hint step-map__hint--cargando">
+<vu-spinner [etiqueta]="'Cargando el mapa…'" [size]="'sm'" />
+Cargando el mapa…
+</div>
 								}
 								<p class="step-map__caption">
 									<vu-icon name="map-pin" [size]="14" />
