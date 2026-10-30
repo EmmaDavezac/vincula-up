@@ -30,6 +30,11 @@ export class NavbarComponent {
 	*/
 	protected readonly enPanel = computed(() => this.urlActual().startsWith('/admin'));
 
+	/** Si estamos en la pantalla de login (/ingresar), se ocultan las acciones de
+	 * acceso del navbar para no duplicar lo que ya muestra la propia vista.
+	 */
+	protected readonly enLogin = computed(() => this.urlActual() === '/ingresar');
+
 	constructor() {
 		this.router.events
 			.pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))

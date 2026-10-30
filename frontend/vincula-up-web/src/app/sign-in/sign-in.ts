@@ -26,4 +26,9 @@ export class SignIn implements OnInit {
 	ingresar(): void {
 		void this.auth.loginWithKeycloak().subscribe();
 	}
+
+	/** Envía al usuario al formulario de registro de Keycloak (misma acción que "Crear cuenta" del navbar). */
+	registrarse(): void {
+		this.auth.registerWithKeycloak();
+	}
 }

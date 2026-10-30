@@ -55,3 +55,14 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
   - En [activation.ts](file:///home/emma/Desktop/vincula-up/frontend/vincula-up-web/src/app/activation/activation.ts#L117-L146): Se habilitó la interactividad completa del mapa Leaflet (arrastrar el marcador `dragend` y hacer clic en el mapa para posicionarlo directamente).
   - En [activation.css](file:///home/emma/Desktop/vincula-up/frontend/vincula-up-web/src/app/activation/activation.css#L160-L220): Se importaron y alinearon los estilos CSS `.location-field`, `.location-gps`, `.step-map` y `.privacy-note`.
 - **Verificación:** Compilación exitosa del frontend Angular mediante `npm run build`.
+
+
+### [2026-10-30] - feat: login y crear cuenta reutilizan navbar y footer de la landing
+- **Objetivo:** Que la pantalla de acceso (/ingresar) reutilice el header y footer de la landing, y que el enlace "Registrate" dispare el registro de Keycloak sin duplicar las acciones de autenticación del navbar.
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/sign-in/sign-in.html`: el enlace "Registrate" ahora llama a `registrarse()` en lugar de `routerLink="/ingresar"` (evitaba redirección circular a la misma pantalla de login).
+  - `frontend/vincula-up-web/src/app/sign-in/sign-in.ts`: nuevo método `registrarse()` que invoca `auth.registerWithKeycloak()`.
+  - `frontend/vincula-up-web/src/app/shared/navbar/navbar.ts`: computed `enLogin` que detecta si la ruta actual es `/ingresar`.
+  - `frontend/vincula-up-web/src/app/shared/navbar/navbar.html`: se ocultan las acciones "Ingresar" y "Crear cuenta" del navbar cuando `enLogin()` es true, para no duplicar lo que ya muestra la vista de login.
+- **Verificación:** `npm run build` compila limpiamente; `app.html` sigue inyectando `<app-navbar />` y `<app-footer />` alrededor de `<router-outlet />` para todas las rutas incluidas `/ingresar`.
+- **Especificación:** `ESPECIFICACION.md` no requiere cambios (ajuste de presentación/CSS sin modificar rutas, contratos de API ni flujos de autenticación).

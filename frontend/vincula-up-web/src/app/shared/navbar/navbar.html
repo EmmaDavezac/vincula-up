@@ -102,7 +102,7 @@
 						</div>
 					}
 				</div>
-			} @else {
+			} @else if (!enLogin()) {
 				<a class="auth-action auth-action--link" routerLink="/ingresar">Ingresar</a>
 				<button
 					type="button"
