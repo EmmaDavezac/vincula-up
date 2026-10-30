@@ -50,6 +50,9 @@ export class MyRequests {
   private readonly requestService = inject(RequestService);
   private readonly sanitizer = inject(DomSanitizer);
 
+  /** Cache de URLs de mapa: evita crear SafeResourceUrl en cada detección de cambios (ciclo NG0600). */
+  private readonly _urlCache = new Map<string, SafeResourceUrl>();
+
   readonly requests = this.requestService.myRequests;
   readonly errorMessage = signal('');
   readonly successMessage = signal('');
@@ -334,10 +337,15 @@ export class MyRequests {
   embeddedMapUrl(request: ServiceRequest): SafeResourceUrl | null {
     const coords = this.mapCoords(request);
     if (!coords) return null;
+    const key = `${coords.lat},${coords.lng}`;
+    const cached = this._urlCache.get(key);
+    if (cached) return cached;
     const delta = 0.008;
     const bbox = `${coords.lng - delta}%2C${coords.lat - delta}%2C${coords.lng + delta}%2C${coords.lat + delta}`;
     const url = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${coords.lat}%2C${coords.lng}`;
-    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+    const safe = this.sanitizer.bypassSecurityTrustResourceUrl(url);
+    this._urlCache.set(key, safe);
+    return safe;
   }
 
   /** Se dispara cuando el iframe termina de cargar sus tiles. */
