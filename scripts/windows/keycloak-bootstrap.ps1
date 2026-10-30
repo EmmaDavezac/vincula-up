@@ -72,6 +72,9 @@ $smtpPassword   = if ($env:KEYCLOAK_SMTP_PASSWORD)           { $env:KEYCLOAK_SMT
 # Reply-To y contacto: opcionales. Si no están, el Reply-To cae al From (el
 # comportamiento anterior) y el pie del correo usa el default del tema.
 $smtpReplyToRaw = if ($env:KEYCLOAK_SMTP_REPLY_TO)          { $env:KEYCLOAK_SMTP_REPLY_TO }          else { '' }
+# Contacto del pie del login. Opcional: si queda vacío, el footer.ftl del tema
+# `vincula-up` no imprime ese bloque.
+$keycloakContacto = if ($env:KEYCLOAK_CONTACTO)               { $env:KEYCLOAK_CONTACTO }               else { '' }
 # Client público del frontend. Sus redirectUris se sincronizan más abajo leyendo el
 # JSON del import, que es la fuente de verdad.
 $publicClientId = if ($env:KEYCLOAK_PUBLIC_CLIENT_ID)        { $env:KEYCLOAK_PUBLIC_CLIENT_ID }        else { 'vincula-up-public' }
@@ -240,6 +243,25 @@ Write-Host '==> Activando el tema de correo con la marca (vincula-up)'
 # atributos del realm se ignoran. Se cambian en
 # keycloak/themes/vincula-up/email/theme.properties.
 Invoke-Kcadm update "realms/$realm" -s 'emailTheme=vincula-up'
+
+# ── 6. Tema de acceso con la marca ───────────────────────────────────────────
+Write-Host '==> Activando el tema de acceso con la marca (vincula-up)'
+# El loginTheme es el que pinta las pantallas de acceso con la estetica de la
+# app: el ingreso, el registro, la recuperacion de contrasena, la verificacion
+# de correo y el logout. El tema es el mismo `vincula-up` que el del correo, pero
+# del tipo `login` (keycloak/themes/vincula-up/login/), que se apoya en
+# `keycloak.v2` en vez de `keycloak`. El import del realm no alcanza porque solo
+# corre la primera vez que se crea el realm.
+#
+# El contacto del pie del login SI sale de aca, como atributo del realm, y no de
+# un theme.properties: el contexto de las plantillas del login expone el realm
+# (el de las de correo no). Si KEYCLOAK_CONTACTO viene vacio, el footer.ftl no
+# imprime ese bloque.
+#
+# Ojo: el tema se cachea. Despues de cambiar los archivos de
+# keycloak/themes/vincula-up/login/ hay que reiniciar el contenedor
+# (docker compose restart keycloak).
+Invoke-Kcadm update "realms/$realm" -s 'loginTheme=vincula-up' -s "attributes.vinculaUpContacto=$keycloakContacto"
 
 
 Write-Host ''

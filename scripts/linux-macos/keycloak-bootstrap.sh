@@ -196,6 +196,26 @@ echo "==> Activando el tema de correo con la marca (vincula-up)"
 # keycloak/themes/vincula-up/email/theme.properties.
 kcadm update "realms/$REALM" -s "emailTheme=vincula-up"
 
+echo "==> Activando el tema de acceso con la marca (vincula-up)"
+# El loginTheme es el que pinta las pantallas de acceso con la estética de la
+# app: el ingreso, el registro, la recuperación de contraseña, la verificación
+# de correo y el logout. El tema es el mismo `vincula-up` que el del correo,
+# pero del tipo `login` (keycloak/themes/vincula-up/login/), que se apoya en
+# `keycloak.v2` en vez de `keycloak`. El import del realm no alcanza porque solo
+# corre la primera vez que se crea el realm.
+#
+# El contacto del pie del login SÍ sale de acá, como atributo del realm, y no
+# de un theme.properties: el contexto de las plantillas del login expone el
+# realm (el de las de correo no). Si KEYCLOAK_CONTACTO viene vacío, el footer.ftl
+# no imprime ese bloque.
+#
+# Ojo: el tema se cachea. Después de cambiar los archivos de
+# keycloak/themes/vincula-up/login/ hay que reiniciar el contenedor
+# (docker compose restart keycloak).
+kcadm update "realms/$REALM" \
+  -s "loginTheme=vincula-up" \
+  -s "attributes.vinculaUpContacto=${KEYCLOAK_CONTACTO:-}"
+
 echo
 echo "Listo."
 echo "  Client de servicio : $ADMIN_CLIENT_ID"

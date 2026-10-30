@@ -17,6 +17,7 @@
     "password": ""
   },
   "emailTheme": "vincula-up",
+  "loginTheme": "vincula-up",
   "registrationAllowed": true,
   "registrationEmailAsUsername": true,
   "loginWithEmailAllowed": true,

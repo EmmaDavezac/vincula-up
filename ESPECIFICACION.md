@@ -627,6 +627,8 @@ cuentas antiguas ([§16](#16-deuda-técnica-conocida)).
 | `resetPasswordAllowed` | `true` (requiere SMTP configurado) |
 | `verifyEmail` | `false` |
 | `sslRequired` | `none` (el TLS lo termina nginx) |
+| `emailTheme` | `vincula-up` — los correos llevan la marca |
+| `loginTheme` | `vincula-up` — las pantallas de acceso llevan la marca |
 | Roles de realm | `CLIENTE`, `PROFESIONAL`, `ADMIN` |
 
 > **Por qué `registrationEmailAsUsername`.** La aplicación se identifica por
@@ -1077,6 +1079,79 @@ Keycloak, y su maqueta está en
 > `true` de multipart, o `setText(texto, html)` falla con *"Not in multipart
 > mode"*. Y es best-effort: si la maqueta no se puede leer, manda texto plano en
 > lugar de romper el alta del profesional.
+
+### El login de Keycloak también lleva la marca
+
+Las pantallas de acceso (ingreso, registro, recuperación de contraseña,
+verificación de correo, cambio de clave y logout) usan el **mismo nombre de
+tema**, `vincula-up`, pero del tipo `login`:
+
+```
+keycloak/themes/vincula-up/
+├── theme.properties                      parent=keycloak
+├── email/…                               (correos)
+└── login/
+    ├── theme.properties                  parent=keycloak.v2 + styles + URL de la app
+    ├── template.ftl                      <title>, favicon y cabecera con la marca
+    ├── footer.ftl                        pie institucional (extensión oficial de KC)
+    ├── messages/messages_es.properties   los textos, en voseo
+    └── resources/
+        ├── css/vincula-up.css            toda la estética
+        └── img/favicon.svg               el ícono de la pestaña
+```
+
+Se activa con `loginTheme=vincula-up`, que aplica `keycloak-bootstrap.*` por la
+misma razón que el `emailTheme`. El contacto del pie llega como atributo del
+realm (`vinculaUpContacto`, desde `KEYCLOAK_CONTACTO`) y la URL de la app como
+propiedad del tema (`vinculaUpAppUrl`).
+
+| | |
+|---|---|
+| Colores | Los tokens de `src/styles.css`, con prefijo `--vu-` y el nombre del token de origen al lado |
+| Tipografía | La misma división del app: serif para los títulos, sans para el cuerpo |
+| Modo oscuro | `.pf-v5-theme-dark`, que Keycloak activa con `prefers-color-scheme`, con los valores del [Anexo C](#anexo-c-tema-claro-y-oscuro) |
+
+> **Por qué `parent=keycloak.v2` en el tipo `login` y `parent=keycloak` en la
+> raíz.** El `theme.properties` de la raíz aplica a todos los tipos del tema y lo
+> necesita el correo, que extiende el tema clásico. El tipo `login` se apoya en
+> `keycloak.v2`, el tema de fábrica de Keycloak 26.3.3 (PatternFly v5), que es el
+> que está activo sin este tema. El de tipo pisa al de la raíz.
+>
+> **`styles` se encadena a propósito.** Esa propiedad NO se acumula entre padre e
+> hijo: el hijo pisa la entera. Por eso el `theme.properties` del login repite
+> `css/styles.css` del padre y le suma `css/vincula-up.css` detrás, que gana por
+> orden de cascada.
+
+> **El costo de sobreescribir `template.ftl`.** Es una copia de
+> `theme/keycloak.v2/login/template.ftl` de la versión 26.3.3 y hay que
+> mantenerla: al actualizar Keycloak hay que volver a compararla contra la del
+> JAR nuevo y portar los cambios. Se sobreescribe solo para tres cosas (el
+> `<title>`, el favicon y el `<header>`); el resto quedó literal. Los comentarios
+> van con `<#-- -->` y no con `<!-- -->` porque el de FreeMarker no se emite y el
+> de HTML viaja en cada respuesta.
+
+> **Tres trampas del CSS de PatternFly que dejaron restos de fábrica.** Todas se
+> detectaron mirando la pantalla renderizada, no leyendo el código:
+>
+> 1. **`pf-v5-c-form__helper-text` trae un borde inferior** que en el resto de la
+>    app no existe: quedaba una raya gris atravesando el formulario debajo del
+>    campo de contraseña.
+> 2. **El anillo de foco lo dibuja un pseudo-elemento** (`::after` del
+>    `.pf-v5-c-form-control`), no un `box-shadow`. Por eso anular el `box-shadow`
+>    no lo desarmaba y el campo enfocado seguía con una línea azul al pie, con el
+>    borde ya coral. Se desactiva el pseudo y el foco queda solo con el borde y
+>    el halo.
+> 3. **El borde del `<input>` interno** es un segundo borde: `pf-v5-c-form-control`
+>    es el `<span>` envolvente. Se anula el del input para que se vea solo el del
+>    wrapper, y el `border-color` del foco lleva `!important` porque el CSS
+>    minificado de PatternFly gana por especificidad.
+
+> **`url.realmUri` no existe en el contexto del login.** La primera versión del
+> pie lo usaba para el enlace a la app y devolvía **HTTP 500 en todas las
+> pantallas de acceso** (`InvalidReferenceException`). Las plantillas del login
+> de Keycloak 26 exponen `url.resourcesPath`, `url.loginAction`,
+> `url.registrationUrl` y poco más. La URL pública viene de
+> `theme.properties`.
 
 **El logo** (`logo-cuadrado.png`, 256×256) lo genera
 `scripts/generate-logo.py` desde la misma geometría del `favicon.svg`, sin
