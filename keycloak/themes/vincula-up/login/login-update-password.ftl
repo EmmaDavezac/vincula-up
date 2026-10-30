@@ -36,3 +36,4 @@
         <@validator.script field="password-new"/>
     </#if>
 </@layout.registrationLayout>
+
