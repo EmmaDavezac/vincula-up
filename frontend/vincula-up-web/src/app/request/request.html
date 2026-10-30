@@ -48,8 +48,8 @@
 							<!-- 1) Dirección: el campo va primero, con el GPS como botón compacto al lado. -->
 					@if (gpsLoading()) {
 <div class="location-field__gps-loading">
-<vu-spinner [etiqueta]="'Verificando dirección…'" [size]="'sm'" />
-Verificando dirección…
+<vu-spinner [etiqueta]="verificacionLabel" [size]="'sm'" />
+{{ verificacionLabel }}
 </div>
 }
 <p class="location-field__label">
@@ -87,6 +87,28 @@ Verificando dirección…
 }
 										<span class="location-gps__label">Mi ubicación</span>
 									</button>
+									<!-- Botón de editar: aparece cuando la dirección está confirmada -->
+									@if (address() && !location().editing) {
+										<button
+											type="button"
+											class="location-field__edit"
+											(click)="startEditLocation()"
+											aria-label="Editar dirección"
+											title="Editar dirección"
+										>
+											<vu-icon name="pencil" [size]="16" />
+										</button>
+									}
+									<!-- Acciones de edición: el usuario puede cancelar -->
+									@if (location().editing) {
+										<button
+											type="button"
+											class="location-field__cancel-edit"
+											(click)="cancelEditLocation()"
+										>
+											Cancelar
+										</button>
+									}
 								</div>
 
 								@if (locationSuggestionOpen() && locationSuggestions().length) {

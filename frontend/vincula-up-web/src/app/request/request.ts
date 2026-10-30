@@ -99,15 +99,34 @@ export class Request implements OnInit, AfterViewInit {
   readonly pendingLocation = signal<PlaceSuggestion | null>(null);
   readonly locationEditValue = signal('');
 
+  /**
+   * `true` durante la verificación automática de dirección que se dispara tras
+   * el debounce de 2 segundos al escribir. Se usa para mostrar la animación
+   * "Validando dirección…" en lugar del "Verificando dirección…" del Enter.
+   */
+  readonly addressValidating = signal(false);
+
   readonly geolocationAvailable = signal<boolean | 'unknown'>('unknown');
   readonly geolocationPermission = signal<PermissionState | 'unknown'>('unknown');
 
   private suggestionTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Timer del debounce de 2 s para la verificación automática de dirección. */
+  private locationVerifyTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly address = signal('');
   readonly gpsPosition = signal<GpsPosition | null>(null);
   readonly gpsLoading = signal(false);
   readonly gpsError = signal('');
+
+  /**
+   * Texto que acompaña al spinner mientras se verifica la dirección escrita.
+   * Cambia a "Validando dirección…" cuando la verificación se disparó por el
+   * debounce de 2 segundos (escritura) y mantiene "Verificando dirección…"
+   * para la verificación manual (Enter o editar + confirmar).
+   */
+  get verificacionLabel(): string {
+    return this.addressValidating() ? 'Validando dirección…' : 'Verificando dirección…';
+  }
 
   // ── Profesionales ──────────────────────────────────────
   readonly allProfessionals = signal<ProfWithDistance[]>([]);
@@ -308,6 +327,14 @@ export class Request implements OnInit, AfterViewInit {
     } else if (!available) {
       this.geolocationPermission.set('denied');
     }
+
+    // Auto-detección: al entrar a crear una solicitud se solicita el permiso de
+    // ubicación y se intenta obtener la posición automáticamente (con spinner).
+    // Si fue denegado, `retryDetectLocation` muestra el mensaje y deja el campo
+    // editable para que el usuario escriba su dirección.
+    if (available && !this.location().lat && !this.location().lng) {
+      this.retryDetectLocation();
+    }
   }
 
   isStepDone(key: Step): boolean {
@@ -322,6 +349,13 @@ export class Request implements OnInit, AfterViewInit {
     if (q.length > 0) {
       this.locatorError.set('');
     }
+    // Cancelar la verificación automática previa (el usuario sigue escribiendo).
+    if (this.locationVerifyTimer) {
+      clearTimeout(this.locationVerifyTimer);
+      this.locationVerifyTimer = null;
+    }
+    this.addressValidating.set(false);
+
     if (q.length < 4) {
       this.locationSuggestions.set([]);
       this.locationSuggestionOpen.set(false);
@@ -343,6 +377,85 @@ export class Request implements OnInit, AfterViewInit {
     this.suggestionTimer = setTimeout(() => {
       void this.searchLocationSuggestions(q);
     }, 500);
+
+    // Verificación automática tras 2 s de inactividad: la dirección escrita
+    // se valida en segundo plano y el pin se ajusta, sin que el usuario tenga
+    // que presionar Enter. La animación muestra "Validando dirección…".
+    this.locationVerifyTimer = setTimeout(() => {
+      void this.verificarDireccionAutomatica(q);
+    }, 2000);
+  }
+
+  /**
+   * Verifica automáticamente la dirección escrita en el campo tras el debounce
+   * de 2 segundos. Muestra la animación de "Validando dirección…" mientras el
+   * backend geocodifica la calle y ajusta el pin del mapa con el resultado.
+   */
+  private async verificarDireccionAutomatica(query: string): Promise<void> {
+    const q = query.trim();
+    if (q.length < 4) {
+      return;
+    }
+    // No volver a verificar si la dirección escrita ya coincide con la confirmada.
+    if (this.address().trim().toLowerCase() === q.toLowerCase()) {
+      return;
+    }
+    this.locationVerifyTimer = null;
+    this.addressValidating.set(true);
+    this.gpsLoading.set(true);
+    this.gpsError.set('');
+    this.locatorError.set('');
+    this.locationSuggestionOpen.set(false);
+
+    this.api.getGpsPosition(q).pipe(
+      catchError((error) => {
+        this.gpsError.set(this.api.describeError(error, 'No pudimos validar esa dirección. Probá con el mapa.'));
+        return of(null);
+      })
+    ).subscribe((pos) => {
+      this.gpsLoading.set(false);
+      this.addressValidating.set(false);
+      if (!pos) return;
+      this.gpsPosition.set(pos);
+      if (pos.resolved === false) {
+        this.gpsError.set(pos.error || 'No se pudo validar la dirección. Probá con el mapa interactivo.');
+        return;
+      }
+      const lat = (pos.latitude ?? pos.latitud) ?? null;
+      const lng = (pos.longitude ?? pos.longitud) ?? null;
+      const displayName = pos.address || q;
+      if (lat == null || lng == null) {
+        this.gpsError.set(pos.error || 'No se obtuvieron coordenadas. Probá con el mapa interactivo.');
+        return;
+      }
+      this.location.set({ lat, lng, displayName, detecting: false, editing: false });
+      this.address.set(displayName);
+      this.locationQuery.set(displayName);
+      this.pendingLocation.set({ lat, lng, displayName });
+      this.form.update((f) =>
+        emptyServiceRequest({
+          ...f,
+          address: displayName,
+          latitude: lat,
+          longitude: lng,
+        })
+      );
+      this.updateDistances(lat, lng);
+      this.gpsError.set('');
+    });
+  }
+
+  /**
+   * Cancela el debounce de verificación automática de dirección (si está activo)
+   * y restablece el estado de validación. Se llama cuando el usuario interactúa
+   * de otra forma: elige una sugerencia, usa el GPS, presiona Enter, etc.
+   */
+  private cancelarVerificacionAutomatica(): void {
+    if (this.locationVerifyTimer) {
+      clearTimeout(this.locationVerifyTimer);
+      this.locationVerifyTimer = null;
+    }
+    this.addressValidating.set(false);
   }
 
   private async searchLocationSuggestions(query: string): Promise<void> {
@@ -396,6 +509,7 @@ export class Request implements OnInit, AfterViewInit {
       clearTimeout(this.suggestionTimer);
       this.suggestionTimer = null;
     }
+    this.cancelarVerificacionAutomatica();
     this.locationQuery.set(suggestion.displayName);
     this.locationSuggestions.set([]);
     this.locationSuggestionOpen.set(false);
@@ -418,8 +532,10 @@ export class Request implements OnInit, AfterViewInit {
   }
 
   startEditLocation(): void {
+    this.cancelarVerificacionAutomatica();
     const loc = this.location();
     this.locationEditValue.set(loc.displayName);
+    this.locationQuery.set(loc.displayName);
     this.location.set({ ...loc, editing: true, detecting: false });
     setTimeout(() => {
       const input = document.getElementById('loc-input') as HTMLInputElement | null;
@@ -429,6 +545,7 @@ export class Request implements OnInit, AfterViewInit {
   }
 
   confirmEditLocation(): void {
+    this.cancelarVerificacionAutomatica();
     const value = this.locationEditValue().trim();
     if (!value) {
       this.locatorError.set('Escribí una dirección válida.');
@@ -475,7 +592,9 @@ export class Request implements OnInit, AfterViewInit {
   }
 
   cancelEditLocation(): void {
+    this.cancelarVerificacionAutomatica();
     const loc = this.location();
+    this.locationQuery.set(loc.displayName);
     this.location.set({ ...loc, editing: false });
   }
 
@@ -507,6 +626,7 @@ export class Request implements OnInit, AfterViewInit {
       this.locatorError.set('Tu navegador no permite acceder a la ubicación del dispositivo.');
       return;
     }
+    this.cancelarVerificacionAutomatica();
     this.location.set({ ...this.location(), detecting: true, editing: false });
     this.locatorError.set('');
 
@@ -589,6 +709,7 @@ export class Request implements OnInit, AfterViewInit {
       this.locatorError.set('Escribí al menos 4 caracteres para buscar la dirección.');
       return;
     }
+    this.cancelarVerificacionAutomatica();
     this.locatorError.set('');
     this.gpsLoading.set(true);
     this.api.getGpsPosition(q).pipe(

@@ -672,7 +672,7 @@ cuentas antiguas ([§16](#16-deuda-técnica-conocida)).
 
 ### 9.1 Cliente: pedir un turno
 
-Ruta `/solicitar`, en **4 pasos** (wizard de 1101 líneas en `request.ts`):
+Ruta `/solicitar`, en **4 pasos** (wizard de ~1200 líneas en `request.ts`):
 
 | Paso | Qué hace | Validación |
 |---|---|---|
@@ -680,6 +680,12 @@ Ruta `/solicitar`, en **4 pasos** (wizard de 1101 líneas en `request.ts`):
 | 2. **Categoría** | Elige la especialidad | Obligatorio |
 | 3. **Día y horario** | Elige día de la semana y franja, contra la disponibilidad real del profesional | Obligatorio. Se filtran horarios ya pasados |
 | 4. **Profesional** | Elige entre los profesionales de esa especialidad, ordenados por cercanía | Obligatorio |
+
+**Paso 1 — Ubicación (auto-detección y debounce):**
+
+- **Auto-detección al entrar:** al abrir `/solicitar`, si el navegador soporta geolocalización, se solicita el permiso y se intenta obtener la posición automáticamente. Mientras dura, el botón "Mi ubicación" muestra un spinner (*Detectando ubicación…*). Si se deniega el permiso, se muestra un mensaje informativo y el campo queda editable. Si falla el GPS, se intenta geolocalización por IP y, como último recurso, se centra en Concepción del Uruguay.
+- **Escritura con debounce de 2 s:** al escribir en el campo de dirección, se buscan sugerencias con un debounce de 500 ms (Nominatim). Si el texto supera 4 caracteres y el usuario deja de escribir durante **2 segundos**, se dispara una verificación automática: el backend geocodifica la dirección y el pin del mapa se ajusta con el resultado. Durante este proceso se muestra la animación *"Validando dirección…"* (spinner + texto). Al presionar **Enter** la verificación es inmediata y muestra *"Verificando dirección…"*.
+- **Edición de dirección:** cuando la dirección está confirmada, aparece un ícono de lápiz para editar. Al hacer clic, el campo se enfoca con el texto actual y aparece un botón "Cancelar". La edición también activa el debounce de 2 s.
 
 Al enviar: se valida en `ms-solicitudes` que el profesional esté `ACTIVO` y que
 haya cobertura para las coordenadas del servicio. La solicitud nace `PENDIENTE`.

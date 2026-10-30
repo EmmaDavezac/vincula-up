@@ -308,3 +308,25 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
     - Eliminada la clase `.auth-action--desktop` sin usar.
 - **Verificación:** `npm run build` → `Application bundle generation complete` sin errores. 2 files changed, 9 insertions(+), 28 deletions(-).
 - **Nota:** `ESPECIFICACION.md` no requiere cambios (presentación/CSS).
+
+### [2026-10-30] - feat: auto-detección de ubicación y debounce de verificación de dirección
+
+- **Objetivo:** Mejorar la UX del paso 1 (Ubicación) en `/solicitar`: al entrar como cliente, pedir permisos de ubicación automáticamente y solicitar la posición; y al editar el campo de dirección, aplicar un debounce de 2 segundos antes de validar, mostrando una animación de "Validando dirección…".
+- **Diagnóstico:** Hasta ahora el cliente debía clickear explícitamente el botón "Mi ubicación" para disparar la geolocalización, y para verificar una dirección escrita tenía que presionar Enter. Esto creaba fricción y una percepción de espera vacía al teclear.
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/request/request.ts`:
+    - **Auto-detección en `ngOnInit()`**: si el navegador soporta geolocalización y aún no hay ubicación confirmada, se llama `retryDetectLocation()` automáticamente — pide permiso, muestra el spinner del botón GPS (*Detectando ubicación…*), y aplica los fallbacks por IP o Concepción del Uruguay si falla.
+    - **Signal `addressValidating`**: nuevo signal que indica que la verificación se disparó por debounce (escritura) en lugar de Enter.
+    - **Timer `locationVerifyTimer`**: debounce de 2 s en `onLocationQueryChange()`. Al dejar de escribir 2 segundos (y con ≥ 4 caracteres), se llama a `verificarDireccionAutomatica()`, que llama a `GET /api/gps` y actualiza el pin del mapa. El spinner muestra *"Validando dirección…"*.
+    - **Getter `verificacionLabel`**: devuelve *"Validando dirección…"* (debounce) o *"Verificando dirección…"* (Enter/editar), alimentando el `vu-spinner` existente.
+    - **Método `cancelarVerificacionAutomatica()`**: helper que cancela el timer y resetea el signal. Se llama en `selectSuggestion`, `retryDetectLocation`, `confirmLocationFromQuery`, `startEditLocation`, `confirmEditLocation` y `cancelEditLocation` para evitar verificaciones conflictivas.
+    - `startEditLocation()` y `cancelEditLocation()` ahora sincronizan `locationQuery` con la dirección confirmada para que el input refleje el estado.
+  - `frontend/vincula-up-web/src/app/request/request.html`:
+    - El spinner de carga usar ahora `{{ verificacionLabel }}` en lugar de texto fijado.
+    - Agrega el ícono **lápiz** (`vu-icon name="pencil"`) para editar la dirección cuando `address()` está confirmada y no se está editando.
+    - Agrega el botón **"Cancelar"** cuando `location().editing` es `true`.
+  - `frontend/vincula-up-web/src/app/request/request.css`:
+    - `.location-field__edit` — botón ícono compacto (borde sutil, hover coral).
+    - `.location-field__cancel-edit` — botón de texto secundario.
+- **Verificación:** `npx ng build --configuration development` → `Application bundle generation complete` sin errores ni warnings. 6 files changed, ~170 insertions(+), ~20 deletions(-).
+- **Actualiza `ESPECIFICACION.md` (§ 9.1):** documenta el auto-detectar al entrar y el debounce de 2 s con animación "Validando dirección…".
