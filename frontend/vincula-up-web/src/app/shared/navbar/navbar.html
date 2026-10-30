@@ -108,14 +108,16 @@ Cerrar sesión
 }
 </div>
 } @else {
-<a class="auth-action auth-action--link" routerLink="/ingresar">Ingresar</a>
+<a
+class="auth-action auth-action--link"
+(click)="auth.registerWithKeycloak()"
+>Crear cuenta</a
+>
 <button
 type="button"
 class="vu-btn vu-btn--ink auth-action auth-action--cta"
-(click)="crearCuenta()"
->
-Crear cuenta
-</button>
+(click)="auth.loginWithKeycloak()"
+>Ingresar</button>
 }
 </div>
 </div>

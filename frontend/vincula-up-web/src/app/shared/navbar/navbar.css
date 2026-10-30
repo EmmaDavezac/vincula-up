@@ -86,6 +86,7 @@ borde usa `--line`, que ya cambia con el tema.
 	}
 }
 
+/* Enlace secundario: "Crear cuenta". */
 .auth-action--link {
 	color: var(--ink);
 	font-size: 0.875rem;
@@ -93,36 +94,14 @@ borde usa `--line`, que ya cambia con el tema.
 	text-decoration: none;
 }
 
-/*
-	En pantallas muy angostas la barra superior se queda con la marca y "Crear
-	cuenta": "Ingresar" ya está en la barra inferior y acá no entra.
-*/
-@media (max-width: 479px) {
-	.auth-action--link {
-		display: none;
-	}
-}
-
+/* En mobile, "Ingresar" viene del tabbar: el botón primario se oculta. */
 .auth-action--cta {
 	display: none;
 	font-size: 0.75rem;
 	padding: 0.625rem 0.75rem;
 }
 
-/*
-	En móvil, "Ingresar" y "Crear cuenta" viven sólo en el panel desplegable: si
-	quedaran también en la barra aparecerían duplicados. Por eso el link de la
-	barra está oculto por defecto y la barra lo muestra recién en desktop.
-*/
-.auth-action--desktop {
-	display: none;
-}
-
 @media (min-width: 1024px) {
-	.auth-action--desktop {
-		display: inline;
-	}
-
 	.auth-action--cta {
 		display: inline-flex;
 		font-size: 0.875rem;
