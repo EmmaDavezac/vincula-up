@@ -525,7 +525,7 @@ a {
 .vu-btn {
 	align-items: center;
 	border: 1px solid transparent;
-	border-radius: 8px;
+	border-radius: 0;
 	cursor: pointer;
 	display: inline-flex;
 	font-family: var(--font-sans);
@@ -623,7 +623,10 @@ a {
 }
 
 .vu-btn--pill {
-	border-radius: 999px;
+	/* La guía visual exige botones cuadrados: esta variante se anula y deja
+	   el botón cuadrado como el resto. Se conserva la clase por compatibilidad
+	   con componentes que aún la referencian, pero no aplica píldora. */
+	border-radius: 0;
 }
 
 .vu-btn--block {

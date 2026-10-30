@@ -106,3 +106,14 @@ Cada vez que se complete una tarea, funcionalidad o corrección relevante:
 - **Base de datos:** PostgreSQL.
 - **Entorno:** Todo se ejecuta mediante contenedores Docker (`docker compose`).
 - **Secretos:** El archivo `.env` almacena variables sensibles y **nunca** debe comitearse.
+
+---
+
+## 7. Guía visual obligatoria (MANDATORIO)
+
+Todo agente de IA debe respetar [`GUÍA-VISUAL.md`](GUÍA-VISUAL.md) como documento de diseño de referencia. Antes de crear o modificar cualquier componente de interfaz:
+
+1. **Leer `GUÍA-VISUAL.md`** y aplicar sus reglas: paleta de colores como tokens CSS (nunca colores sueltos/hardcoded), botones planos y cuadrados, diferenciación clara entre botones primarios (`.vu-btn--ink`, relleno) y secundarios (`.vu-btn--outline`, borde), hover solo con cambio de color (sin `transform`), y barra inferior de móvil con fondo sólido (no transparente).
+2. **Nunca usar `.vu-btn--pill`**: la guía visual exige botones cuadrados; la variante píldora está anulada (`border-radius: 0`) en `styles.css`.
+3. **Verificar con `npm run build`** que la SPA compila sin errores de TypeScript ni plantillas antes de considerar la tarea terminada.
+
