@@ -295,3 +295,16 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
   - `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`: `embeddedMapUrl()` ahora cachea el `SafeResourceUrl` en un `Map` (`_urlCache`) usando `lat,lng` como clave, retornando siempre el mismo objeto para las mismas coordenadas. El `@if` y `[src]` del iframe ya no ven cambios falsos.
 - **Verificación:** `npm run build` → `Application bundle generation complete`. El cache (`_urlCache`) está presente en el bundle (`chunk-3sA7-ta_.js`).
 - **Nota:** `ESPECIFICACION.md` no requiere cambios (presentación/CSS).
+
+### [2026-10-30] - feat: intercambio de estilos de ingresar/crear cuenta en navbar
+- **Objetivo:** Que "Ingresar" sea el botón primario (`vu-btn--ink`) y "Crear cuenta" el enlace secundario (`.auth-action--link`), invirtiendo el orden anterior.
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/shared/navbar/navbar.html`:
+    - "Crear cuenta": `<a>` con `auth.registerWithKeycloak()` y clase `auth-action--link` (enlace secundario).
+    - "Ingresar": `<button>` con `auth.loginWithKeycloak()` y clases `vu-btn vu-btn--ink auth-action--cta` (botón primario).
+  - `frontend/vincula-up-web/src/app/shared/navbar/navbar.css`:
+    - Eliminada la regla `@media (max-width: 479px) { .auth-action--link { display: none } }` que ocultaba "Crear cuenta" en móvil. Ahora "Crear cuenta" es visible en todos los tamaños.
+    - `.auth-action--cta` (botón "Ingresar") permanece oculto en mobile (≤1024px) porque en mobile "Ingresar" viene del `tabbar` (barra inferior).
+    - Eliminada la clase `.auth-action--desktop` sin usar.
+- **Verificación:** `npm run build` → `Application bundle generation complete` sin errores. 2 files changed, 9 insertions(+), 28 deletions(-).
+- **Nota:** `ESPECIFICACION.md` no requiere cambios (presentación/CSS).
