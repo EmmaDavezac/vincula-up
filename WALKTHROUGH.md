@@ -279,3 +279,12 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
     - Overlay absoluto `.mapa-embed__spinner` con `<vu-spinner size="md">` y texto "Cargando mapa…" sobre el iframe, visible mientras `mapaCargando()`.
     - `.mapa-embed-container` con `position: relative` para anclar el overlay.
 - **Verificación:** `npm run build` → `Application bundle generation complete` sin errores de TypeScript ni de plantillas.
+
+### [2026-10-29] - fix: evitar ciclo NG0600 moviendo mapaCargando a effect
+- **Diagnóstico:** Activar `this.mapaCargando.set(true)` dentro de `embeddedMapUrl()` (un método llamado desde `@if` en el template en cada detección de cambios) provocó un **ciclo de detección infinito** (NG0600) en `my-requests`, bloqueando la página.
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`:
+    - Se eliminó `this.mapaCargando.set(true)` de `embeddedMapUrl()`.
+    - Se agregó un `effect` (`_mapaLoadEffect`) que activa `mapaCargando` observando `filteredRequests()` y `isProfessional()`: se dispara asíncronamente después de la detección, sin crear ciclo.
+    - Importado `effect` desde `@angular/core`.
+- **Verificación:** `npm run build` → `Application bundle generation complete` sin errores.

@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -58,7 +58,23 @@ export class MyRequests {
    * estado vacío (que diría "todavía no tenés solicitudes" sin haber llegado nada).
    */
   readonly loading = signal(true);
-  /** El mapa embebido todavía está cargando sus tiles. */  readonly mapaCargando = signal(false);
+  /** El mapa embebido todavía está cargando sus tiles. */
+  readonly mapaCargando = signal(false);
+
+  /**
+   * Activa el spinner de carga del mapa cuando hay solicitudes profesionales
+   * con coordenadas visibles. Se usa un `effect` (no un método de template) para
+   * evitar el ciclo de detección de cambios NG0600: `embeddedMapUrl` se evalúa en
+   * cada cambio, así que no puede activar signals por sí mismo.
+   */
+  private readonly _mapaLoadEffect = effect(() => {
+    if (this.isProfessional()) {
+      const tieneMapa = this.filteredRequests().some((r) => this.mapCoords(r) != null);
+      if (tieneMapa) {
+        this.mapaCargando.set(true);
+      }
+    }
+  });
 
   // Filtros de la lista
   readonly statusFilter = signal<'TODAS' | RequestStatus>('TODAS');
@@ -318,7 +334,6 @@ export class MyRequests {
   embeddedMapUrl(request: ServiceRequest): SafeResourceUrl | null {
     const coords = this.mapCoords(request);
     if (!coords) return null;
-    this.mapaCargando.set(true);
     const delta = 0.008;
     const bbox = `${coords.lng - delta}%2C${coords.lat - delta}%2C${coords.lng + delta}%2C${coords.lat + delta}`;
     const url = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${coords.lat}%2C${coords.lng}`;
