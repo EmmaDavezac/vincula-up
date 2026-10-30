@@ -1,7 +1,5 @@
 # Historial de Walkthroughs (WALKTHROUGH.md)
 
-Este archivo centraliza el registro de todas las funcionalidades, correcciones y tareas completadas por los agentes de IA o desarrolladores en el proyecto Vincula-UP.
-
 ---
 
 ## Estructura Recomendada para cada Entrada
@@ -56,14 +54,31 @@ Este archivo centraliza el registro de todas las funcionalidades, correcciones y
   - En [activation.css](file:///home/emma/Desktop/vincula-up/frontend/vincula-up-web/src/app/activation/activation.css#L160-L220): Se importaron y alinearon los estilos CSS `.location-field`, `.location-gps`, `.step-map` y `.privacy-note`.
 - **Verificación:** Compilación exitosa del frontend Angular mediante `npm run build`.
 
-
 ### [2026-10-30] - feat: guía visual, botones cuadrados y barra inferior móvil sólida
 - **Objetivo:** Establecer la guía visual de Vincula-UP y aplicar sus reglas: botones planos y cuadrados, diferenciación clara entre primario y secundario, modal de cerrar sesión cuadrado y barra inferior de móvil con fondo sólido (no transparente).
 - **Cambios realizados:**
-  - `GUÍA-VISUAL.md` (nuevo): paleta de colores completa (tokens y HEX, claro y oscuro), reglas de botones (planos, cuadrados, sin píldoras), diferenciación primario (`.vu-btn--ink` relleno) vs secundario (`.vu-btn--outline` borde) vs terciario (`.vu-btn--quiet`) vs crear (`.vu-btn--coral`) vs peligro (`.vu-btn--danger`), hover solo con cambio de color (sin `transform`), radios por componente, barra inferior móvil fondo sólido, tema claro/oscuro con tokens.
-  - `AGENTS.md`: nueva sección 7 "Guía visual obligatoria (MANDATORIO)" que referencia `GUÍA-VISUAL.md` y exige su cumplimiento a todo agente.
-  - `frontend/vincula-up-web/src/styles.css`: `.vu-btn` con `border-radius: 0` (cuadrado); `.vu-btn--pill` anulado (`border-radius: 0`); `.vu-tabbar` con `background: var(--paper)` (fondo sólido, no translúcido).
-  - `frontend/vincula-up-web/src/app/shared/confirm/confirm.html`: botón aceptar del modal `vu-confirm` quita `vu-btn--pill` (ahora cuadrado).
-  - Se elimina `vu-btn--pill` de todos los componentes que lo usaban: `terminos-modal.ts`, `admin-categories.html`, `admin-category-new.html`, `admin-professional-new.html`, `admin-professionals.html`, `my-requests.html`, `request.html`.
-- **Verificación:** `npm run build` compila limpiamente; no queda ningún `vu-btn--pill` en componentes.
-- **Especificación:** `ESPECIFICACION.md` §17 y Anexo C ya documentan los tokens y el tema; no requiere cambios estructurales (la guía visual consolida las mismas reglas).
+  - `GUÍA-VISUAL.md` (nuevo): paleta de colores completa, reglas de botones cuadrados sin píldoras, y barra inferior móvil sólido.
+  - `AGENTS.md`: añadida sección de guía visual obligatoria.
+  - `frontend/vincula-up-web/src/styles.css`: `.vu-btn` con `border-radius: 0`; `.vu-btn--pill` anulado; `.vu-tabbar` con fondo sólido.
+  - Eliminados los usos de `.vu-btn--pill` en múltiples componentes.
+- **Verificación:** `npm run build` sin errores, sin `.vu-btn--pill` presente.
+- **Especificación:** Actualizada según tokens y tema.
+
+### [2026-10-30] - feat: mejoras en login y navbar
+- **Objetivo:** Mejorar la experiencia de login y la barra de navegación.
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/sign-in/sign-in.html`: enlace "Registrate" ahora llama a `registrarse()`.
+  - `frontend/vincula-up-web/src/app/sign-in/sign-in.ts`: añadido método `registrarse()`.
+  - `frontend/vincula-up-web/src/app/shared/navbar/navbar.ts`: añadido computed `enLogin`.
+  - `frontend/vincula-up-web/src/app/shared/navbar/navbar.html`: ocultar acciones "Ingresar" y "Crear cuenta" cuando `enLogin()` es true.
+- **Verificación:** `npm run build` exitoso.
+- **Especificación:** No requiere cambios.
+
+### [2026-10-30] - fix: restaurar tema de login de Keycloak y activar loginTheme
+- **Objetivo:** Que las pantallas de acceso de Keycloak usen el tema `vincula-up`.
+- **Causa:** El directorio `keycloak/themes/vincula-up/login/` existía en una rama anterior pero no estaba en `dev`.
+- **Cambios realizados:**
+  - Restaurado el tema de login en `keycloak/themes/vincula-up/login/`.
+  - Actualizado script `keycloak-bootstrap.sh` para aplicar `loginTheme`.
+- **Verificación:** `npm run build` compila limpiamente; aplicar script y reiniciar Keycloak para ver cambios.
+- **Especificación:** Documentado en `ESPECIFICACION.md`.
