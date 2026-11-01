@@ -44,33 +44,39 @@ z-index 70 compite de verdad contra el 50 de la barra.
 	}
 }
 
-/*
-Toggle de tema. Es un botón circular discreto: el cambio de tema es una
-preferencia personal y no debería competir con las acciones de la barra. El
-borde usa `--line`, que ya cambia con el tema.
-*/
-.theme-toggle {
+.theme-icon-toggle {
 	align-items: center;
-	appearance: none;
-	background: transparent;
-	border: 1px solid var(--line);
-	border-radius: 50%;
-	color: var(--ink);
+	background: var(--paper);
+	border: 1px solid var(--coral);
+	border-radius: 0.5rem;
+	color: var(--coral);
 	cursor: pointer;
 	display: inline-flex;
-	height: 2.125rem;
+	height: 2.5rem;
 	justify-content: center;
 	padding: 0;
 	transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-	width: 2.125rem;
+	width: 2.5rem;
 }
 
-.theme-toggle:hover {
-	background: var(--surface-highlight);
-	border-color: var(--muted);
+.theme-icon-toggle.is-dark {
+	background: var(--coral);
+	border-color: var(--coral);
+	color: var(--on-solid);
 }
 
-.theme-toggle:focus-visible {
+.theme-icon-toggle:hover {
+	background: var(--coral-dark);
+	border-color: var(--coral-dark);
+	color: var(--on-solid);
+}
+
+.theme-icon-toggle.is-dark:hover {
+	background: var(--coral-dark);
+	border-color: var(--coral-dark);
+}
+
+.theme-icon-toggle:focus-visible {
 	outline: 2px solid var(--coral);
 	outline-offset: 2px;
 }
@@ -186,10 +192,12 @@ borde usa `--line`, que ya cambia con el tema.
 
 .user-menu__chevron {
 	color: var(--muted);
-	transition: transform 0.18s ease;
+	margin-left: 0.25rem;
+	transition: transform 0.18s ease, color 0.18s ease;
 }
 
 .user-menu__chevron.is-open {
+	color: var(--coral);
 	transform: rotate(180deg);
 }
 
@@ -225,6 +233,10 @@ borde usa `--line`, que ya cambia con el tema.
 	text-align: left;
 	text-decoration: none;
 	width: 100%;
+}
+
+.user-menu__item vu-icon {
+	color: var(--muted);
 }
 
 .user-menu__item:hover {

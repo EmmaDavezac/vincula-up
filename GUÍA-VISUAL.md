@@ -41,14 +41,14 @@ El tema oscuro redefine los tokens de superficie, tinta, líneas, sombras y velo
 
 ## 2. Botones
 
-### 2.1 Todos los botones son planos y cuadrados
+### 2.1 Todos los botones son rectangulares con radio moderado
 
 Cada botón de la aplicación usa la clase base `.vu-btn`. La regla de diseño es:
 
 - **Planos:** sin sombras elevadas, sin `transform`, sin movimiento al hacer hover.
-- **Cuadrados:** `border-radius` mínimo (sin redondeo excesivo, sin píldoras).
+- **Rectangulares:** radio uniforme de `8px`; sin píldoras ni botones circulares.
 
-La variante `.vu-btn--pill` (`border-radius: 999px`) **no se usa**. Si aparece en algún componente, se elimina y se reemplaza por el estilo base cuadrado.
+La forma se aplica globalmente a botones nativos, enlaces-botón y toggles de selección Material, incluso si un componente define estilos locales. Los botones icon-only también mantienen el rectángulo redondeado; el switch conserva su forma de cápsula porque es un control de estado, no un botón de acción. Los avatares circulares y chips mantienen sus excepciones.
 
 ### 2.2 Diferenciación primario vs secundario
 
@@ -61,6 +61,11 @@ Los botones primarios y secundarios deben diferenciarse claramente por relleno y
 | `.vu-btn--quiet` | Fondo transparente, borde tenue, sin relleno marcado | Terciario: acciones menores, "Cerrar", "Limpiar búsqueda" |
 | `.vu-btn--coral` | Relleno coral (`--coral`), texto blanco | Acción que crea algo nuevo (ej. "Nueva categoría", "Nuevo profesional") |
 | `.vu-btn--danger` | Relleno de alerta, texto de error | Borrado y acciones irreversibles |
+
+En tema oscuro `.vu-btn--outline` cambia a una superficie clara con texto oscuro
+para mantener una diferencia visible frente al primario sólido. `.vu-btn--quiet`
+sigue siendo terciario y transparente, con un borde más contrastado; estos tokens
+son globales y se aplican en todas las pantallas.
 
 ### 2.3 Hover
 
@@ -77,7 +82,8 @@ El hover **solo cambia color** (`background-color`, `border-color`, `color`). Nu
 
 | Componente | Radio | Nota |
 |------------|-------|------|
-| Botones e inputs | Cuadrado (mínimo) | Reglas de la guía visual |
+| Botones | Rectángulo con radio de `8px` | Todos los temas y componentes, incluidos botones icon-only |
+| Inputs | Cuadrado (mínimo) | Campos de formulario |
 | Tarjetas, paneles, modales | `1rem` – `1.25rem` | `vu-card`, `vu-panel`, `vu-confirm__dialog` |
 | Chips, badges, estados | `999px` (píldora) | Excepción documentada: son etiquetas, no botones |
 | Avatar | `999px` | Círculo |

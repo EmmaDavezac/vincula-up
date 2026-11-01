@@ -8,6 +8,7 @@ import {
 	requireRequestsAccess,
 	requireRole,
 } from './core/guards/role.guard';
+import { confirmarSalidaDeSolicitud } from './request/request.guard';
 
 export const routes: Routes = [
 	{
@@ -42,6 +43,7 @@ export const routes: Routes = [
 	{
 		path: 'solicitar',
 		canActivate: [requireRole('CLIENTE')],
+		canDeactivate: [confirmarSalidaDeSolicitud],
 		loadComponent: () => import('./request/request').then((module) => module.Request),
 		title: 'Vincula-UP | Solicitar turno',
 	},

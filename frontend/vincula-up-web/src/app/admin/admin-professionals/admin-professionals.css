@@ -2,40 +2,6 @@
 	display: block;
 }
 
-/* ── Encabezado (lead + contador + botón coral) ─────────────────────────── */
-
-.admin-professionals__head {
-	display: flex;
-	flex-direction: column;
-	gap: 1rem;
-	justify-content: space-between;
-}
-
-@media (min-width: 640px) {
-	.admin-professionals__head {
-		align-items: flex-end;
-		flex-direction: row;
-	}
-}
-
-.admin-professionals__head .vu-btn {
-	flex-shrink: 0;
-}
-
-.admin-professionals__lead {
-	font-size: 0.875rem;
-	line-height: 1.6;
-	margin: 0.75rem 0 0;
-	max-width: 42rem;
-}
-
-.admin-professionals__count {
-	color: var(--coral);
-	font-size: 0.75rem;
-	font-weight: 700;
-	margin: 0.5rem 0 0;
-}
-
 .admin-professionals__alert {
 	margin: 1.5rem 0 0;
 }
@@ -85,113 +51,142 @@
 	color: var(--alert-info-ink);
 }
 
-/* ── Cards del padrón (dos columnas, como el prototipo) ────────────────── */
-
 .admin-professionals__list {
+	width: 100%;
+}
+
+.admin-professionals__row {
+	align-items: center;
 	display: grid;
-	gap: 1rem;
-	margin-top: 1.5rem;
+	gap: 0.75rem 1rem;
+	grid-template-columns: minmax(0, 1fr) auto;
+	width: 100%;
 }
 
-@media (min-width: 1024px) {
-	.admin-professionals__list {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-	}
-}
-
-.admin-professionals__card {
-	padding: 1.25rem;
-}
-
-.admin-professionals__card-head {
-	align-items: flex-start;
+.admin-professionals__person {
+	align-items: center;
 	display: flex;
-	gap: 1rem;
+	gap: 0.75rem;
+	grid-column: 1 / -1;
 	min-width: 0;
 }
 
-.admin-professionals__card-head > vu-avatar {
+.admin-professionals__person > vu-avatar {
 	flex-shrink: 0;
 }
 
 .admin-professionals__identity {
-	flex: 1;
-	min-width: 0;
-}
-
-.admin-professionals__card-top {
-	align-items: flex-start;
-	display: flex;
-	flex-wrap: wrap;
-	gap: 0.5rem;
-	justify-content: space-between;
-}
-
-.admin-professionals__card-info {
 	min-width: 0;
 }
 
 .admin-professionals__name {
-	font-family: var(--font-serif);
-	font-size: 1.25rem;
+	font-family: var(--font-sans);
+	font-size: 1rem;
+	font-weight: 700;
+	line-height: 1.35;
+	margin: 0;
 }
 
 .admin-professionals__email {
 	color: var(--muted);
 	font-size: 0.875rem;
-	margin: 0.25rem 0 0;
-	overflow-wrap: anywhere;
+	margin: 0.2rem 0 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.admin-professionals__specialties {
+	grid-column: 1 / -1;
+	min-width: 0;
 }
 
 .admin-professionals__chips {
-	margin-top: 1rem;
+	margin-top: 0.25rem;
+}
+
+.admin-professionals__legajo-field,
+.admin-professionals__status {
+	align-items: flex-start;
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
 }
 
 .admin-professionals__legajo {
 	color: var(--muted);
 	font-size: 0.75rem;
 	font-weight: 700;
-	margin: 0.75rem 0 0;
+	margin: 0;
 }
 
 .admin-professionals__actions {
-	border-top: 1px solid var(--line);
+	align-items: center;
 	display: flex;
 	flex-wrap: wrap;
+	grid-column: 1 / -1;
 	gap: 0.5rem;
-	margin-top: 1.25rem;
-	padding-top: 1rem;
+	justify-content: flex-end;
+}
+
+.admin-professionals__actions .vu-admin-field-label {
+	margin-right: auto;
+}
+
+@media (max-width: 1099px) {
+	.admin-professionals__row > span {
+		display: none;
+	}
+
+	.admin-professionals__person .vu-admin-field-label,
+	.admin-professionals__specialties > .vu-admin-field-label,
+	.admin-professionals__legajo-field .vu-admin-field-label,
+	.admin-professionals__status .vu-admin-field-label,
+	.admin-professionals__actions .vu-admin-field-label {
+		display: inline-block;
+	}
+}
+
+@media (min-width: 1100px) {
+	.vu-admin-material-list .vu-admin-material-list__header {
+		display: flex;
+	}
+
+	.admin-professionals__row {
+		gap: 1rem;
+		grid-template-columns: minmax(12rem, 1.5fr) minmax(12rem, 1.4fr) minmax(5rem, 0.55fr) minmax(7rem, 0.7fr) minmax(11rem, 1.2fr);
+	}
+
+	.admin-professionals__person,
+	.admin-professionals__specialties,
+	.admin-professionals__actions {
+		grid-column: auto;
+	}
+
+	.admin-professionals__legajo-field,
+	.admin-professionals__status {
+		align-items: flex-start;
+	}
+
+	.admin-professionals__actions {
+		justify-content: flex-end;
+	}
+
+	.admin-professionals__actions .vu-admin-field-label {
+		display: none;
+	}
+
+	.vu-admin-field-label {
+		display: none;
+	}
 }
 
 /* La baja del padrón es lógica: el botón "Suspender" es el único que baja. */
 
-/* ── Detalle ────────────────────────────────────────────────────────────── */
-
-.admin-professionals__overlay {
-	align-items: center;
-	background: var(--scrim);
-	display: flex;
-	inset: 0;
-	justify-content: center;
-	padding: 1rem;
-	position: fixed;
-	z-index: 60;
-}
-
 .admin-professionals__modal {
-	background: var(--surface-card);
-	border-radius: 1rem;
-	box-shadow: var(--shadow-lg);
-	max-height: 90vh;
+	max-height: 80vh;
 	overflow-y: auto;
-	padding: 1.5rem;
-	width: 100%;
-}
-
-@media (min-width: 640px) {
-	.admin-professionals__modal {
-		max-width: 28rem;
-	}
+	width: min(36rem, calc(100vw - 3rem));
 }
 
 .admin-professionals__modal-head {
@@ -276,29 +271,3 @@ modificar, así se lee como otra cosa y no como el siguiente paso del flujo.
 	margin: 0.5rem 0 0;
 }
 
-/* ── Buscador del padrón ────────────────────────────────────────────── */
-
-.admin-professionals__search {
-align-items: center;
-display: flex;
-gap: 0.75rem;
-margin-top: 1.5rem;
-}
-
-.admin-professionals__search > .vu-field-with-icon {
-flex: 1 1 auto;
-min-width: 0;
-}
-
-.admin-professionals__empty {
-align-items: center;
-background: var(--surface-card);
-border: 1px dashed var(--line);
-border-radius: 12px;
-display: flex;
-flex-direction: column;
-gap: 0.75rem;
-margin-top: 1.5rem;
-padding: 2rem 1rem;
-text-align: center;
-}

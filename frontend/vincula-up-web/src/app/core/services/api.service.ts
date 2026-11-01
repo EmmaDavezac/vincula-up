@@ -204,7 +204,9 @@ export class ApiService {
       especialidades,
       // La foto no viene como URL: el backend manda solo el booleano y el
       // `vu-avatar` pide la imagen por `/api/usuarios/{usuarioId}/foto`.
-      tieneFoto: raw['tieneFoto'] === true,
+      tieneFoto:
+        raw['tieneFoto'] === true ||
+        (typeof raw['fotoUrl'] === 'string' && raw['fotoUrl'].trim().length > 0),
       estado: typeof raw['estado'] === 'string' ? (raw['estado'] as string) : 'ACTIVO',
       // Zona de cobertura: sin estos datos el directorio no puede calcular la
       // distancia ni el asistente ordenar por proximidad.

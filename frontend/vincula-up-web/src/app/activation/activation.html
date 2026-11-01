@@ -1,17 +1,19 @@
 <!-- ── Modal de mapa interactivo (OpenStreetMap / Leaflet) ── -->
-@if (showMapModal()) {
-	<div class="map-overlay" (click)="closeMapPicker()">
-		<div class="map-modal" (click)="$event.stopPropagation()">
-			<div class="map-modal__head">
+
+<ng-template #mapPickerDialog>
+	@if (showMapModal()) {
+		<div class="map-modal">
+			<div mat-dialog-title class="map-modal__head">
 				<div>
 					<h3 class="map-modal__title">Elegí la ubicación de tu domicilio o base</h3>
 					<p class="map-modal__sub">Hacé clic o arrastrá el marcador para fijar el centro de tu zona de trabajo.</p>
 				</div>
-				<button type="button" class="vu-btn vu-btn--quiet vu-btn--icon" (click)="closeMapPicker()" aria-label="Cerrar">
+				<button type="button" mat-button class="vu-btn vu-btn--quiet vu-btn--icon" (click)="closeMapPicker()" aria-label="Cerrar">
 					<vu-icon name="x" [size]="20" />
 				</button>
 			</div>
 
+			<div mat-dialog-content class="map-modal__content">
 			<div class="map-search">
 				<input
 					class="vu-input"
@@ -21,10 +23,10 @@
 					placeholder="Buscar ciudad, calle o localidad..."
 					(keydown.enter)="searchAddressInMap()"
 				/>
-				<button type="button" class="vu-btn vu-btn--ink vu-btn--sm" (click)="searchAddressInMap()" [disabled]="mapSearching()">
+				<button type="button" mat-flat-button class="vu-btn vu-btn--ink vu-btn--sm" (click)="searchAddressInMap()" [disabled]="mapSearching()">
 					{{ mapSearching() ? 'Buscando...' : 'Buscar' }}
 				</button>
-				<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="detectDeviceGps()">Mi GPS</button>
+				<button type="button" mat-stroked-button class="vu-btn vu-btn--outline vu-btn--sm" (click)="detectDeviceGps()">Mi GPS</button>
 			</div>
 
 			<div id="activation-map" class="map-canvas"></div>
@@ -40,14 +42,15 @@
 					}
 				</div>
 			</div>
+			</div>
 
-			<div class="map-modal__actions">
-				<button type="button" class="vu-btn vu-btn--quiet" (click)="closeMapPicker()">Cancelar</button>
-				<button type="button" class="vu-btn vu-btn--coral" (click)="confirmMapLocation()">Confirmar esta ubicación</button>
+			<div mat-dialog-actions class="map-modal__actions">
+				<button type="button" mat-button class="vu-btn vu-btn--quiet" (click)="closeMapPicker()">Cancelar</button>
+				<button type="button" mat-flat-button class="vu-btn vu-btn--coral" (click)="confirmMapLocation()">Confirmar esta ubicación</button>
 			</div>
 		</div>
-	</div>
-}
+	}
+</ng-template>
 
 <div class="vu-page activation">
 	<section class="activation__section">
@@ -67,22 +70,29 @@
 			</div>
 		} @else {
 			<div class="vu-stepper activation__stepper" aria-label="Progreso de activación">
-				@for (label of stepLabels; track label; let index = $index) {
+				@for (item of steps; track item.label; let index = $index) {
 					<div
 						class="vu-stepper__item"
 						[class.vu-stepper__item--active]="step() === index + 1"
-						[class.vu-stepper__item--done]="step() > index + 1"
+						[class.vu-stepper__item--done]="stepDone(index)"
 					>
-						<div class="vu-stepper__label">
+						<button
+							type="button"
+							class="vu-stepper__label activation__stepper-button"
+							[disabled]="!stepDone(index)"
+							[attr.aria-current]="step() === index + 1 ? 'step' : null"
+							[attr.aria-label]="'Paso ' + (index + 1) + ': ' + item.label"
+							(click)="irAPaso(index + 1)"
+						>
 							<span class="vu-stepper__circle">
-								@if (step() > index + 1) {
-									<vu-icon name="check" [size]="16" />
+								@if (stepDone(index)) {
+									<vu-icon name="check" [size]="16" aria-hidden="true" />
 								} @else {
 									{{ index + 1 }}
 								}
 							</span>
-							<span class="vu-stepper__name">{{ label }}</span>
-						</div>
+							<span class="vu-stepper__name">{{ item.label }}</span>
+						</button>
 						@if (index < 2) {
 							<div class="vu-stepper__line"></div>
 						}
@@ -120,7 +130,6 @@
 
 					<div class="dropzone__actions">
 						<label class="vu-btn vu-btn--ink">
-							<vu-icon name="upload" [size]="16" />
 							{{ photoPreview() ? 'Cambiar foto' : 'Elegir archivo' }}
 							<input type="file" accept="image/jpeg,image/png" class="vu-sr-only" (change)="selectPhoto($event)" />
 						</label>
@@ -165,7 +174,6 @@
 								[attr.aria-label]="validatedLocation() ? 'Mi ubicación: ' + validatedLocation()?.displayName : 'Usar mi ubicación'"
 								[title]="validatedLocation()?.displayName || 'Usar mi ubicación'"
 							>
-								<vu-icon name="navigation" [size]="18" class="location-gps__icon" />
 								<span class="location-gps__label">Mi ubicación</span>
 							</button>
 						</div>
@@ -260,14 +268,17 @@
 			}
 
 			<div class="activation__actions">
-				<button type="button" class="vu-btn activation__back back" [class.is-hidden]="step() === 1" (click)="previous()">
-					<vu-icon name="chevron-left" [size]="16" />
-					Atrás
-				</button>
+				<div class="activation__actions-start">
+					<button type="button" class="vu-btn vu-btn--outline activation__back" [class.is-hidden]="step() === 1" (click)="previous()">
+						Atrás
+					</button>
+				</div>
 
-				<button type="button" class="vu-btn vu-btn--ink next" [disabled]="submitting() || photoLoading() || !hasPhoto()" (click)="next()">
+				<button type="button" class="vu-btn vu-btn--ink activation__next" [disabled]="submitting() || photoLoading() || validatingLocation()" (click)="next()">
+					@if (submitting() || validatingLocation()) {
+						<mat-spinner class="activation__spinner" diameter="18" aria-hidden="true" />
+					}
 					{{ step() === 3 ? 'Activar' : 'Continuar' }}
-					<vu-icon name="chevron-right" [size]="16" />
 				</button>
 			</div>
 

@@ -65,6 +65,10 @@ export class AuthService {
   private photoRequested = false;
   /** Si el backend ya respondió sobre la cuenta. Antes de eso no se sabe. */
   private readonly cuentaConsultada = signal(false);
+  readonly errorConsultaCuenta = signal(false);
+  readonly verificandoCuenta = computed(() => this.user() !== null && !this.cuentaConsultada());
+  readonly cerrandoSesion = signal(false);
+  readonly loginRedirecting = signal(false);
   /** Si aceptó la versión vigente de los términos. */
   private readonly terminosAceptados = signal(false);
 
@@ -92,6 +96,7 @@ export class AuthService {
 
   loginWithKeycloak(): Observable<boolean> {
     this.loginError.set('');
+    this.loginRedirecting.set(true);
     const state = this.randomValue();
     const nonce = this.randomValue();
     sessionStorage.setItem(KEYCLOAK_STATE_KEY, state);
@@ -117,6 +122,9 @@ export class AuthService {
 
       const authorizeUrl = `${this.getKeycloakUrl()}/realms/${environment.keycloakRealm}/protocol/openid-connect/auth?${params.toString()}`;
       window.location.href = authorizeUrl;
+    }).catch(() => {
+      this.loginRedirecting.set(false);
+      this.loginError.set('No se pudo preparar el inicio de sesión. Intentá nuevamente.');
     });
 
     return of(true);
@@ -184,6 +192,7 @@ export class AuthService {
   }
 
   logout(): void {
+    this.cerrandoSesion.set(true);
     const idToken = localStorage.getItem(ID_TOKEN_KEY);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
@@ -209,7 +218,9 @@ export class AuthService {
       params.set('id_token_hint', idToken);
     }
     const logoutUrl = `${this.getKeycloakUrl()}/realms/${environment.keycloakRealm}/protocol/openid-connect/logout?${params.toString()}`;
-    window.location.href = logoutUrl;
+  window.setTimeout(() => {
+      window.location.href = logoutUrl;
+  }, 120);
   }
 
   refreshSession(): void {
@@ -245,6 +256,8 @@ export class AuthService {
       return;
     }
 
+    this.loginRedirecting.set(true);
+
     sessionStorage.removeItem(KEYCLOAK_STATE_KEY);
     sessionStorage.removeItem(KEYCLOAK_NONCE_KEY);
 
@@ -278,6 +291,7 @@ export class AuthService {
       .pipe(
         switchMap((token) => this.maybeUseToken(token)),
         catchError((error: HttpErrorResponse) => {
+          this.loginRedirecting.set(false);
           this.loginError.set(this.describeError(error, 'No se pudo completar el inicio de sesión.'));
           return of(false);
         }),
@@ -287,7 +301,9 @@ export class AuthService {
         // router ya pasó por la landing (aún sin token), así que acá se entra
         // derecho a la sección del rol y la portada queda inaccesible.
         if (ok) {
-          void this.irASeccionDelRol();
+          void this.irASeccionDelRol().finally(() => this.loginRedirecting.set(false));
+        } else {
+          this.loginRedirecting.set(false);
         }
       });
   }
@@ -490,6 +506,7 @@ export class AuthService {
       return;
     }
     this.photoRequested = true;
+    this.errorConsultaCuenta.set(false);
 
     const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
     this.http
@@ -499,6 +516,7 @@ export class AuthService {
           const tieneFoto = Boolean(cuenta?.fotoUrl && cuenta.fotoUrl.trim().length > 0);
           this.refreshProfile({ tieneFoto });
           this.cuentaConsultada.set(true);
+          this.errorConsultaCuenta.set(false);
           // La versión vigente la publica el frontend (es donde vive el texto):
           // si cambió lo que aceptó, hay que volver a pedirlo.
           this.terminosAceptados.set(
@@ -509,25 +527,32 @@ export class AuthService {
           }
           return cuenta;
         }),
-        catchError(() => of(null)),
+        catchError(() => {
+          this.photoRequested = false;
+          this.errorConsultaCuenta.set(true);
+          return of(null);
+        }),
       )
       .subscribe();
+  }
+
+  reintentarConsultaCuenta(): void {
+    this.loadOwnPhoto(true);
   }
 
   /**
    * Si hay que pedir los términos y condiciones.
    *
-   * <p>Es {@code true} con sesión abierta y sin aceptación de la versión vigente.
-   * Antes de que responda el backend se considera {@code true}: se prefiere mostrar
-   * el modal un instante antes de bloquear de más, y no al revés. El modal es una capa
-   * sobre la aplicación, no una pantalla: no se puede saltar navegando.
+  * <p>Es {@code true} solo después de que el backend confirme que falta la
+  * aceptación vigente. Mientras se consulta, la aplicación muestra una carga y
+  * el modal no se monta.
    */
   readonly terminosPendientes = computed(() => {
     if (!this.user()) {
       return false;
     }
     if (!this.cuentaConsultada()) {
-      return true;
+      return false;
     }
     return !this.terminosAceptados();
   });

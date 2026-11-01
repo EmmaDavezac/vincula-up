@@ -56,7 +56,14 @@ export class TemaService {
     }
   }
 
-  /** Alterna entre claro y oscuro y guarda la elección. */
+  /** Establece el tema explícitamente y guarda la elección. */
+  establecer(preferencia: TemaPreferido): void {
+    this.preferido.set(preferencia);
+    this.efectivo.set(this.resolver(preferencia));
+    this.persistir(preferencia);
+    this.aplicar();
+  }
+
   alternar(): void {
     const nuevo: TemaPreferido = this.oscuro() ? 'claro' : 'oscuro';
     this.preferido.set(nuevo);

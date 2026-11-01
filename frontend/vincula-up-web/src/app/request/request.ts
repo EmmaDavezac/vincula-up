@@ -10,14 +10,16 @@ import { RequestService } from '../core/services/request.service';
 import { Professional } from '../core/models/professional';
 import { emptyServiceRequest } from '../core/models/service-request';
 import { VuAvatar } from '../shared/avatar/avatar';
+import { VuConfirm } from '../shared/confirm/confirm';
 import { VuIcon } from '../shared/icon/icon';
-import { VuSkeletonList } from '../shared/skeleton-list/skeleton-list';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 
 /**
  * Flujo de pasos del prototipo: ubicación → especialidad → día y horario →
  * elección del profesional (el envío cierra el flujo, sin formulario extra).
  */
-type Step = 'location' | 'specialty' | 'schedule' | 'professionals';
+type Step = 'location' | 'specialty' | 'problem' | 'day' | 'time' | 'professionals';
 
 
 interface PlaceSuggestion {
@@ -56,7 +58,7 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 }
 
 @Component({
-	imports: [CommonModule, FormsModule, RouterLink, DecimalPipe, VuAvatar, VuIcon, VuSkeletonList],
+  imports: [CommonModule, FormsModule, RouterLink, DecimalPipe, VuAvatar, VuConfirm, VuIcon, MatProgressSpinnerModule, MatButtonToggleModule],
 	selector: 'app-request',
 	styleUrl: './request.css',
 	templateUrl: './request.html',
@@ -72,7 +74,9 @@ export class Request implements OnInit, AfterViewInit {
   readonly steps: Array<{ key: Step; label: string; title: string }> = [
     { key: 'location', label: 'Ubicación', title: '¿Dónde necesitás el servicio?' },
     { key: 'specialty', label: 'Categoría', title: '¿Qué necesitás resolver?' },
-    { key: 'schedule', label: 'Día y horario', title: '¿Cuándo te viene bien?' },
+    { key: 'problem', label: 'Problema', title: 'Contanos qué necesitás resolver' },
+    { key: 'day', label: 'Día', title: '¿Qué día te viene bien?' },
+    { key: 'time', label: 'Horario', title: 'Elegí una franja horaria' },
     { key: 'professionals', label: 'Profesional', title: 'Elegí un profesional' },
   ];
 
@@ -107,10 +111,12 @@ export class Request implements OnInit, AfterViewInit {
   readonly gpsPosition = signal<GpsPosition | null>(null);
   readonly gpsLoading = signal(false);
   readonly gpsError = signal('');
+  readonly reverseGeocoding = signal(false);
 
   // ── Profesionales ──────────────────────────────────────
   readonly allProfessionals = signal<ProfWithDistance[]>([]);
   readonly loadingProfessionals = signal(true);
+  readonly loadingSpecialties = signal(true);
   readonly professionalsError = signal('');
 
   /**
@@ -131,48 +137,25 @@ export class Request implements OnInit, AfterViewInit {
     return unica && unica !== 'Servicio técnico' ? [unica] : [];
   }
 
-  /**
-   * Especialidades que se ofrecen en el paso 2: el catálogo completo, para que
-   * se vean todas aunque todavía no haya técnicos para alguna.
-   */
+  /** Solo se ofrecen categorías que tienen al menos un profesional activo. */
   readonly specialties = computed(() => {
-    const catalogo = this.catalogoEspecialidades();
-    if (catalogo.length) {
-      return catalogo;
-    }
-    // Sin catálogo disponible se arma con lo que traen los profesionales.
-    const seen = new Set<string>();
-    const result: string[] = [];
-    for (const p of this.allProfessionals()) {
-      for (const s of this.especialidadesDe(p)) {
-        if (!seen.has(s)) {
-          seen.add(s);
-          result.push(s);
-        }
+    const disponibles = new Map<string, string>();
+    for (const professional of this.allProfessionals()) {
+      for (const name of this.especialidadesDe(professional)) {
+        disponibles.set(this.normalizarEspecialidad(name), name);
       }
     }
-    return result;
+    const catalogo = this.catalogoEspecialidades();
+    if (catalogo.length) {
+      return catalogo.filter((name) => disponibles.has(this.normalizarEspecialidad(name)));
+    }
+    return [...disponibles.values()].sort((a, b) => a.localeCompare(b, 'es'));
   });
 
   readonly selectedSpecialty = signal<string | null>(null);
 
-  /** Especialidades que cuentan con al menos un técnico activo. */
-  private readonly especialidadesConTecnicos = computed(() => {
-    const conTecnicos = new Set<string>();
-    for (const p of this.allProfessionals()) {
-      for (const n of this.especialidadesDe(p)) {
-        conTecnicos.add(n);
-      }
-    }
-    return conTecnicos;
-  });
-
-  /**
-   * Si la especialidad todavía no tiene técnicos lo aclara en el paso 2, para no
-   * elegirla a ciegas y frenar en el paso 4 sin opciones.
-   */
-  tieneTecnicos(specialty: string): boolean {
-    return this.especialidadesConTecnicos().has(specialty);
+  private normalizarEspecialidad(value: string): string {
+    return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('es');
   }
 
   /**
@@ -184,9 +167,10 @@ export class Request implements OnInit, AfterViewInit {
   readonly filteredProfessionals = computed(() => {
     const spec = this.selectedSpecialty();
     if (!spec) return [];
+    const especialidadSeleccionada = this.normalizarEspecialidad(spec);
     const byDistance = this.sortBy() === 'proximidad';
     return [...this.allProfessionals()]
-      .filter((p) => this.especialidadesDe(p).some((n) => n === spec))
+      .filter((p) => this.especialidadesDe(p).some((name) => this.normalizarEspecialidad(name) === especialidadSeleccionada))
       .sort((a, b) => {
         if (byDistance) {
           const distance = (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity);
@@ -206,17 +190,24 @@ export class Request implements OnInit, AfterViewInit {
   readonly time = signal('');
   readonly submitted = signal(false);
   readonly errorMessage = signal('');
+  readonly enviandoSolicitud = signal(false);
+  readonly confirmandoSalida = signal(false);
+  private resolverGuardSalida: ((permitir: boolean) => void) | null = null;
 
   /** Días del prototipo (etiqueta corta y día de la semana real). */
-  readonly dayOptions: ReadonlyArray<{ id: string; label: string; weekday: number }> = [
-    { id: 'LUN', label: 'Lun', weekday: 1 },
-    { id: 'MAR', label: 'Mar', weekday: 2 },
-    { id: 'MIÉ', label: 'Mié', weekday: 3 },
-    { id: 'JUE', label: 'Jue', weekday: 4 },
-    { id: 'VIE', label: 'Vie', weekday: 5 },
-    { id: 'SÁB', label: 'Sáb', weekday: 6 },
-    { id: 'DOM', label: 'Dom', weekday: 0 },
-  ];
+  readonly dayOptions = computed(() => {
+    const today = new Date();
+    return Array.from({ length: 7 }, (_, offset) => {
+      const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offset);
+      const id = `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, '0')}-${`${date.getDate()}`.padStart(2, '0')}`;
+      const weekday = date.toLocaleDateString('es-AR', { weekday: 'short' }).replace(/\.$/, '');
+      return {
+        id,
+        label: offset === 0 ? 'Hoy' : `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}`,
+        monthDay: date.getDate(),
+      };
+    });
+  });
 
   /** Franjas horarias del prototipo: el turno siempre es un rango. */
   readonly slotOptions: ReadonlyArray<{ id: string; label: string; start: string; end: string }> = [
@@ -232,7 +223,7 @@ export class Request implements OnInit, AfterViewInit {
 
   elegirDia(id: string): void {
     this.selectedDay.set(id);
-    this.date.set(this.proximaFecha(this.dayOptions.find((day) => day.id === id)?.weekday ?? 1));
+    this.date.set(id);
   }
 
   elegirHorario(id: string): void {
@@ -240,17 +231,6 @@ export class Request implements OnInit, AfterViewInit {
     this.selectedSlot.set(id);
     this.time.set(franja?.start ?? '');
     this.timeEnd.set(franja?.end ?? '');
-  }
-
-  /** Próxima fecha (YYYY-MM-DD) del día de la semana elegido, contando desde hoy. */
-  private proximaFecha(weekday: number): string {
-    const today = new Date();
-    const diff = (weekday - today.getDay() + 7) % 7;
-    const target = new Date(today);
-    target.setDate(today.getDate() + diff);
-    const month = `${target.getMonth() + 1}`.padStart(2, '0');
-    const day = `${target.getDate()}`.padStart(2, '0');
-    return `${target.getFullYear()}-${month}-${day}`;
   }
 
   /** Etiqueta de la franja elegida (para el resumen del turno). */
@@ -351,6 +331,9 @@ export class Request implements OnInit, AfterViewInit {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=6&accept-language=es`,
       );
+      if (!res.ok) {
+        throw new Error(`Map search failed with status ${res.status}`);
+      }
       const data = (await res.json()) as Array<{ lat: string; lon: string; display_name: string }>;
       const sugerencias = (Array.isArray(data) ? data : []).map((item) => ({
         lat: parseFloat(item.lat),
@@ -479,37 +462,68 @@ export class Request implements OnInit, AfterViewInit {
   }
 
   retryDetectLocation(): void {
-    if (!('geolocation' in navigator)) {
-      this.locatorError.set('Tu navegador no permite acceder a la ubicación del dispositivo.');
+    if (typeof window !== 'undefined' && !window.isSecureContext && window.location.hostname !== 'localhost') {
+      this.locatorError.set('El navegador solo permite compartir la ubicación en una conexión segura. Usá HTTPS o ingresá la dirección manualmente.');
+      return;
+    }
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      this.locatorError.set('Este navegador no ofrece geolocalización. Escribí una dirección para continuar.');
       return;
     }
     this.location.set({ ...this.location(), detecting: true, editing: false });
     this.locatorError.set('');
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        const name = await this.reverseGeocode(latitude, longitude);
-        this.location.set({ lat: latitude, lng: longitude, displayName: name, detecting: false, editing: false });
-        this.address.set(name);
-        this.locationQuery.set(name);
-        this.pendingLocation.set({ lat: latitude, lng: longitude, displayName: name });
-        this.form.update((f) =>
-          emptyServiceRequest({
-            ...f,
-            address: name,
-            latitude,
-            longitude,
-          })
-        );
-        this.updateDistances(latitude, longitude);
-        this.locatorError.set('');
-      },
-      () => {
-        this.location.set({ ...this.location(), detecting: false });
-        this.locatorError.set('No pudimos detectar tu ubicación. Escribí la dirección manualmente o usá el mapa.');
-      },
-      { timeout: 10000, maximumAge: 60000, enableHighAccuracy: true },
-    );
+    try {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          const name = await this.reverseGeocode(latitude, longitude);
+          this.aplicarUbicacionDetectada(latitude, longitude, name);
+        },
+        (error) => {
+          if (error.code === error.TIMEOUT || error.code === error.POSITION_UNAVAILABLE) {
+            navigator.geolocation.getCurrentPosition(
+              async (position) => {
+                const { latitude, longitude } = position.coords;
+                const name = await this.reverseGeocode(latitude, longitude);
+                this.aplicarUbicacionDetectada(latitude, longitude, name);
+              },
+              (fallbackError) => {
+                this.location.set({ ...this.location(), detecting: false });
+                this.locatorError.set(this.mensajeErrorGeolocalizacion(fallbackError));
+              },
+              { timeout: 25000, maximumAge: 300000, enableHighAccuracy: false },
+            );
+            return;
+          }
+          this.location.set({ ...this.location(), detecting: false });
+          this.locatorError.set(this.mensajeErrorGeolocalizacion(error));
+        },
+        { timeout: 12000, maximumAge: 300000, enableHighAccuracy: false },
+      );
+    } catch {
+      this.location.set({ ...this.location(), detecting: false });
+      this.locatorError.set('El navegador no pudo iniciar la geolocalización. Ingresá la dirección manualmente.');
+    }
+  }
+
+  private aplicarUbicacionDetectada(latitude: number, longitude: number, name: string): void {
+    this.location.set({ lat: latitude, lng: longitude, displayName: name, detecting: false, editing: false });
+    this.address.set(name);
+    this.locationQuery.set(name);
+    this.pendingLocation.set({ lat: latitude, lng: longitude, displayName: name });
+    this.form.update((current) => emptyServiceRequest({ ...current, address: name, latitude, longitude }));
+    this.updateDistances(latitude, longitude);
+    this.locatorError.set('');
+  }
+
+  private mensajeErrorGeolocalizacion(error: GeolocationPositionError): string {
+    if (error.code === error.PERMISSION_DENIED) {
+      return 'No tenemos permiso para usar tu ubicación. Habilitalo en el navegador o ingresá la dirección manualmente.';
+    }
+    if (error.code === error.TIMEOUT) {
+      return 'La PC no respondió con una ubicación a tiempo. Revisá el permiso del navegador o ingresá la dirección manualmente.';
+    }
+    return 'La PC no pudo determinar una ubicación (GPS, Wi-Fi o red). Permití el acceso a la ubicación o ingresá la dirección manualmente.';
   }
 
   canConfirmLocation(): boolean {
@@ -605,9 +619,7 @@ export class Request implements OnInit, AfterViewInit {
       this.locationQuery.set(current.displayName);
       this.address.set(current.displayName);
     }
-    this.step.set('location');
-    // Vuelve al paso 1: el mapa se refresca para mostrar el punto actual.
-    this.onCambioDePaso();
+    this.cambiarPaso('location');
   }
 
   /**
@@ -642,6 +654,10 @@ export class Request implements OnInit, AfterViewInit {
     const loc = this.location();
     const lat = loc.lat ?? this.centroPorDefecto.lat;
     const lng = loc.lng ?? this.centroPorDefecto.lng;
+
+    if (this.mapaInstancia && this.mapaInstancia.getContainer() !== container) {
+      this.destruirMapa();
+    }
 
     if (!this.mapaInstancia) {
       this.mapaInstancia = L.map('mapa-paso', { scrollWheelZoom: false }).setView([lat, lng], 15);
@@ -692,6 +708,25 @@ export class Request implements OnInit, AfterViewInit {
     }
   }
 
+  private destruirMapa(): void {
+    this.mapaInstancia?.remove();
+    this.mapaInstancia = null;
+    this.marcador = null;
+    this.mapaListo.set(false);
+    this.mapaIntentos = 0;
+  }
+
+  private cambiarPaso(next: Step): void {
+    if (this.step() === next) return;
+    if (this.step() === 'location') {
+      this.destruirMapa();
+    }
+    this.step.set(next);
+    if (next === 'location') {
+      setTimeout(() => void this.inicializarMapa(), 80);
+    }
+  }
+
 
   // ── Navegación entre pasos ─────────────────────────────
 
@@ -713,31 +748,20 @@ export class Request implements OnInit, AfterViewInit {
     switch (this.step()) {
       case 'location': {
         const faltan: string[] = [];
-        if (!this.location().lat || !this.location().lng) {
+        if (this.location().lat == null || this.location().lng == null) {
           faltan.push('la dirección donde necesitás el servicio');
         }
         return faltan;
       }
       case 'specialty': {
-        const faltan: string[] = [];
-        if (!this.selectedSpecialty()) {
-          faltan.push('la especialidad');
-        }
-        if (!this.resumenValido()) {
-          faltan.push(`el resumen del problema (mínimo ${this.MIN_SUMMARY_LENGTH} caracteres)`);
-        }
-        return faltan;
+        return this.selectedSpecialty() ? [] : ['la categoría'];
       }
-      case 'schedule': {
-        const faltan: string[] = [];
-        if (!this.selectedDay()) {
-          faltan.push('el día');
-        }
-        if (!this.selectedSlot()) {
-          faltan.push('el horario');
-        }
-        return faltan;
-      }
+      case 'problem':
+        return this.resumenValido() ? [] : [`el resumen del problema (mínimo ${this.MIN_SUMMARY_LENGTH} caracteres)`];
+      case 'day':
+        return this.selectedDay() ? [] : ['el día'];
+      case 'time':
+        return this.selectedSlot() ? [] : ['el horario'];
       case 'professionals':
         return this.selectedProfessional() ? [] : ['el profesional que te atienda'];
       default:
@@ -762,12 +786,15 @@ export class Request implements OnInit, AfterViewInit {
   get canContinue(): boolean {
     switch (this.step()) {
       case 'location':
-        return Boolean(this.address().trim());
+        return Boolean(this.address().trim()) && this.location().lat != null && this.location().lng != null;
       case 'specialty':
-        // La categoría sola no alcanza: hay que describir el problema.
-        return Boolean(this.selectedSpecialty()) && this.resumenValido();
-      case 'schedule':
-        return Boolean(this.selectedDay() && this.selectedSlot());
+        return Boolean(this.selectedSpecialty());
+      case 'problem':
+        return this.resumenValido();
+      case 'day':
+        return Boolean(this.selectedDay());
+      case 'time':
+        return Boolean(this.selectedSlot());
       case 'professionals':
         return Boolean(this.selectedProfessional());
       default:
@@ -783,7 +810,7 @@ export class Request implements OnInit, AfterViewInit {
 
   /** Vuelve al paso 2 para elegir otra especialidad. */
   goToSpecialtyStep(): void {
-    this.step.set('specialty');
+    this.cambiarPaso('specialty');
   }
 
   selectProfessional(prof: ProfWithDistance): void {
@@ -807,7 +834,7 @@ export class Request implements OnInit, AfterViewInit {
     const index = this.pasoActual - 1;
     const next = this.steps[index + 1];
     if (next) {
-      this.step.set(next.key);
+      this.cambiarPaso(next.key);
     }
   }
 
@@ -815,8 +842,25 @@ export class Request implements OnInit, AfterViewInit {
     const index = this.pasoActual - 1;
     const previous = this.steps[index - 1];
     if (previous) {
-      this.step.set(previous.key);
+      this.cambiarPaso(previous.key);
     }
+  }
+
+  confirmarSalidaPendiente(): boolean | Promise<boolean> {
+    if (this.submitted()) {
+      return true;
+    }
+    this.confirmandoSalida.set(true);
+    return new Promise((resolve) => {
+      this.resolverGuardSalida = resolve;
+    });
+  }
+
+  resolverConfirmacionSalida(permitir: boolean): void {
+    this.confirmandoSalida.set(false);
+    const resolver = this.resolverGuardSalida;
+    this.resolverGuardSalida = null;
+    resolver?.(permitir);
   }
 
   // ── Envío del formulario ───────────────────────────────
@@ -828,14 +872,17 @@ export class Request implements OnInit, AfterViewInit {
 
     if (!this.date()) {
       this.errorMessage.set('Elegí una fecha para la visita.');
+      this.cambiarPaso('day');
       return;
     }
     if (!this.time()) {
       this.errorMessage.set('Elegí un horario aproximado.');
+      this.cambiarPaso('time');
       return;
     }
     if (!this.address().trim()) {
       this.errorMessage.set('Escribí una dirección antes de enviar la solicitud.');
+      this.cambiarPaso('location');
       return;
     }
 
@@ -918,7 +965,7 @@ export class Request implements OnInit, AfterViewInit {
     // Última barrera: aunque se llegara al envío sin resumen, no sale.
     if (!this.resumenValido()) {
       this.errorMessage.set('Contanos brevemente el problema para que el profesional pueda venir preparado.');
-      this.step.set('specialty');
+      this.cambiarPaso('problem');
       return;
     }
 
@@ -952,12 +999,15 @@ export class Request implements OnInit, AfterViewInit {
       descripcion: this.problemSummary().trim(),
     };
 
+    this.enviandoSolicitud.set(true);
     this.api.createRequest(payload).pipe(
       catchError((error) => {
+        this.enviandoSolicitud.set(false);
         this.errorMessage.set(this.api.describeError(error, 'No se pudo enviar la solicitud.'));
         return of(null);
       })
     ).subscribe((created) => {
+      this.enviandoSolicitud.set(false);
       if (!created) return;
       this.requestService.create({
         professionalId: prof.id,
@@ -1073,6 +1123,7 @@ export class Request implements OnInit, AfterViewInit {
         .map((n) => (n ?? '').trim())
         .filter((n) => n.length > 0);
       this.catalogoEspecialidades.set([...new Set(nombres)].sort((a, b) => a.localeCompare(b, 'es')));
+      this.loadingSpecialties.set(false);
     });
   }
 
@@ -1090,14 +1141,20 @@ export class Request implements OnInit, AfterViewInit {
 
   /** Geocodificación inversa usando Nominatim (OpenStreetMap, gratuito) */
   private async reverseGeocode(lat: number, lng: number): Promise<string> {
+    this.reverseGeocoding.set(true);
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=es`,
       );
+      if (!res.ok) {
+        throw new Error('No se pudo consultar el servicio de mapas.');
+      }
       const data = (await res.json()) as { display_name?: string };
       return data.display_name || 'Tu ubicación';
     } catch {
       return 'Tu ubicación';
+    } finally {
+      this.reverseGeocoding.set(false);
     }
   }
 }

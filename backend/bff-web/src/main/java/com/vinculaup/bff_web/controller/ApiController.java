@@ -180,7 +180,7 @@ public class ApiController {
             try {
                 UUID usuarioId = UUID.fromString(profesional.get("usuarioId").asText());
                 usuarios.computeIfAbsent(usuarioId, id -> {
-                    JsonNode usuario = gateway.buscarUsuarioPorId(id);
+                    JsonNode usuario = gateway.buscarUsuarioPorIdOKeycloakId(id);
                     return usuario != null && usuario.isObject() ? usuario : null;
                 });
             } catch (RuntimeException ignored) {
@@ -255,7 +255,7 @@ public class ApiController {
         JsonNode usuario = null;
         try {
             if (profesional.hasNonNull("usuarioId")) {
-                usuario = gateway.buscarUsuarioPorId(UUID.fromString(profesional.get("usuarioId").asText()));
+                usuario = gateway.buscarUsuarioPorIdOKeycloakId(UUID.fromString(profesional.get("usuarioId").asText()));
                 if (usuario != null && !usuario.isObject()) {
                     usuario = null;
                 }
@@ -272,6 +272,11 @@ public class ApiController {
         copia.setAll((tools.jackson.databind.node.ObjectNode) profesional);
         String clave = null;
         if (usuario != null) {
+            if (usuario.hasNonNull("id")) {
+                // El avatar necesita el id de ms-usuarios para el endpoint privado
+                // de foto, aunque el perfil histórico haya guardado el keycloakId.
+                copia.put("usuarioId", usuario.get("id").asText());
+            }
             if (usuario.hasNonNull("nombre")) copia.put("nombre", usuario.get("nombre").asText());
             if (usuario.hasNonNull("apellido")) copia.put("apellido", usuario.get("apellido").asText());
             // La foto que se muestra es la de la cuenta (ms-usuarios), que es la que

@@ -8,6 +8,7 @@ import { VuAvatar } from '../avatar/avatar';
 import { VuConfirm } from '../confirm/confirm';
 import { VuIcon } from '../icon/icon';
 
+
 @Component({
 	selector: 'app-navbar',
 	standalone: true,

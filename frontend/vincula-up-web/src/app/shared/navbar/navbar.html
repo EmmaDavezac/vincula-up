@@ -42,21 +42,16 @@
 		</nav>
 
 		<div class="toolbar-actions">
-			<!--
-				Tema claro/oscuro. Va antes del menú de usuario para que también esté
-				disponible sin sesión: cambiar el tema no pide iniciar sesión.
-			-->
 			<button
 				type="button"
-				class="theme-toggle"
+				class="theme-icon-toggle"
+				[class.is-dark]="tema.oscuro()"
 				(click)="tema.alternar()"
 				[attr.aria-label]="tema.etiqueta()"
-				[attr.aria-pressed]="tema.oscuro()"
 				[title]="tema.etiqueta()"
 			>
-				<vu-icon [name]="tema.oscuro() ? 'sun' : 'moon'" [size]="17" />
+				<vu-icon [name]="tema.oscuro() ? 'sun' : 'moon'" [size]="18" aria-hidden="true" />
 			</button>
-
 			@if (auth.currentUser(); as user) {
 				<div class="user-menu">
 					<button
@@ -76,27 +71,26 @@
 							[size]="16"
 							class="user-menu__chevron"
 							[class.is-open]="userMenuOpen"
+							aria-hidden="true"
 						/>
 					</button>
 
 					@if (userMenuOpen) {
-						<div class="user-menu__panel" role="menu">
+						<div class="user-menu__panel">
 							<a
-								role="menuitem"
 								routerLink="/mi-cuenta"
 								class="user-menu__item"
 								(click)="userMenuOpen = false"
 							>
-								<vu-icon name="user-round" [size]="17" />
-								Actualizar perfil
+								<vu-icon name="user-round" [size]="17" aria-hidden="true" />
+								Mi cuenta
 							</a>
 							<button
 								type="button"
-								role="menuitem"
 								class="user-menu__item user-menu__item--danger"
 								(click)="salir()"
 							>
-								<vu-icon name="log-out" [size]="17" />
+								<vu-icon name="log-out" [size]="17" aria-hidden="true" />
 								Cerrar sesión
 							</button>
 						</div>
@@ -106,7 +100,7 @@
 				<a class="auth-action auth-action--link" routerLink="/ingresar">Ingresar</a>
 				<button
 					type="button"
-					class="vu-btn vu-btn--ink auth-action auth-action--cta"
+					class="vu-btn vu-btn--ink auth-action auth-action--cta vu-btn--square"
 					(click)="crearCuenta()"
 				>
 					Crear cuenta

@@ -3,16 +3,20 @@ import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { NavbarComponent } from './shared/navbar/navbar';
 import { FooterComponent } from './shared/footer/footer';
+import { AdminFooterComponent } from './shared/footer/admin-footer';
 import { VuTabbar } from './shared/tabbar/tabbar';
 import { TerminosModal } from './legal/terminos-modal';
+import { AuthService } from './core/services/auth.service';
+import { LoadingScreen } from './shared/loading-screen/loading-screen';
 
 @Component({
-  imports: [RouterOutlet, NavbarComponent, FooterComponent, VuTabbar, TerminosModal],
+  imports: [RouterOutlet, NavbarComponent, FooterComponent, AdminFooterComponent, VuTabbar, TerminosModal, LoadingScreen],
   selector: 'app-root',
   styleUrl: './app.css',
   templateUrl: './app.html',
 })
 export class App {
+  readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly urlActual = signal(this.router.url);
 

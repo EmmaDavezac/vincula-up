@@ -1,4 +1,6 @@
-import { ChangeDetectionStrategy, Component, ElementRef, HostListener, afterNextRender, inject, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, TemplateRef, ViewChild, AfterViewInit, inject, input, output } from '@angular/core';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MatButtonModule } from '@angular/material/button';
 import { VuIcon, VuIconName } from '../icon/icon';
 
 /**
@@ -14,12 +16,12 @@ import { VuIcon, VuIconName } from '../icon/icon';
  */
 @Component({
 	selector: 'vu-confirm',
-	imports: [VuIcon],
+	imports: [VuIcon, MatButtonModule],
 	changeDetection: ChangeDetectionStrategy.OnPush,
 	templateUrl: './confirm.html',
 	styleUrl: './confirm.css',
 })
-export class VuConfirm {
+export class VuConfirm implements AfterViewInit {
 	/** Encabezado de la pregunta. */
 	readonly titulo = input.required<string>();
 	/** Qué va a pasar, en una frase. */
@@ -32,6 +34,8 @@ export class VuConfirm {
 	readonly textoCancelar = input('Cancelar');
 	/** Acción destructiva: Estilo de peligro y foco inicial en "Cancelar". */
 	readonly peligro = input(false);
+	/** Pone la acción de cancelar como primaria cuando continuar es lo seguro. */
+	readonly cancelarPrimario = input(false);
 	/** Ícono del encabezado. */
 	readonly icono = input<VuIconName>('pencil');
 	/** Acción en curso: deshabilita los botones y evita el doble clic. */
@@ -40,26 +44,48 @@ export class VuConfirm {
 	readonly confirmado = output<void>();
 	readonly cancelado = output<void>();
 
-	private readonly host = inject(ElementRef) as ElementRef<HTMLElement>;
+	private readonly dialog = inject(MatDialog);
+	private readonly destroyRef = inject(DestroyRef);
+	@ViewChild('confirmDialog') private confirmDialog!: TemplateRef<unknown>;
+	private dialogRef?: MatDialogRef<unknown, string>;
 
 	constructor() {
-		afterNextRender(() => this.enfocar());
+		this.destroyRef.onDestroy(() => this.dialogRef?.close());
 	}
 
-	/**
-	 * En acciones destructivas el foco queda en "Cancelar" (Enter no borra). En las
-	 * reversibles queda en confirmar, que es lo que la persona quiere hacer.
-	 */
-	private enfocar(): void {
-		const clase = this.peligro() ? '.vu-confirm__cancel' : '.vu-confirm__accept';
-		const botones = this.host.nativeElement.querySelectorAll<HTMLButtonElement>(clase);
-		botones[0]?.focus();
+	ngAfterViewInit(): void {
+		this.dialogRef = this.dialog.open(this.confirmDialog, {
+			ariaLabel: this.titulo(),
+			ariaModal: true,
+			autoFocus: this.peligro() || this.cancelarPrimario() ? '.vu-confirm__cancel' : '.vu-confirm__accept',
+			disableClose: true,
+			panelClass: 'vu-confirm-dialog',
+			role: 'alertdialog',
+		});
+		this.dialogRef.backdropClick().subscribe(() => this.cancelar());
+		this.dialogRef.keydownEvents().subscribe((event) => {
+			if (event.key === 'Escape') {
+				this.cancelar();
+			}
+		});
+		this.dialogRef.afterClosed().subscribe((result) => {
+			if (result !== 'confirm' && result !== 'cancel') {
+				this.cancelado.emit();
+			}
+		});
 	}
 
-	@HostListener('document:keydown.escape')
-	cerrar(): void {
+	cancelar(): void {
 		if (!this.cargando()) {
+			this.dialogRef?.close('cancel');
 			this.cancelado.emit();
+		}
+	}
+
+	confirmar(): void {
+		if (!this.cargando()) {
+			this.dialogRef?.close('confirm');
+			this.confirmado.emit();
 		}
 	}
 }

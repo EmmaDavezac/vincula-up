@@ -4,7 +4,6 @@ import { Router, RouterLink } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 import { AdminSpecialty } from '../../core/models/admin';
 import { ApiService } from '../../core/services/api.service';
-import { VuIcon } from '../../shared/icon/icon';
 
 /**
  * Alta de un profesional, en su propia pantalla.
@@ -17,7 +16,7 @@ import { VuIcon } from '../../shared/icon/icon';
  */
 @Component({
 	selector: 'app-admin-professional-new',
-	imports: [FormsModule, RouterLink, VuIcon],
+	imports: [FormsModule, RouterLink],
 	templateUrl: './admin-professional-new.html',
 	styleUrl: './admin-professional-new.css',
 })

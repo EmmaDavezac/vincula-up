@@ -159,6 +159,37 @@ public class BackendGateway {
     }
 
     /**
+     * Resuelve perfiles nuevos por id de negocio y padrones históricos por id
+     * de Keycloak. La búsqueda de fallback no envía email, por lo que el endpoint
+     * de compatibilidad nunca auto-crea una cuenta.
+     */
+    public JsonNode buscarUsuarioPorIdOKeycloakId(UUID id) {
+        try {
+            JsonNode usuario = buscarUsuarioPorId(id);
+            if (usuario != null) {
+                return usuario;
+            }
+        } catch (ResponseStatusException exception) {
+            if (exception.getStatusCode().value() != HttpStatus.NOT_FOUND.value()) {
+                throw exception;
+            }
+        }
+
+        try {
+            return usuarios.get().uri(uriBuilder -> uriBuilder.path("/usuarios/por-keycloak")
+                    .queryParam("keycloakId", id.toString())
+                    .build()).retrieve().body(JsonNode.class);
+        } catch (org.springframework.web.client.HttpStatusCodeException notFound) {
+            if (notFound.getStatusCode().value() == HttpStatus.NOT_FOUND.value()) {
+                return null;
+            }
+            throw unavailable(notFound);
+        } catch (RestClientException exception) {
+            throw unavailable(exception);
+        }
+    }
+
+    /**
      * Busca un perfil profesional por id de perfil o, si no existe con ese id,
      * por id de usuario: el frontend guarda el {@code usuarioId} del profesional
      * en la solicitud, y ambos identificadores circulan según la versión con la

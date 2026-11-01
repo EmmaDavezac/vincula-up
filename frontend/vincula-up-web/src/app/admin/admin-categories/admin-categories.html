@@ -1,12 +1,11 @@
 <a class="vu-admin-back" routerLink="/admin">← Resumen</a>
 
-<div class="admin-categories__head">
+<div class="vu-admin-list-head admin-categories__head">
 	<div>
 		<h1 class="vu-admin-title">Categorías</h1>
 		<p class="vu-admin-lead admin-categories__lead">Administrá las especialidades disponibles para los profesionales.</p>
 	</div>
 	<a class="vu-btn vu-btn--coral admin-categories__new" routerLink="/admin/categorias/nueva">
-		<vu-icon name="plus" [size]="16" />
 		Nueva categoría
 	</a>
 </div>
@@ -15,41 +14,78 @@
 	<p class="vu-alert admin-categories__alert" [class]="avisoClase(aviso().tipo)" role="status">{{ aviso().texto }}</p>
 }
 
+<div class="vu-admin-search admin-categories__search">
+	<label class="vu-sr-only" for="admin-search-categories">Buscar categorías</label>
+	<div class="vu-field-with-icon">
+		<vu-icon name="search" [size]="17" class="vu-field-icon" />
+		<input
+			id="admin-search-categories"
+			class="vu-input vu-input--search"
+		type="search"
+			[ngModel]="busqueda()"
+			(ngModelChange)="busqueda.set($event)"
+			placeholder="Buscar por nombre de categoría"
+			autocomplete="off"
+		/>
+	</div>
+	@if (hayBusqueda()) {
+		<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="limpiarBusqueda()">Limpiar</button>
+	}
+</div>
+
 @if (loading()) {
-	<vu-skeleton-list variant="grid" [count]="6" />
+	<div class="vu-admin-list-skeleton"><vu-skeleton-list variant="row" [count]="6" /></div>
 } @else if (categories().length) {
-	<div class="admin-categories__grid">
-		@for (category of categories(); track category.id) {
-			<article class="vu-admin-panel admin-categories__card">
-				<div class="admin-categories__card-info">
+	@if (categoriasFiltradas().length) {
+		<mat-list class="vu-admin-material-list admin-categories__grid" aria-label="Lista de categorías">
+			<mat-list-item class="vu-admin-material-list__header" aria-hidden="true">
+				<div class="admin-categories__row">
+					<span>Categoría</span>
+					<span>Acciones</span>
+				</div>
+			</mat-list-item>
+		@for (category of categoriasFiltradas(); track category.id) {
+			<mat-list-item class="vu-admin-material-list__item">
+				<div class="admin-categories__row">
+				<div class="admin-categories__name-field">
+					<span class="vu-admin-field-label">Categoría</span>
 					@if (renamingId() === category.id) {
 						<input class="vu-input" type="text" name="renameValue" [(ngModel)]="renameValue" (keyup.enter)="saveRename(category)" />
 					} @else {
 						<p class="admin-categories__name">{{ category.nombre }}</p>
 					}
-					<span class="vu-state vu-state--sm vu-state--activo">Activa</span>
 				</div>
 
+				<div class="admin-categories__actions">
+					<span class="vu-admin-field-label">Acciones</span>
 				@if (renamingId() === category.id) {
-					<div class="admin-categories__actions">
 						<button type="button" class="vu-btn vu-btn--ink vu-btn--sm" (click)="saveRename(category)" [disabled]="busy()">
 							{{ busy() ? 'Guardando...' : 'Guardar' }}
 						</button>
 						<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="cancelRename()">Cancelar</button>
-					</div>
 				} @else {
-					<button type="button" class="vu-btn vu-btn--danger vu-btn--sm" (click)="deleteCategory(category)" [disabled]="busy()">
-						Eliminar
-					</button>
-					<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="startRename(category)" [disabled]="busy()">
-						Renombrar
-					</button>
+						<button type="button" class="vu-btn vu-btn--ink vu-btn--sm" (click)="startRename(category)" [disabled]="busy()">
+							Renombrar
+						</button>
+						<button type="button" class="vu-btn vu-btn--danger vu-btn--sm" (click)="deleteCategory(category)" [disabled]="busy()">
+							Eliminar
+						</button>
 				}
-			</article>
+				</div>
+				</div>
+			</mat-list-item>
 		}
-	</div>
+	</mat-list>
+	} @else {
+		<div class="vu-admin-empty">
+			<p class="vu-admin-panel__hint">Ninguna categoría coincide con «{{ consulta() }}».</p>
+			<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="limpiarBusqueda()">Limpiar búsqueda</button>
+		</div>
+	}
 } @else {
-	<p class="vu-admin-panel__hint">Todavía no hay categorías en el catálogo.</p>
+	<div class="vu-admin-empty">
+		<p class="vu-admin-panel__hint">Todavía no hay categorías en el catálogo.</p>
+	</div>
 }
 
 <!-- Confirmación única de toda acción que modifica o borra el catálogo. -->

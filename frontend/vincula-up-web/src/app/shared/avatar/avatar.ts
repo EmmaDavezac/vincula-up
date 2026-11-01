@@ -102,5 +102,6 @@ export class VuAvatar {
 
 	marcarFotoFallida(): void {
 		this.fotoFallida.set(true);
+		this.fotos.invalidar(this.usuarioId());
 	}
 }

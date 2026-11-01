@@ -1,7 +1,9 @@
+@if (loginRedirecting()) {
+	<app-loading-screen mensaje="Conectando con el inicio de sesión..." />
+} @else {
 <div class="vu-page signin">
 	<div class="signin__wrap">
 		<a class="vu-link-back" routerLink="/">
-			<vu-icon name="arrow-left" [size]="15" />
 			Volver a inicio
 		</a>
 
@@ -50,3 +52,4 @@
 		<p class="signin__footer">¿Todavía no tenés una cuenta? <a routerLink="/ingresar">Registrate</a></p>
 	</div>
 </div>
+}

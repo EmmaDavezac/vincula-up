@@ -1,5 +1,7 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, TemplateRef, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MatButtonModule } from '@angular/material/button';
 import { catchError, of } from 'rxjs';
 import { AuthService } from '../core/services/auth.service';
 import { ApiService } from '../core/services/api.service';
@@ -18,14 +20,15 @@ import { ApiService } from '../core/services/api.service';
 @Component({
 	selector: 'app-terminos-modal',
 	changeDetection: ChangeDetectionStrategy.OnPush,
-	imports: [RouterLink],
+	imports: [RouterLink, MatButtonModule],
 	template: `
-		@if (visible()) {
-			<div class="terminos-modal__overlay">
-				<section class="terminos-modal" role="dialog" aria-modal="true" aria-labelledby="terminos-modal-title">
+		<ng-template #termsDialog>
+			@if (visible()) {
+				<section class="terminos-modal" aria-labelledby="terminos-modal-title">
 					<p class="vu-eyebrow">Antes de empezar</p>
-					<h1 class="terminos-modal__title" id="terminos-modal-title">Aceptá los términos y condiciones</h1>
+					<h2 mat-dialog-title class="terminos-modal__title" id="terminos-modal-title">Aceptá los términos y condiciones</h2>
 
+					<div mat-dialog-content class="terminos-modal__content">
 					<p class="terminos-modal__lead">
 						Son las reglas de uso de la red y el detalle de qué datos guardamos y quién puede ver
 						qué. Conviene leerlos antes de continuar.
@@ -54,9 +57,11 @@ import { ApiService } from '../core/services/api.service';
 					@if (error()) {
 						<p class="vu-alert vu-alert--error" role="alert">{{ error() }}</p>
 					}
+					</div>
 
 					<button
 						type="button"
+						mat-flat-button
 						class="vu-btn vu-btn--ink vu-btn--block"
 						[disabled]="!aceptado() || guardando()"
 						(click)="aceptar()"
@@ -64,41 +69,19 @@ import { ApiService } from '../core/services/api.service';
 						{{ guardando() ? 'Guardando...' : 'Aceptar y continuar' }}
 					</button>
 				</section>
-			</div>
-		}
+			}
+		</ng-template>
 	`,
 	styles: [
 		`
-			/*
-				Overlay a pantalla completa, por encima de la navbar y la barra inferior
-				(el modal de confirmación de VuConfirm usa z-index 70; este va un poco
-				más abajo porque no se superponen).
-			*/
-			.terminos-modal__overlay {
-				align-items: center;
-				background: rgb(0 0 0 / 0.45);
-				display: flex;
-				inset: 0;
-				justify-content: center;
-				padding: 1rem;
-				position: fixed;
-				z-index: 65;
-			}
-
 			.terminos-modal {
-				background: var(--surface-card);
-				border-radius: 1rem;
-				box-shadow: var(--shadow-lg);
-				max-height: 90vh;
 				overflow-y: auto;
-				padding: 1.75rem;
-				width: 100%;
+				width: min(32rem, calc(100vw - 3rem));
 			}
 
-			@media (min-width: 640px) {
-				.terminos-modal {
-					max-width: 30rem;
-				}
+			.terminos-modal__title {
+				margin: 0;
+				padding: 0;
 			}
 
 			.terminos-modal__title {
@@ -114,6 +97,11 @@ import { ApiService } from '../core/services/api.service';
 				font-size: 0.9375rem;
 				line-height: 1.6;
 				margin: 1rem 0 0;
+			}
+
+			.terminos-modal__content {
+				max-height: 65vh;
+				padding: 0;
 			}
 
 			.terminos-modal__puntos {
@@ -158,6 +146,9 @@ import { ApiService } from '../core/services/api.service';
 export class TerminosModal {
 	private readonly auth = inject(AuthService);
 	private readonly api = inject(ApiService);
+	private readonly dialog = inject(MatDialog);
+	private readonly termsDialog = viewChild<TemplateRef<unknown>>('termsDialog');
+	private readonly dialogRef = signal<MatDialogRef<unknown> | null>(null);
 
 	readonly aceptado = signal(false);
 	readonly guardando = signal(false);
@@ -170,6 +161,28 @@ export class TerminosModal {
 	 */
 	private readonly leyendo = signal(false);
 	readonly visible = computed(() => this.auth.terminosPendientes() && !this.leyendo());
+
+	constructor() {
+		effect(() => {
+			const visible = this.visible();
+			const template = this.termsDialog();
+			const openRef = this.dialogRef();
+			if (visible && template && !openRef) {
+				const ref = this.dialog.open(template, {
+					ariaLabel: 'Aceptación de términos y condiciones',
+					ariaModal: true,
+					disableClose: true,
+					maxWidth: 'min(34rem, calc(100vw - 2rem))',
+					panelClass: 'vu-details-dialog',
+				});
+				this.dialogRef.set(ref);
+				ref.afterClosed().subscribe(() => this.dialogRef.set(null));
+			} else if (!visible && openRef) {
+				this.dialogRef.set(null);
+				openRef.close();
+			}
+		});
+	}
 
 	marcar(valor: boolean): void {
 		this.aceptado.set(valor);

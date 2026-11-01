@@ -1,11 +1,14 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, TemplateRef, ViewChild } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 import { ApiService } from '../core/services/api.service';
 import { AuthService } from '../core/services/auth.service';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MatButtonModule } from '@angular/material/button';
 import { VuIcon } from '../shared/icon/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 interface ValidatedLocation {
   lat: number;
@@ -14,7 +17,7 @@ interface ValidatedLocation {
 }
 
 @Component({
-	imports: [CommonModule, FormsModule, RouterLink, DecimalPipe, VuIcon],
+  imports: [CommonModule, FormsModule, RouterLink, DecimalPipe, VuIcon, MatButtonModule, MatProgressSpinnerModule],
 	selector: 'app-activation',
 	styleUrl: './activation.css',
 	templateUrl: './activation.html',
@@ -22,11 +25,32 @@ interface ValidatedLocation {
 export class Activation {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
+  private readonly dialog = inject(MatDialog);
+  @ViewChild('mapPickerDialog') private mapPickerDialog!: TemplateRef<unknown>;
+  private mapDialogRef?: MatDialogRef<unknown>;
 
   readonly step = signal(1);
 
   /** Stepper del prototipo. */
-  readonly stepLabels: ReadonlyArray<string> = ['Foto', 'Zona y GPS', 'Disponibilidad'];
+  readonly steps: ReadonlyArray<{ label: string; title: string }> = [
+    { label: 'Foto', title: 'Tu imagen profesional' },
+    { label: 'Zona', title: 'Tu zona de cobertura' },
+    { label: 'Disponibilidad', title: 'Tu disponibilidad semanal' },
+  ];
+
+  stepDone(index: number): boolean {
+    return index + 1 < this.step();
+  }
+
+  irAPaso(step: number): void {
+    if (step < this.step()) {
+      this.step.set(step);
+      if (step === 2) {
+        this.zoneMapAttempts = 0;
+        setTimeout(() => this.syncZoneMap(), 100);
+      }
+    }
+  }
 
   stepTitle(): string {
     return { 1: 'Tu imagen profesional', 2: 'Tu zona de cobertura', 3: 'Tu disponibilidad semanal' }[this.step()] ?? '';
@@ -405,10 +429,23 @@ export class Activation {
     this.tempMapLocation.set(
       loc ?? { lat: -32.4833, lng: -58.2318, displayName: 'Concepción del Uruguay' },
     );
+    this.mapDialogRef = this.dialog.open(this.mapPickerDialog, {
+      ariaLabel: 'Elegir ubicación en el mapa',
+      ariaModal: true,
+      maxWidth: 'min(60rem, calc(100vw - 2rem))',
+      panelClass: 'vu-details-dialog',
+    });
+    this.mapDialogRef.afterClosed().subscribe(() => {
+      this.mapDialogRef = undefined;
+      this.showMapModal.set(false);
+      this.destroyInteractiveMap();
+    });
     setTimeout(() => this.initInteractiveMap(), 150);
   }
 
   closeMapPicker(): void {
+    this.mapDialogRef?.close();
+    this.mapDialogRef = undefined;
     this.showMapModal.set(false);
     this.destroyInteractiveMap();
   }
@@ -534,7 +571,7 @@ export class Activation {
   }
 
   next(): void {
-    if (this.submitting() || this.photoLoading()) return;
+    if (this.submitting() || this.photoLoading() || this.validatingLocation()) return;
     this.errorMessage.set('');
     if (!this.hasPhoto()) {
       this.photoError.set('Subí una foto de perfil para continuar.');
@@ -555,7 +592,7 @@ export class Activation {
     // Paso 2: Validación de Ubicación / Ciudad
     if (this.step() === 2) {
       const loc = this.validatedLocation();
-      if (!loc) {
+      if (!loc || this.radius() < 1 || this.radius() > 50) {
         this.validateCurrentZone(() => {
           this.step.set(3);
         });

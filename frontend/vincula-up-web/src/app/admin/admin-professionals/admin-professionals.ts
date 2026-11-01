@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, TemplateRef, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { catchError, forkJoin, map, of } from 'rxjs';
@@ -20,6 +20,9 @@ import {
 	nombreCompleto,
 } from '../../core/models/admin';
 import { ApiService } from '../../core/services/api.service';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MatButtonModule } from '@angular/material/button';
+import { MatListModule } from '@angular/material/list';
 import { VuAvatar } from '../../shared/avatar/avatar';
 import { VuConfirm } from '../../shared/confirm/confirm';
 import { VuIcon } from '../../shared/icon/icon';
@@ -35,13 +38,16 @@ type ModalModo = 'consulta' | 'edicion';
  */
 @Component({
 	selector: 'app-admin-professionals',
-	imports: [FormsModule, RouterLink, VuAvatar, VuConfirm, VuIcon, VuSkeletonList],
+	imports: [FormsModule, RouterLink, MatButtonModule, MatListModule, VuAvatar, VuConfirm, VuIcon, VuSkeletonList],
 	templateUrl: './admin-professionals.html',
 	styleUrl: './admin-professionals.css',
 })
 export class AdminProfessionals {
 	private readonly api = inject(ApiService);
 	private readonly router = inject(Router);
+	private readonly dialog = inject(MatDialog);
+	@ViewChild('professionalDetailDialog') private professionalDetailDialog!: TemplateRef<unknown>;
+	private detailDialogRef?: MatDialogRef<unknown>;
 
 	readonly professionals = signal<AdminProfessional[]>([]);
 	readonly specialties = signal<AdminSpecialty[]>([]);
@@ -180,9 +186,23 @@ export class AdminProfessionals {
 		this.editForm.legajo = profesional.legajo ?? '';
 		this.editForm.especialidadIds = profesional.especialidades?.map((item) => item.id) ?? [];
 		this.modal.set({ profesional, modo });
+		if (!this.detailDialogRef) {
+			this.detailDialogRef = this.dialog.open(this.professionalDetailDialog, {
+				ariaLabel: 'Detalle del profesional',
+				ariaModal: true,
+				maxWidth: 'min(38rem, calc(100vw - 2rem))',
+				panelClass: 'vu-details-dialog',
+			});
+			this.detailDialogRef.afterClosed().subscribe(() => {
+				this.detailDialogRef = undefined;
+				this.modal.set(null);
+			});
+		}
 	}
 
 	cerrarDetalle(): void {
+		this.detailDialogRef?.close();
+		this.detailDialogRef = undefined;
 		this.modal.set(null);
 	}
 

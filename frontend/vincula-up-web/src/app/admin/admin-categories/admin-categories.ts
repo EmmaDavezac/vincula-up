@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
@@ -9,8 +9,10 @@ import {
 	avisoClase,
 	avisoError,
 	avisoExito,
+	coincideBusqueda,
 } from '../../core/models/admin';
 import { ApiService } from '../../core/services/api.service';
+import { MatListModule } from '@angular/material/list';
 import { VuConfirm } from '../../shared/confirm/confirm';
 import { VuIcon } from '../../shared/icon/icon';
 import { VuSkeletonList } from '../../shared/skeleton-list/skeleton-list';
@@ -21,7 +23,7 @@ import { VuSkeletonList } from '../../shared/skeleton-list/skeleton-list';
  */
 @Component({
 	selector: 'app-admin-categories',
-	imports: [FormsModule, RouterLink, VuConfirm, VuIcon, VuSkeletonList],
+	imports: [FormsModule, RouterLink, MatListModule, VuConfirm, VuIcon, VuSkeletonList],
 	templateUrl: './admin-categories.html',
 	styleUrl: './admin-categories.css',
 })
@@ -32,6 +34,20 @@ export class AdminCategories {
 	readonly categories = signal<AdminSpecialty[]>([]);
 	readonly loading = signal(true);
 	readonly busy = signal(false);
+	readonly busqueda = signal('');
+	readonly consulta = computed(() => this.busqueda().trim());
+	readonly categoriasFiltradas = computed(() => {
+		const query = this.consulta();
+		return this.categories().filter((category) => coincideBusqueda(query, category.nombre));
+	});
+
+	hayBusqueda(): boolean {
+		return this.consulta().length > 0;
+	}
+
+	limpiarBusqueda(): void {
+		this.busqueda.set('');
+	}
 
 	/** Aviso de la última acción: ahora distingue éxito de error. */
 	readonly aviso = signal<AdminAviso>({ texto: '', tipo: 'info' });

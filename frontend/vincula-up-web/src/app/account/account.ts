@@ -1,7 +1,8 @@
 import { Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+
 import { catchError, of } from 'rxjs';
 import { ApiService, MyReputation, UserAccount, UserAccountUpdate } from '../core/services/api.service';
 import { AuthService } from '../core/services/auth.service';
@@ -9,7 +10,6 @@ import { FotoService } from '../core/services/foto.service';
 import { environment } from '../../environments/environment';
 import { VuAvatar } from '../shared/avatar/avatar';
 import { VuConfirm } from '../shared/confirm/confirm';
-import { VuIcon } from '../shared/icon/icon';
 
 type CardKey = 'personal' | 'contact' | 'photo';
 
@@ -22,7 +22,7 @@ type CardKey = 'personal' | 'contact' | 'photo';
 @Component({
   selector: 'app-account',
   standalone: true,
-  imports: [DecimalPipe, FormsModule, RouterLink, VuAvatar, VuConfirm, VuIcon],
+  imports: [FormsModule, VuAvatar, VuConfirm, DecimalPipe],
   templateUrl: './account.html',
   styleUrl: './account.css',
 })

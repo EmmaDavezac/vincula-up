@@ -150,7 +150,10 @@ el BFF (`backend/bff-web`), que cumple cuatro funciones:
 1. **Agregación.** El listado de profesionales devuelve solo `usuarioId` (el
    nombre y apellido viven en `ms-usuarios`). El BFF los pega en cada tarjeta
    con `enriquecerConUsuarios()` (`ApiController.java:160`), en una sola pasada
-   indexada por UUID para no hacer una llamada por tarjeta.
+  indexada por UUID para no hacer una llamada por tarjeta. Para perfiles
+  históricos cuyo `usuarioId` todavía contiene el `keycloakId`, el BFF hace un
+  lookup de solo lectura por esa identidad y publica el `usuarioId` interno
+  resuelto, que es el que requiere el endpoint privado de fotos.
 2. **Autorización.** Valida el JWT contra el JWKS de Keycloak y aplica el RBAC.
    Los microservicios no exponen autenticación propia y por eso no se publican
    fuera de `127.0.0.1`.
@@ -477,6 +480,8 @@ que no quede una ruta con la que pedirle la foto a cualquiera.
 8. Se guarda el access_token y el perfil en localStorage
 9. La app llama a /api/usuarios/por-keycloak con el sub del token
 10. El BFF vincula o recupera el usuario de negocio
+11. Mientras se verifica la cuenta, la SPA muestra una pantalla de carga; el
+  acceso al contenido y la comprobación legal esperan la respuesta.
 ```
 
 La URL de **registro** de Keycloak se usa por separado
@@ -587,16 +592,19 @@ que es lo único que define qué versión está vigente.
 
 **El flujo:**
 
-1. La app llama a `GET /api/usuarios/yo` (que ya hacía) y lee los tres campos.
-2. Si la versión guardada no es la vigente, `terminosPendientes` es `true`.
-3. Aparece un modal montado en `app.html`, **sin botón de cerrar**.
+1. La app muestra una pantalla de carga mientras consulta `GET /api/usuarios/yo`
+  y lee los tres campos.
+2. Solo después de que responda el backend, si la versión guardada no es la
+  vigente, `terminosPendientes` es `true`.
+3. Aparece un modal montado en `app.html`, **sin botón de cerrar**. Si la consulta
+  falla, el modal no aparece y la pantalla de carga ofrece reintentar.
 4. Al marcar el casillero, `PATCH /api/terminos/aceptar` guarda versión y fecha.
 
 **Por qué es un modal y no un guard.** Es una capa sobre toda la aplicación, no
 una pantalla: escribir una URL no lo esquiva, y tampoco navegar. La única forma de
-salir es aceptar. Mientras el backend no responde, `terminosPendientes` devuelve
-`true`: se prefiere bloquear de más un instante antes que dejar pasar a alguien
-que no aceptó.
+salir es aceptar. Mientras el backend no responde, `terminosPendientes` permanece
+`false` y la pantalla de carga bloquea el contenido hasta confirmar el estado,
+evitando mostrar el modal por error o dejar pasar a alguien sin aceptación.
 
 **El id sale del token.** El endpoint no acepta un id en el cuerpo; si lo
 aceptara, cualquiera con su propia sesión podría registrar la aceptación en la
@@ -659,17 +667,22 @@ cuentas antiguas ([§16](#16-deuda-técnica-conocida)).
 
 ### 9.1 Cliente: pedir un turno
 
-Ruta `/solicitar`, en **4 pasos** (wizard de 1101 líneas en `request.ts`):
+Ruta `/solicitar`, en **6 pasos** (`request.ts`):
 
 | Paso | Qué hace | Validación |
 |---|---|---|
 | 1. **Ubicación** | Escribe la dirección o la marca en el mapa. Se geocodifica a coordenadas | Obligatorio. La dirección exacta se difiere hasta que el profesional acepta |
-| 2. **Categoría** | Elige la especialidad | Obligatorio |
-| 3. **Día y horario** | Elige día de la semana y franja, contra la disponibilidad real del profesional | Obligatorio. Se filtran horarios ya pasados |
-| 4. **Profesional** | Elige entre los profesionales de esa especialidad, ordenados por cercanía | Obligatorio |
+| 2. **Categoría** | Elige una especialidad con al menos un profesional activo | Obligatorio; el catálogo se filtra para no ofrecer categorías sin profesionales |
+| 3. **Problema** | Describe brevemente el trabajo solicitado | Obligatorio; mínimo 10 caracteres |
+| 4. **Día** | Elige una fecha desde hoy hasta los próximos seis días; cada opción muestra el día de semana y el día del mes | Obligatorio |
+| 5. **Horario** | Elige una franja horaria | Obligatorio |
+| 6. **Profesional** | Elige entre los profesionales de esa categoría y ordena por cercanía o reputación | Obligatorio |
 
 Al enviar: se valida en `ms-solicitudes` que el profesional esté `ACTIVO` y que
 haya cobertura para las coordenadas del servicio. La solicitud nace `PENDIENTE`.
+El wizard indica visualmente los seis pasos y, si se intenta abandonar `/solicitar`
+antes del envío, pide confirmación para evitar perder lo completado. Las consultas
+de categorías/profesionales y el envío muestran el spinner de Angular Material.
 
 **Chat y calificación.** En `/solicitudes` el cliente ve el estado, escribe
 mensajes dentro de cada solicitud, cancela mientras siga `PENDIENTE` y, cuando el
@@ -1576,7 +1589,8 @@ describiendo la identidad visual. El detalle del segundo tema está en el
 
 ### 17.3 Radios y sombras
 
-- Botones e inputs: `8px`–`10px`
+- Botones: radio uniforme de `8px` en todos los temas y componentes.
+- Inputs: cuadrados, según la guía visual del formulario.
 - Tarjetas y paneles: `16px`
 - Chips y badges: `999px` (píldora)
 - Sombras orgánicas: `0 2px 8px rgba(30, 41, 38, 0.04)`
@@ -1595,9 +1609,15 @@ apretar.
 |---|---|---|
 | `vu-btn--ink` | Relleno oscuro, texto claro | Acción principal de la pantalla |
 | `vu-btn--coral` | Relleno coral | Acción que crea algo nuevo |
-| `vu-btn--outline` | Fondo transparente, borde | Acciones secundarias en grupo |
+| `vu-btn--outline` | Fondo transparente con borde en claro; superficie clara y tinta oscura en oscuro | Acciones secundarias en grupo |
 | `vu-btn--quiet` | Borde tenue, sin relleno | Cancelar, cerrar, acciones terciarias |
 | `vu-btn--danger` | Relleno de alerta | Borrado y acciones irreversibles |
+
+Todos los botones HTML, enlaces-botón y toggles Material usan forma rectangular
+con radio de `8px`, incluidos los controles icon-only. En tema oscuro, `vu-btn--outline` usa fondo claro y tinta
+oscura para conservar contraste frente al primario sólido; `vu-btn--quiet`
+permanece transparente con borde más visible. Estas reglas se definen globalmente
+en `src/styles.css` y aplican en todas las páginas.
 
 **El hover solo cambia color, nunca mueve nada.** La transición es de
 `background-color`, `border-color` y `color`; no incluye `transform`. Un botón que
