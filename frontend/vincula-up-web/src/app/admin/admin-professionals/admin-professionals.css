@@ -51,19 +51,34 @@
 	color: var(--alert-info-ink);
 }
 
+/* ===== Lista de profesionales: mobile first (tarjeta apilada) ===== */
 .admin-professionals__list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	list-style: none;
+	margin: 0;
+	padding: 0;
 	width: 100%;
 }
 
 .admin-professionals__row {
-	align-items: center;
+	background: var(--surface, #fff);
+	border: 1px solid var(--line);
+	border-radius: 0.75rem;
 	display: grid;
-	gap: 0.9rem 1rem;
-	grid-template-columns: minmax(0, 2.4fr) minmax(0, 2.2fr) minmax(0, 0.8fr) minmax(0, 0.8fr) auto;
+	gap: 0.85rem;
+	grid-template-columns: minmax(0, 1fr);
 	min-width: 0;
-	width: 100%;
+	padding: 1rem;
 }
 
+/* La cabecera de columnas solo existe en escritorio */
+.admin-professionals__row--head {
+	display: none;
+}
+
+/* 1. Foto + nombre + email */
 .admin-professionals__person {
 	align-items: center;
 	display: flex;
@@ -93,9 +108,9 @@
 	font-size: 0.875rem;
 	margin: 0.2rem 0 0;
 	overflow-wrap: anywhere;
-	white-space: normal;
 }
 
+/* 2. Especialidades */
 .admin-professionals__specialties {
 	min-width: 0;
 }
@@ -104,125 +119,81 @@
 	margin-top: 0.25rem;
 }
 
+/* 3 y 4. Legajo y estado */
 .admin-professionals__legajo-field,
 .admin-professionals__status {
 	align-items: flex-start;
 	display: flex;
 	flex-direction: column;
 	gap: 0.25rem;
+	min-width: 0;
 }
 
 .admin-professionals__legajo {
 	color: var(--muted);
-	font-size: 0.75rem;
+	font-size: 0.875rem;
 	font-weight: 700;
 	margin: 0;
 }
 
+/* 5. Acciones: botón a todo el ancho en mobile */
 .admin-professionals__actions {
-	align-items: center;
 	display: flex;
-	flex-wrap: wrap;
+	flex-direction: column;
 	gap: 0.5rem;
-	justify-content: flex-start;
+	min-width: 0;
 }
 
-.admin-professionals__actions .vu-admin-field-label {
-	margin-right: auto;
+.admin-professionals__actions .vu-btn {
+	width: 100%;
 }
 
-@media (max-width: 1099px) {
-	.admin-professionals__row {
-		align-items: start;
-		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: 0.8rem 1rem;
+/* ===== Escritorio / tablet ancha: tabla de una fila por profesional ===== */
+@media (min-width: 900px) {
+	.admin-professionals__list {
+		gap: 0;
 	}
 
-	.admin-professionals__row > span {
+	.admin-professionals__row {
+		align-items: center;
+		border-radius: 0;
+		border-width: 0 0 1px;
+		gap: 1rem;
+		grid-template-columns:
+			minmax(0, 1.4fr) minmax(0, 1.5fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 1fr);
+		padding: 0.9rem 0.5rem;
+	}
+
+	.admin-professionals__row--head {
+		border-bottom: 1px solid var(--ink);
+		color: var(--muted);
+		display: grid;
+		font-size: 0.6875rem;
+		font-weight: 800;
+		letter-spacing: 0.08em;
+		padding-block: 0.6rem;
+		text-transform: uppercase;
+	}
+
+	/* Las etiquetas por campo sobran: ya está la cabecera */
+	.admin-professionals__row .vu-admin-field-label {
 		display: none;
 	}
 
-	.admin-professionals__person,
-	.admin-professionals__specialties,
-	.admin-professionals__legajo-field,
-	.admin-professionals__status,
 	.admin-professionals__actions {
-		grid-column: auto;
-		min-width: 0;
-	}
-
-	.admin-professionals__person,
-	.admin-professionals__specialties {
-		grid-column: 1 / -1;
-	}
-
-	.admin-professionals__person .vu-admin-field-label,
-	.admin-professionals__specialties > .vu-admin-field-label,
-	.admin-professionals__legajo-field .vu-admin-field-label,
-	.admin-professionals__status .vu-admin-field-label,
-	.admin-professionals__actions .vu-admin-field-label {
-		display: inline-block;
-	}
-
-	.admin-professionals__actions {
-		align-items: stretch;
-		grid-column: 1 / -1;
-		flex-direction: column;
-		width: 100%;
+		align-items: center;
+		flex-direction: row;
+		flex-wrap: wrap;
+		justify-content: flex-end;
 	}
 
 	.admin-professionals__actions .vu-btn {
-		width: 100%;
+		width: auto;
 	}
 }
-
-@media (max-width: 559px) {
-	.admin-professionals__row {
-		grid-template-columns: minmax(0, 1fr);
-	}
-
-	.admin-professionals__person {
-		align-items: flex-start;
-	}
-
-	.admin-professionals__identity {
-		min-width: 0;
-		width: 100%;
-	}
+.admin-professionals__search {
+	margin-bottom: 1rem;
 }
-
-@media (min-width: 1100px) {
-	.admin-professionals__row {
-		gap: 0.9rem;
-	}
-
-	.admin-professionals__person,
-	.admin-professionals__specialties,
-	.admin-professionals__actions {
-		grid-column: auto;
-	}
-
-	.admin-professionals__legajo-field,
-	.admin-professionals__status {
-		align-items: flex-start;
-	}
-
-	.admin-professionals__actions {
-		justify-content: flex-start;
-	}
-
-	.admin-professionals__actions .vu-admin-field-label {
-		display: none;
-	}
-
-	.vu-admin-field-label {
-		display: none;
-	}
-}
-
-/* La baja del padrón es lógica: el botón "Suspender" es el único que baja. */
-
 .admin-professionals__modal {
 	display: flex;
 	flex-direction: column;

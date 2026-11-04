@@ -26,6 +26,24 @@
 - **Verificación:** `cd /home/emma/Desktop/vincula-up/frontend/vincula-up-web && npm run build` ejecutado tras el ajuste.
 - **Especificación:** Sin cambios en rutas ni contratos de API.
 
+### [2026-11-04] - ux: corregir listados admin responsive en mobile (sin ocultar contenido)
+- **Objetivo:** Corregir que los listados de admin no sean responsivos y no se puedan leer en mobile quitando `display: none` en mobile y usando apilado de columnas en su lugar.
+- **Cambios realizados:**
+  - `admin-categories/admin-categories.css`: Reemplazó media queries que ocultaban contenido en móvil (`display: none`) por apilado en columna con etiquetas visibles; en desktop layout en fila con etiquetas ocultas.
+  - `admin-clients/admin-clients.css`: Reemplazó media queries para apilar en móvil (1 columna en pantallas <900px, 1 columna en <480px) manteniendo etiquetas y contenido visible; en desktop layout en fila.
+  - `admin-professionals/admin-professionals.css`: Reemplazó media queries para 2 columnas en tablet (<=1099px) y 1 columna en móvil chico (<=559px) con etiquetas visibles en móvil; contenido apilado verticalmente sin ocultarse.
+- **Verificación:** `cd /home/emma/Desktop/vincula-up/frontend/vincula-up-web && npm run build` exitoso.
+- **Especificación:** Sin cambios en rutas ni contratos de API.
+
+### [2026-11-04] - ux: ajustar listados admin segun especificación mobile (sin overflow clip)
+- **Objetivo:** Ajustar listados admin segun requerimiento: mobile sin recortes, filas especificaas, y en md mostrar todo en primera fila menos botón de acción.
+- **Cambios realizados:**
+  - `admin-categories/admin-categories.css`: Mobile: nombre categoria fila 1, botones accion fila 2 ocupando mitad cada uno. Tablet: nombre fila 1, botones fila 2 completas.
+  - `admin-clients/admin-clients.css`: Mobile: fila 1 foto|nombre, fila 2 solicitudes|estado, fila 3 botón consultar. Tablet: todas las filas en primera fila, botón acción en segunda fila a la derecha.
+  - `admin-professionals/admin-professionals.css`: Mobile: fila 1 foto|nombre, fila 2 email, fila 3 especialidades, fila 4 legajo, fila 5 botón acción full width. Tablet: todo en fila única, botón a la derecha.
+- **Verificación:** `cd /home/emma/Desktop/vincula-up/frontend/vincula-up-web && npm run build` exitoso.
+- **Especificación:** Sin cambios en rutas ni contratos de API.
+
 ### [2026-11-04] - ux: ajustar listados responsive y métricas a 4 columnas en desktop
 - **Objetivo:** Corregir la visibilidad de los listados en móvil y dejar las tarjetas del dashboard con 4 columnas en desktop sin perder legibilidad en tablet y mobile.
 - **Cambios realizados:**
@@ -428,3 +446,17 @@
   - `docker exec vinculaup-keycloak /opt/keycloak/bin/kcadm.sh get realms/vincula-up -F loginTheme,emailTheme` devolvió `vincula-up` para ambos valores.
   - `npm run build` en el frontend compiló correctamente sin errores de TypeScript ni CSS.
 - **Especificación:** Actualizada en `ESPECIFICACION.md` para dejar constancia del arranque automatizado del tema y la política de anchos de modales.
+
+### [2026-11-04] - fix: reorganizar y hacer responsables los listados de admin (categorías, clientes y profesionales)
+
+- **Objetivo:** Reparar los listados del panel de administración que estaban rotos, mal organizados y no se veían bien; reorganizar todos los campos y botones sin ocultar nada; hacerlos completamente legibles y utilizables desde móvil.
+- **Causa:** Los listados usaban `flex`/`grid` mezclados con propiedades `order` duplicadas, redefinían `:host` y la fila varias veces, ocultaban las etiquetas de campo con `display: none` y alineaban los botones de forma inconsistente, lo que hacía que en móvil los campos se cortaran o se apilaran mal.
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/admin/admin-categories/admin-categories.css`: fila `__item` con `display: grid` y `grid-template-columns` definido una sola vez; nombre con etiqueta visible; acciones alineadas a la derecha; breakpoint en tablet y escritorio; eliminado `display: none` de etiquetas.
+  - `frontend/vincula-up-web/src/app/admin/admin-categories/admin-categories.html`: `admin-categories__grid` → `admin-categories__list`; `admin-categories__row` → `admin-categories__item`; botones con clase `admin-categories__action`.
+  - `frontend/vincula-up-web/src/app/admin/admin-clients/admin-clients.css`: fila `__item` con `display: grid` y 4 columnas (`persona`, `actividad`, `estado`, `acciones`); avatar no se contrae; etiquetas visibles; botón de acción a la derecha en tablet/escritorio; eliminado `display: none` de etiquetas y redefiniciones duplicadas de `:host`/fila.
+  - `frontend/vincula-up-web/src/app/admin/admin-clients/admin-clients.html`: `admin-clients__grid` → `admin-clients__list`; `admin-clients__row` → `admin-clients__item`; `admin-clients__action-field` → `admin-clients__action`.
+  - `frontend/vincula-up-web/src/app/admin/admin-professionals/admin-professionals.css`: fila `__item` con `display: grid` y 5 columnas (`profesional`, `especialidades`, `legajo`, `estado`, `acciones`); chips de especialidades visibles; botones alineados a la derecha en tablet/escritorio; etiquetas visibles; eliminado `order`, `flex` y `display: none` de etiquetas.
+  - `frontend/vincula-up-web/src/app/admin/admin-professionals/admin-professionals.html`: `admin-professionals__row` → `admin-professionals__item`; `admin-professionals__actions` → `admin-professionals__action`; botones `Consultar` y `Reenviar invitación` con clase `__action`.
+- **Verificación:** `npm run build` en el frontend compiló correctamente sin errores de TypeScript ni plantillas.
+- **Especificación:** No requiere cambios (no se modificaron rutas, endpoints, contratos de API ni modelos de datos).

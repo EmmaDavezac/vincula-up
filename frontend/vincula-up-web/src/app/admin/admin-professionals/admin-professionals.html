@@ -49,27 +49,25 @@
 	<div class="vu-admin-list-skeleton"><vu-skeleton-list variant="row" [count]="4" /></div>
 } @else if (professionals().length) {
 	@if (profesionalesFiltrados().length) {
-		<mat-list class="vu-admin-material-list admin-professionals__list" aria-label="Lista de profesionales">
-			<mat-list-item class="vu-admin-material-list__header" aria-hidden="true">
-				<div class="admin-professionals__row">
-					<span>Profesional</span>
-					<span>Especialidades</span>
-					<span>Legajo</span>
-					<span>Estado</span>
-					<span>Acciones</span>
-				</div>
-			</mat-list-item>
+		<ul class="vu-admin-material-list admin-professionals__list" aria-label="Lista de profesionales">
+			<li class="admin-professionals__row admin-professionals__row--head" aria-hidden="true">
+				<span>Profesional</span>
+				<span>Especialidades</span>
+				<span>Legajo</span>
+				<span>Estado</span>
+				<span>Acciones</span>
+			</li>
+
 			@for (professional of profesionalesFiltrados(); track professional.id) {
-				<mat-list-item class="vu-admin-material-list__item">
-					<div class="admin-professionals__row">
-						<div class="admin-professionals__person">
+				<li class="admin-professionals__row">
+					<div class="admin-professionals__person">
 						<vu-avatar size="xl" [nombre]="nombre(professional)" [usuarioId]="usuarioIdFoto(professional)" [tieneFoto]="tieneFoto(professional)" />
 						<div class="admin-professionals__identity">
-							<span class="vu-admin-field-label">Profesional</span>
 							<h2 class="admin-professionals__name">{{ nombre(professional) }}</h2>
 							<p class="admin-professionals__email">{{ email(professional) }}</p>
 						</div>
 					</div>
+
 					<div class="admin-professionals__specialties">
 						<span class="vu-admin-field-label">Especialidades</span>
 						<div class="vu-admin-chips admin-professionals__chips">
@@ -83,17 +81,18 @@
 							}
 						</div>
 					</div>
+
 					<div class="admin-professionals__legajo-field">
 						<span class="vu-admin-field-label">Legajo</span>
 						<p class="admin-professionals__legajo">{{ professional.legajo || 'Sin legajo' }}</p>
 					</div>
+
 					<div class="admin-professionals__status">
 						<span class="vu-admin-field-label">Estado</span>
 						<span class="vu-state vu-state--sm" [class]="estadoClase(professional.estado)">{{ estadoLabel(professional.estado) }}</span>
 					</div>
 
 					<div class="admin-professionals__actions">
-						<span class="vu-admin-field-label">Acciones</span>
 						<button type="button" mat-flat-button class="vu-btn vu-btn--ink vu-btn--sm" (click)="abrirDetalle(professional, 'consulta')">
 							Consultar
 						</button>
@@ -109,16 +108,15 @@
 							</button>
 						}
 					</div>
-					</div>
-				</mat-list-item>
+				</li>
 			}
-		</mat-list>
+		</ul>
 	} @else {
 		<div class="vu-admin-empty">
 			<p class="vu-admin-panel__hint">
 				Ningún profesional coincide con «{{ consulta() }}».
 			</p>
-			<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="limpiarBusqueda()">
+			<button type="button" class="vu-btn vu-btn--outline vu-btn--sm admin-professionals__action" (click)="limpiarBusqueda()">
 				Limpiar búsqueda
 			</button>
 		</div>
@@ -149,7 +147,7 @@
 				</div>
 				<div class="admin-professionals__modal-head-actions">
 					@if (abierto.modo !== 'edicion') {
-						<button type="button" mat-stroked-button class="vu-btn vu-btn--outline vu-btn--sm" (click)="abrirDetalle(abierto.profesional, 'edicion')">
+						<button type="button" mat-stroked-button class="vu-btn vu-btn--outline vu-btn--sm admin-professionals__action" (click)="abrirDetalle(abierto.profesional, 'edicion')">
 							Modificar
 						</button>
 					}

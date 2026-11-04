@@ -6,134 +6,47 @@
 	margin: 1.5rem 0 0;
 }
 
-.admin-clients__row {
-	align-items: center;
-	display: grid;
-	gap: 0.9rem 1rem;
-	grid-template-columns: minmax(0, 2.3fr) minmax(0, 1.2fr) minmax(0, 0.8fr) auto;
-	min-width: 0;
+/* ===== Lista de clientes: mobile first (tarjeta apilada) ===== */
+.admin-clients__list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	list-style: none;
+	margin: 0;
+	padding: 0;
 	width: 100%;
 }
 
-@media (max-width: 899px) {
-	.admin-clients__row {
-		align-items: start;
-		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: 0.8rem 1rem;
-	}
-
-	.admin-clients__row > span {
-		display: none;
-	}
-
-	.admin-clients__person,
-	.admin-clients__activity-field,
-	.admin-clients__status-field,
-	.admin-clients__action-field {
-		grid-column: auto;
-		min-width: 0;
-	}
-
-	.admin-clients__person {
-		grid-column: 1 / -1;
-	}
-
-	.admin-clients__status-field,
-	.admin-clients__activity-field {
-		align-items: flex-start;
-	}
-
-	.admin-clients__action-field {
-		align-items: stretch;
-		grid-column: 1 / -1;
-		justify-content: flex-start;
-		width: 100%;
-	}
-
-	.admin-clients__action {
-		justify-self: stretch;
-		width: 100%;
-	}
-
-	.admin-clients__person .vu-admin-field-label,
-	.admin-clients__activity-field .vu-admin-field-label,
-	.admin-clients__status-field .vu-admin-field-label,
-	.admin-clients__action-field .vu-admin-field-label {
-		display: inline-block;
-	}
-}
-
-@media (max-width: 479px) {
-	.admin-clients__row {
-		grid-template-columns: minmax(0, 1fr);
-	}
-
-	.admin-clients__person-content {
-		align-items: flex-start;
-		flex-wrap: wrap;
-	}
-
-	.admin-clients__person-info {
-		min-width: 0;
-		width: 100%;
-	}
-}
-
-@media (min-width: 900px) {
-	.admin-clients__person {
-		align-items: flex-start;
-		flex-direction: column;
-	}
-
-	.admin-clients__person-content {
-		align-items: center;
-		display: flex;
-		gap: 0.75rem;
-		min-width: 0;
-	}
-
-	.admin-clients__activity-field,
-	.admin-clients__status-field,
-	.admin-clients__action-field {
-		align-items: flex-start;
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-	}
-
-	.admin-clients__action-field {
-		align-items: flex-end;
-	}
-
-	.admin-clients__action-field .vu-admin-field-label,
-	.admin-clients__person .vu-admin-field-label,
-	.admin-clients__activity-field .vu-admin-field-label,
-	.admin-clients__status-field .vu-admin-field-label {
-		display: none;
-	}
-}
-
-.admin-clients__person {
-	align-items: flex-start;
-	display: flex;
-	flex-direction: column;
-	gap: 0.25rem;
+.admin-clients__row {
+	background: var(--surface, #fff);
+	border: 1px solid var(--line);
+	border-radius: 0.75rem;
+	display: grid;
+	gap: 0.85rem;
+	grid-template-columns: minmax(0, 1fr);
 	min-width: 0;
+	padding: 1rem;
 }
 
-.admin-clients__person-content {
+/* La cabecera de columnas solo existe en escritorio */
+.admin-clients__row--head {
+	display: none;
+}
+
+/* 1. Foto + nombre + email (también se usa en la cabecera del modal) */
+.admin-clients__person {
 	align-items: center;
 	display: flex;
 	gap: 0.75rem;
 	min-width: 0;
 }
 
-.admin-clients__person vu-avatar {
+.admin-clients__person > vu-avatar {
 	flex-shrink: 0;
 }
 
 .admin-clients__person-info {
+	flex: 1 1 auto;
 	min-width: 0;
 }
 
@@ -141,14 +54,25 @@
 	font-family: var(--font-sans);
 	font-size: 1rem;
 	font-weight: 700;
+	line-height: 1.35;
+	margin: 0;
 }
 
 .admin-clients__email {
 	color: var(--muted);
 	font-size: 0.875rem;
-	margin: 0.125rem 0 0;
+	margin: 0.2rem 0 0;
 	overflow-wrap: anywhere;
-	white-space: normal;
+}
+
+/* 2 y 3. Actividad y estado */
+.admin-clients__activity-field,
+.admin-clients__status-field {
+	align-items: flex-start;
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	min-width: 0;
 }
 
 .admin-clients__activity {
@@ -162,26 +86,63 @@
 	font-weight: 700;
 }
 
-.admin-clients__action {
-	justify-self: end;
-}
-
-.admin-clients__activity-field,
-.admin-clients__status-field,
-.admin-clients__action-field {
+/* 4. Acciones: botón a todo el ancho en mobile */
+.admin-clients__actions {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
 	min-width: 0;
 }
 
-.admin-clients__action-field {
-	align-items: center;
-	display: flex;
-	justify-content: flex-end;
+.admin-clients__actions .vu-btn {
+	width: 100%;
 }
 
-.admin-clients__action-field .vu-admin-field-label {
-	margin-right: auto;
-}
+/* ===== Escritorio / tablet ancha: tabla ===== */
+@media (min-width: 900px) {
+	.admin-clients__list {
+		gap: 0;
+	}
 
+	.admin-clients__row {
+		align-items: center;
+		border-radius: 0;
+		border-width: 0 0 1px;
+		gap: 1rem;
+		grid-template-columns:
+			minmax(0, 2fr) minmax(0, 1.1fr) minmax(0, 0.8fr) minmax(0, 1fr);
+		padding: 0.9rem 0.5rem;
+	}
+
+	.admin-clients__row--head {
+		border-bottom: 1px solid var(--ink);
+		color: var(--muted);
+		display: grid;
+		font-size: 0.6875rem;
+		font-weight: 800;
+		letter-spacing: 0.08em;
+		padding-block: 0.6rem;
+		text-transform: uppercase;
+	}
+
+	/* Las etiquetas por campo sobran: ya está la cabecera */
+	.admin-clients__row .vu-admin-field-label {
+		display: none;
+	}
+
+	.admin-clients__actions {
+		align-items: center;
+		flex-direction: row;
+		justify-content: flex-end;
+	}
+
+	.admin-clients__actions .vu-btn {
+		width: auto;
+	}
+}
+.admin-clients__search {
+	margin-bottom: 1rem;
+}
 .admin-clients__modal {
 	display: flex;
 	flex-direction: column;

@@ -40,27 +40,22 @@
 		}
 	</div>
 
-	@if (clientesOrdenados().length) {
-	<mat-list class="vu-admin-material-list admin-clients__grid" aria-label="Lista de clientes">
-		<mat-list-item class="vu-admin-material-list__header" aria-hidden="true">
-			<div class="admin-clients__row">
+		@if (clientesOrdenados().length) {
+		<ul class="vu-admin-material-list admin-clients__list" aria-label="Lista de clientes">
+			<li class="admin-clients__row admin-clients__row--head" aria-hidden="true">
 				<span>Cliente</span>
 				<span>Actividad</span>
 				<span>Estado</span>
 				<span>Acciones</span>
-			</div>
-		</mat-list-item>
-		@for (item of clientesOrdenados(); track item.client.id) {
-			<mat-list-item class="vu-admin-material-list__item">
-				<div class="admin-clients__row">
+			</li>
+
+			@for (item of clientesOrdenados(); track item.client.id) {
+				<li class="admin-clients__row">
 					<div class="admin-clients__person">
-						<span class="vu-admin-field-label">Cliente</span>
-						<div class="admin-clients__person-content">
-							<vu-avatar size="md" [nombre]="nombre(item.client)" [usuarioId]="item.client.id" [tieneFoto]="item.client.tieneFoto === true" />
-							<div class="admin-clients__person-info">
-								<h2 class="admin-clients__name">{{ nombre(item.client) }}</h2>
-								<p class="admin-clients__email">{{ item.client.email }}</p>
-							</div>
+						<vu-avatar size="xl" [nombre]="nombre(item.client)" [usuarioId]="item.client.id" [tieneFoto]="item.client.tieneFoto === true" />
+						<div class="admin-clients__person-info">
+							<h2 class="admin-clients__name">{{ nombre(item.client) }}</h2>
+							<p class="admin-clients__email">{{ item.client.email }}</p>
 						</div>
 					</div>
 
@@ -70,21 +65,20 @@
 							<span class="admin-clients__count-strong">{{ item.solicitudes }}</span> solicitudes realizadas
 						</p>
 					</div>
+
 					<div class="admin-clients__status-field">
 						<span class="vu-admin-field-label">Estado</span>
-						<span class="vu-state" [class]="estadoClase(item.client.estado)">{{ estadoLabel(item.client.estado) }}</span>
+						<span class="vu-state vu-state--sm" [class]="estadoClase(item.client.estado)">{{ estadoLabel(item.client.estado) }}</span>
 					</div>
 
-					<div class="admin-clients__action-field">
-						<span class="vu-admin-field-label">Acciones</span>
-						<button type="button" mat-flat-button class="vu-btn vu-btn--ink vu-btn--sm admin-clients__action" (click)="abrirDetalle(item.client)">
+					<div class="admin-clients__actions">
+						<button type="button" mat-flat-button class="vu-btn vu-btn--ink vu-btn--sm" (click)="abrirDetalle(item.client)">
 							Consultar
 						</button>
 					</div>
-				</div>
-			</mat-list-item>
-		}
-	</mat-list>
+				</li>
+			}
+		</ul>
 	} @else {
 		<div class="vu-admin-empty">
 			<p class="vu-admin-panel__hint">Ningún cliente coincide con «{{ consulta() }}».</p>
