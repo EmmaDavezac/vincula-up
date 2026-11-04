@@ -3,28 +3,26 @@ Una sola navegación para todo el sitio: la barra superior va siempre (también
 dentro del panel de administración) y en móvil se suma la barra inferior
 para pasar entre secciones. El footer del sitio no se muestra en el panel.
 -->
-@if (auth.cerrandoSesion()) {
-	<app-loading-screen mensaje="Cerrando sesión..." />
-} @else if (auth.loginRedirecting()) {
-	<app-loading-screen mensaje="Conectando con el inicio de sesión..." />
-} @else if (auth.verificandoCuenta()) {
-	<app-loading-screen
-		mensaje="Iniciando sesión..."
-		[error]="auth.errorConsultaCuenta() ? 'No pudimos verificar tu cuenta.' : ''"
-		(reintentarClick)="auth.reintentarConsultaCuenta()"
-	/>
+<app-navbar />
+<main>
+	<router-outlet />
+</main>
+@if (enPanelAdmin()) {
+	<app-admin-footer />
 } @else {
-	<app-navbar />
-	<main>
-		<router-outlet />
-	</main>
-	@if (enPanelAdmin()) {
-		<app-admin-footer />
-	} @else {
-		<app-footer />
-	}
-	<vu-tabbar />
-
-	<!-- El modal solo se monta tras verificar la aceptación en el backend. -->
-	<app-terminos-modal />
+	<app-footer />
 }
+<vu-tabbar />
+
+<!--
+Aceptación de los términos y condiciones. Va al final y por encima de todo: es
+una capa sobre la aplicación, no una pantalla más, para que no se pueda esquivar
+escribiendo una URL.
+-->
+<app-terminos-modal />
+
+<!--
+Animación de inicio de sesión y verificación de credenciales de acceso.
+Disimula las consultas iniciales y evita el parpadeo de modales o pantallas.
+-->
+<app-auth-loading />

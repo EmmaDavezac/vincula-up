@@ -1,0 +1,46 @@
+/*
+ * Spinner de carga.
+ * El anillo gira con una animación CSS; se respeta `prefers-reduced-motion`.
+ */
+
+.vu-spinner {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	position: relative;
+	color: var(--ink);
+}
+
+.vu-spinner--size-sm {
+	width: 1.25rem;
+	height: 1.25rem;
+}
+
+.vu-spinner--size-md {
+	width: 2rem;
+	height: 2rem;
+}
+
+.vu-spinner__anillo {
+	position: absolute;
+	inset: 0;
+	margin: auto;
+	border: 2px solid rgba(var(--ink-rgb, 30 41 38) / 0.2);
+	border-top-color: currentColor;
+	border-radius: 50%;
+	animation: vu-spinner-girar 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.vu-spinner__anillo {
+		animation: none;
+		border-top-color: currentColor;
+		opacity: 0.6;
+	}
+}
+
+@keyframes vu-spinner-girar {
+	to {
+		transform: rotate(1turn);
+	}
+}

@@ -1,7 +1,7 @@
 import { inject, Injectable, computed, effect, signal } from '@angular/core';
 import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { catchError, map, Observable, of, switchMap, tap } from 'rxjs';
+import { catchError, finalize, map, Observable, of, switchMap, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { UserProfile, UserRole } from '../models/user-profile';
 import { inicioDeSesion } from '../guards/role.guard';
@@ -72,9 +72,63 @@ export class AuthService {
   /** Si aceptó la versión vigente de los términos. */
   private readonly terminosAceptados = signal(false);
 
+  /**
+   * Estado de la animación de autenticación (verificación de credenciales / inicio de sesión).
+   * Disimula las consultas iniciales y evita el renderizado prematuro del modal de términos.
+   */
+  readonly estadoAuth = signal<'inactivo' | 'verificando_credenciales' | 'iniciando_sesion'>('inactivo');
+  readonly cargandoAuth = computed(() => this.estadoAuth() !== 'inactivo');
+  readonly mensajeCarga = signal('Iniciando sesión...');
+  readonly detalleCarga = signal('Preparando tu cuenta...');
+  private tiempoInicioCarga = 0;
+
+  iniciarCargaAuth(
+    estado: 'verificando_credenciales' | 'iniciando_sesion',
+    mensaje: string,
+    detalle: string,
+  ): void {
+    this.tiempoInicioCarga = Date.now();
+    this.estadoAuth.set(estado);
+    this.mensajeCarga.set(mensaje);
+    this.detalleCarga.set(detalle);
+  }
+
+  finalizarCargaAuth(): void {
+    if (this.estadoAuth() === 'inactivo') {
+      return;
+    }
+    const minDuracion = 450;
+    const transcurrido = Date.now() - this.tiempoInicioCarga;
+    const restante = Math.max(0, minDuracion - transcurrido);
+    setTimeout(() => {
+      this.estadoAuth.set('inactivo');
+    }, restante);
+  }
+
   constructor() {
-    this.handleCodeCallback();
     this.fotos.establecerToken(this.getToken());
+
+    const tieneCodeCallback =
+      typeof window !== 'undefined' &&
+      Boolean(window.location.search) &&
+      window.location.search.includes('code=') &&
+      window.location.search.includes('state=');
+
+    if (tieneCodeCallback) {
+      this.iniciarCargaAuth(
+        'verificando_credenciales',
+        'Verificando credenciales de acceso...',
+        'Validando tu cuenta con la Universidad Popular...',
+      );
+    } else if (this.user()) {
+      this.iniciarCargaAuth(
+        'iniciando_sesion',
+        'Iniciando sesión...',
+        'Verificando estado de la cuenta...',
+      );
+    }
+
+    this.handleCodeCallback();
 
     // La foto de perfil se pide sola cuando hay sesión con token: así el avatar
     // aparece con la foto real sin importar si la navbar estaba en pantalla antes
@@ -97,6 +151,11 @@ export class AuthService {
   loginWithKeycloak(): Observable<boolean> {
     this.loginError.set('');
     this.loginRedirecting.set(true);
+    this.iniciarCargaAuth(
+      'verificando_credenciales',
+      'Redirigiendo a inicio de sesión...',
+      'Conectando con el servidor de autenticación...',
+    );
     const state = this.randomValue();
     const nonce = this.randomValue();
     sessionStorage.setItem(KEYCLOAK_STATE_KEY, state);
@@ -166,6 +225,11 @@ export class AuthService {
 
   loginDirect(username: string, password = 'password'): Observable<boolean> {
     this.loginError.set('');
+    this.iniciarCargaAuth(
+      'verificando_credenciales',
+      'Verificando credenciales de acceso...',
+      'Validando credenciales con la Universidad Popular...',
+    );
     const body = new HttpParams()
       .set('grant_type', 'password')
       .set('client_id', environment.keycloakClientId)
@@ -177,15 +241,25 @@ export class AuthService {
     const tokenUrl = `${this.getKeycloakUrl()}/realms/${environment.keycloakRealm}/protocol/openid-connect/token`;
 
     return this.http.post<KeycloakTokenResponse>(tokenUrl, body.toString(), { headers }).pipe(
-      switchMap((token) => this.maybeUseToken(token)),
+      switchMap((token) => {
+        this.iniciarCargaAuth(
+          'iniciando_sesion',
+          'Iniciando sesión...',
+          'Preparando tu cuenta y verificando el perfil...',
+        );
+        return this.maybeUseToken(token);
+      }),
       // Igual que en el callback de Keycloak: al entrar se va a la sección del rol.
       tap((ok) => {
         if (ok) {
           void this.irASeccionDelRol();
+        } else {
+          this.finalizarCargaAuth();
         }
       }),
       catchError((error: HttpErrorResponse) => {
         this.loginError.set(this.describeError(error, 'No se pudo iniciar sesión con las credenciales indicadas.'));
+        this.finalizarCargaAuth();
         return of(false);
       }),
     );
@@ -193,6 +267,9 @@ export class AuthService {
 
   logout(): void {
     this.cerrandoSesion.set(true);
+    this.estadoAuth.set('inactivo');
+    this.cuentaConsultada.set(false);
+    this.terminosAceptados.set(false);
     const idToken = localStorage.getItem(ID_TOKEN_KEY);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
@@ -253,6 +330,9 @@ export class AuthService {
     const storedState = sessionStorage.getItem(KEYCLOAK_STATE_KEY);
 
     if (!code || !returnedState || returnedState !== storedState) {
+      if (this.estadoAuth() === 'verificando_credenciales') {
+        this.finalizarCargaAuth();
+      }
       return;
     }
 
@@ -271,6 +351,12 @@ export class AuthService {
     }
 
     this.loginError.set('');
+    this.iniciarCargaAuth(
+      'verificando_credenciales',
+      'Verificando credenciales de acceso...',
+      'Validando tu cuenta con la Universidad Popular...',
+    );
+
     const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/` : environment.keycloakRedirectUri;
     let body = new HttpParams()
       .set('grant_type', 'authorization_code')
@@ -289,10 +375,18 @@ export class AuthService {
 
     this.http.post<KeycloakTokenResponse>(tokenUrl, body.toString(), { headers })
       .pipe(
-        switchMap((token) => this.maybeUseToken(token)),
+        switchMap((token) => {
+          this.iniciarCargaAuth(
+            'iniciando_sesion',
+            'Iniciando sesión...',
+            'Preparando tu cuenta y verificando el perfil...',
+          );
+          return this.maybeUseToken(token);
+        }),
         catchError((error: HttpErrorResponse) => {
           this.loginRedirecting.set(false);
           this.loginError.set(this.describeError(error, 'No se pudo completar el inicio de sesión.'));
+          this.finalizarCargaAuth();
           return of(false);
         }),
       )
@@ -304,6 +398,7 @@ export class AuthService {
           void this.irASeccionDelRol().finally(() => this.loginRedirecting.set(false));
         } else {
           this.loginRedirecting.set(false);
+          this.finalizarCargaAuth();
         }
       });
   }
@@ -494,12 +589,14 @@ export class AuthService {
   loadOwnPhoto(force = false): void {
     const current = this.user();
     if (!current) {
+      this.finalizarCargaAuth();
       return;
     }
     // Sin token todavía (p. ej. la navbar se montó antes de completar el login):
     // no se marca como pedida para reintentar cuando la sesión esté lista.
     const token = this.getToken();
     if (!token) {
+      this.finalizarCargaAuth();
       return;
     }
     if (!force && this.photoRequested) {
@@ -529,8 +626,12 @@ export class AuthService {
         }),
         catchError(() => {
           this.photoRequested = false;
+          this.cuentaConsultada.set(true);
           this.errorConsultaCuenta.set(true);
           return of(null);
+        }),
+        finalize(() => {
+          this.finalizarCargaAuth();
         }),
       )
       .subscribe();
@@ -543,9 +644,9 @@ export class AuthService {
   /**
    * Si hay que pedir los términos y condiciones.
    *
-  * <p>Es {@code true} solo después de que el backend confirme que falta la
-  * aceptación vigente. Mientras se consulta, la aplicación muestra una carga y
-  * el modal no se monta.
+   * <p>Es {@code true} con sesión abierta y habiendo verificado la cuenta
+   * sin aceptación de la versión vigente. No se muestra antes de consultar la
+   * cuenta: durante la consulta se muestra la animación de inicio de sesión.
    */
   readonly terminosPendientes = computed(() => {
     if (!this.user()) {

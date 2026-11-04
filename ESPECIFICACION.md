@@ -28,7 +28,7 @@
     - [10.1 Geocodificación](#101-geocodificación) · [10.2 Cifrado de ubicaciones](#102-cifrado-de-ubicaciones) · [10.3 Almacenamiento de fotos](#103-almacenamiento-de-fotos) · [10.4 Quién ve la foto de quién](#104-quién-ve-la-foto-de-quién) · [10.5 Privacidad de la dirección](#105-privacidad-de-la-dirección-del-cliente)
 11. [Variables de entorno](#11-variables-de-entorno)
 12. [Datos de arranque](#12-datos-de-arranque)
-13. [Infraestructura: pgAdmin, TLS, Nginx](#13-infraestructura-pgadmin-tls-nginx)
+13. [Infraestructura: TLS, Nginx](#13-infraestructura-tls-nginx)
 14. [Scripts operativos](#14-scripts-operativos)
 15. [Estado real del MVP](#15-estado-real-del-mvp)
 16. [Deuda técnica conocida](#16-deuda-técnica-conocida)
@@ -173,15 +173,15 @@ el BFF (`backend/bff-web`), que cumple cuatro funciones:
 | `nginx` | 80 / 443 | Sí (todas las interfaces) |
 | `keycloak` | 8080 | Sí |
 | `postgres` | 5432 | Sí |
-| `pgadmin` | 5050 | Sí |
 | `bff-web` | 9001 | Sí |
-| `ms-usuarios` | 8081 | Solo `127.0.0.1` |
-| `ms-profesionales` | 8082 | Solo `127.0.0.1` |
-| `ms-solicitudes` | 8083 | Solo `127.0.0.1` |
+| `ms-usuarios` | 8081 | Sí (red interna) |
+| `ms-profesionales` | 8082 | Sí (red interna) |
+| `ms-solicitudes` | 8083 | Sí (red interna) |
 
-Los tres microservicios de dominio se publican únicamente en `127.0.0.1` a
-propósito: no implementan autenticación propia, así que no deben quedar
-alcanzables desde la red. Toda entrada del exterior pasa por nginx → BFF.
+Los tres microservicios de dominio se publican en la red interna de Docker
+porque cada uno valida el JWT de Keycloak por su cuenta (oauth2-resource-server).
+Toda entrada del exterior pasa por nginx → BFF, pero los ms-* ya no confían
+ciegamente en el perímetro: rechazan peticiones sin token válido.
 
 ### Puertos entre servicios (red interna de Docker)
 
@@ -602,9 +602,11 @@ que es lo único que define qué versión está vigente.
 
 **Por qué es un modal y no un guard.** Es una capa sobre toda la aplicación, no
 una pantalla: escribir una URL no lo esquiva, y tampoco navegar. La única forma de
-salir es aceptar. Mientras el backend no responde, `terminosPendientes` permanece
-`false` y la pantalla de carga bloquea el contenido hasta confirmar el estado,
-evitando mostrar el modal por error o dejar pasar a alguien sin aceptación.
+salir es aceptar. Mientras el backend no responde, la aplicación muestra una capa de
+animación de inicio de sesión y verificación de credenciales (`app-auth-loading`):
+primero se consulta la cuenta (`GET /api/usuarios/yo`) de forma disimulada y, si
+los términos no están aceptados, se despliega el modal sin parpadeos para quienes ya
+los aceptaron.
 
 **El id sale del token.** El endpoint no acepta un id en el cuerpo; si lo
 aceptara, cualquiera con su propia sesión podría registrar la aceptación en la
@@ -660,6 +662,17 @@ cuentas antiguas ([§16](#16-deuda-técnica-conocida)).
 > Postgres, los cambios posteriores al JSON no se aplican solos: hay que correr
 > `scripts/linux-macos/keycloak-bootstrap.sh` (o `.ps1` en Windows) — ver
 > [§14](#14-scripts-operativos).
+
+> **Los textos del import van cortos: 255 caracteres es el techo.** Las columnas
+> de texto de Keycloak 26.x en Postgres son `varchar(255)`. Si un campo del JSON
+> (por ejemplo el `description` de un client) lo supera, el import **falla
+> entero** con `ERROR: value too long for type character varying(255)`,
+> Keycloak aborta la transacción, no arranca y entra en un **loop de reinicios**
+> (`restartCount` creciendo, `exitCode=1` en los logs del contenedor). El síntoma
+> desde el host es que `http://localhost:8080` reinicia la conexión y el BFF se
+> queda sin issuer. La explicación larga de por qué `https://*` está en los
+> `redirectUris` vive en `keycloak/import/README.md`, no en el `description` del
+> client. Detalle en [§16.1](#161-prioridad-alta).
 
 ---
 
@@ -935,7 +948,7 @@ El domicilio del cliente **no se le muestra al profesional hasta que acepta el t
 **Lo que esto no cubre:**
 
 - La **descripción** que escribe el cliente es texto libre: si la persona escribe la dirección ahí, se ve. La prevención es aclarar en el formulario que describa el problema, no la ubicación.
-- `ms-solicitudes` sigue devolviendo la dirección exacta a quien le pregunte: el filtrado vive en el BFF. Los microservicios están publicados solo en `127.0.0.1` y sin autenticación, así que el alcance es un acceso local.
+- `ms-solicitudes` sigue devolviendo la dirección exacta a quien le pregunte: el filtrado vive en el BFF. Los microservicios validan el JWT de Keycloak por su cuenta (oauth2-resource-server), así que requieren token válido en cada petición.
 - Las coordenadas siguen **cifradas en reposo** en la base: el cifrado no cambia, lo que cambia es que la API devuelve un punto redondeado.
 
 ---
@@ -1220,24 +1233,9 @@ ni pierde el legajo ya asignado.
 Tres scripts `ALTER TABLE` defensivos, todos toleran el fallo:
 
 
-## 13. Infraestructura: pgAdmin, TLS, Nginx
+## 13. Infraestructura: TLS, Nginx
 
-### 13.1 pgAdmin
-
-Servicio activo en el stack, publicado en `http://localhost:5050`.
-
-| Campo | Valor |
-|---|---|
-| Email | `admin@vincula-up.com` (o `PGADMIN_DEFAULT_EMAIL`) |
-| Contraseña | `admin` (o `PGADMIN_DEFAULT_PASSWORD`) |
-| Servidor de BD | host `postgres`, puerto `5432`, base `vinculaup` |
-| Usuario / contraseña BD | `postgres` / `postgres` |
-
-Se conecta al host `postgres` de la red de Docker, no a `localhost`: desde
-dentro del contenedor, `localhost` es el propio pgAdmin. El volumen
-`pgadmin_data` conserva los servidores guardados entre reinicios.
-
-### 13.2 TLS
+### 13.1 TLS
 
 El repositorio incluye una CA y un certificado de servidor en `nginx/certs/`.
 Los navegadores modernos exigen **dos certificados separados**, y hay que
@@ -1486,17 +1484,18 @@ Pendientes conocidos. No bloquean la demo, pero conviene tenerlos fichados.
 | 4 | **`webOrigins: ["*"]`** en el client público | Permitido en demo; en producción conviene restringirlo a los orígenes reales |
 | 5 | **`redirectUris: ["https://*"]`** en el client público | Agregado para que los túneles de Cloudflare funcionen sin reconfigurar el client cada vez que `cloudflared` genera una URL nueva: Keycloak sólo matchea comodines **al final** del patrón, así que `https://*.trycloudflare.com/*` nunca matchearía (el soporte de comodines de host sigue sin mergear). `https://*` es un prefijo y matchea **cualquier** origen https, no sólo los de Cloudflare. Cerrado en producción reemplazando ese patrón por el dominio real. Mitiga que el client sea público con PKCE S256: sin el `code_verifier` el código no se cambia por tokens |
 | 6 | **`KC_HOSTNAME` vacío (hostname dinámico)** | Con `KC_HOSTNAME_STRICT=false` y sin hostname fijo, Keycloak resuelve el host desde el request, que es lo que hace que el túnel funcione. El mismo mecanismo documenta que un atacante podría manipular el `Host` para falsificar los enlaces de recuperación de contraseña. Cerrado fijando `KEYCLOAK_HOSTNAME` en `.env` al dominio propio y con un proxy delante que no acepte `Host` arbitrarios |
+| 7 | **Textos del import sin control de longitud** | Las columnas de texto de Keycloak 26.x en Postgres son `varchar(255)`. Un `description` de 377 caracteres en `keycloak/import/vincula-up-realm.json` hizo fallar el import entero (`value too long for type character varying(255)`), con Keycloak en loop de reinicios y el BFF sin issuer. Hoy está corregido (231 caracteres), pero el JSON no tiene ninguna validación que lo impida: cualquier texto nuevo que pase de 255 rompe el arranque del stack de la misma forma. Mitigable con un check en CI que recorra el JSON y valide la longitud de cada string |
 
 ### 16.2 Prioridad media
 
 | # | Deuda | Impacto |
 |---|---|---|
-| 7 | **`verifyEmail: false`** | Nadie confirma que la dirección sea suya. Con el alta nueva el profesional no se auto-registra, así que el riesgo queda sobre todo en los clientes que se registran solos. Cerrarlo requiere `verifyEmail: true` en el realm **y** `docker compose down -v`; además rompe las cuentas `@vincula-up.local` de prueba, que no son entregables |
-| 8 | **H2 por defecto en desarrollo** | Sin `DATABASE_URL`, los datos se pierden al reiniciar y el comportamiento difiere de producción |
-| 9 | **CORS con lista de orígenes fija** | `SecurityConfig.java` enumera los orígenes. Agregar un dominio es tocar código |
-| 10 | **Geocodificación puede resolver a otra ciudad** | Nominatim a veces devuelve un lugar homónimo: una dirección de Concepción del Uruguay terminó en Entre Ríos, Argentina. Es un comportamiento del servicio público, no del código; convendría validar el país del resultado |
-| 11 | **Sin reenvío de la invitación** | Si el profesional pierde la contraseña temporal antes de entrar, no hay acción para emitir una nueva (`resetearContrasenaTemporal` está prevista pero **no implementada** en `KeycloakAdminService`) y hay que hacerlo desde la consola de Keycloak o dar de alta de nuevo |
-| 12 | **La contraseña temporal siempre sale en la respuesta** | `POST /api/profesionales/alta` devuelve `passwordTemporal` aunque el correo haya salido bien, para que el panel pueda mostrarlo si el aviso falla. Cualquiera con el token de admin que lea la respuesta (o un log con el body) tiene esa clave |
+| 8 | **`verifyEmail: false`** | Nadie confirma que la dirección sea suya. Con el alta nueva el profesional no se auto-registra, así que el riesgo queda sobre todo en los clientes que se registran solos. Cerrarlo requiere `verifyEmail: true` en el realm **y** `docker compose down -v`; además rompe las cuentas `@vincula-up.local` de prueba, que no son entregables |
+| 9 | **H2 por defecto en desarrollo** | Sin `DATABASE_URL`, los datos se pierden al reiniciar y el comportamiento difiere de producción |
+| 10 | **CORS con lista de orígenes fija** | `SecurityConfig.java` enumera los orígenes. Agregar un dominio es tocar código |
+| 11 | **Geocodificación puede resolver a otra ciudad** | Nominatim a veces devuelve un lugar homónimo: una dirección de Concepción del Uruguay terminó en Entre Ríos, Argentina. Es un comportamiento del servicio público, no del código; convendría validar el país del resultado |
+| 12 | **Sin reenvío de la invitación** | Si el profesional pierde la contraseña temporal antes de entrar, no hay acción para emitir una nueva (`resetearContrasenaTemporal` está prevista pero **no implementada** en `KeycloakAdminService`) y hay que hacerlo desde la consola de Keycloak o dar de alta de nuevo |
+| 13 | **La contraseña temporal siempre sale en la respuesta** | `POST /api/profesionales/alta` devuelve `passwordTemporal` aunque el correo haya salido bien, para que el panel pueda mostrarlo si el aviso falla. Cualquiera con el token de admin que lea la respuesta (o un log con el body) tiene esa clave |
 
 ### 16.3 Higiene del repositorio
 

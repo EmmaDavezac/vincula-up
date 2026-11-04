@@ -32,6 +32,26 @@ resolvía igual, pero así se lee lo que de verdad queda guardado.
 > reporta el mismo comportamiento. La documentación de Keycloak describe la
 > función, pero en este escenario no opera.
 
+## Límite de 255 caracteres en los textos
+
+Las columnas de texto de Keycloak 26.x en Postgres son `varchar(255)`. Si un
+campo del JSON (por ejemplo `description` de un client) supera los 255
+caracteres, el import **falla entero** con:
+
+```
+ERROR: value too long for type character varying(255)
+```
+
+Keycloak aborta la transacción del import, no arranca y entra en un loop de
+reinicios (`restartCount` creciendo, `exitCode=1` en los logs del contenedor).
+El síntoma es que `http://localhost:8080` reinicia la conexión y el BFF se
+queda sin issuer.
+
+Por eso los textos del import van **cortos**: la explicación larga de por qué
+`https://*` está en los `redirectUris` (Keycloak sólo matchea comodines al
+final del patrón, así que `https://*.trycloudflare.com/*` no serviría) queda
+acá y no en el `description` del client.
+
 ## Entonces, ¿cómo se configura el realm?
 
 Con los scripts de reconciliación, que usan la Admin API (`kcadm.sh`) y **sí**

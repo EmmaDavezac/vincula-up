@@ -1,45 +1,45 @@
 <header class="vu-header">
-	<div class="vu-header-inner">
-		<a class="vu-brand brand" routerLink="/" aria-label="Vincula-UP inicio">
-			<span class="vu-brand-mark" aria-hidden="true">V</span>
-			<span class="vu-brand-name">Vincula<em>-UP</em></span>
-		</a>
+<div class="vu-header-inner">
+<a class="vu-brand brand" routerLink="/" aria-label="Vincula-UP inicio">
+<span class="vu-brand-mark" aria-hidden="true">V</span>
+<span class="vu-brand-name">Vincula<em>-UP</em></span>
+</a>
 
-		<!--
-			Secciones de la barra superior. Dentro del panel el administrador recorre
-			sus cuatro secciones desde acá (antes vivían en una columna lateral); en
-			él se enlaza al panel como una sección más. En móvil esta barra no
-			se muestra: las secciones van en la barra inferior.
-		-->
-		<nav class="nav-links" aria-label="Navegación principal">
-			@if (auth.hasRole('ADMIN')) {
-				@if (enPanel()) {
-					<a
-						routerLink="/admin"
-						routerLinkActive="active"
-						[routerLinkActiveOptions]="{ exact: true }"
-						>Resumen</a
-					>
-					<a routerLink="/admin/profesionales" routerLinkActive="active">Profesionales</a>
-					<a routerLink="/admin/categorias" routerLinkActive="active">Categorías</a>
-					<a routerLink="/admin/clientes" routerLinkActive="active">Clientes</a>
-				} @else {
-					<a routerLink="/admin" routerLinkActive="active">Administración</a>
-				}
-			}
+<!--
+Secciones de la barra superior. Dentro del panel el administrador recorre
+sus cuatro secciones desde acá (antes vivían en una columna lateral); en
+él se enlaza al panel como una sección más. En móvil esta barra no
+se muestra: las secciones van en la barra inferior.
+-->
+<nav class="nav-links" aria-label="Navegación principal">
+@if (auth.hasRole('ADMIN')) {
+@if (enPanel()) {
+<a
+routerLink="/admin"
+routerLinkActive="active"
+[routerLinkActiveOptions]="{ exact: true }"
+>Resumen</a
+>
+<a routerLink="/admin/profesionales" routerLinkActive="active">Profesionales</a>
+<a routerLink="/admin/categorias" routerLinkActive="active">Categorías</a>
+<a routerLink="/admin/clientes" routerLinkActive="active">Clientes</a>
+} @else {
+<a routerLink="/admin" routerLinkActive="active">Administración</a>
+}
+}
 
-			@if (auth.hasRole('CLIENTE') && !enPanel()) {
-				<a routerLink="/solicitudes" routerLinkActive="active">Mis solicitudes</a>
-			}
+@if (auth.hasRole('CLIENTE') && !enPanel()) {
+<a routerLink="/solicitudes" routerLinkActive="active">Mis solicitudes</a>
+}
 
-			@if (auth.hasRole('PROFESIONAL') && !enPanel()) {
-				<a
-					routerLink="{{ auth.isProfessionalActive() ? '/solicitudes' : '/activar-perfil' }}"
-					routerLinkActive="active"
-					>{{ auth.isProfessionalActive() ? 'Mis solicitudes' : 'Activar perfil' }}</a
-				>
-			}
-		</nav>
+@if (auth.hasRole('PROFESIONAL') && !enPanel()) {
+<a
+routerLink="{{ auth.isProfessionalActive() ? '/solicitudes' : '/activar-perfil' }}"
+routerLinkActive="active"
+>{{ auth.isProfessionalActive() ? 'Mis solicitudes' : 'Activar perfil' }}</a
+>
+}
+</nav>
 
 		<div class="toolbar-actions">
 			<button
@@ -52,6 +52,7 @@
 			>
 				<vu-icon [name]="tema.oscuro() ? 'sun' : 'moon'" [size]="18" aria-hidden="true" />
 			</button>
+
 			@if (auth.currentUser(); as user) {
 				<div class="user-menu">
 					<button
@@ -76,8 +77,9 @@
 					</button>
 
 					@if (userMenuOpen) {
-						<div class="user-menu__panel">
+						<div class="user-menu__panel" role="menu">
 							<a
+								role="menuitem"
 								routerLink="/mi-cuenta"
 								class="user-menu__item"
 								(click)="userMenuOpen = false"
@@ -87,24 +89,31 @@
 							</a>
 							<button
 								type="button"
+								role="menuitem"
 								class="user-menu__item user-menu__item--danger"
 								(click)="salir()"
+								[disabled]="cerrandoSesion()"
 							>
-								<vu-icon name="log-out" [size]="17" aria-hidden="true" />
+								@if (cerrandoSesion()) {
+									<vu-spinner [etiqueta]="'Cerrando sesión…'" [size]="'sm'" />
+								} @else {
+									<vu-icon name="log-out" [size]="17" aria-hidden="true" />
+								}
 								Cerrar sesión
 							</button>
 						</div>
 					}
 				</div>
 			} @else {
-				<a class="auth-action auth-action--link" routerLink="/ingresar">Ingresar</a>
+				<a
+					class="auth-action auth-action--link"
+					(click)="auth.registerWithKeycloak()"
+				>Crear cuenta</a>
 				<button
 					type="button"
 					class="vu-btn vu-btn--ink auth-action auth-action--cta vu-btn--square"
-					(click)="crearCuenta()"
-				>
-					Crear cuenta
-				</button>
+					(click)="auth.loginWithKeycloak()"
+				>Ingresar</button>
 			}
 		</div>
 	</div>
@@ -112,14 +121,14 @@
 
 <!-- Confirmación de cierre de sesión. -->
 @if (confirmarSalida()) {
-	<vu-confirm
-		titulo="Cerrar sesión"
-		mensaje="¿Querés cerrar sesión?"
-		detalle="Tu sesión queda cerrada en este dispositivo. Si estabas editando algo sin guardar, se pierde."
-		textoConfirmar="Cerrar sesión"
-		[peligro]="true"
-		icono="log-out"
-		(confirmado)="confirmarCierreDeSesion()"
-		(cancelado)="confirmarSalida.set(false)"
-	/>
+<vu-confirm
+titulo="Cerrar sesión"
+mensaje="¿Querés cerrar sesión?"
+detalle="Tu sesión queda cerrada en este dispositivo. Si estabas editando algo sin guardar, se pierde."
+textoConfirmar="Cerrar sesión"
+[peligro]="true"
+icono="log-out"
+(confirmado)="confirmarCierreDeSesion()"
+(cancelado)="confirmarSalida.set(false)"
+/>
 }
