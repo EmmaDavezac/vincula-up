@@ -21,67 +21,74 @@ import { ApiService } from '../core/services/api.service';
 	selector: 'app-terminos-modal',
 	changeDetection: ChangeDetectionStrategy.OnPush,
 	imports: [RouterLink, MatButtonModule],
-	template: `
+		template: `
 		<ng-template #termsDialog>
 			@if (visible()) {
 				<section class="terminos-modal" aria-labelledby="terminos-modal-title">
-					<p class="vu-eyebrow">Antes de empezar</p>
-					<h2 mat-dialog-title class="terminos-modal__title" id="terminos-modal-title">Aceptá los términos y condiciones</h2>
+					<header class="terminos-modal__head">
+						<p class="vu-eyebrow">Antes de empezar</p>
+						<h2 class="terminos-modal__title" id="terminos-modal-title">Aceptá los términos y condiciones</h2>
+					</header>
 
-					<div mat-dialog-content class="terminos-modal__content">
-					<p class="terminos-modal__lead">
-						Son las reglas de uso de la red y el detalle de qué datos guardamos y quién puede ver
-						qué. Conviene leerlos antes de continuar.
-					</p>
+					<div class="terminos-modal__content">
+						<p class="terminos-modal__lead">
+							Son las reglas de uso de la red y el detalle de qué datos guardamos y quién puede ver
+							qué. Conviene leerlos antes de continuar.
+						</p>
 
-					<ul class="terminos-modal__puntos">
-						<li>Qué hace cada rol y qué puede ver cada persona.</li>
-						<li>Qué datos guardamos: cuenta, fotos, mensajes, solicitudes y zonas de cobertura.</li>
-						<li>Que no usamos cookies de seguimiento ni de terceros, y por qué no hay un cartel.</li>
-						<li>Cómo pedir la eliminación de tus datos.</li>
-					</ul>
+						<ul class="terminos-modal__puntos">
+							<li>Qué hace cada rol y qué puede ver cada persona.</li>
+							<li>Qué datos guardamos: cuenta, fotos, mensajes, solicitudes y zonas de cobertura.</li>
+							<li>Que no usamos cookies de seguimiento ni de terceros, y por qué no hay un cartel.</li>
+							<li>Cómo pedir la eliminación de tus datos.</li>
+						</ul>
 
-					<label class="terminos-modal__check">
-						<input
-							type="checkbox"
-							class="vu-checkbox"
-							[checked]="aceptado()"
-							(change)="marcar($any($event.target).checked)"
-						/>
-						<span>
-							Leí los <a routerLink="/terminos" (click)="cerrarParaLeer()">términos y condiciones</a> y los
-							acepto.
-						</span>
-					</label>
+						<label class="terminos-modal__check">
+							<input
+								type="checkbox"
+								class="vu-checkbox"
+								[checked]="aceptado()"
+								(change)="marcar($any($event.target).checked)"
+							/>
+							<span>
+								Leí los <a routerLink="/terminos" (click)="cerrarParaLeer()">términos y condiciones</a> y los
+								acepto.
+							</span>
+						</label>
 
-					@if (error()) {
-						<p class="vu-alert vu-alert--error" role="alert">{{ error() }}</p>
-					}
+						@if (error()) {
+							<p class="vu-alert vu-alert--error" role="alert">{{ error() }}</p>
+						}
 					</div>
 
-					<button
-						type="button"
-						mat-flat-button
-						class="vu-btn vu-btn--ink vu-btn--block"
-						[disabled]="!aceptado() || guardando()"
-						(click)="aceptar()"
-					>
-						{{ guardando() ? 'Guardando...' : 'Aceptar y continuar' }}
-					</button>
+					<footer class="terminos-modal__foot">
+						<button
+							type="button"
+							mat-flat-button
+							class="vu-btn vu-btn--ink vu-btn--block"
+							[disabled]="!aceptado() || guardando()"
+							(click)="aceptar()"
+						>
+							{{ guardando() ? 'Guardando...' : 'Aceptar' }}
+						</button>
+					</footer>
 				</section>
 			}
 		</ng-template>
 	`,
-	styles: [
+		styles: [
 		`
 			.terminos-modal {
-				overflow-y: auto;
-				width: min(32rem, calc(100vw - 3rem));
+				box-sizing: border-box;
+				display: flex;
+				flex-direction: column;
+				max-height: min(85vh, 40rem);
+				padding: 1.5rem;
+				width: min(32rem, 100%);
 			}
 
-			.terminos-modal__title {
-				margin: 0;
-				padding: 0;
+			.terminos-modal__head {
+				flex: 0 0 auto;
 			}
 
 			.terminos-modal__title {
@@ -90,6 +97,15 @@ import { ApiService } from '../core/services/api.service';
 				letter-spacing: -0.02em;
 				line-height: 1.15;
 				margin: 0.75rem 0 0;
+				padding: 0;
+			}
+
+			/* Lo único que scrollea: el botón queda siempre visible */
+			.terminos-modal__content {
+				flex: 1 1 auto;
+				min-height: 0;
+				overflow-y: auto;
+				padding: 0;
 			}
 
 			.terminos-modal__lead {
@@ -97,11 +113,6 @@ import { ApiService } from '../core/services/api.service';
 				font-size: 0.9375rem;
 				line-height: 1.6;
 				margin: 1rem 0 0;
-			}
-
-			.terminos-modal__content {
-				max-height: 65vh;
-				padding: 0;
 			}
 
 			.terminos-modal__puntos {
@@ -119,6 +130,7 @@ import { ApiService } from '../core/services/api.service';
 			.terminos-modal__check {
 				align-items: flex-start;
 				background: var(--surface-highlight);
+				border: 1px solid var(--line);
 				border-radius: 0.75rem;
 				cursor: pointer;
 				display: flex;
@@ -130,15 +142,37 @@ import { ApiService } from '../core/services/api.service';
 			}
 
 			.terminos-modal__check input {
+				flex-shrink: 0;
 				margin-top: 0.125rem;
 			}
 
-			.terminos-modal .vu-alert {
-				margin-top: 1rem;
+			.terminos-modal__content .vu-alert {
+				margin: 1rem 0 0;
 			}
 
-			.terminos-modal .vu-btn {
-				margin-top: 1.25rem;
+			.terminos-modal__foot {
+				flex: 0 0 auto;
+				padding-top: 1.25rem;
+			}
+
+			/* Botón habilitado: relleno sólido con el color de acento de la marca */
+			.terminos-modal .vu-btn.mat-mdc-unelevated-button:not(:disabled) {
+				background: var(--coral, #e2603f);
+				color: #fff;
+			}
+
+			/* Botón deshabilitado: relleno visible pero atenuado */
+			.terminos-modal .vu-btn.mat-mdc-unelevated-button:disabled {
+				background: var(--surface-highlight);
+				border: 1px solid var(--line);
+				color: var(--muted);
+				opacity: 1;
+			}
+
+			@media (max-width: 479px) {
+				.terminos-modal {
+					padding: 1.25rem;
+				}
 			}
 		`,
 	],
