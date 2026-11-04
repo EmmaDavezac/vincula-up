@@ -17,6 +17,190 @@
 
 ## Historial
 
+### [2026-11-04] - fix: error 502 en POST /api/profesionales/alta (crear profesional)
+- **Objetivo:** Resolver el error HTTP 502 Bad Gateway que devolvía el endpoint `POST /api/profesionales/alta` al intentar dar de alta un profesional desde el panel de administración.
+- **Cambios realizados:**
+  - Se identificó la causa raíz: desfaso entre `KEYCLOAK_ADMIN_CLIENT_SECRET` en `.env` (valor personalizado `2e2bceef...`) y el secreto configurado en Keycloak (`vincula-up-admin-secret`, fijado en `keycloak/import/vincula-up-realm.json`). El import del realm no resuelve placeholders `${env.*}`, por lo que el secreto en Keycloak nunca se actualizó al cambiarlo en `.env`.
+  - El BFF (`bff-web`) no podía obtener el token de servicio de Keycloak (`401 invalid_client_credentials`), por lo que `crearUsuarioConContrasenaTemporal()` devolvía `null` y `ApiController` lanzaba explícitamente `502 BAD_GATEWAY`.
+  - Se ejecutó `./scripts/linux-macos/keycloak-bootstrap.sh` para sincronizar el secreto del `.env` hacia Keycloak (vía `kcadm.sh`).
+  - Se recreó el contenedor `bff-web` con `docker compose up -d --force-recreate bff-web`.
+- **Verificación:**
+  - `POST https://vincula-up.local/api/profesionales/alta` con token de ADMIN devuelve ahora `HTTP 201 Created` con el profesional creado, usuario vinculado, perfil pendiente, correo enviado y contraseña temporal.
+  - Antes de la fix devolvía `HTTP 502 Bad Gateway`.
+- **Especificación:** Sin cambios en rutas ni contratos de API.
+
+### [2026-11-04] - fix: healthcheck de Keycloak sin curl (unhealthy)
+- **Objetivo:** Curar el estado `unhealthy` del contenedor `vinculaup-keycloak` causado por un healthcheck que usa `curl`, comando que no existe en la imagen de Keycloak 26.3.3.
+- **Cambios realizados:**
+  - `docker-compose.yml`: se cambió el `healthcheck` del servicio `keycloak` de `curl -fsS http://localhost:8080/health/ready` a una verificación TCP con `/bin/bash` mediante `/dev/tcp/127.0.0.1/8080`, que confirma que el puerto de Keycloak está escuchando.
+- **Verificación:**
+  - `docker compose up -d --force-recreate keycloak`
+  - `docker ps` muestra `vinculaup-keycloak` como `(healthy)`.
+- **Especificación:** Sin cambios en rutas ni contratos de API.
+
+### [2026-11-04] - ux: corregir listados admin en mobile y evitar recorte de contenido
+- **Objetivo:** Mejorar la legibilidad de los listados del panel administrativo en pantallas pequeñas, permitiendo que cada fila se adapte al ancho disponible y que el contenido no quede cortado.
+- **Cambios realizados:**
+  - Se quitaron los `overflow` forzados en los items de Material del panel admin para que las filas puedan expandirse al contenido.
+  - Se reforzó la responsividad móvil de clientes y profesionales hasta una sola columna en pantallas muy pequeñas y se preservó el orden visual de nombre, estado y acciones.
+  - Se ajustó el wrapping de texto y los mínimos de ancho para emails, especialidades, legajos y nombres, evitando cortes o columnas comprimidas.
+- **Verificación:** `cd /home/emma/Desktop/vincula-up/frontend/vincula-up-web && npm run build` ejecutado tras el ajuste.
+- **Especificación:** Sin cambios en rutas ni contratos de API.
+
+### [2026-11-04] - ux: corregir listados admin responsive en mobile (sin ocultar contenido)
+- **Objetivo:** Corregir que los listados de admin no sean responsivos y no se puedan leer en mobile quitando `display: none` en mobile y usando apilado de columnas en su lugar.
+- **Cambios realizados:**
+  - `admin-categories/admin-categories.css`: Reemplazó media queries que ocultaban contenido en móvil (`display: none`) por apilado en columna con etiquetas visibles; en desktop layout en fila con etiquetas ocultas.
+  - `admin-clients/admin-clients.css`: Reemplazó media queries para apilar en móvil (1 columna en pantallas <900px, 1 columna en <480px) manteniendo etiquetas y contenido visible; en desktop layout en fila.
+  - `admin-professionals/admin-professionals.css`: Reemplazó media queries para 2 columnas en tablet (<=1099px) y 1 columna en móvil chico (<=559px) con etiquetas visibles en móvil; contenido apilado verticalmente sin ocultarse.
+- **Verificación:** `cd /home/emma/Desktop/vincula-up/frontend/vincula-up-web && npm run build` exitoso.
+- **Especificación:** Sin cambios en rutas ni contratos de API.
+
+### [2026-11-04] - ux: ajustar listados admin segun especificación mobile (sin overflow clip)
+- **Objetivo:** Ajustar listados admin segun requerimiento: mobile sin recortes, filas especificaas, y en md mostrar todo en primera fila menos botón de acción.
+- **Cambios realizados:**
+  - `admin-categories/admin-categories.css`: Mobile: nombre categoria fila 1, botones accion fila 2 ocupando mitad cada uno. Tablet: nombre fila 1, botones fila 2 completas.
+  - `admin-clients/admin-clients.css`: Mobile: fila 1 foto|nombre, fila 2 solicitudes|estado, fila 3 botón consultar. Tablet: todas las filas en primera fila, botón acción en segunda fila a la derecha.
+  - `admin-professionals/admin-professionals.css`: Mobile: fila 1 foto|nombre, fila 2 email, fila 3 especialidades, fila 4 legajo, fila 5 botón acción full width. Tablet: todo en fila única, botón a la derecha.
+- **Verificación:** `cd /home/emma/Desktop/vincula-up/frontend/vincula-up-web && npm run build` exitoso.
+- **Especificación:** Sin cambios en rutas ni contratos de API.
+
+### [2026-11-04] - ux: ajustar listados responsive y métricas a 4 columnas en desktop
+- **Objetivo:** Corregir la visibilidad de los listados en móvil y dejar las tarjetas del dashboard con 4 columnas en desktop sin perder legibilidad en tablet y mobile.
+- **Cambios realizados:**
+  - Se reforzaron las filas de clientes y profesionales para que en móvil se apilen con ancho completo, el botón principal quede visible y el texto no se recorte ni se oculte por `nowrap`.
+  - Se ajustó la grilla global del panel administrativo para que las métricas pasen a 2 columnas en móvil, 3 en tablet y 4 en desktop.
+  - Se limitaron los `overflow` y se habilitó `overflow-wrap` en las listas para conservar nombres, emails y especialidades sin cortes verticales.
+- **Verificación:** `cd /home/emma/Desktop/vincula-up/frontend/vincula-up-web && npm run build` exitoso.
+- **Especificación:** Sin cambios en rutas ni contratos de API.
+
+### [2026-11-04] - ux: reestructurar modales de consulta y aceptación de términos
+- **Objetivo:** Dejar los diálogos de consulta y de aceptación de términos con estructura Angular Material consistente, ancho controlado y botones alineados a la jerarquía visual primaria/secundaria del producto.
+- **Cambios realizados:**
+  - Se reestructuraron los títulos y acciones de los modales de consulta y términos usando `mat-dialog-title`, `mat-dialog-content` y `mat-dialog-actions` para respetar el patrón de Material y evitar superficies desordenadas.
+  - Se reforzó el estilo global de diálogos con superficie contenedora, altura máxima limitada, scroll interno y botones con radio y altura uniformes.
+  - Se ajustó el botón de “Consultar” en clientes y profesionales para que conserve la identidad primaria de la marca y no quede visualmente “apagado” frente a los botones secundarios.
+  - El modal de aceptación de términos queda como footer con acción principal única, con cuerpo scrollable y checkbox claro con mejor legibilidad.
+- **Verificación:** `cd /home/emma/Desktop/vincula-up/frontend/vincula-up-web && npm run build` exitoso.
+- **Especificación:** Sin cambios en rutas ni contratos de API.
+
+### [2026-11-02] - ux: tarjeta administrativa con grid compacto y botones Material
+- **Objetivo:** Corregir el apretamiento y la mala jerarquía visual de los listados de clientes y profesionales, dejando dos columnas en móvil y cuatro en desktop con botones Material claros y consistentes.
+- **Cambios realizados:**
+  - Se transformó la grilla administrativa en tarjetas compactas y legibles, con espaciado más generoso y proporciones adecuadas para móvil y escritorio.
+  - Los botones de acción en clientes y profesionales usan `mat-flat-button` y `mat-stroked-button` con la jerarquía visual primaria/secundaria del diseño del producto.
+  - Se ajustó el contenedor global de `mat-list` para que los listados no queden comprimidos ni superpuestos, manteniendo la paleta y las variables visuales del proyecto.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` exitoso.
+- **Especificación:** Sin cambios en rutas ni contratos de API.
+
+### [2026-11-02] - ux: compresión del wizard de solicitudes y toggle dentro del menú
+- **Objetivo:** Mantener el formulario de nueva solicitud visible sin scroll en móvil y mover el control de tema al menú de usuario con estilo tipo switch.
+- **Cambios realizados:**
+  - Se fusionaron los pasos de categoría + detalle del problema y día + horario para reducir la altura total del wizard y evitar columnas redundantes.
+  - El stepper queda en una sola fila compacta en tamaños pequeños y el texto del paso se redujo para no saturar el viewport.
+  - El menú de usuario ahora incluye un switch de tema con etiqueta “tema oscuro” a la izquierda y el interruptor a la derecha.
+  - Ajustes visuales del formulario: categorías, textarea, day-grid y acciones aparecen más compactos en pantallas pequeñas, sin perder validaciones ni lógica de navegación.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` exitoso.
+- **Especificación:** Sin cambios en rutas ni contratos de API.
+
+### [2026-11-02] - feat: notificaciones web PWA para solicitudes
+- **Objetivo:** Informar en la web a clientes y profesionales sobre cambios de estado, con notificaciones del navegador cuando la app está en segundo plano.
+- **Cambios realizados:**
+  - Servicio Angular consulta las solicitudes cada 30 segundos, detecta cambios de estado, sincroniza la lista abierta y persiste avisos/no leídos por cuenta.
+  - La navbar incorpora bandeja accesible con permiso, contador, historial y acceso a solicitudes.
+  - Se añadió manifest PWA y service worker para avisos del sistema y navegación al tocarlos.
+  - Los avisos del sistema requieren permiso y página activa; Web Push con la app cerrada queda fuera de esta fase porque falta guardar suscripciones y un emisor VAPID.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` exitoso; manifest servido con `application/manifest+json`, `sw.js` con `application/javascript` y sintaxis JS válida. En el navegador integrado el permiso está denegado y no se confirmó un worker activo, por lo que no se pudo probar la notificación de sistema de extremo a extremo.
+- **Especificación:** Actualizada §8.7.
+
+### [2026-11-01] - feat: avisar por email los cambios de solicitudes
+- **Objetivo:** Notificar por correo las solicitudes nuevas y los cambios de estado, reutilizando el SMTP existente; no se agregan avisos dentro de la aplicación.
+- **Cambios realizados:**
+  - El BFF envía aviso al profesional al crear una solicitud y a la contraparte al aceptar, rechazar, completar o cancelar.
+  - Los envíos se realizan después de la respuesta exitosa de `ms-solicitudes`; fallos SMTP o falta de destinatario son best-effort y no revierten la transición.
+  - Se reutilizan `KEYCLOAK_SMTP_*`, el nombre institucional, Reply-To y el enlace a `/solicitudes`.
+- **Verificación:** `cd backend/bff-web && ./mvnw clean test` exitoso; el proyecto no contiene fuentes de pruebas automatizadas (`No tests to run`).
+- **Especificación:** Actualizada §14.5 con los eventos de correo y su comportamiento best-effort.
+
+### [2026-11-01] - fix: alinear botones de ingreso y crear cuenta
+- **Objetivo:** Igualar tamaño y alineación de los botones del login.
+- **Cambios realizados:**
+  - «Ingresar» y «Crear cuenta» usan 100% del ancho disponible, 48 px de alto y margen cero.
+  - Eliminado el margen negativo heredado de PatternFly que desplazaba «Ingresar» 8 px respecto de los campos.
+- **Verificación:** En navegador, ambos botones midieron 432 × 48 px y comenzaron en la misma coordenada horizontal; página completa en viewport 1366 × 650.
+- **Especificación:** Sin cambios en rutas ni contratos.
+
+### [2026-11-01] - ux: restaurar pregunta antes de iniciar sesión
+- **Objetivo:** Mostrar «¿Ya tenés cuenta?» encima del enlace «Iniciar sesión» en el alta.
+- **Cambios realizados:**
+  - Se añadió la pregunta como texto independiente y se conservó el enlace debajo.
+  - Se compactaron las separaciones del formulario y el padding inferior para mantener el registro dentro de la ventana.
+- **Verificación:** En navegador, registro en 1366 × 650 y 390 × 844; sin overflow horizontal, enlace debajo de la pregunta y botones de igual ancho.
+- **Especificación:** Sin cambios en rutas ni contratos.
+
+### [2026-11-01] - ux: igualar ancho de botones y compactar aviso requerido
+- **Objetivo:** Dar al botón «Crear cuenta» el mismo ancho que «Ingresar», unificar estilos del formulario de registro y reducir el espacio del aviso de campos requeridos.
+- **Cambios realizados:**
+  - «Crear cuenta» usa ancho completo; el enlace «¿Ya tenés cuenta? Iniciar sesión» usa el mismo ancho con estilo secundario outline.
+  - El aviso «* Campos requeridos» queda compacto con 8 px de margen inferior.
+- **Verificación:** En navegador, login y registro con botones de 432 px en escritorio; registro con botones de 334 px en móvil y contenido dentro de 1366 × 650 y 390 × 844.
+- **Especificación:** Sin cambios en rutas ni contratos.
+
+### [2026-11-01] - ux: apilar enlaces entre login y registro
+- **Objetivo:** Colocar «Crear cuenta» debajo de «¿Todavía no tenés cuenta?» y usar la misma jerarquía al volver desde el registro.
+- **Cambios realizados:**
+  - El bloque de registro del login ahora es una columna: texto primero y enlace debajo.
+  - El formulario de registro mantiene el botón «Crear cuenta» y muestra debajo el enlace «¿Ya tenés cuenta? Iniciar sesión».
+- **Verificación:** En móvil, el enlace del login queda debajo del texto; en escritorio, el registro termina en 614 px dentro de un viewport de 650 px.
+- **Especificación:** Sin cambios en rutas ni contratos.
+
+### [2026-11-01] - ux: compactar registro y limpiar footer de Keycloak
+- **Objetivo:** Reducir el espacio alrededor de la recuperación de contraseña, optimizar el registro y simplificar la identidad del pie de login.
+- **Cambios realizados:**
+  - El margen entre «¿Olvidaste tu contraseña?» e «Ingresar» quedó en 30 px.
+  - El registro usa dos columnas para nombre/apellido en escritorio, una columna en móvil, menos separación y un enlace de regreso compacto; se mantienen campos y requisitos de contraseña.
+  - El logo del header enlaza a la aplicación; el tagline identifica a la Universidad Popular de Concepción del Uruguay.
+  - El footer conserva solo contacto, sin marca duplicada ni enlace «Ir a Vincula-UP».
+- **Verificación:** En navegador, registro dentro de 1366 × 650 y 390 × 844; sin overflow horizontal. Login con margen de 30 px al botón y enlaces/footer comprobados.
+- **Especificación:** Sin cambios en rutas ni contratos.
+
+### [2026-11-01] - ux: ubicar toggle dentro del formulario y dejar margen de ventana
+- **Objetivo:** Poner el cambio de tema dentro del panel, reducir la altura visible y eliminar scroll causado por el espacio reservado de la página.
+- **Cambios realizados:**
+  - El icono de tema se movió a la esquina superior derecha del encabezado del formulario, sin etiqueta visible.
+  - El texto de registro y su botón quedan en una fila en escritorio; el pie también se compacta y puede envolver en móvil.
+  - Se quitó padding exterior que generaba scroll aunque el contenido ya entraba en la ventana.
+- **Verificación:** En navegador: login 1366 × 650 con altura de documento 650 px y footer visible; registro móvil 390 px sin desbordamiento horizontal.
+- **Especificación:** Sin cambios en rutas ni contratos.
+
+### [2026-11-01] - ux: quitar separadores y compactar login de escritorio
+- **Objetivo:** Eliminar las dos líneas y el hueco entre ingresar y crear cuenta, reducir el espacio del tema y mostrar el login completo en escritorio.
+- **Cambios realizados:**
+  - Retirados el borde, margen y padding redundantes del bloque `kc-info` y del contenedor de registro.
+  - El control de tema queda como botón icon-only accesible de 36 × 36 px.
+  - Ajustados márgenes del header, del formulario y del pie para que la página mida 768 px en un viewport de 1366 × 768.
+- **Verificación:** Comprobación visual del login y registro en viewport móvil y escritorio; escritorio sin scroll vertical en 1366 × 768.
+- **Especificación:** Sin cambios en rutas ni contratos.
+
+### [2026-11-01] - ux: compactar la pantalla de autenticación
+- **Objetivo:** Reducir el espacio superior y la altura del login, y quitar los bordes laterales redundantes alrededor del formulario.
+- **Cambios realizados:**
+  - Se redujo el padding superior de la página y la cabecera de marca, y se anuló el margen superior de 64 px heredado de PatternFly.
+  - Se compactaron el encabezado, los grupos de campos, las acciones y el registro en el pie.
+  - Se retiró el borde exterior de la tarjeta; cada input conserva su borde y foco.
+- **Verificación:** Comprobación visual del login y registro en viewport móvil y escritorio; el registro no presenta desbordamiento horizontal.
+- **Especificación:** Sin cambios en rutas ni contratos.
+
+### [2026-11-01] - feat: compartir modo oscuro con login Keycloak
+- **Objetivo:** Permitir cambiar tema en iniciar sesión, registro y recuperación, conservando la preferencia del sitio.
+- **Cambios realizados:**
+  - El layout común de Keycloak incluye un control accesible claro/oscuro que persiste en la clave `vincula-up-tema`.
+  - Angular y Keycloak comparten la preferencia mediante una cookie de mismo host; se conserva `localStorage` como respaldo local y `prefers-color-scheme` como valor inicial.
+  - Se confirmó que recuperación de contraseña ya estaba habilitada en el realm y bootstrap (`resetPasswordAllowed=true`); el enlace y formulario usan el flujo seguro nativo de Keycloak y requieren SMTP configurado.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build`; en navegador se alternó el tema en Keycloak y se verificó el enlace/formulario de recuperación sin enviar correo.
+- **Especificación:** Actualizadas §§8.6 y Anexo C.
+
+>>>>>>> Stashed changes
 ### [2026-11-01] - ux: separar footers y unificar diálogos Material
 - **Objetivo:** Dar identidad de navegación a usuarios y admins, aumentar la separación entre búsqueda y resultados y centralizar diálogos con bloqueo del fondo.
 - **Cambios realizados:**
