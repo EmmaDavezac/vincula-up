@@ -18,7 +18,7 @@
 }
 
 .admin-categories__row {
-	background: var(--surface, #fff);
+	background: var(--surface-card);
 	border: 1px solid var(--line);
 	border-radius: 0.75rem;
 	display: grid;
