@@ -65,7 +65,7 @@
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <meta name="robots" content="noindex, nofollow">
-    <meta name="color-scheme" content="light${darkMode?then(' dark', '')}">
+    <meta name="color-scheme" content="light dark">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <#if properties.meta?has_content>
@@ -109,25 +109,77 @@
             }
         }
     </script>
-    <#if darkMode>
-      <script type="module" async blocking="render">
-          const DARK_MODE_CLASS = "${properties.kcDarkModeClass}";
-          const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    <script>
+      (function () {
+        var storageKey = 'vincula-up-tema';
+        var darkClass = "${properties.kcDarkModeClass}";
+        var root = document.documentElement;
+        var media = window.matchMedia('(prefers-color-scheme: dark)');
 
-          updateDarkMode(mediaQuery.matches);
-          mediaQuery.addEventListener("change", (event) => updateDarkMode(event.matches));
+        function readPreference(value) {
+          return value === 'claro' || value === 'oscuro' || value === 'sistema' ? value : 'sistema';
+        }
 
-          function updateDarkMode(isEnabled) {
-            const { classList } = document.documentElement;
+        function readCookiePreference() {
+          var prefix = storageKey + '=';
+          var entry = document.cookie.split('; ').find(function (item) { return item.indexOf(prefix) === 0; });
+          return entry ? entry.slice(prefix.length) : null;
+        }
 
-            if (isEnabled) {
-              classList.add(DARK_MODE_CLASS);
-            } else {
-              classList.remove(DARK_MODE_CLASS);
-            }
+        function updateControl(isDark) {
+          var button = document.getElementById('kc-theme-toggle');
+          if (!button) return;
+          var label = isDark ? button.getAttribute('data-label-light') : button.getAttribute('data-label-dark');
+          var icon = button.querySelector('.kc-theme-toggle__icon');
+          var text = button.querySelector('.kc-theme-toggle__label');
+          button.setAttribute('aria-pressed', String(isDark));
+          button.setAttribute('aria-label', label);
+          button.title = label;
+          if (icon) icon.className = 'kc-theme-toggle__icon fas ' + (isDark ? 'fa-sun' : 'fa-moon');
+          if (text) text.textContent = label;
+        }
+
+        var preference = 'sistema';
+        try {
+          preference = readPreference(readCookiePreference() || localStorage.getItem(storageKey));
+        } catch (error) {
+          preference = 'sistema';
+        }
+
+        function applyTheme() {
+          var isDark = preference === 'oscuro' || (preference === 'sistema' && media.matches);
+          root.classList.toggle(darkClass, isDark);
+          root.setAttribute('data-tema', isDark ? 'oscuro' : 'claro');
+          updateControl(isDark);
+        }
+
+        window.vuSyncThemeToggle = applyTheme;
+        window.vuToggleTheme = function () {
+          preference = root.classList.contains(darkClass) ? 'claro' : 'oscuro';
+          try {
+            localStorage.setItem(storageKey, preference);
+          } catch (error) {
+            // El tema cambia para esta página aunque el almacenamiento esté bloqueado.
           }
-      </script>
-    </#if>
+          var secure = window.location.protocol === 'https:' ? '; Secure' : '';
+          document.cookie = storageKey + '=' + preference + '; Path=/; Max-Age=31536000; SameSite=Lax' + secure;
+          applyTheme();
+        };
+
+        if (typeof media.addEventListener === 'function') {
+          media.addEventListener('change', function () {
+            if (preference === 'sistema') applyTheme();
+          });
+        }
+        window.addEventListener('storage', function (event) {
+          if (event.key === storageKey) {
+            preference = readPreference(readCookiePreference() || event.newValue);
+            applyTheme();
+          }
+        });
+        applyTheme();
+      })();
+    </script>
     <#if properties.scripts?has_content>
         <#list properties.scripts?split(' ') as script>
             <script src="${url.resourcesPath}/${script}" type="text/javascript"></script>
@@ -208,15 +260,29 @@
         un solo lugar, el CSS. El único recurso gráfico del tema es el favicon.
     -->
     <header id="kc-header" class="pf-v5-c-login__header vu-header">
-      <div class="vu-brand">
+      <a class="vu-brand" href="${properties.vinculaUpAppUrl}" aria-label="Volver a Vincula-UP">
         <span class="vu-brand-mark" aria-hidden="true">V</span>
         <span class="vu-brand-name">Vincula<em>-UP</em></span>
-      </div>
+      </a>
       <p class="vu-header__tagline">${msg("vinculaUpTagline")}</p>
     </header>
     <main class="${properties.kcLoginMain!}">
       <div class="${properties.kcLoginMainHeader!}">
         <h1 class="${properties.kcLoginMainTitle!} kc-page-title" id="kc-page-title"><#nested "header"></h1>
+        <div class="kc-theme-control">
+          <button
+            id="kc-theme-toggle"
+            class="kc-theme-toggle"
+            type="button"
+            aria-pressed="false"
+            aria-label="${msg('themeToDark')}"
+            title="${msg('themeToDark')}"
+            data-label-dark="${msg('themeToDark')}"
+            data-label-light="${msg('themeToLight')}"
+          >
+            <i class="kc-theme-toggle__icon fas fa-moon" aria-hidden="true"></i>
+          </button>
+        </div>
         <#if realm.internationalizationEnabled  && locale.supported?size gt 1>
         <div class="${properties.kcLoginMainHeaderUtilities!}">
           <div class="${properties.kcInputClass!}">
@@ -333,6 +399,14 @@
     </main>
   </div>
 </div>
+<script>
+  (function () {
+    var button = document.getElementById('kc-theme-toggle');
+    if (!button) return;
+    window.vuSyncThemeToggle();
+    button.addEventListener('click', window.vuToggleTheme);
+  })();
+</script>
 </body>
 </html>
 </#macro>

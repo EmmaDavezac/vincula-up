@@ -46,6 +46,12 @@ services:
         condition: service_healthy
     restart: unless-stopped
     command: start-dev --import-realm
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health/ready >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
@@ -108,6 +114,36 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  keycloak-init:
+    image: quay.io/keycloak/keycloak:26.3.3
+    container_name: vinculaup-keycloak-init
+    depends_on:
+      keycloak:
+        condition: service_started
+    restart: "no"
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-vincula-up}
+    entrypoint: /bin/bash
+    command:
+      - -lc
+      - |
+        for i in $(seq 1 120); do
+          if curl -fsS http://keycloak:8080/health/ready >/dev/null 2>&1 && \
+             /opt/keycloak/bin/kcadm.sh config credentials \
+               --server http://keycloak:8080 \
+               --realm master \
+               --user "$${KEYCLOAK_ADMIN}" \
+               --password "$${KEYCLOAK_ADMIN_PASSWORD}" >/dev/null 2>&1; then
+            break
+          fi
+          sleep 2
+        done
+        /opt/keycloak/bin/kcadm.sh update "realms/$${KEYCLOAK_REALM:-vincula-up}" \
+          -s "emailTheme=vincula-up" \
+          -s "loginTheme=vincula-up"
 
   postgres:
     image: postgres:16
@@ -281,6 +317,11 @@ services:
       KEYCLOAK_CONTACTO: ${KEYCLOAK_CONTACTO:-}
       # Enlace que va en el correo para que el profesional active su perfil.
       APP_URL: ${APP_URL:-https://vincula-up.local}
+      # Claves VAPID para notificaciones Push cuando la app está cerrada.
+      # No definir valores por defecto: si faltan, se conserva la bandeja y el polling web.
+      PUSH_VAPID_PUBLIC_KEY: ${PUSH_VAPID_PUBLIC_KEY:-}
+      PUSH_VAPID_PRIVATE_KEY: ${PUSH_VAPID_PRIVATE_KEY:-}
+      PUSH_VAPID_SUBJECT: ${PUSH_VAPID_SUBJECT:-mailto:vinculaup@gmail.com}
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
     volumes:
       - fotos_data:/data/fotos

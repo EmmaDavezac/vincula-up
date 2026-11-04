@@ -86,6 +86,176 @@ z-index 70 compite de verdad contra el 50 de la barra.
 	gap: 0.5rem;
 }
 
+.notification-menu {
+	position: relative;
+}
+
+.notification-trigger,
+.notification-panel__close {
+	align-items: center;
+	background: var(--paper);
+	border: 1px solid var(--line);
+	border-radius: 0.5rem;
+	color: var(--ink);
+	cursor: pointer;
+	display: inline-flex;
+	height: 2.5rem;
+	justify-content: center;
+	padding: 0;
+	position: relative;
+	width: 2.5rem;
+}
+
+.notification-trigger:hover,
+.notification-panel__close:hover {
+	border-color: var(--coral);
+	color: var(--coral);
+}
+
+.notification-count {
+	align-items: center;
+	background: var(--coral);
+	border: 2px solid var(--paper);
+	border-radius: 999px;
+	color: var(--on-solid);
+	display: flex;
+	font-size: 0.625rem;
+	font-weight: 800;
+	height: 1.125rem;
+	justify-content: center;
+	line-height: 1;
+	min-width: 1.125rem;
+	padding: 0 0.2rem;
+	position: absolute;
+	right: -0.375rem;
+	top: -0.375rem;
+}
+
+.notification-panel {
+	background: var(--surface-card);
+	border: 1px solid var(--line);
+	border-radius: 0.75rem;
+	box-shadow: var(--shadow-lg);
+	color: var(--ink);
+	max-height: min(32rem, calc(100dvh - 6rem));
+	overflow-y: auto;
+	padding: 0.875rem;
+	position: absolute;
+	right: 0;
+	top: calc(100% + 0.5rem);
+	width: min(22rem, calc(100vw - 2rem));
+	z-index: 70;
+}
+
+.notification-panel__header {
+	align-items: center;
+	border-bottom: 1px solid var(--line);
+	display: flex;
+	justify-content: space-between;
+	padding-bottom: 0.625rem;
+}
+
+.notification-panel__header h2 {
+	font-size: 1rem;
+	margin: 0;
+}
+
+.notification-panel__close {
+	background: transparent;
+	border: 0;
+	height: 2rem;
+	width: 2rem;
+}
+
+.notification-permission {
+	background: var(--surface-highlight);
+	margin-top: 0.75rem;
+	padding: 0.75rem;
+}
+
+.notification-permission p,
+.notification-permission__hint,
+.notification-empty {
+	color: var(--muted);
+	font-size: 0.8125rem;
+	line-height: 1.4;
+	margin: 0;
+}
+
+.notification-permission__button,
+.notification-clear {
+	background: transparent;
+	border: 0;
+	color: var(--coral);
+	cursor: pointer;
+	font: inherit;
+	font-size: 0.8125rem;
+	font-weight: 700;
+	margin-top: 0.625rem;
+	padding: 0;
+}
+
+.notification-permission__hint,
+.notification-empty {
+	padding: 0.875rem 0;
+}
+
+.notification-list {
+	list-style: none;
+	margin: 0.375rem 0 0;
+	max-height: 20rem;
+	overflow-y: auto;
+	padding: 0;
+}
+
+.notification-list li + li {
+	border-top: 1px solid var(--line);
+}
+
+.notification-item {
+	background: transparent;
+	border: 0;
+	color: var(--ink);
+	cursor: pointer;
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	padding: 0.75rem 0.375rem;
+	text-align: left;
+	width: 100%;
+}
+
+.notification-item.is-unread {
+	border-left: 3px solid var(--coral);
+	padding-left: 0.625rem;
+}
+
+.notification-item__title {
+	font-size: 0.8125rem;
+	font-weight: 800;
+}
+
+.notification-item__body,
+.notification-item time {
+	color: var(--muted);
+	font-size: 0.75rem;
+	line-height: 1.4;
+}
+
+.notification-clear {
+	border-top: 1px solid var(--line);
+	margin-top: 0.25rem;
+	padding-top: 0.625rem;
+	width: 100%;
+}
+
+.notification-trigger:focus-visible,
+.notification-item:focus-visible,
+.notification-panel button:focus-visible {
+	outline: 2px solid var(--coral);
+	outline-offset: 2px;
+}
+
 @media (min-width: 640px) {
 	.toolbar-actions {
 		gap: 1rem;
@@ -194,6 +364,75 @@ z-index 70 compite de verdad contra el 50 de la barra.
 	   dentro de su rango, al scrollear el panel se ve POR ENCIMA de la navbar
 	   porque su ancestro sticky ya no lo encierra. */
 	z-index: 60;
+}
+
+.user-menu__theme {
+	align-items: center;
+	border-bottom: 1px solid var(--line);
+	display: flex;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin-bottom: 0.25rem;
+	padding: 0.375rem 0.25rem 0.625rem;
+}
+
+.user-menu__theme-label {
+	color: var(--ink);
+	font-size: 0.75rem;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	text-transform: none;
+}
+
+@media (max-width: 639px) {
+	.notification-panel {
+		left: 0;
+		right: auto;
+		width: min(18rem, calc(100vw - 1rem));
+	}
+}
+
+.theme-switch {
+	background: transparent;
+	border: 0;
+	cursor: pointer;
+	padding: 0;
+}
+
+.theme-switch__track {
+	background: var(--line);
+	border: 1px solid transparent;
+	border-radius: 999px;
+	display: inline-flex;
+	height: 1.375rem;
+	padding: 0.125rem;
+	position: relative;
+	transition: background-color 0.2s ease, border-color 0.2s ease;
+	width: 2.25rem;
+}
+
+.theme-switch__thumb {
+	background: var(--surface-card);
+	border: 1px solid var(--line);
+	border-radius: 50%;
+	display: block;
+	height: 0.875rem;
+	left: 0.125rem;
+	position: absolute;
+	top: 0.125rem;
+	transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+	width: 0.875rem;
+}
+
+.theme-switch.is-on .theme-switch__track {
+	background: var(--coral);
+	border-color: var(--coral);
+}
+
+.theme-switch.is-on .theme-switch__thumb {
+	background: var(--on-solid);
+	border-color: var(--on-solid);
+	transform: translateX(0.875rem);
 }
 
 .user-menu__item {

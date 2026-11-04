@@ -29,7 +29,7 @@
 		/>
 	</div>
 	@if (hayBusqueda()) {
-		<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="limpiarBusqueda()">Limpiar</button>
+		<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm admin-categories__action" (click)="limpiarBusqueda()">Limpiar</button>
 	}
 </div>
 
@@ -37,45 +37,41 @@
 	<div class="vu-admin-list-skeleton"><vu-skeleton-list variant="row" [count]="6" /></div>
 } @else if (categories().length) {
 	@if (categoriasFiltradas().length) {
-		<mat-list class="vu-admin-material-list admin-categories__grid" aria-label="Lista de categorías">
-			<mat-list-item class="vu-admin-material-list__header" aria-hidden="true">
-				<div class="admin-categories__row">
-					<span>Categoría</span>
-					<span>Acciones</span>
-				</div>
-			</mat-list-item>
-		@for (category of categoriasFiltradas(); track category.id) {
-			<mat-list-item class="vu-admin-material-list__item">
-				<div class="admin-categories__row">
-				<div class="admin-categories__name-field">
-					<span class="vu-admin-field-label">Categoría</span>
-					@if (renamingId() === category.id) {
-						<input class="vu-input" type="text" name="renameValue" [(ngModel)]="renameValue" (keyup.enter)="saveRename(category)" />
-					} @else {
-						<p class="admin-categories__name">{{ category.nombre }}</p>
-					}
-				</div>
+		<ul class="vu-admin-material-list admin-categories__list" aria-label="Lista de categorías">
+			<li class="admin-categories__row admin-categories__row--head" aria-hidden="true">
+				<span>Categoría</span>
+				<span>Acciones</span>
+			</li>
 
-				<div class="admin-categories__actions">
-					<span class="vu-admin-field-label">Acciones</span>
-				@if (renamingId() === category.id) {
-						<button type="button" class="vu-btn vu-btn--ink vu-btn--sm" (click)="saveRename(category)" [disabled]="busy()">
-							{{ busy() ? 'Guardando...' : 'Guardar' }}
-						</button>
-						<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="cancelRename()">Cancelar</button>
-				} @else {
-						<button type="button" class="vu-btn vu-btn--ink vu-btn--sm" (click)="startRename(category)" [disabled]="busy()">
-							Renombrar
-						</button>
-						<button type="button" class="vu-btn vu-btn--danger vu-btn--sm" (click)="deleteCategory(category)" [disabled]="busy()">
-							Eliminar
-						</button>
-				}
-				</div>
-				</div>
-			</mat-list-item>
-		}
-	</mat-list>
+			@for (category of categoriasFiltradas(); track category.id) {
+				<li class="admin-categories__row">
+					<div class="admin-categories__name-field">
+						<span class="vu-admin-field-label">Categoría</span>
+						@if (renamingId() === category.id) {
+							<input class="vu-input" type="text" name="renameValue" [(ngModel)]="renameValue" (keyup.enter)="saveRename(category)" />
+						} @else {
+							<p class="admin-categories__name">{{ category.nombre }}</p>
+						}
+					</div>
+
+					<div class="admin-categories__actions">
+						@if (renamingId() === category.id) {
+							<button type="button" class="vu-btn vu-btn--ink vu-btn--sm" (click)="saveRename(category)" [disabled]="busy()">
+								{{ busy() ? 'Guardando...' : 'Guardar' }}
+							</button>
+							<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="cancelRename()">Cancelar</button>
+						} @else {
+							<button type="button" class="vu-btn vu-btn--ink vu-btn--sm" (click)="startRename(category)" [disabled]="busy()">
+								Renombrar
+							</button>
+							<button type="button" class="vu-btn vu-btn--danger vu-btn--sm" (click)="deleteCategory(category)" [disabled]="busy()">
+								Eliminar
+							</button>
+						}
+					</div>
+				</li>
+			}
+		</ul>
 	} @else {
 		<div class="vu-admin-empty">
 			<p class="vu-admin-panel__hint">Ninguna categoría coincide con «{{ consulta() }}».</p>

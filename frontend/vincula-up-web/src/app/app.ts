@@ -6,6 +6,7 @@ import { FooterComponent } from './shared/footer/footer';
 import { AdminFooterComponent } from './shared/footer/admin-footer';
 import { VuTabbar } from './shared/tabbar/tabbar';
 import { TerminosModal } from './legal/terminos-modal';
+import { AuthService } from './core/services/auth.service';
 import { AuthLoading } from './shared/auth-loading/auth-loading';
 
 @Component({

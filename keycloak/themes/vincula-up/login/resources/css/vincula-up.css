@@ -67,17 +67,27 @@
 	min-height: 100vh;
 }
 
+.pf-v5-c-login {
+	align-items: flex-start;
+	justify-content: center;
+	padding: 0;
+}
+
+.pf-v5-c-login__header.vu-header {
+	margin-top: 0 !important;
+}
+
 /* Ancho y estructura de la tarjeta */
 .pf-v5-c-login__container {
 	grid-template-columns: min(30rem, 100%);
-	padding: 2rem 1.25rem;
+	padding: 0.5rem 1.25rem 0.5rem;
 }
 
 .pf-v5-c-login__main {
 	background: var(--vu-card);
-	border: 1px solid var(--vu-line);
+	border: 0;
 	border-radius: var(--vu-radius-card);
-	box-shadow: var(--vu-shadow-md);
+	box-shadow: none;
 	color: var(--vu-ink);
 	overflow: hidden;
 }
@@ -109,7 +119,7 @@ body {
 	}
 
 	.pf-v5-c-login__container {
-		padding: 1rem 0.75rem;
+		padding: 0.25rem 0.75rem 0.75rem;
 	}
 }
 
@@ -118,15 +128,21 @@ body {
  */
 .vu-header {
 	background: transparent;
-	padding: 2rem 1.5rem 1rem;
+	padding: 0.25rem 1.5rem 0.375rem;
 	text-align: center;
 }
 
 .vu-brand {
 	align-items: center;
+	color: inherit;
 	display: flex;
 	gap: 0.75rem;
 	justify-content: center;
+	text-decoration: none;
+}
+
+.vu-brand:hover {
+	text-decoration: none;
 }
 
 .vu-brand-mark {
@@ -157,18 +173,69 @@ body {
 
 .vu-header__tagline {
 	color: var(--vu-muted);
-	font-size: 0.8125rem;
-	line-height: 1.5;
-	margin: 0.75rem 0 0;
+	font-size: 0.75rem;
+	line-height: 1.25;
+	margin: 0.25rem 0 0;
+}
+
+html {
+	color-scheme: light;
+}
+
+html.pf-v5-theme-dark {
+	color-scheme: dark;
+}
+
+.kc-theme-control {
+	position: absolute;
+	right: 1rem;
+	top: 0.5rem;
+}
+
+.kc-theme-toggle {
+	align-items: center;
+	background: var(--vu-card);
+	border: 1px solid var(--vu-line);
+	border-radius: var(--vu-radius-btn);
+	color: var(--vu-ink);
+	cursor: pointer;
+	display: inline-flex;
+	font-family: var(--vu-font-sans);
+	font-size: 1rem;
+	justify-content: center;
+	height: 2.25rem;
+	min-height: 2.25rem;
+	padding: 0;
+	transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+	width: 2.25rem;
+}
+
+.kc-theme-toggle:hover {
+	border-color: var(--vu-coral);
+	color: var(--vu-coral-dark);
+}
+
+.kc-theme-toggle:focus-visible {
+	outline: 2px solid var(--vu-coral);
+	outline-offset: 2px;
+}
+
+.kc-theme-toggle__icon {
+	color: var(--vu-coral);
+	font-size: 0.9375rem;
 }
 
 /*
  * ── Pie Institucional ─────────────────────────────────────────────────────
  */
 .kc-footer {
-	border-top: 1px solid var(--vu-line);
-	margin-top: 1.75rem;
-	padding: 1.25rem 1.5rem;
+	border-top: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem 0.75rem;
+	justify-content: center;
+	margin-top: 0;
+	padding: 0.25rem 0.5rem;
 	text-align: center;
 }
 
@@ -176,12 +243,11 @@ body {
 	color: var(--vu-ink);
 	font-size: 0.75rem;
 	line-height: 1.6;
-	margin: 0;
+	margin: 0 !important;
 }
 
 .kc-footer__line--muted {
 	color: var(--vu-muted);
-	margin-top: 0.25rem;
 }
 
 .kc-footer a,
@@ -206,7 +272,20 @@ body {
  */
 
 .pf-v5-c-form__group {
-	margin-bottom: 1.25rem;
+	margin-bottom: 0.875rem;
+}
+
+.pf-v5-c-login__main-header {
+	position: relative;
+	padding: 1.375rem 1.5rem 0.625rem;
+}
+
+.pf-v5-c-login__main-header .kc-page-title {
+	padding-right: 2.75rem;
+}
+
+.pf-v5-c-login__main-body {
+	padding: 0 1.5rem 1.375rem;
 }
 
 .pf-v5-c-login .pf-v5-c-form__label {
@@ -318,12 +397,26 @@ body {
 }
 
 .pf-v5-c-login .kc-forgot-password-link {
-	margin-top: 0.25rem;
+	margin-top: 0;
 }
 
 .pf-v5-c-login .kc-forgot-password-link a {
 	font-size: 0.8125rem;
 	font-weight: 600;
+	line-height: 1.2;
+}
+
+.pf-v5-c-login #kc-form-login .kc-form-actions-group {
+	margin-top: -0.5rem;
+}
+
+.pf-v5-c-login #kc-form-login .kc-button-stack {
+	margin: 0 !important;
+	padding: 0 !important;
+}
+
+.pf-v5-c-login #kc-form-login .kc-button-stack .pf-v5-c-button {
+	margin: 0;
 }
 
 /* Mensajes de error específicos */
@@ -529,16 +622,16 @@ body {
 .pf-v5-c-login .pf-v5-c-form__actions {
 	display: flex !important;
 	flex-direction: column !important;
-	gap: 0.75rem !important;
-	margin-top: 1.25rem !important;
+	gap: 0.5rem !important;
+	margin-top: 0.75rem !important;
 	width: 100% !important;
 }
 
 /* Área de registro en el pie del login */
 .pf-v5-c-login #kc-registration-container {
-	border-top: 1px solid var(--vu-line);
-	margin-top: 1.5rem;
-	padding-top: 1.25rem;
+	border-top: 0;
+	margin-top: 0.375rem;
+	padding-top: 0;
 	width: 100%;
 }
 
@@ -546,13 +639,158 @@ body {
 	align-items: center;
 	display: flex;
 	flex-direction: column;
-	gap: 0.75rem;
+	flex-wrap: nowrap;
+	gap: 0.25rem;
 	width: 100%;
+}
+
+.pf-v5-c-login #kc-info,
+.pf-v5-c-login .pf-v5-c-login__main-footer-band {
+	border: 0 !important;
+	margin: 0 !important;
+	padding: 0 !important;
 }
 
 .pf-v5-c-login .kc-registration-text {
 	color: var(--vu-muted);
 	font-size: 0.875rem;
+}
+
+.pf-v5-c-login #kc-login,
+.pf-v5-c-login .kc-register-btn {
+	box-sizing: border-box !important;
+	display: flex !important;
+	flex: 0 0 100%;
+	height: 3rem;
+	margin: 0 !important;
+	min-height: 3rem;
+	padding: 0.8125rem 1.25rem;
+	width: 100% !important;
+}
+
+#kc-register-form {
+	display: grid;
+	column-gap: 0.75rem;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	row-gap: 0.25rem;
+}
+
+#kc-register-form > .pf-v5-c-form__group {
+	margin-bottom: 0.125rem;
+	min-width: 0;
+}
+
+#kc-register-form > .pf-v5-c-form__group:has(#email),
+#kc-register-form > .pf-v5-c-form__group:has(#password),
+#kc-register-form > .pf-v5-c-form__group:has(#password-confirm),
+#kc-register-form > .kc-form-actions-group {
+	grid-column: 1 / -1;
+}
+
+#kc-register-form .kc-field-help-text {
+	display: none;
+}
+
+#kc-register-form .pf-v5-c-form__label {
+	font-size: 0.8125rem;
+	margin-bottom: 0.2rem;
+}
+
+#kc-register-form .pf-v5-c-form-control,
+#kc-register-form .pf-v5-c-input-group,
+#kc-register-form .pf-v5-c-input-group .pf-v5-c-form-control {
+	min-height: 2.5rem;
+}
+
+#kc-register-form .pf-v5-c-form-control input {
+	font-size: 0.875rem;
+	padding: 0.5rem 0;
+}
+
+#kc-register-form .kc-button-stack {
+	gap: 0.25rem !important;
+	margin-top: 0 !important;
+}
+
+#kc-register-form .pf-v5-c-button,
+#kc-register-form .kc-register-back-link {
+	box-sizing: border-box;
+	display: flex;
+	font-family: var(--vu-font-sans);
+	font-size: 0.875rem;
+	font-weight: 700;
+	justify-content: center;
+	min-height: 2.5rem;
+	padding: 0.625rem 1rem;
+	text-align: center;
+	width: 100%;
+}
+
+#kc-register-form .kc-register-back-prompt {
+	color: var(--vu-muted);
+	font-size: 0.8125rem;
+	line-height: 1.25;
+	margin-top: 0;
+	text-align: center;
+}
+
+#kc-register-form .kc-register-back-link {
+	align-items: center;
+	background: transparent;
+	border: 1px solid var(--vu-line);
+	border-radius: var(--vu-radius-btn);
+	color: var(--vu-ink);
+	flex: 0 0 100%;
+	font-weight: 600;
+	min-height: 2.25rem;
+	padding: 0.5rem 1rem;
+	text-decoration: none;
+}
+
+#kc-register-form .kc-register-back-link:hover {
+	background: var(--vu-surface-highlight);
+	border-color: var(--vu-muted);
+	color: var(--vu-ink);
+}
+
+.pf-v5-c-login .pf-v5-c-login__main-body > .pf-v5-u-mb-md-on-md:has(.subtitle) {
+	margin-bottom: 0.5rem !important;
+}
+
+.pf-v5-c-login .pf-v5-c-login__main-body .subtitle {
+	font-size: 0.75rem;
+	line-height: 1.2;
+}
+
+@media (max-width: 520px) {
+	#kc-register-form {
+		column-gap: 0;
+		grid-template-columns: minmax(0, 1fr);
+		row-gap: 0.125rem;
+	}
+
+	#kc-register-form > .pf-v5-c-form__group:has(#email),
+	#kc-register-form > .pf-v5-c-form__group:has(#password),
+	#kc-register-form > .pf-v5-c-form__group:has(#password-confirm),
+	#kc-register-form > .kc-form-actions-group {
+		grid-column: 1;
+	}
+}
+
+@media (max-width: 480px) {
+	.pf-v5-c-login__main-header {
+		padding-right: 1rem;
+		padding-left: 1rem;
+	}
+
+	.pf-v5-c-login__main-body {
+		padding-right: 1rem;
+		padding-left: 1rem;
+	}
+
+	.pf-v5-c-login #kc-registration {
+		justify-content: center;
+	}
 }
 
 .pf-v5-c-login .kc-reset-instruction {

@@ -105,6 +105,24 @@ public class BackendGateway {
         return ejecutar(() -> profesionales.activar(id, body));
     }
 
+    public void guardarSuscripcionPush(UUID usuarioId, JsonNode body) {
+        ejecutarSinRespuesta(() -> {
+            usuarios.guardarSuscripcionPush(usuarioId, body);
+            return null;
+        });
+    }
+
+    public JsonNode listarSuscripcionesPush(UUID usuarioId) {
+        return ejecutar(() -> usuarios.listarSuscripcionesPush(usuarioId));
+    }
+
+    public void eliminarSuscripcionPush(UUID usuarioId, String endpoint) {
+        ejecutarSinRespuesta(() -> {
+            usuarios.eliminarSuscripcionPush(usuarioId, endpoint);
+            return null;
+        });
+    }
+
     /**
      * Resuelve perfiles nuevos por id de negocio y padrones históricos por id
      * de Keycloak.

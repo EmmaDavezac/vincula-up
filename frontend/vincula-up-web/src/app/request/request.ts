@@ -2,7 +2,7 @@ import { AfterViewInit, Component, OnInit, computed, effect, inject, signal } fr
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { catchError, firstValueFrom, of } from 'rxjs';
+import { catchError, of } from 'rxjs';
 import { ApiService, GpsPosition } from '../core/services/api.service';
 import { AuthService } from '../core/services/auth.service';
 import { DirectoryService } from '../core/services/directory.service';
@@ -59,7 +59,7 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 }
 
 @Component({
-	imports: [CommonModule, FormsModule, RouterLink, DecimalPipe, VuAvatar, VuConfirm, VuIcon, VuSpinner, MatProgressSpinnerModule, MatButtonToggleModule],
+  imports: [CommonModule, FormsModule, RouterLink, DecimalPipe, VuAvatar, VuConfirm, VuIcon, VuSpinner, MatProgressSpinnerModule, MatButtonToggleModule],
 	selector: 'app-request',
 	styleUrl: './request.css',
 	templateUrl: './request.html',
@@ -462,105 +462,69 @@ export class Request implements OnInit, AfterViewInit {
     this.location.set({ ...loc, editing: false });
   }
 
-  private async aplicarUbicacion(
-    latitude: number,
-    longitude: number,
-    displayName?: string,
-    mensajeAviso = '',
-  ): Promise<void> {
-    const name = displayName?.trim() || (await this.reverseGeocode(latitude, longitude));
-    this.location.set({ lat: latitude, lng: longitude, displayName: name, detecting: false, editing: false });
-    this.address.set(name);
-    this.locationQuery.set(name);
-    this.pendingLocation.set({ lat: latitude, lng: longitude, displayName: name });
-    this.form.update((f) =>
-      emptyServiceRequest({
-        ...f,
-        address: name,
-        latitude,
-        longitude,
-      })
-    );
-    this.updateDistances(latitude, longitude);
-    this.locatorError.set(mensajeAviso);
-  }
-
   retryDetectLocation(): void {
     if (typeof window !== 'undefined' && !window.isSecureContext && window.location.hostname !== 'localhost') {
       this.locatorError.set('El navegador solo permite compartir la ubicación en una conexión segura. Usá HTTPS o ingresá la dirección manualmente.');
       return;
     }
-    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
-      this.locatorError.set('Tu navegador no permite acceder a la ubicación del dispositivo.');
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      this.locatorError.set('Este navegador no ofrece geolocalización. Escribí una dirección para continuar.');
       return;
     }
     this.location.set({ ...this.location(), detecting: true, editing: false });
     this.locatorError.set('');
-
-    const onExito = async (pos: GeolocationPosition) => {
-      await this.aplicarUbicacion(pos.coords.latitude, pos.coords.longitude);
-    };
-
-    const intentarFallbackPorIpODefecto = async (codigoError?: number) => {
-      // Si el usuario denegó explícitamente el permiso, respetamos su decisión
-      if (codigoError === 1) {
-        this.location.set({ ...this.location(), detecting: false });
-        this.locatorError.set('Permiso de ubicación denegado en el navegador. Podés escribir tu dirección o seleccionarla en el mapa.');
-        return;
-      }
-
-      // Si falló por falta de hardware GPS o proveedor no disponible en desktop (POSITION_UNAVAILABLE o TIMEOUT),
-      // intentamos resolver por geolocalización IP aproximada
-      try {
-        const ipRes = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(3000) });
-        if (ipRes.ok) {
-          const ipData = (await ipRes.json()) as { latitude?: number; longitude?: number; city?: string; region?: string };
-          if (typeof ipData.latitude === 'number' && typeof ipData.longitude === 'number') {
-            const ciudad = [ipData.city, ipData.region].filter(Boolean).join(', ') || 'Ubicación aproximada por red';
-            await this.aplicarUbicacion(
-              ipData.latitude,
-              ipData.longitude,
-              ciudad,
-              'Ubicación aproximada detectada por red. Podés afinarla arrastrando el pin en el mapa o escribiendo tu calle.',
+    try {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          const name = await this.reverseGeocode(latitude, longitude);
+          this.aplicarUbicacionDetectada(latitude, longitude, name);
+        },
+        (error) => {
+          if (error.code === error.TIMEOUT || error.code === error.POSITION_UNAVAILABLE) {
+            navigator.geolocation.getCurrentPosition(
+              async (position) => {
+                const { latitude, longitude } = position.coords;
+                const name = await this.reverseGeocode(latitude, longitude);
+                this.aplicarUbicacionDetectada(latitude, longitude, name);
+              },
+              (fallbackError) => {
+                this.location.set({ ...this.location(), detecting: false });
+                this.locatorError.set(this.mensajeErrorGeolocalizacion(fallbackError));
+              },
+              { timeout: 25000, maximumAge: 300000, enableHighAccuracy: false },
             );
             return;
           }
-        }
-      } catch {
-        // En caso de modo offline o sin respuesta, continuamos al fallback institucional
-      }
-
-      // Fallback amigable: centrar en Concepción del Uruguay (zona base de la red universitaria)
-      const { lat, lng } = this.centroPorDefecto;
-      await this.aplicarUbicacion(
-        lat,
-        lng,
-        'Concepción del Uruguay, Entre Ríos',
-        'Tu dispositivo no cuenta con sensor GPS. Fijamos la ubicación en Concepción del Uruguay: podés arrastrar el pin en el mapa para indicar tu dirección exacta.',
+          this.location.set({ ...this.location(), detecting: false });
+          this.locatorError.set(this.mensajeErrorGeolocalizacion(error));
+        },
+        { timeout: 12000, maximumAge: 300000, enableHighAccuracy: false },
       );
-    };
+    } catch {
+      this.location.set({ ...this.location(), detecting: false });
+      this.locatorError.set('El navegador no pudo iniciar la geolocalización. Ingresá la dirección manualmente.');
+    }
+  }
 
-    // Intentamos primero con enableHighAccuracy: false (funciona en desktops, laptops, Wi-Fi e IP sin colgarse por GPS)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => void onExito(pos),
-      (err1) => {
-        // Si fue denegado por el usuario, no reintentamos
-        if (err1.code === 1) {
-          void intentarFallbackPorIpODefecto(1);
-          return;
-        }
+  private aplicarUbicacionDetectada(latitude: number, longitude: number, name: string): void {
+    this.location.set({ lat: latitude, lng: longitude, displayName: name, detecting: false, editing: false });
+    this.address.set(name);
+    this.locationQuery.set(name);
+    this.pendingLocation.set({ lat: latitude, lng: longitude, displayName: name });
+    this.form.update((current) => emptyServiceRequest({ ...current, address: name, latitude, longitude }));
+    this.updateDistances(latitude, longitude);
+    this.locatorError.set('');
+  }
 
-        // Si fue por timeout o no disponible, intentamos con enableHighAccuracy: true con timeout breve
-        navigator.geolocation.getCurrentPosition(
-          (pos) => void onExito(pos),
-          (err2) => {
-            void intentarFallbackPorIpODefecto(err2.code);
-          },
-          { timeout: 4000, maximumAge: 60000, enableHighAccuracy: true },
-        );
-      },
-      { timeout: 6000, maximumAge: 300000, enableHighAccuracy: false },
-    );
+  private mensajeErrorGeolocalizacion(error: GeolocationPositionError): string {
+    if (error.code === error.PERMISSION_DENIED) {
+      return 'No tenemos permiso para usar tu ubicación. Habilitalo en el navegador o ingresá la dirección manualmente.';
+    }
+    if (error.code === error.TIMEOUT) {
+      return 'La PC no respondió con una ubicación a tiempo. Revisá el permiso del navegador o ingresá la dirección manualmente.';
+    }
+    return 'La PC no pudo determinar una ubicación (GPS, Wi-Fi o red). Permití el acceso a la ubicación o ingresá la dirección manualmente.';
   }
 
   canConfirmLocation(): boolean {
@@ -1176,22 +1140,9 @@ export class Request implements OnInit, AfterViewInit {
     );
   }
 
-  /** Geocodificación inversa usando el endpoint interno del BFF o Nominatim */
+  /** Geocodificación inversa usando Nominatim (OpenStreetMap, gratuito) */
   private async reverseGeocode(lat: number, lng: number): Promise<string> {
     this.reverseGeocoding.set(true);
-    try {
-      const gpsRes = await firstValueFrom(
-        this.api.getGpsPosition(`${lat.toFixed(5)}, ${lng.toFixed(5)}`).pipe(
-          catchError(() => of(null)),
-        ),
-      );
-      if (gpsRes?.address && gpsRes.address.trim().length > 0 && gpsRes.resolved) {
-        return gpsRes.address;
-      }
-    } catch {
-      // Fallback a consulta directa
-    }
-
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=es`,
@@ -1200,9 +1151,9 @@ export class Request implements OnInit, AfterViewInit {
         throw new Error('No se pudo consultar el servicio de mapas.');
       }
       const data = (await res.json()) as { display_name?: string };
-      return data.display_name || `Ubicación (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+      return data.display_name || 'Tu ubicación';
     } catch {
-      return `Ubicación (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+      return 'Tu ubicación';
     } finally {
       this.reverseGeocoding.set(false);
     }

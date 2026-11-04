@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -34,14 +35,17 @@ public class ApiController {
     private final com.vinculaup.bff_web.service.KeycloakAdminService keycloakAdmin;
     private final com.vinculaup.bff_web.service.FotoStorage fotoStorage;
     private final com.vinculaup.bff_web.service.NotificacionService notificar;
+        private final com.vinculaup.bff_web.service.WebPushService webPush;
 
     public ApiController(BackendGateway gateway, com.vinculaup.bff_web.service.KeycloakAdminService keycloakAdmin,
             com.vinculaup.bff_web.service.FotoStorage fotoStorage,
-            com.vinculaup.bff_web.service.NotificacionService notificar) {
+            com.vinculaup.bff_web.service.NotificacionService notificar,
+            com.vinculaup.bff_web.service.WebPushService webPush) {
         this.gateway = gateway;
         this.keycloakAdmin = keycloakAdmin;
         this.fotoStorage = fotoStorage;
         this.notificar = notificar;
+        this.webPush = webPush;
     }
 
     private JsonNode authenticatedUser() {
@@ -108,6 +112,35 @@ public class ApiController {
 
     private UUID userId(JsonNode user) {
         return UUID.fromString(user.get("id").asText());
+    }
+
+    @GetMapping("/notifications/vapid-public-key")
+    public ResponseEntity<Map<String, String>> clavePublicaPush() {
+        if (!webPush.configurado()) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(Map.of("publicKey", webPush.clavePublica()));
+    }
+
+    @PutMapping("/notifications/push-subscription")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void guardarSuscripcionPush(@RequestBody JsonNode subscription) {
+        JsonNode user = authenticatedUser();
+        JsonNode keys = subscription.path("keys");
+        if (subscription.path("endpoint").asText("").isBlank()
+                || keys.path("p256dh").asText("").isBlank()
+                || keys.path("auth").asText("").isBlank()) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La suscripción push está incompleta");
+        }
+        webPush.guardar(userId(user), subscription);
+    }
+
+    @DeleteMapping("/notifications/push-subscription")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void eliminarSuscripcionPush(@RequestParam String endpoint) {
+        JsonNode user = authenticatedUser();
+        webPush.eliminar(userId(user), endpoint);
     }
 
     private JsonNode professionalProfile(JsonNode user, boolean activeRequired) {
@@ -785,7 +818,9 @@ public class ApiController {
     @ResponseStatus(HttpStatus.CREATED)
     public JsonNode crearSolicitud(@RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
-        return gateway.crearSolicitud(identityBody(body, user, "clienteId"));
+        JsonNode creada = gateway.crearSolicitud(identityBody(body, user, "clienteId"));
+        notificarCambioSolicitud(creada, "CLIENTE", null);
+        return creada;
     }
 
     @GetMapping("/usuarios/por-keycloak")
@@ -896,28 +931,136 @@ public class ApiController {
     public JsonNode aceptar(@PathVariable UUID id, @RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
         professionalProfile(user, true);
-        return gateway.aceptarSolicitud(id, actorIdentityBody(body, user));
+        JsonNode actualizada = gateway.aceptarSolicitud(id, actorIdentityBody(body, user));
+        notificarCambioSolicitud(actualizada, "PROFESIONAL", null);
+        return actualizada;
     }
 
     @PatchMapping("/solicitudes/{id}/rechazar")
     public JsonNode rechazar(@PathVariable UUID id, @RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
         professionalProfile(user, true);
-        return gateway.rechazarSolicitud(id, actorIdentityBody(body, user));
+        JsonNode actualizada = gateway.rechazarSolicitud(id, actorIdentityBody(body, user));
+        notificarCambioSolicitud(actualizada, "PROFESIONAL", body.path("motivo").asText(null));
+        return actualizada;
     }
 
     /** Cualquiera de los dos lados puede dar el turno por terminado. */
     @PatchMapping("/solicitudes/{id}/completar")
     public JsonNode completar(@PathVariable UUID id, @RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
-        return gateway.completarSolicitud(id, actorIdentityBody(body, user));
+        JsonNode actualizada = gateway.completarSolicitud(id, actorIdentityBody(body, user));
+        notificarCambioSolicitud(actualizada, authenticatedRole(), null);
+        return actualizada;
     }
 
     /** Lo mismo para cancelar: disponible para cliente y profesional. */
     @PatchMapping("/solicitudes/{id}/cancelar")
     public JsonNode cancelar(@PathVariable UUID id, @RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
-        return gateway.cancelarSolicitud(id, actorIdentityBody(body, user));
+        JsonNode actualizada = gateway.cancelarSolicitud(id, actorIdentityBody(body, user));
+        notificarCambioSolicitud(actualizada, authenticatedRole(), body.path("motivo").asText(null));
+        return actualizada;
+    }
+
+    /**
+     * Notifica por correo al participante afectado después de que ms-solicitudes
+     * confirmó el cambio. La notificación es best-effort: un fallo de SMTP o de
+     * resolución de cuenta no convierte una transición ya guardada en error HTTP.
+     */
+    private void notificarCambioSolicitud(JsonNode solicitud, String rolActor, String motivo) {
+        if (solicitud == null || !solicitud.isObject()) {
+            return;
+        }
+        try {
+            String estado = solicitud.path("estado").asText("");
+            UUID destinatarioId;
+            boolean esProfesional;
+
+            if ("PENDIENTE".equalsIgnoreCase(estado)) {
+                destinatarioId = uuidOrNull(solicitud.path("profesionalId").asText(null));
+                esProfesional = true;
+            } else if ("CLIENTE".equalsIgnoreCase(rolActor)) {
+                destinatarioId = uuidOrNull(solicitud.path("profesionalId").asText(null));
+                esProfesional = true;
+            } else {
+                destinatarioId = uuidOrNull(solicitud.path("clienteId").asText(null));
+                esProfesional = false;
+            }
+            if (destinatarioId == null) {
+                return;
+            }
+
+            JsonNode destinatario;
+            if (esProfesional) {
+                JsonNode perfil = gateway.buscarProfesionalPorIdOUsuario(destinatarioId);
+                UUID usuarioId = perfil == null ? null : uuidOrNull(perfil.path("usuarioId").asText(null));
+                destinatario = usuarioId == null ? null : gateway.buscarUsuarioPorIdOKeycloakId(usuarioId);
+            } else {
+                destinatario = gateway.buscarUsuarioPorIdOKeycloakId(destinatarioId);
+            }
+            if (destinatario == null || !destinatario.isObject()) {
+                return;
+            }
+
+            String nombre = (destinatario.path("nombre").asText("") + " "
+                    + destinatario.path("apellido").asText("")).trim();
+                try {
+                notificarPushSolicitud(destinatarioId, nombre, estado, solicitud);
+                } catch (RuntimeException pushException) {
+                org.slf4j.LoggerFactory.getLogger(ApiController.class)
+                    .warn("No se pudo enviar Web Push para solicitud {}: {}",
+                        solicitud.path("id").asText("sin-id"), pushException.getMessage());
+                }
+            notificar.avisarCambioSolicitud(
+                    destinatario.path("email").asText(null), nombre, estado, motivo);
+        } catch (RuntimeException exception) {
+            org.slf4j.LoggerFactory.getLogger(ApiController.class)
+                    .warn("No se pudo preparar el correo de cambio de estado de solicitud {}: {}",
+                            solicitud.path("id").asText("sin-id"), exception.getMessage());
+        }
+    }
+
+    private void notificarPushSolicitud(UUID destinatarioId, String nombre, String estado, JsonNode solicitud) {
+        String title;
+        String detail;
+        switch (estado == null ? "" : estado.toUpperCase(java.util.Locale.ROOT)) {
+            case "PENDIENTE" -> {
+                title = "Nueva solicitud";
+                detail = "Tenés una nueva solicitud pendiente de respuesta.";
+            }
+            case "ACEPTADA" -> {
+                title = "Solicitud aceptada";
+                detail = "Tu solicitud fue aceptada.";
+            }
+            case "RECHAZADA" -> {
+                title = "Solicitud rechazada";
+                detail = "Tu solicitud fue rechazada.";
+            }
+            case "COMPLETADA" -> {
+                title = "Solicitud completada";
+                detail = "La solicitud se marcó como completada.";
+            }
+            case "CANCELADA" -> {
+                title = "Solicitud cancelada";
+                detail = "La solicitud fue cancelada.";
+            }
+            default -> { return; }
+        }
+        String especialidad = solicitud.path("especialidadNombre").asText("");
+        String body = especialidad.isBlank() ? detail : especialidad + ": " + detail;
+        webPush.enviar(destinatarioId, title, body, "/solicitudes");
+    }
+
+    private UUID uuidOrNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 
     /**

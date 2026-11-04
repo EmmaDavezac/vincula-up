@@ -739,3 +739,31 @@
     - Eliminada la clase `.auth-action--desktop` sin usar.
 - **Verificación:** `npm run build` → `Application bundle generation complete` sin errores. 2 files changed, 9 insertions(+), 28 deletions(-).
 - **Nota:** `ESPECIFICACION.md` no requiere cambios (presentación/CSS).
+
+### [2026-11-04] - fix: bootstrap automático del tema y modales con ancho controlado
+- **Objetivo:**
+  1. Asegurar que el tema `vincula-up` se vuelva a aplicar cada vez que `docker compose up` levanta Keycloak.
+  2. Reducir el ancho de los modales para que no rompan la estructura interna.
+- **Cambios realizados:**
+  - `docker-compose.yml`: agregado el servicio `keycloak-init`, que espera a la salud de Keycloak y vuelve a setear `loginTheme=vincula-up` y `emailTheme=vincula-up` cada arranque.
+  - `frontend/vincula-up-web/src/styles.css`: límite global de ancho para `.vu-details-dialog` y `.vu-confirm-dialog` para no sobrepasar la viewport.
+  - `frontend/vincula-up-web/src/app/legal/terminos-modal.ts`: ancho de modal ajustado a `30rem` y `maxWidth` restringido.
+  - `frontend/vincula-up-web/src/app/admin/admin-professionals/admin-professionals.css`: ancho del detalle de profesional reducido a `32rem`.
+- **Verificación:**
+  - `docker exec vinculaup-keycloak /opt/keycloak/bin/kcadm.sh get realms/vincula-up -F loginTheme,emailTheme` devolvió `vincula-up` para ambos valores.
+  - `npm run build` en el frontend compiló correctamente sin errores de TypeScript ni CSS.
+- **Especificación:** Actualizada en `ESPECIFICACION.md` para dejar constancia del arranque automatizado del tema y la política de anchos de modales.
+
+### [2026-11-04] - fix: reorganizar y hacer responsables los listados de admin (categorías, clientes y profesionales)
+
+- **Objetivo:** Reparar los listados del panel de administración que estaban rotos, mal organizados y no se veían bien; reorganizar todos los campos y botones sin ocultar nada; hacerlos completamente legibles y utilizables desde móvil.
+- **Causa:** Los listados usaban `flex`/`grid` mezclados con propiedades `order` duplicadas, redefinían `:host` y la fila varias veces, ocultaban las etiquetas de campo con `display: none` y alineaban los botones de forma inconsistente, lo que hacía que en móvil los campos se cortaran o se apilaran mal.
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/admin/admin-categories/admin-categories.css`: fila `__item` con `display: grid` y `grid-template-columns` definido una sola vez; nombre con etiqueta visible; acciones alineadas a la derecha; breakpoint en tablet y escritorio; eliminado `display: none` de etiquetas.
+  - `frontend/vincula-up-web/src/app/admin/admin-categories/admin-categories.html`: `admin-categories__grid` → `admin-categories__list`; `admin-categories__row` → `admin-categories__item`; botones con clase `admin-categories__action`.
+  - `frontend/vincula-up-web/src/app/admin/admin-clients/admin-clients.css`: fila `__item` con `display: grid` y 4 columnas (`persona`, `actividad`, `estado`, `acciones`); avatar no se contrae; etiquetas visibles; botón de acción a la derecha en tablet/escritorio; eliminado `display: none` de etiquetas y redefiniciones duplicadas de `:host`/fila.
+  - `frontend/vincula-up-web/src/app/admin/admin-clients/admin-clients.html`: `admin-clients__grid` → `admin-clients__list`; `admin-clients__row` → `admin-clients__item`; `admin-clients__action-field` → `admin-clients__action`.
+  - `frontend/vincula-up-web/src/app/admin/admin-professionals/admin-professionals.css`: fila `__item` con `display: grid` y 5 columnas (`profesional`, `especialidades`, `legajo`, `estado`, `acciones`); chips de especialidades visibles; botones alineados a la derecha en tablet/escritorio; etiquetas visibles; eliminado `order`, `flex` y `display: none` de etiquetas.
+  - `frontend/vincula-up-web/src/app/admin/admin-professionals/admin-professionals.html`: `admin-professionals__row` → `admin-professionals__item`; `admin-professionals__actions` → `admin-professionals__action`; botones `Consultar` y `Reenviar invitación` con clase `__action`.
+- **Verificación:** `npm run build` en el frontend compiló correctamente sin errores de TypeScript ni plantillas.
+- **Especificación:** No requiere cambios (no se modificaron rutas, endpoints, contratos de API ni modelos de datos).

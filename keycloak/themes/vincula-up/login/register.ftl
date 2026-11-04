@@ -52,7 +52,8 @@
                             ${msg("doRegisterSubmit")}
                         </button>
                     </#if>
-                    <a href="${url.loginUrl}" class="pf-v5-c-button pf-m-secondary pf-m-block">
+                    <span class="kc-register-back-prompt">${msg("alreadyHaveAccount")}</span>
+                    <a href="${url.loginUrl}" class="kc-register-back-link">
                         ${msg("alreadyHaveAccountBack")}
                     </a>
                 </div>

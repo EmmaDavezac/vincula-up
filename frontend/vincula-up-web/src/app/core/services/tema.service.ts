@@ -103,11 +103,21 @@ export class TemaService {
   }
 
   private leerPreferencia(): TemaPreferido {
-    if (typeof localStorage === 'undefined') {
+    if (typeof document !== 'undefined') {
+      const cookie = document.cookie
+        .split('; ')
+        .find((item) => item.startsWith(`${CLAVE}=`))
+        ?.slice(CLAVE.length + 1);
+      if (cookie === 'claro' || cookie === 'oscuro' || cookie === 'sistema') {
+        return cookie;
+      }
+    }
+    try {
+      const valor = typeof localStorage === 'undefined' ? null : localStorage.getItem(CLAVE);
+      return valor === 'claro' || valor === 'oscuro' || valor === 'sistema' ? valor : 'sistema';
+    } catch {
       return 'sistema';
     }
-    const valor = localStorage.getItem(CLAVE);
-    return valor === 'claro' || valor === 'oscuro' || valor === 'sistema' ? valor : 'sistema';
   }
 
   private persistir(valor: TemaPreferido): void {
@@ -115,6 +125,10 @@ export class TemaService {
       localStorage.setItem(CLAVE, valor);
     } catch {
       /* almacenamiento no disponible: el tema dura lo que la sesión abierta */
+    }
+    if (typeof document !== 'undefined') {
+      const secure = document.location.protocol === 'https:' ? '; Secure' : '';
+      document.cookie = `${CLAVE}=${valor}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`;
     }
   }
 }

@@ -51,23 +51,38 @@
 	color: var(--alert-info-ink);
 }
 
+/* ===== Lista de profesionales: mobile first (tarjeta apilada) ===== */
 .admin-professionals__list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	list-style: none;
+	margin: 0;
+	padding: 0;
 	width: 100%;
 }
 
 .admin-professionals__row {
-	align-items: center;
+	background: var(--surface-card);
+	border: 1px solid var(--line);
+	border-radius: 0.75rem;
 	display: grid;
-	gap: 0.75rem 1rem;
-	grid-template-columns: minmax(0, 1fr) auto;
-	width: 100%;
+	gap: 0.85rem;
+	grid-template-columns: minmax(0, 1fr);
+	min-width: 0;
+	padding: 1rem;
 }
 
+/* La cabecera de columnas solo existe en escritorio */
+.admin-professionals__row--head {
+	display: none;
+}
+
+/* 1. Foto + nombre + email */
 .admin-professionals__person {
 	align-items: center;
 	display: flex;
 	gap: 0.75rem;
-	grid-column: 1 / -1;
 	min-width: 0;
 }
 
@@ -76,6 +91,7 @@
 }
 
 .admin-professionals__identity {
+	flex: 1 1 auto;
 	min-width: 0;
 }
 
@@ -91,13 +107,11 @@
 	color: var(--muted);
 	font-size: 0.875rem;
 	margin: 0.2rem 0 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	overflow-wrap: anywhere;
 }
 
+/* 2. Especialidades */
 .admin-professionals__specialties {
-	grid-column: 1 / -1;
 	min-width: 0;
 }
 
@@ -105,135 +119,151 @@
 	margin-top: 0.25rem;
 }
 
+/* 3 y 4. Legajo y estado */
 .admin-professionals__legajo-field,
 .admin-professionals__status {
 	align-items: flex-start;
 	display: flex;
 	flex-direction: column;
 	gap: 0.25rem;
+	min-width: 0;
 }
 
 .admin-professionals__legajo {
 	color: var(--muted);
-	font-size: 0.75rem;
+	font-size: 0.875rem;
 	font-weight: 700;
 	margin: 0;
 }
 
+/* 5. Acciones: botón a todo el ancho en mobile */
 .admin-professionals__actions {
-	align-items: center;
 	display: flex;
-	flex-wrap: wrap;
-	grid-column: 1 / -1;
+	flex-direction: column;
 	gap: 0.5rem;
-	justify-content: flex-end;
+	min-width: 0;
 }
 
-.admin-professionals__actions .vu-admin-field-label {
-	margin-right: auto;
+.admin-professionals__actions .vu-btn {
+	width: 100%;
 }
 
-@media (max-width: 1099px) {
-	.admin-professionals__row > span {
-		display: none;
-	}
-
-	.admin-professionals__person .vu-admin-field-label,
-	.admin-professionals__specialties > .vu-admin-field-label,
-	.admin-professionals__legajo-field .vu-admin-field-label,
-	.admin-professionals__status .vu-admin-field-label,
-	.admin-professionals__actions .vu-admin-field-label {
-		display: inline-block;
-	}
-}
-
-@media (min-width: 1100px) {
-	.vu-admin-material-list .vu-admin-material-list__header {
-		display: flex;
+/* ===== Escritorio / tablet ancha: tabla de una fila por profesional ===== */
+@media (min-width: 900px) {
+	.admin-professionals__list {
+		gap: 0;
 	}
 
 	.admin-professionals__row {
+		align-items: center;
+		border-radius: 0;
+		border-width: 0 0 1px;
 		gap: 1rem;
-		grid-template-columns: minmax(12rem, 1.5fr) minmax(12rem, 1.4fr) minmax(5rem, 0.55fr) minmax(7rem, 0.7fr) minmax(11rem, 1.2fr);
+		grid-template-columns:
+			minmax(0, 1.4fr) minmax(0, 1.5fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 1fr);
+		padding: 0.9rem 0.5rem;
 	}
 
-	.admin-professionals__person,
-	.admin-professionals__specialties,
+	.admin-professionals__row--head {
+		border-bottom: 1px solid var(--ink);
+		color: var(--muted);
+		display: grid;
+		font-size: 0.6875rem;
+		font-weight: 800;
+		letter-spacing: 0.08em;
+		padding-block: 0.6rem;
+		text-transform: uppercase;
+	}
+
+	/* Las etiquetas por campo sobran: ya está la cabecera */
+	.admin-professionals__row .vu-admin-field-label {
+		display: none;
+	}
+
 	.admin-professionals__actions {
-		grid-column: auto;
-	}
-
-	.admin-professionals__legajo-field,
-	.admin-professionals__status {
-		align-items: flex-start;
-	}
-
-	.admin-professionals__actions {
+		align-items: center;
+		flex-direction: row;
+		flex-wrap: wrap;
 		justify-content: flex-end;
 	}
 
-	.admin-professionals__actions .vu-admin-field-label {
-		display: none;
-	}
-
-	.vu-admin-field-label {
-		display: none;
+	.admin-professionals__actions .vu-btn {
+		width: auto;
 	}
 }
-
-/* La baja del padrón es lógica: el botón "Suspender" es el único que baja. */
-
+.admin-professionals__search {
+	margin-bottom: 1rem;
+}
+/* ===== Modal de detalle ===== */
 .admin-professionals__modal {
-	max-height: 80vh;
-	overflow-y: auto;
-	width: min(36rem, calc(100vw - 3rem));
+	display: flex;
+	flex-direction: column;
+	max-height: min(85vh, 44rem);
+	width: min(100%, 34rem);
 }
 
 .admin-professionals__modal-head {
 	align-items: flex-start;
+	border-bottom: 1px solid var(--line);
 	display: flex;
-	gap: 0.75rem;
-	justify-content: space-between;
+	gap: 0.9rem;
+	padding: 0 0 1rem;
 }
 
-/* Las acciones de la cabecera se agrupan a la derecha y se pegan entre sí. */
-.admin-professionals__modal-head-actions {
-	display: flex;
+.admin-professionals__modal-head > vu-avatar {
 	flex-shrink: 0;
-	gap: 0.5rem;
 }
 
-.admin-professionals__modal-person {
-	align-items: center;
+.admin-professionals__modal-head > .vu-btn {
+	flex-shrink: 0;
+	margin-left: auto;
+}
+
+.admin-professionals__modal-info {
+	align-items: flex-start;
 	display: flex;
-	gap: 0.75rem;
+	flex: 1 1 auto;
+	flex-direction: column;
+	gap: 0.3rem;
 	min-width: 0;
 }
 
 .admin-professionals__modal-name {
 	font-family: var(--font-serif);
-	font-size: 1.5rem;
+	font-size: 1.375rem;
+	line-height: 1.2;
+	margin: 0;
+	overflow-wrap: anywhere;
 }
 
-.admin-professionals__modal-section {
-	margin-top: 1.5rem;
-}
-
-.admin-professionals__modal-label {
+.admin-professionals__modal-link {
+	color: var(--muted);
 	font-size: 0.875rem;
-	font-weight: 700;
-	margin: 1.5rem 0 0.5rem;
+	overflow-wrap: anywhere;
+	text-decoration: none;
 }
 
-.admin-professionals__checks--modal {
-	margin-top: 0;
+.admin-professionals__modal-link:hover {
+	color: var(--ink);
+	text-decoration: underline;
+}
+
+/* El cuerpo es lo único que scrollea */
+.admin-professionals__modal-body {
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	gap: 1.25rem;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 1.25rem 0.25rem 1rem 0;
 }
 
 .admin-professionals__modal-grid {
 	display: grid;
 	gap: 1rem;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
-	margin: 1.5rem 0;
+	grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+	margin: 0;
 }
 
 .admin-professionals__modal-grid dt {
@@ -245,29 +275,56 @@
 }
 
 .admin-professionals__modal-grid dd {
-	font-size: 0.875rem;
+	font-size: 0.9375rem;
 	margin: 0.25rem 0 0;
+	overflow-wrap: anywhere;
 }
 
-/*
-Zona de acciones sensibles del detalle. Va separada del resto con un borde
-arriba y aire: la idea es que el botón de desactivar no quede pegado al de
-modificar, así se lee como otra cosa y no como el siguiente paso del flujo.
-*/
+.admin-professionals__modal-label {
+	font-size: 0.875rem;
+	font-weight: 700;
+	margin: 0 0 0.5rem;
+}
+
+.admin-professionals__checks--modal {
+	margin-top: 0;
+}
+
+/* Acciones sensibles, separadas del resto */
 .admin-professionals__modal-danger {
 	border-top: 1px solid var(--line);
-	margin-top: 1.5rem;
-	padding-top: 0.5rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	padding-top: 1rem;
 }
 
 .admin-professionals__modal-danger .admin-professionals__modal-label {
-	margin-top: 0.75rem;
+	margin: 0;
 }
 
 .admin-professionals__modal-hint {
 	color: var(--muted);
 	font-size: 0.8125rem;
 	line-height: 1.5;
-	margin: 0.5rem 0 0;
+	margin: 0;
 }
 
+/* Pie fijo con las acciones principales */
+.admin-professionals__modal-foot {
+	border-top: 1px solid var(--line);
+	display: flex;
+	gap: 0.5rem;
+	justify-content: flex-end;
+	padding-top: 1rem;
+}
+
+@media (max-width: 479px) {
+	.admin-professionals__modal-foot {
+		flex-direction: column-reverse;
+	}
+
+	.admin-professionals__modal-foot .vu-btn {
+		width: 100%;
+	}
+}

@@ -17,6 +17,7 @@
     "password": ""
   },
   "emailTheme": "vincula-up",
+  "loginTheme": "vincula-up",
   "registrationAllowed": true,
   "registrationEmailAsUsername": true,
   "loginWithEmailAllowed": true,
@@ -35,7 +36,7 @@
     {
       "clientId": "vincula-up-public",
       "name": "Vincula-UP Public Client",
-      "description": "Client público del frontend (PKCE S256, sin secreto). Los redirectUris incluyen https://* para los túneles de Cloudflare: Keycloak sólo matchea comodines al final del patrón. En producción, reemplazar https://* por el dominio real.",
+      "description": "Cliente público del frontend con PKCE S256 y redirect HTTPS. Permite login local y por túneles de Cloudflare.",
       "enabled": true,
       "publicClient": true,
       "standardFlowEnabled": true,

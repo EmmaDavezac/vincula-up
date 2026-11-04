@@ -10,24 +10,19 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 /**
- * Avisos por correo al profesional.
+ * Avisos transaccionales por correo.
  * <p>
- * Hoy el único aviso es el de alta: el administrador da de alta a un profesional
- * y ese correo le entrega el acceso (su correo y una contraseña temporal) y los
- * pasos para activar su perfil. Reutiliza el mismo SMTP que Keycloak (para el
- * reseteo de contraseña), de modo que no hay credenciales duplicadas.
+ * Incluye el aviso de alta de profesionales y los avisos de creación y cambio de
+ * estado de solicitudes. Reutiliza el mismo SMTP que Keycloak (para el reseteo de
+ * contraseña), de modo que no hay credenciales duplicadas.
  * <p>
- * Es best-effort, igual que la promoción de roles: si el SMTP no está
- * configurado o el servidor rechaza el mensaje, la cuenta queda creada igual
- * y se registra el motivo en el log. Dar de alta a un profesional no puede
- * fallar porque un correo no salió.
+ * Es best-effort: si el SMTP no está configurado o el servidor rechaza un mensaje,
+ * la operación de negocio ya confirmada se conserva y el motivo queda en el log.
  * <p>
  * <b>Por qué sale en HTML y no solo en texto plano.</b> Un correo pelado, sin
- * marca y sin formato, se lee como un mensaje automático cualquiera, y en el
- * caso del alta eso es justo lo que más importa: el profesional no
- * sabe si es real o si es phishing. El HTML usa la misma paleta que la
- * aplicación y la maqueta vive en {@code prerregistro.html}, al lado de este
- * archivo, para poder editar el diseño sin tocar el código.
+ * marca y sin formato, se lee como un mensaje automático cualquiera. El aviso de
+ * alta usa la maqueta {@code prerregistro.html}; las notificaciones de solicitud
+ * usan una plantilla HTML compacta. Ambos mantienen una alternativa de texto plano.
  * <p>
  * <b>Always hay una versión en texto plano.</b> No es adorno: los clientes de
  * correo la usan para decidir si el mensaje es legítimo y los filtros
@@ -106,6 +101,66 @@ public class NotificacionService {
         return enviar(email, "Vincula-UP · Tu cuenta de profesional está lista",
                 cuerpoTextoPlano(saludo, email, legajo, especialidad, passwordTemporal),
                 cuerpoHtml(saludo, email, legajo, especialidad, passwordTemporal));
+    }
+
+    /** Avisa a la contraparte cuando una solicitud se crea o cambia de estado. */
+    public boolean avisarCambioSolicitud(String email, String nombre, String estado, String motivo) {
+        if (email == null || email.isBlank()) {
+            log.warn("No se pudo enviar el aviso de solicitud: el destinatario no tiene email");
+            return false;
+        }
+
+        String estadoNormalizado = estado == null ? "" : estado.trim().toUpperCase(java.util.Locale.ROOT);
+        String asunto;
+        String detalle;
+        switch (estadoNormalizado) {
+            case "PENDIENTE" -> {
+                asunto = "Vincula-UP · Recibiste una nueva solicitud";
+                detalle = "Tenés una nueva solicitud de servicio. Iniciá sesión para revisar los datos y responder.";
+            }
+            case "ACEPTADA" -> {
+                asunto = "Vincula-UP · Tu solicitud fue aceptada";
+                detalle = "El profesional aceptó tu solicitud. Ya podés entrar para coordinar los detalles del servicio.";
+            }
+            case "RECHAZADA" -> {
+                asunto = "Vincula-UP · Actualización de tu solicitud";
+                detalle = "El profesional no podrá tomar esta solicitud. Podés volver a buscar otro profesional desde la aplicación.";
+            }
+            case "COMPLETADA" -> {
+                asunto = "Vincula-UP · Solicitud completada";
+                detalle = "La solicitud fue marcada como completada. Iniciá sesión para revisar el servicio.";
+            }
+            case "CANCELADA" -> {
+                asunto = "Vincula-UP · Solicitud cancelada";
+                detalle = "La solicitud fue cancelada.";
+                if (motivo != null && !motivo.isBlank()) {
+                    detalle += " Motivo: " + motivo.trim();
+                }
+            }
+            default -> {
+                log.warn("No se envió aviso de solicitud: estado no reconocido ({})", estadoNormalizado);
+                return false;
+            }
+        }
+
+        String saludo = nombre == null || nombre.isBlank() ? "Hola," : "Hola " + nombre.strip() + ",";
+        String urlSolicitudes = appUrl.replaceAll("/+$", "") + "/solicitudes";
+        String texto = saludo + "\n\n" + detalle + "\n\n"
+                + "Revisá tus solicitudes: " + urlSolicitudes + "\n\n"
+                + "Vincula-UP · Universidad Popular de Concepción del Uruguay\n"
+                + (contacto.isEmpty() ? "" : "Ayuda: " + contacto + "\n");
+        String html = "<!doctype html><html lang=\"es\"><body style=\"margin:0;background:#f6f3ec;font-family:Arial,sans-serif;color:#1e2926;\">"
+                + "<div style=\"max-width:560px;margin:24px auto;padding:24px;background:#fffdf8;border:1px solid #d8d8ce;border-top:4px solid #e35f43;\">"
+                + "<p style=\"font-size:16px;\">" + escapar(saludo) + "</p>"
+                + "<p style=\"font-size:15px;line-height:1.6;\">" + escapar(detalle) + "</p>"
+                + "<p style=\"margin:24px 0;\"><a href=\"" + escapar(urlSolicitudes)
+                + "\" style=\"display:inline-block;background:#e35f43;color:#fff;padding:12px 18px;text-decoration:none;font-weight:bold;\">Ver solicitudes</a></p>"
+                + "<p style=\"font-size:12px;color:#67716c;\">Vincula-UP · Universidad Popular de Concepción del Uruguay</p>"
+                + (contacto.isEmpty() ? "" : "<p style=\"font-size:12px;color:#67716c;\">Ayuda: <a href=\"mailto:" + escapar(contacto)
+                        + "\">" + escapar(contacto) + "</a></p>")
+                + "</div></body></html>";
+
+        return enviar(email, asunto, texto, html);
     }
 
     /**
@@ -248,7 +303,7 @@ public class NotificacionService {
             helper.setSubject(asunto);
             helper.setText(textoPlano, html);
             sender.send(message);
-            log.info("Prerregistro avisado por correo a {} (Reply-To: {})", destinatario, replyTo);
+            log.info("Notificación por correo enviada a {} (Reply-To: {})", destinatario, replyTo);
             return true;
         } catch (Exception ex) {
             log.warn("No se pudo enviar '{}' a {}: {}", asunto, destinatario, ex.getMessage());

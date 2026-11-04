@@ -3,6 +3,8 @@ package com.vinculaup.ms_usuarios.controller;
 import com.vinculaup.ms_usuarios.dto.AceptarTerminosRequest;
 import com.vinculaup.ms_usuarios.dto.ActualizarUsuarioRequest;
 import com.vinculaup.ms_usuarios.dto.CrearUsuarioRequest;
+import com.vinculaup.ms_usuarios.dto.GuardarSuscripcionPushRequest;
+import com.vinculaup.ms_usuarios.dto.SuscripcionPushResponse;
 import com.vinculaup.ms_usuarios.dto.UsuarioResponse;
 import com.vinculaup.ms_usuarios.dto.VincularKeycloakRequest;
 import com.vinculaup.ms_usuarios.entity.EstadoUsuario;
@@ -59,6 +61,23 @@ public class UsuarioController {
     @PatchMapping("/{id}/terminos")
     public UsuarioResponse aceptarTerminos(@PathVariable UUID id, @RequestBody AceptarTerminosRequest request) {
         return service.aceptarTerminos(id, request.version());
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/{id}/push-subscription")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void guardarSuscripcionPush(@PathVariable UUID id, @Valid @RequestBody GuardarSuscripcionPushRequest request) {
+        service.guardarSuscripcionPush(id, request.endpoint(), request.p256dh(), request.auth());
+    }
+
+    @GetMapping("/{id}/push-subscription")
+    public List<SuscripcionPushResponse> listarSuscripcionesPush(@PathVariable UUID id) {
+        return service.listarSuscripcionesPush(id).stream().map(SuscripcionPushResponse::desde).toList();
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/{id}/push-subscription")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void eliminarSuscripcionPush(@PathVariable UUID id, @RequestParam String endpoint) {
+        service.eliminarSuscripcionPush(id, endpoint);
     }
 
     @GetMapping("/{id}")

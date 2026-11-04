@@ -6,59 +6,126 @@
 	margin: 1.5rem 0 0;
 }
 
-.admin-categories__row {
-	align-items: center;
-	display: grid;
+/* ===== Lista de categorías: mobile first (tarjeta apilada) ===== */
+.admin-categories__list {
+	display: flex;
+	flex-direction: column;
 	gap: 0.75rem;
-	grid-template-columns: minmax(0, 1fr);
+	list-style: none;
+	margin: 0;
+	padding: 0;
 	width: 100%;
 }
 
+.admin-categories__row {
+	background: var(--surface-card);
+	border: 1px solid var(--line);
+	border-radius: 0.75rem;
+	display: grid;
+	gap: 0.85rem;
+	grid-template-columns: minmax(0, 1fr);
+	min-width: 0;
+	padding: 1rem;
+}
+
+/* La cabecera de columnas solo existe en escritorio */
+.admin-categories__row--head {
+	display: none;
+}
+
 .admin-categories__name-field {
+	align-items: flex-start;
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
 	min-width: 0;
 }
 
 .admin-categories__name {
+	display: block;
 	font-size: 1rem;
 	font-weight: 700;
 	margin: 0;
 	overflow-wrap: anywhere;
 }
 
+.admin-categories__name-field .vu-input {
+	width: 100%;
+}
+
+/* Acciones: botones a todo el ancho, en columna */
 .admin-categories__actions {
-	align-items: center;
 	display: flex;
-	flex-wrap: wrap;
+	flex-direction: column;
 	gap: 0.5rem;
-	justify-content: flex-end;
+	min-width: 0;
 }
 
-.admin-categories__actions .vu-admin-field-label {
-	margin-right: auto;
+.admin-categories__actions .vu-btn {
+	width: 100%;
 }
 
-@media (max-width: 639px) {
-	.admin-categories__row > span {
-		display: none;
+/* Búsqueda: el botón Limpiar no se estira */
+.admin-categories__search .vu-btn {
+	flex-shrink: 0;
+}
+
+/* ===== Tablet: botones en fila dentro de la tarjeta ===== */
+@media (min-width: 560px) {
+	.admin-categories__actions {
+		flex-direction: row;
 	}
 
-	.admin-categories__name-field > .vu-admin-field-label,
-	.admin-categories__actions > .vu-admin-field-label {
-		display: inline-block;
+	.admin-categories__actions .vu-btn {
+		flex: 1 1 0;
 	}
 }
 
-@media (min-width: 640px) {
-	.vu-admin-material-list .vu-admin-material-list__header {
-		display: flex;
+/* ===== Escritorio / tablet ancha: tabla ===== */
+@media (min-width: 900px) {
+	.admin-categories__list {
+		gap: 0;
 	}
 
 	.admin-categories__row {
-		grid-template-columns: minmax(0, 1fr) minmax(15rem, 0.45fr);
+		align-items: center;
+		border-radius: 0;
+		border-width: 0 0 1px;
+		gap: 1rem;
+		grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+		padding: 0.9rem 0.5rem;
 	}
 
-	.admin-categories__actions .vu-admin-field-label,
-	.admin-categories__name-field > .vu-admin-field-label {
+	.admin-categories__row--head {
+		border-bottom: 1px solid var(--ink);
+		color: var(--muted);
+		display: grid;
+		font-size: 0.6875rem;
+		font-weight: 800;
+		letter-spacing: 0.08em;
+		padding-block: 0.6rem;
+		text-transform: uppercase;
+	}
+
+	/* La etiqueta por campo sobra: ya está la cabecera */
+	.admin-categories__row .vu-admin-field-label {
 		display: none;
 	}
+
+	.admin-categories__name {
+		font-size: 1.0625rem;
+	}
+
+	.admin-categories__actions {
+		justify-content: flex-end;
+	}
+
+	.admin-categories__actions .vu-btn {
+		flex: 0 0 auto;
+		width: auto;
+	}
+}
+
+.admin-categories__search {
+	margin-bottom: 1rem;
 }

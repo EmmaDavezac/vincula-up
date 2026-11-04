@@ -50,12 +50,21 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
 		</dependency>
-		<!-- Avisos por correo: hoy, el mail de prerregistro que el administrador
-		     envía al profesional. Reutiliza el mismo SMTP que Keycloak
-		     (KEYCLOAK_SMTP_*), así no hay credenciales duplicadas en el .env. -->
+		<!-- Avisos de alta y cambios de estado por correo. Reutiliza el mismo SMTP
+		     que Keycloak (KEYCLOAK_SMTP_*), sin credenciales duplicadas en .env. -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>nl.martijndwars</groupId>
+			<artifactId>web-push</artifactId>
+			<version>5.1.1</version>
+		</dependency>
+		<dependency>
+			<groupId>org.bouncycastle</groupId>
+			<artifactId>bcprov-jdk18on</artifactId>
+			<version>1.78.1</version>
 		</dependency>
 
 		<!-- Las fotos de perfil se guardan en un volumen en disco que escribe el BFF

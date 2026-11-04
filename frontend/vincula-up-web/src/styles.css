@@ -232,6 +232,9 @@
 
 	--surface-strong: #0d1112;
 	--line-strong: #3d4844;
+	--band-dark: #2f3f3d;
+	--band-dark-hover: #3a4f4a;
+	--band-ink: #f3faf8;
 
 	--on-accent: #0d1112;
 	--button-secondary-bg: #e8edea;
@@ -569,6 +572,43 @@ a {
 .vu-btn:disabled {
 	cursor: not-allowed;
 	opacity: 0.4;
+}
+
+:root :is(button.mat-mdc-unelevated-button, button.mat-mdc-outlined-button, button.mat-mdc-button) {
+	border-radius: 0.5rem !important;
+	min-height: 2.75rem;
+}
+
+button.mat-mdc-unelevated-button.vu-btn--ink,
+button.mat-mdc-unelevated-button.vu-btn--coral,
+button.mat-mdc-unelevated-button.vu-btn--danger {
+	background: var(--band-dark) !important;
+	color: var(--band-ink) !important;
+	border-color: transparent !important;
+	box-shadow: none !important;
+}
+
+button.mat-mdc-unelevated-button.vu-btn--coral {
+	background: var(--coral) !important;
+	color: var(--surface-input) !important;
+}
+
+button.mat-mdc-unelevated-button.vu-btn--danger {
+	background: var(--alert-error-bg) !important;
+	color: var(--alert-error-ink) !important;
+}
+
+button.mat-mdc-outlined-button.vu-btn--outline,
+button.mat-mdc-outlined-button.vu-btn--quiet {
+	background: var(--button-secondary-bg) !important;
+	border-color: var(--button-secondary-border) !important;
+	color: var(--button-secondary-ink) !important;
+}
+
+button.mat-mdc-button.vu-btn--quiet {
+	background: transparent !important;
+	border-color: var(--button-quiet-border) !important;
+	color: var(--ink) !important;
 }
 
 /*
@@ -1010,9 +1050,8 @@ a {
 /* ── Resumen del problema (paso 2, obligatorio) ───────────────────────── */
 
 .problem {
-	border-top: 1px solid var(--line);
-	margin-top: 1.5rem;
-	padding-top: 1.5rem;
+	margin-top: 0;
+	padding-top: 0;
 }
 
 .problem__label {
@@ -1035,8 +1074,9 @@ a {
 }
 
 .problem__textarea {
-	min-height: 6.5rem;
-	resize: vertical;
+	min-height: 4.25rem;
+	max-height: 7rem;
+	resize: none;
 }
 
 .problem__foot {
@@ -1382,17 +1422,24 @@ a {
 	display: grid;
 	gap: 1rem;
 	margin-top: 2.5rem;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-@media (min-width: 640px) {
+@media (min-width: 768px) {
 	.vu-admin-metrics {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
+		grid-template-columns: repeat(3, minmax(0, 1fr));
 	}
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1100px) {
 	.vu-admin-metrics {
-		grid-template-columns: repeat(3, minmax(0, 1fr));
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+}
+
+@media (min-width: 1460px) {
+	.vu-admin-metrics {
+		grid-template-columns: repeat(5, minmax(0, 1fr));
 	}
 }
 
@@ -1548,9 +1595,12 @@ a {
 .vu-admin-material-list .vu-admin-material-list__item {
 	background: var(--surface-card);
 	color: var(--ink);
+	display: block;
 	height: auto;
 	min-height: 4.5rem;
+	overflow: visible;
 	padding: 1rem 1.25rem;
+	width: 100%;
 }
 
 .vu-admin-material-list .vu-admin-material-list__item:not(:last-child) {
@@ -1558,11 +1608,17 @@ a {
 }
 
 .vu-admin-material-list .vu-admin-material-list__item .mdc-list-item__content {
+	display: block;
+	max-width: 100%;
+	min-width: 0;
+	overflow: visible;
 	width: 100%;
 }
 
 .vu-admin-material-list .vu-admin-material-list__item .mdc-list-item__primary-text {
 	color: var(--ink);
+	overflow-wrap: anywhere;
+	word-break: break-word;
 	width: 100%;
 }
 
@@ -1598,15 +1654,76 @@ a {
 }
 
 html:has([aria-modal='true']) {
-	overflow: hidden;
+	overflow: auto;
+}
+
+.mat-mdc-dialog-container {
+	padding: 0.75rem;
+}
+
+@media (min-width: 768px) {
+	.mat-mdc-dialog-container {
+		padding: 1.5rem;
+	}
 }
 
 .vu-confirm-dialog .mat-mdc-dialog-surface,
 .vu-details-dialog .mat-mdc-dialog-surface {
 	background: var(--surface-card);
 	border: 1px solid var(--line);
-	border-radius: 0.75rem;
+	border-radius: 1rem;
+	box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+	box-sizing: border-box;
 	color: var(--ink);
+	display: flex;
+	flex-direction: column;
+	height: auto;
+	max-height: calc(100vh - 1.5rem);
+	max-width: calc(100vw - 1rem);
+	min-width: 0;
+	overflow: hidden;
+	padding: 1rem;
+	width: min(100%, 40rem);
+}
+
+@media (max-width: 767px) {
+	.mat-mdc-dialog-container {
+		padding: 0.5rem;
+	}
+
+	.vu-confirm-dialog .mat-mdc-dialog-surface,
+	.vu-details-dialog .mat-mdc-dialog-surface {
+		max-height: calc(100dvh - 1rem);
+		max-width: calc(100vw - 0.75rem);
+		padding: 0.875rem;
+		width: min(100%, 100vw);
+	}
+}
+
+.mat-mdc-dialog-title,
+.mat-mdc-dialog-content,
+.mat-mdc-dialog-actions {
+	margin: 0;
+	padding: 0;
+}
+
+.mat-mdc-dialog-title {
+	margin-bottom: 0.5rem;
+}
+
+.mat-mdc-dialog-content {
+	flex: 1 1 auto;
+	overflow: visible;
+	padding-top: 0.5rem;
+}
+
+.mat-mdc-dialog-actions {
+	border-top: 1px solid var(--line);
+	display: flex;
+	gap: 0.75rem;
+	justify-content: flex-end;
+	margin-top: 1rem;
+	padding-top: 0.9rem;
 }
 
 .vu-admin-empty {

@@ -142,4 +142,29 @@ public class UsuariosClient {
                 .retrieve()
                 .body(JsonNode.class);
     }
+
+    public void guardarSuscripcionPush(UUID id, JsonNode body) {
+        restClient.put()
+                .uri("/usuarios/{id}/push-subscription", id)
+                .body(body)
+                .retrieve()
+                .toBodilessEntity();
+    }
+
+    public JsonNode listarSuscripcionesPush(UUID id) {
+        return restClient.get()
+                .uri("/usuarios/{id}/push-subscription", id)
+                .retrieve()
+                .body(JsonNode.class);
+    }
+
+    public void eliminarSuscripcionPush(UUID id, String endpoint) {
+        restClient.delete()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/usuarios/{id}/push-subscription")
+                        .queryParam("endpoint", endpoint)
+                        .build(id))
+                .retrieve()
+                .toBodilessEntity();
+    }
 }

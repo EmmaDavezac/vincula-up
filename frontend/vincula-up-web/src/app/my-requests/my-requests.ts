@@ -9,6 +9,7 @@ import { Professional } from '../core/models/professional';
 import { ApiService, ClienteInfo } from '../core/services/api.service';
 import { AuthService } from '../core/services/auth.service';
 import { RequestService } from '../core/services/request.service';
+import { NotificationService } from '../core/services/notification.service';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { fotoUtil } from '../core/utils/photo';
@@ -57,6 +58,7 @@ export class MyRequests {
   private cancelDialogRef?: MatDialogRef<unknown>;
   readonly auth = inject(AuthService);
   private readonly requestService = inject(RequestService);
+  private readonly notifications = inject(NotificationService);
   private readonly sanitizer = inject(DomSanitizer);
 
   /** Cache de URLs de mapa: evita crear SafeResourceUrl en cada detección de cambios (ciclo NG0600). */
@@ -585,6 +587,7 @@ export class MyRequests {
       this.cerrarActualizarEstado();
       if (!updated) return;
       this.requestService.updateStatus(request.id, updated.status);
+      this.notifications.markStatusHandledLocally(request.id, updated.status);
       this.successMessage.set(
         nuevo === 'COMPLETADA' ? 'La solicitud fue marcada como completada. ¡Ahora podés calificar el servicio!'
         : nuevo === 'CANCELADA' ? 'Cancelaste la solicitud. La contraparte ve el motivo que escribiste.'

@@ -1,8 +1,10 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { filter } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { TemaService } from '../../core/services/tema.service';
+import { NotificationService } from '../../core/services/notification.service';
 import { UserRole } from '../../core/models/user-profile';
 import { VuAvatar } from '../avatar/avatar';
 import { VuConfirm } from '../confirm/confirm';
@@ -13,7 +15,7 @@ import { VuSpinner } from '../spinner/spinner';
 @Component({
 	selector: 'app-navbar',
 	standalone: true,
-	imports: [RouterLink, RouterLinkActive, VuAvatar, VuConfirm, VuIcon, VuSpinner],
+	imports: [DatePipe, RouterLink, RouterLinkActive, VuAvatar, VuConfirm, VuIcon, VuSpinner],
 	templateUrl: './navbar.html',
 	styleUrl: './navbar.css',
 })
@@ -21,7 +23,9 @@ export class NavbarComponent {
 	protected readonly auth = inject(AuthService);
 	/** Tema claro/oscuro. El toggle vive en la barra y no pide sesión. */
 	protected readonly tema = inject(TemaService);
+	protected readonly notificaciones = inject(NotificationService);
 	protected userMenuOpen = false;
+	protected notificationsOpen = false;
 
 	private readonly router = inject(Router);
 	private readonly urlActual = signal(this.router.url);
@@ -56,6 +60,16 @@ export class NavbarComponent {
 
 	crearCuenta(): void {
 		this.auth.registerWithKeycloak();
+	}
+
+	protected alternarNotificaciones(): void {
+		this.notificationsOpen = !this.notificationsOpen;
+		if (this.notificationsOpen) this.notificaciones.markAllRead();
+	}
+
+	protected abrirSolicitudes(): void {
+		this.notificationsOpen = false;
+		void this.router.navigateByUrl('/solicitudes');
 	}
 
 	roleTexto(role: UserRole | undefined): string {
