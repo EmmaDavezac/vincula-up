@@ -42,16 +42,61 @@
 		</nav>
 
 		<div class="toolbar-actions">
-			<button
-				type="button"
-				class="theme-icon-toggle"
-				[class.is-dark]="tema.oscuro()"
-				(click)="tema.alternar()"
-				[attr.aria-label]="tema.etiqueta()"
-				[title]="tema.etiqueta()"
-			>
-				<vu-icon [name]="tema.oscuro() ? 'sun' : 'moon'" [size]="18" aria-hidden="true" />
-			</button>
+			@if (auth.currentUser(); as signedInUser) {
+				@if (signedInUser.role === 'CLIENTE' || signedInUser.role === 'PROFESIONAL') {
+					<div class="notification-menu">
+						<button
+							type="button"
+							class="notification-trigger"
+							[attr.aria-label]="notificaciones.unreadCount() ? 'Notificaciones sin leer: ' + notificaciones.unreadCount() : 'Notificaciones'"
+							[attr.aria-expanded]="notificationsOpen"
+							aria-haspopup="dialog"
+							(click)="alternarNotificaciones()"
+						>
+							<vu-icon name="bell" [size]="19" aria-hidden="true" />
+							@if (notificaciones.unreadCount()) {
+								<span class="notification-count">{{ notificaciones.unreadCount() > 99 ? '99+' : notificaciones.unreadCount() }}</span>
+							}
+						</button>
+						@if (notificationsOpen) {
+							<section class="notification-panel" role="dialog" aria-label="Notificaciones">
+								<header class="notification-panel__header">
+									<h2>Notificaciones</h2>
+									<button type="button" class="notification-panel__close" aria-label="Cerrar notificaciones" (click)="notificationsOpen = false">
+										<vu-icon name="x" [size]="18" />
+									</button>
+								</header>
+								@if (notificaciones.permission() === 'default') {
+									<div class="notification-permission">
+										<p>Activá los avisos del navegador para enterarte cuando cambien tus solicitudes.</p>
+										<button type="button" class="notification-permission__button" (click)="notificaciones.enableBrowserNotifications()">Activar avisos</button>
+									</div>
+								} @else if (notificaciones.permission() === 'unsupported') {
+									<p class="notification-permission__hint">Este navegador no admite avisos del sistema. La bandeja web sigue disponible.</p>
+								} @else if (notificaciones.permission() === 'denied') {
+									<p class="notification-permission__hint">Los avisos están bloqueados en el navegador; podés consultarlos aquí.</p>
+								}
+								@if (notificaciones.notifications().length) {
+									<ul class="notification-list">
+										@for (item of notificaciones.notifications(); track item.id) {
+											<li>
+												<button type="button" class="notification-item" [class.is-unread]="!item.read" (click)="abrirSolicitudes()">
+													<span class="notification-item__title">{{ item.title }}</span>
+													<span class="notification-item__body">{{ item.body }}</span>
+													<time [attr.datetime]="item.createdAt">{{ item.createdAt | date: 'd/M, HH:mm' }}</time>
+												</button>
+											</li>
+										}
+									</ul>
+									<button type="button" class="notification-clear" (click)="notificaciones.clear()">Borrar notificaciones</button>
+								} @else {
+									<p class="notification-empty">Todavía no hay notificaciones.</p>
+								}
+							</section>
+						}
+					</div>
+				}
+			}
 			@if (auth.currentUser(); as user) {
 				<div class="user-menu">
 					<button
@@ -77,6 +122,21 @@
 
 					@if (userMenuOpen) {
 						<div class="user-menu__panel">
+							<div class="user-menu__theme">
+								<span class="user-menu__theme-label">Tema oscuro</span>
+								<button
+									type="button"
+									class="theme-switch"
+									[class.is-on]="tema.oscuro()"
+									[attr.aria-pressed]="tema.oscuro()"
+									[attr.aria-label]="tema.etiqueta()"
+									(click)="tema.alternar()"
+								>
+									<span class="theme-switch__track">
+										<span class="theme-switch__thumb"></span>
+									</span>
+								</button>
+							</div>
 							<a
 								routerLink="/mi-cuenta"
 								class="user-menu__item"

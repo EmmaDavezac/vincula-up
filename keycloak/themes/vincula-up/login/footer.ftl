@@ -27,34 +27,11 @@
     ahí, y menos en un despliegue donde el hostname cambia.
 -->
 <#macro content>
-    <#--
-        URL pública de la app. Viene de theme.properties y NO del realm: el
-        contexto del login sí expone el realm, pero la URL depende del despliegue
-        (el hostname cambia detrás de un túnel de Cloudflare), así que es un
-        valor de configuración del tema, igual que en el tema de correo. Si
-        quedara vacía, el bloque no se imprime.
-    -->
-    <#assign appUrl = ''>
-    <#if properties??>
-        <#if properties.vinculaUpAppUrl??>
-            <#assign appUrl = properties.vinculaUpAppUrl>
-        </#if>
-    </#if>
-
+    <#if realm.attributes.vinculaUpContacto?? && realm.attributes.vinculaUpContacto?has_content>
     <div class="kc-footer">
         <p class="kc-footer__line">
-            <strong>Vincula-UP</strong> · Universidad Popular de Concepción del Uruguay
+            ¿Necesitás ayuda? <a href="mailto:${realm.attributes.vinculaUpContacto}">${realm.attributes.vinculaUpContacto}</a>
         </p>
-        <#if realm.attributes.vinculaUpContacto?? && realm.attributes.vinculaUpContacto?has_content>
-        <p class="kc-footer__line kc-footer__line--muted">
-            ¿Algún problema con tu cuenta?
-            <a href="mailto:${realm.attributes.vinculaUpContacto}">${realm.attributes.vinculaUpContacto}</a>
-        </p>
-        </#if>
-        <#if appUrl?has_content>
-        <p class="kc-footer__line kc-footer__line--muted">
-            <a href="${appUrl}">Ir a Vincula-UP</a>
-        </p>
-        </#if>
     </div>
+    </#if>
 </#macro>

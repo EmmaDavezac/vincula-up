@@ -19,7 +19,7 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
  * Flujo de pasos del prototipo: ubicación → especialidad → día y horario →
  * elección del profesional (el envío cierra el flujo, sin formulario extra).
  */
-type Step = 'location' | 'specialty' | 'problem' | 'day' | 'time' | 'professionals';
+type Step = 'location' | 'category' | 'daytime' | 'professionals';
 
 
 interface PlaceSuggestion {
@@ -72,12 +72,10 @@ export class Request implements OnInit, AfterViewInit {
   // ── Pasos ──────────────────────────────────────────────
   readonly step = signal<Step>('location');
   readonly steps: Array<{ key: Step; label: string; title: string }> = [
-    { key: 'location', label: 'Ubicación', title: '¿Dónde necesitás el servicio?' },
-    { key: 'specialty', label: 'Categoría', title: '¿Qué necesitás resolver?' },
-    { key: 'problem', label: 'Problema', title: 'Contanos qué necesitás resolver' },
-    { key: 'day', label: 'Día', title: '¿Qué día te viene bien?' },
-    { key: 'time', label: 'Horario', title: 'Elegí una franja horaria' },
-    { key: 'professionals', label: 'Profesional', title: 'Elegí un profesional' },
+    { key: 'location', label: 'Ubicación', title: 'Ubicación' },
+    { key: 'category', label: 'Problema', title: 'Problema' },
+    { key: 'daytime', label: 'Fecha', title: 'Fecha y horario' },
+    { key: 'professionals', label: 'Profesional', title: 'Profesional' },
   ];
 
   /**
@@ -87,6 +85,8 @@ export class Request implements OnInit, AfterViewInit {
    */
   readonly problemSummary = signal('');
   readonly MIN_SUMMARY_LENGTH = 10;
+  readonly MAX_SUMMARY_LENGTH = 140;
+  readonly specialtyQuery = signal('');
 
   /** El resumen ya tiene contenido suficiente para avanzar. */
   readonly resumenValido = computed(() => this.problemSummary().trim().length >= this.MIN_SUMMARY_LENGTH);
@@ -150,6 +150,15 @@ export class Request implements OnInit, AfterViewInit {
       return catalogo.filter((name) => disponibles.has(this.normalizarEspecialidad(name)));
     }
     return [...disponibles.values()].sort((a, b) => a.localeCompare(b, 'es'));
+  });
+
+  readonly filteredSpecialties = computed(() => {
+    const query = this.specialtyQuery().trim().toLowerCase();
+    const list = [...this.specialties()];
+    if (!query) {
+      return list.length > 8 ? list.slice(0, 8) : list;
+    }
+    return list.filter((item) => item.toLowerCase().includes(query));
   });
 
   readonly selectedSpecialty = signal<string | null>(null);
@@ -753,15 +762,22 @@ export class Request implements OnInit, AfterViewInit {
         }
         return faltan;
       }
-      case 'specialty': {
-        return this.selectedSpecialty() ? [] : ['la categoría'];
+      case 'category': {
+        const faltan: string[] = [];
+        if (!this.selectedSpecialty()) {
+          faltan.push('la categoría');
+        }
+        if (!this.resumenValido()) {
+          faltan.push(`el detalle del problema (mínimo ${this.MIN_SUMMARY_LENGTH} caracteres)`);
+        }
+        return faltan;
       }
-      case 'problem':
-        return this.resumenValido() ? [] : [`el resumen del problema (mínimo ${this.MIN_SUMMARY_LENGTH} caracteres)`];
-      case 'day':
-        return this.selectedDay() ? [] : ['el día'];
-      case 'time':
-        return this.selectedSlot() ? [] : ['el horario'];
+      case 'daytime': {
+        const faltan: string[] = [];
+        if (!this.selectedDay()) faltan.push('el día');
+        if (!this.selectedSlot()) faltan.push('el horario');
+        return faltan;
+      }
       case 'professionals':
         return this.selectedProfessional() ? [] : ['el profesional que te atienda'];
       default:
@@ -787,14 +803,10 @@ export class Request implements OnInit, AfterViewInit {
     switch (this.step()) {
       case 'location':
         return Boolean(this.address().trim()) && this.location().lat != null && this.location().lng != null;
-      case 'specialty':
-        return Boolean(this.selectedSpecialty());
-      case 'problem':
-        return this.resumenValido();
-      case 'day':
-        return Boolean(this.selectedDay());
-      case 'time':
-        return Boolean(this.selectedSlot());
+      case 'category':
+        return Boolean(this.selectedSpecialty()) && this.resumenValido();
+      case 'daytime':
+        return Boolean(this.selectedDay()) && Boolean(this.selectedSlot());
       case 'professionals':
         return Boolean(this.selectedProfessional());
       default:
@@ -810,7 +822,7 @@ export class Request implements OnInit, AfterViewInit {
 
   /** Vuelve al paso 2 para elegir otra especialidad. */
   goToSpecialtyStep(): void {
-    this.cambiarPaso('specialty');
+    this.cambiarPaso('category');
   }
 
   selectProfessional(prof: ProfWithDistance): void {
@@ -872,12 +884,12 @@ export class Request implements OnInit, AfterViewInit {
 
     if (!this.date()) {
       this.errorMessage.set('Elegí una fecha para la visita.');
-      this.cambiarPaso('day');
+      this.cambiarPaso('daytime');
       return;
     }
     if (!this.time()) {
       this.errorMessage.set('Elegí un horario aproximado.');
-      this.cambiarPaso('time');
+      this.cambiarPaso('daytime');
       return;
     }
     if (!this.address().trim()) {
@@ -965,7 +977,7 @@ export class Request implements OnInit, AfterViewInit {
     // Última barrera: aunque se llegara al envío sin resumen, no sale.
     if (!this.resumenValido()) {
       this.errorMessage.set('Contanos brevemente el problema para que el profesional pueda venir preparado.');
-      this.cambiarPaso('problem');
+      this.cambiarPaso('category');
       return;
     }
 

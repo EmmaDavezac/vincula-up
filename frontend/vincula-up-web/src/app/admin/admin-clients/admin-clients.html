@@ -77,7 +77,7 @@
 
 					<div class="admin-clients__action-field">
 						<span class="vu-admin-field-label">Acciones</span>
-						<button type="button" class="vu-btn vu-btn--outline vu-btn--sm admin-clients__action" (click)="abrirDetalle(item.client)">
+						<button type="button" mat-flat-button class="vu-btn vu-btn--ink vu-btn--sm admin-clients__action" (click)="abrirDetalle(item.client)">
 							Consultar
 						</button>
 					</div>
@@ -107,7 +107,7 @@ esto; la única acción que altera la cuenta queda adentro, con su confirmación
 <ng-template #clientDetailDialog>
 	@if (modal(); as abierto) {
 		<section class="admin-clients__modal" aria-labelledby="admin-client-title">
-			<header class="admin-clients__modal-head">
+			<header class="admin-clients__modal-head" mat-dialog-title>
 				<div class="admin-clients__person">
 					<vu-avatar size="md" [nombre]="nombre(abierto)" [usuarioId]="abierto.id" [tieneFoto]="abierto.tieneFoto === true" />
 					<div class="admin-clients__person-info">

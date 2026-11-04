@@ -94,13 +94,14 @@
 
 					<div class="admin-professionals__actions">
 						<span class="vu-admin-field-label">Acciones</span>
-						<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="abrirDetalle(professional, 'consulta')">
+						<button type="button" mat-flat-button class="vu-btn vu-btn--ink vu-btn--sm" (click)="abrirDetalle(professional, 'consulta')">
 							Consultar
 						</button>
 						@if (puedeReenviarse(professional)) {
 							<button
 								type="button"
-								class="vu-btn vu-btn--quiet vu-btn--sm"
+								mat-stroked-button
+								class="vu-btn vu-btn--outline vu-btn--sm"
 								(click)="reenviarInvitacion(professional)"
 								[disabled]="busyId() === professional.id"
 							>
@@ -138,7 +139,7 @@
 				acción de la cabecera, no del cuerpo del modal. A la izquierda compite
 				con el avatar y con el nombre, y se leía como parte de la ficha.
 			-->
-			<header class="admin-professionals__modal-head">
+			<header class="admin-professionals__modal-head" mat-dialog-title>
 				<div class="admin-professionals__modal-person">
 					<vu-avatar size="md" [nombre]="nombre(abierto.profesional)" [usuarioId]="usuarioIdFoto(abierto.profesional)" [tieneFoto]="tieneFoto(abierto.profesional)" />
 					<div class="admin-professionals__card-info">
@@ -270,9 +271,6 @@
 					</p>
 				}
 
-			@if (abierto.modo !== 'edicion') {
-				<button type="button" mat-stroked-button class="vu-btn vu-btn--outline vu-btn--block" (click)="cerrarDetalle()">Cerrar</button>
-			}
 		</section>
 	}
 </ng-template>

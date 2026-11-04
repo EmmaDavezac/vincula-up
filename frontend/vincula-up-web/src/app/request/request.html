@@ -36,9 +36,10 @@
 					}
 				</ol>
 				<div class="wizard__head">
-					<div>
+					<div class="wizard__title-wrap">
 						<h2 class="wizard__title">{{ tituloPaso }}</h2>
 					</div>
+					<a class="wizard__cancel" routerLink="/solicitudes" aria-label="Cancelar solicitud">×</a>
 				</div>
 
 				<!-- ── Paso 1: ¿Dónde necesitás el servicio? ── -->
@@ -51,10 +52,6 @@
 									<p class="vu-alert vu-alert--error" role="alert">{{ gpsError() }}</p>
 								}
 
-							<!-- 1) Dirección: el campo va primero, con el GPS como botón compacto al lado. -->
-					<p class="location-field__label">
-						<span>¿Dónde necesitás el servicio? <span class="vu-required">obligatorio</span></span>
-					</p>
 							<div class="location-field">
 								<div class="vu-field-with-icon location-field__input">
 									<vu-icon name="search" [size]="17" class="vu-field-icon" />
@@ -111,9 +108,10 @@
 							</div>
 						}
 
-				<!-- ── Paso 2: ¿Qué necesitás resolver? ── -->
-				@if (step() === 'specialty') {
-					<div class="wizard__body">
+				<!-- ── Paso 2: categoría + detalle del problema ── -->
+				@if (step() === 'category') {
+					<div class="wizard__body wizard__body--compact">
+						<p class="wizard__helper">Elegí la categoría y contanos qué necesitás.</p>
 						@if (loadingProfessionals() || loadingSpecialties()) {
 							<div class="request-loading" role="status" aria-live="polite">
 								<mat-spinner class="request-spinner" diameter="32" aria-label="Cargando categorías disponibles" />
@@ -122,8 +120,18 @@
 						} @else if (!specialties().length) {
 							<p class="vu-body">No hay categorías con profesionales disponibles en este momento.</p>
 						} @else {
+							<div class="specialty-search">
+								<input
+									class="vu-input specialty-search__input"
+									type="search"
+									placeholder="Buscar categoría"
+									[ngModel]="specialtyQuery()"
+									(ngModelChange)="specialtyQuery.set($event)"
+								/>
+							</div>
+							<p class="specialty-hint">Mostrando las más usadas. Buscá si no aparece la que necesitás.</p>
 							<div class="category-grid">
-								@for (specialty of specialties(); track specialty) {
+								@for (specialty of filteredSpecialties(); track specialty) {
 									<button
 										type="button"
 										class="category"
@@ -135,27 +143,20 @@
 									</button>
 								}
 							</div>
+							@if (!filteredSpecialties().length) {
+								<p class="vu-body specialty-empty">No encontramos esa categoría. Probá con otra búsqueda.</p>
+							}
 						}
-					</div>
-				}
 
-				<!-- ── Paso 3: descripción del problema ── -->
-				@if (step() === 'problem') {
-					<div class="wizard__body">
-						<p class="vu-body">Un resumen claro ayuda al profesional a prepararse antes de la visita.</p>
 						<div class="problem">
-							<label class="problem__label" for="problem-summary">
-								Contanos brevemente el problema
-								<span class="vu-required">obligatorio</span>
-							</label>
 							<textarea
 								id="problem-summary"
 								class="vu-textarea problem__textarea"
-								rows="4"
-								maxlength="1000"
+								rows="2"
+								maxlength="140"
 								[ngModel]="problemSummary()"
 								(ngModelChange)="problemSummary.set($event)"
-								placeholder="Ej: se corta la luz en la cocina desde anoche y no vuelve."
+								placeholder="Ej: se corta la luz en la cocina desde anoche."
 							></textarea>
 							<div class="problem__foot">
 								@if (problemSummary().trim() && !resumenValido()) {
@@ -163,47 +164,40 @@
 										Contá un poco más para que el profesional sepa qué necesita (mínimo {{ MIN_SUMMARY_LENGTH }} caracteres).
 									</p>
 								}
-								<span class="problem__counter">{{ problemSummary().trim().length }}/1000</span>
+								<span class="problem__counter">{{ problemSummary().trim().length }}/{{ MAX_SUMMARY_LENGTH }}</span>
 							</div>
 						</div>
 					</div>
 				}
 
-				<!-- ── Paso 4: día ── -->
-				@if (step() === 'day') {
-					<div class="wizard__body wizard__body--column">
-						<div>
-							<p class="field-title">Día <span class="vu-required">obligatorio</span></p>
-							<div class="day-grid">
-								@for (day of dayOptions(); track day.id) {
-									<button
-										type="button"
-										class="day"
-										[class.is-active]="selectedDay() === day.id"
-										[attr.aria-pressed]="selectedDay() === day.id"
-										(click)="elegirDia(day.id)"
-									>
-										<span class="day__label">{{ day.label }}</span>
-										<span class="day__number">{{ day.monthDay }}</span>
-									</button>
-								}
-							</div>
+				<!-- ── Paso 3: día y horario ── -->
+				@if (step() === 'daytime') {
+					<div class="wizard__body wizard__body--stacked wizard__body--compact">
+						<p class="wizard__helper">Seleccioná el día y la franja horaria más cómoda para la visita.</p>
+						<div class="day-grid">
+							@for (day of dayOptions(); track day.id) {
+								<button
+									type="button"
+									class="day"
+									[class.is-active]="selectedDay() === day.id"
+									[attr.aria-pressed]="selectedDay() === day.id"
+									(click)="elegirDia(day.id)"
+								>
+									<span class="day__label">{{ day.label }}</span>
+									<span class="day__number">{{ day.monthDay }}</span>
+								</button>
+							}
 						</div>
-					</div>
-				}
 
-				<!-- ── Paso 5: horario ── -->
-				@if (step() === 'time') {
-					<div class="wizard__body wizard__body--column">
-						<label class="vu-label">
-							Horario <span class="vu-required">obligatorio</span>
-							<select class="vu-select schedule__select" [ngModel]="selectedSlot()" (ngModelChange)="elegirHorario($event)">
+						<div class="schedule-block">
+							<label class="schedule__label" for="schedule-select">Franja horaria</label>
+							<select id="schedule-select" class="vu-select schedule__select" aria-label="Horario disponible" [ngModel]="selectedSlot()" (ngModelChange)="elegirHorario($event)">
 								<option value="" disabled>Elegí una franja horaria</option>
 								@for (slot of slotOptions; track slot.id) {
 									<option [value]="slot.id">{{ slot.label }}</option>
 								}
 							</select>
-						</label>
+						</div>
 
 						@if (turnoLegible) {
 							<p class="turno-resumen">Turno propuesto: {{ turnoLegible }}, {{ selectedSlotLabel }}.</p>
@@ -290,7 +284,6 @@
 						<button type="button" class="wizard__back-btn" [class.is-hidden]="pasoActual === 1" (click)="goBack()">
 							Atrás
 						</button>
-						<a class="wizard__cancel" routerLink="/solicitudes">Cancelar solicitud</a>
 					</div>
 
 					@if (pasoActual < steps.length) {

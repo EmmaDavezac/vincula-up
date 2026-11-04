@@ -25,49 +25,53 @@ import { ApiService } from '../core/services/api.service';
 		<ng-template #termsDialog>
 			@if (visible()) {
 				<section class="terminos-modal" aria-labelledby="terminos-modal-title">
-					<p class="vu-eyebrow">Antes de empezar</p>
-					<h2 mat-dialog-title class="terminos-modal__title" id="terminos-modal-title">Aceptá los términos y condiciones</h2>
+					<header mat-dialog-title class="terminos-modal__header">
+						<p class="vu-eyebrow">Antes de empezar</p>
+						<h2 class="terminos-modal__title" id="terminos-modal-title">Aceptá los términos y condiciones</h2>
+					</header>
 
 					<div mat-dialog-content class="terminos-modal__content">
-					<p class="terminos-modal__lead">
-						Son las reglas de uso de la red y el detalle de qué datos guardamos y quién puede ver
-						qué. Conviene leerlos antes de continuar.
-					</p>
+						<p class="terminos-modal__lead">
+							Son las reglas de uso de la red y el detalle de qué datos guardamos y quién puede ver
+							qué. Conviene leerlos antes de continuar.
+						</p>
 
-					<ul class="terminos-modal__puntos">
-						<li>Qué hace cada rol y qué puede ver cada persona.</li>
-						<li>Qué datos guardamos: cuenta, fotos, mensajes, solicitudes y zonas de cobertura.</li>
-						<li>Que no usamos cookies de seguimiento ni de terceros, y por qué no hay un cartel.</li>
-						<li>Cómo pedir la eliminación de tus datos.</li>
-					</ul>
+						<ul class="terminos-modal__puntos">
+							<li>Qué hace cada rol y qué puede ver cada persona.</li>
+							<li>Qué datos guardamos: cuenta, fotos, mensajes, solicitudes y zonas de cobertura.</li>
+							<li>Que no usamos cookies de seguimiento ni de terceros, y por qué no hay un cartel.</li>
+							<li>Cómo pedir la eliminación de tus datos.</li>
+						</ul>
 
-					<label class="terminos-modal__check">
-						<input
-							type="checkbox"
-							class="vu-checkbox"
-							[checked]="aceptado()"
-							(change)="marcar($any($event.target).checked)"
-						/>
-						<span>
-							Leí los <a routerLink="/terminos" (click)="cerrarParaLeer()">términos y condiciones</a> y los
-							acepto.
-						</span>
-					</label>
+						<label class="terminos-modal__check">
+							<input
+								type="checkbox"
+								class="vu-checkbox"
+								[checked]="aceptado()"
+								(change)="marcar($any($event.target).checked)"
+							/>
+							<span>
+								Leí los <a routerLink="/terminos" (click)="cerrarParaLeer()">términos y condiciones</a> y los
+								acepto.
+							</span>
+						</label>
 
-					@if (error()) {
-						<p class="vu-alert vu-alert--error" role="alert">{{ error() }}</p>
-					}
+						@if (error()) {
+							<p class="vu-alert vu-alert--error" role="alert">{{ error() }}</p>
+						}
 					</div>
 
-					<button
-						type="button"
-						mat-flat-button
-						class="vu-btn vu-btn--ink vu-btn--block"
-						[disabled]="!aceptado() || guardando()"
-						(click)="aceptar()"
-					>
-						{{ guardando() ? 'Guardando...' : 'Aceptar y continuar' }}
-					</button>
+					<footer mat-dialog-actions class="terminos-modal__actions">
+						<button
+							type="button"
+							mat-flat-button
+							class="vu-btn vu-btn--ink vu-btn--block"
+							[disabled]="!aceptado() || guardando()"
+							(click)="aceptar()"
+						>
+							{{ guardando() ? 'Guardando...' : 'Aceptar y continuar' }}
+						</button>
+					</footer>
 				</section>
 			}
 		</ng-template>
@@ -75,11 +79,15 @@ import { ApiService } from '../core/services/api.service';
 	styles: [
 		`
 			.terminos-modal {
-				overflow-y: auto;
-				width: min(32rem, calc(100vw - 3rem));
+				display: flex;
+				flex-direction: column;
+				gap: 1rem;
+				max-height: min(82vh, 44rem);
+				overflow: hidden;
+				width: min(30rem, calc(100vw - 2rem));
 			}
 
-			.terminos-modal__title {
+			.terminos-modal__header {
 				margin: 0;
 				padding: 0;
 			}
@@ -100,7 +108,9 @@ import { ApiService } from '../core/services/api.service';
 			}
 
 			.terminos-modal__content {
+				flex: 1 1 auto;
 				max-height: 65vh;
+				overflow: auto;
 				padding: 0;
 			}
 
@@ -137,8 +147,16 @@ import { ApiService } from '../core/services/api.service';
 				margin-top: 1rem;
 			}
 
-			.terminos-modal .vu-btn {
-				margin-top: 1.25rem;
+			.terminos-modal__actions {
+				display: flex;
+				justify-content: stretch;
+				margin: 0;
+				padding: 0;
+			}
+
+			.terminos-modal__actions .vu-btn {
+				flex: 1 1 auto;
+				margin: 0;
 			}
 		`,
 	],
@@ -172,7 +190,7 @@ export class TerminosModal {
 					ariaLabel: 'Aceptación de términos y condiciones',
 					ariaModal: true,
 					disableClose: true,
-					maxWidth: 'min(34rem, calc(100vw - 2rem))',
+					maxWidth: 'min(30rem, calc(100vw - 2rem))',
 					panelClass: 'vu-details-dialog',
 				});
 				this.dialogRef.set(ref);

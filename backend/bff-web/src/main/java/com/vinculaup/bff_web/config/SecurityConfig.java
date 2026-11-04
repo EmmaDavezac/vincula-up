@@ -54,6 +54,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/solicitudes/panel").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/usuarios").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/usuarios/yo", "/api/usuarios/por-keycloak").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/notifications/vapid-public-key").permitAll()
+                .requestMatchers(HttpMethod.PUT, "/api/notifications/push-subscription").authenticated()
+                .requestMatchers(HttpMethod.DELETE, "/api/notifications/push-subscription").authenticated()
                 // Ficha de la contraparte: el profesional necesita los datos del
                 // cliente (y viceversa) para coordinar la solicitud, así que la
                 // lectura de un usuario por id exige sesión válida, no un rol puntual.

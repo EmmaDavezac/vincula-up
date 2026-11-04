@@ -158,6 +158,31 @@ public class BackendGateway {
         return get(usuarios, "/usuarios/{id}", null, null, id);
     }
 
+    public void guardarSuscripcionPush(UUID usuarioId, JsonNode body) {
+        try {
+            usuarios.put().uri("/usuarios/{id}/push-subscription", usuarioId)
+                    .body(body).retrieve().toBodilessEntity();
+        } catch (RestClientException exception) {
+            throw unavailable(exception);
+        }
+    }
+
+    public JsonNode listarSuscripcionesPush(UUID usuarioId) {
+        return get(usuarios, "/usuarios/{id}/push-subscription", null, null, usuarioId);
+    }
+
+    public void eliminarSuscripcionPush(UUID usuarioId, String endpoint) {
+        try {
+            usuarios.method(HttpMethod.DELETE).uri(uriBuilder -> uriBuilder
+                    .path("/usuarios/{id}/push-subscription")
+                    .queryParam("endpoint", endpoint)
+                    .build(usuarioId))
+                    .retrieve().toBodilessEntity();
+        } catch (RestClientException exception) {
+            throw unavailable(exception);
+        }
+    }
+
     /**
      * Resuelve perfiles nuevos por id de negocio y padrones históricos por id
      * de Keycloak. La búsqueda de fallback no envía email, por lo que el endpoint

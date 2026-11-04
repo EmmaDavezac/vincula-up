@@ -23,6 +23,7 @@ export type VuIconName =
 	| 'message-circle'
 	| 'moon'
 	| 'navigation'
+	| 'bell'
 	| 'paperclip'
 	| 'pause'
 	| 'pencil'
