@@ -38,6 +38,13 @@
   - `docker ps` muestra `vinculaup-keycloak` como `(healthy)`.
 - **Especificación:** Sin cambios en rutas ni contratos de API.
 
+### [2026-11-04] - fix: error 502 en POST /api/profesionales/alta (reaparición tras reinicio de Keycloak)
+- **Objetivo:** Resolver el error HTTP 502 Bad Gateway que volvió a devolver `POST /api/profesionales/alta` tras recrear el contenedor de Keycloak.
+- **Causa:** El BFF (`bff-web`) llevaba 2 horas arriba y mantenía conexiones HTTP en caché (keep-alive) y estado interno hacia la instancia anterior de Keycloak. Aunque el DNS resolvía correctamente (`keycloak` → `172.18.0.4`), las conexiones del `RestClient` de Spring apuntaban a una instancia ya terminada, provocando `I/O error` en todas las peticiones al Admin API de Keycloak y, en consecuencia, `502 BAD_GATEWAY` en `altaProfesional()`.
+- **Cambios realizados:** Se reinició el contenedor `bff-web` para limpiar su caché de conexiones HTTP y estado interno: `docker compose up -d --force-recreate bff-web`.
+- **Verificación:** `POST https://vincula-up.local/api/profesionales/alta` con token de ADMIN devuelve ahora `HTTP 201 Created` con el profesional creado, usuario vinculado, perfil pendiente, correo enviado y contraseña temporal.
+- **Especificación:** Sin cambios en rutas ni contratos de API.
+
 ### [2026-11-04] - ux: corregir listados admin en mobile y evitar recorte de contenido
 - **Objetivo:** Mejorar la legibilidad de los listados del panel administrativo en pantallas pequeñas, permitiendo que cada fila se adapte al ancho disponible y que el contenido no quede cortado.
 - **Cambios realizados:**
