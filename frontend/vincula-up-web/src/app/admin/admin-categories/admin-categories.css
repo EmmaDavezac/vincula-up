@@ -15,6 +15,7 @@
 	margin: 0;
 	padding: 0;
 	width: 100%;
+	margin-top: 1rem;
 }
 
 .admin-categories__row {
@@ -81,6 +82,9 @@
 	}
 }
 
+.admin-categories__row .vu-admin-field-label {
+	display: block;
+}
 /* ===== Escritorio / tablet ancha: tabla ===== */
 @media (min-width: 900px) {
 	.admin-categories__list {
@@ -97,7 +101,7 @@
 	}
 
 	.admin-categories__row--head {
-		border-bottom: 1px solid var(--ink);
+		border-bottom: 1px solid var(--line);
 		color: var(--muted);
 		display: grid;
 		font-size: 0.6875rem;

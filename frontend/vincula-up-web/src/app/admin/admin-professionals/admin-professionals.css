@@ -60,6 +60,7 @@
 	margin: 0;
 	padding: 0;
 	width: 100%;
+	margin-top: 1rem;
 }
 
 .admin-professionals__row {
@@ -147,7 +148,9 @@
 .admin-professionals__actions .vu-btn {
 	width: 100%;
 }
-
+.admin-professionals__row .vu-admin-field-label {
+	display: block;
+}
 /* ===== Escritorio / tablet ancha: tabla de una fila por profesional ===== */
 @media (min-width: 900px) {
 	.admin-professionals__list {
@@ -165,7 +168,7 @@
 	}
 
 	.admin-professionals__row--head {
-		border-bottom: 1px solid var(--ink);
+		border-bottom: 1px solid var(--line);
 		color: var(--muted);
 		display: grid;
 		font-size: 0.6875rem;

@@ -12,16 +12,12 @@
 } @else {
 	<div class="vu-page request">
 		<section class="request__section vu-container-sm">
-			<p class="vu-eyebrow-inline">Pedir un servicio</p>
+			 <div class="request__top">
+   	<p class="vu-eyebrow-inline">Pedir un servicio</p>
+   	<a class="vu-btn vu-btn--secondary" routerLink="/solicitudes">Cancelar solicitud</a>
+   </div>
 
-			@if (errorMessage()) {
-				<p class="vu-alert vu-alert--error request__alert" role="alert">{{ errorMessage() }}</p>
-			}
-			@if (professionalsError()) {
-				<p class="vu-alert vu-alert--error" role="alert">{{ professionalsError() }}</p>
-			}
-
-			<div class="vu-panel wizard">
+			<div class="vu-panel wizard" [attr.inert]="bloqueo() ? '' : null">
 				<ol class="request-stepper" aria-label="Pasos para crear una solicitud">
 					@for (item of steps; track item.key; let index = $index) {
 						<li
@@ -44,20 +40,10 @@
 				<!-- ── Paso 1: ¿Dónde necesitás el servicio? ── -->
 						@if (step() === 'location') {
 							<div class="wizard__body">
-								@if (locatorError()) {
-									<p class="vu-alert vu-alert--error" role="alert">{{ locatorError() }}</p>
-								}
-								@if (gpsError()) {
-									<p class="vu-alert vu-alert--error" role="alert">{{ gpsError() }}</p>
-								}
+								
 
 							<!-- 1) Dirección: el campo va primero, con el GPS como botón compacto al lado. -->
-					@if (gpsLoading()) {
-<div class="location-field__gps-loading">
-<vu-spinner [etiqueta]="'Verificando dirección…'" [size]="'sm'" />
-Verificando dirección…
-</div>
-}
+
 <p class="location-field__label">
 						<span>¿Dónde necesitás el servicio? <span class="vu-required">obligatorio</span></span>
 					</p>
@@ -86,22 +72,20 @@ Verificando dirección…
 										[attr.aria-label]="address() ? 'Mi ubicación: ' + address() : 'Usar mi ubicación'"
 										[title]="address() || 'Usar mi ubicación'"
 									>
-										@if (detectingGps()) {
+										@if (location().detecting) {
 <vu-spinner [etiqueta]="'Detectando ubicación…'" [size]="'sm'" />
 } @else {
-<vu-icon name="navigation" [size]="18" class="location-gps__icon" />
+<vu-icon name="location-crosshairs" [size]="18" class="location-gps__icon" />
 }
 										<span class="location-gps__label">Mi ubicación</span>
 									</button>
 								</div>
-								@if (locationSearching() || gpsLoading() || reverseGeocoding()) {
-									<div class="location-loading" role="status" aria-live="polite">
-										<mat-spinner class="request-spinner" diameter="18" aria-hidden="true" />
-										<span>
-											{{ locationSearching() ? 'Buscando direcciones...' : 'Consultando el servicio de mapas...' }}
-										</span>
-									</div>
-								}
+								 @if (locationSearching()) {
+   	<div class="location-loading" role="status" aria-live="polite">
+   		<mat-spinner class="request-spinner" diameter="18" aria-hidden="true" />
+   		<span>Buscando direcciones...</span>
+   	</div>
+   }
 
 								@if (locationSuggestionOpen() && locationSuggestions().length) {
 									<ul class="suggestions">
@@ -136,32 +120,48 @@ Cargando el mapa…
 
 				<!-- ── Paso 2: ¿Qué necesitás resolver? ── -->
 				@if (step() === 'specialty') {
-					<div class="wizard__body">
-						@if (loadingProfessionals() || loadingSpecialties()) {
-							<div class="request-loading" role="status" aria-live="polite">
-								<mat-spinner class="request-spinner" diameter="32" aria-label="Cargando categorías disponibles" />
-								<span>Consultando categorías disponibles...</span>
-							</div>
-						} @else if (!specialties().length) {
-							<p class="vu-body">No hay categorías con profesionales disponibles en este momento.</p>
-						} @else {
-							<div class="category-grid">
-								@for (specialty of specialties(); track specialty) {
-									<button
-										type="button"
-										class="category"
-										[class.is-active]="selectedSpecialty() === specialty"
-										[attr.aria-pressed]="selectedSpecialty() === specialty"
-										(click)="selectSpecialty(specialty)"
-									>
-										{{ specialty }}
-									</button>
-								}
-							</div>
-						}
-					</div>
-				}
+	<div class="wizard__body">
+		@if (loadingProfessionals() || loadingSpecialties()) {
+			<div class="request-loading" role="status" aria-live="polite">
+				<mat-spinner class="request-spinner" diameter="32" aria-label="Cargando categorías disponibles" />
+				<span>Consultando categorías disponibles...</span>
+			</div>
+		} @else if (!specialties().length) {
+			<p class="vu-body">No hay categorías con profesionales disponibles en este momento.</p>
+		} @else {
+			<div class="vu-field-with-icon specialty-search">
+				<vu-icon name="search" [size]="17" class="vu-field-icon" />
+				<span class="vu-sr-only">Buscar categoría</span>
+				<input
+					class="vu-input vu-input--search specialty-search__input"
+					type="search"
+					autocomplete="off"
+					placeholder="Buscar categoría (ej: plomería)"
+					[ngModel]="specialtySearch()"
+					(ngModelChange)="specialtySearch.set($event)"
+				/>
+			</div>
 
+			@if (!filteredSpecialties().length) {
+				<p class="vu-body">No encontramos categorías que coincidan con "{{ specialtySearch() }}".</p>
+			} @else {
+				<div class="category-grid">
+					@for (specialty of filteredSpecialties(); track specialty) {
+						<button
+							type="button"
+							class="category"
+							[class.is-active]="selectedSpecialty() === specialty"
+							[attr.aria-pressed]="selectedSpecialty() === specialty"
+							(click)="selectSpecialty(specialty)"
+						>
+							{{ specialty }}
+						</button>
+					}
+				</div>
+			}
+		}
+	</div>
+}
 				<!-- ── Paso 3: descripción del problema ── -->
 				@if (step() === 'problem') {
 					<div class="wizard__body">
@@ -202,6 +202,7 @@ Cargando el mapa…
 									<button
 										type="button"
 										class="day"
+										[disabled]="day.disabled"
 										[class.is-active]="selectedDay() === day.id"
 										[attr.aria-pressed]="selectedDay() === day.id"
 										(click)="elegirDia(day.id)"
@@ -221,11 +222,13 @@ Cargando el mapa…
 						<label class="vu-label">
 							Horario <span class="vu-required">obligatorio</span>
 							<select class="vu-select schedule__select" [ngModel]="selectedSlot()" (ngModelChange)="elegirHorario($event)">
-								<option value="" disabled>Elegí una franja horaria</option>
-								@for (slot of slotOptions; track slot.id) {
-									<option [value]="slot.id">{{ slot.label }}</option>
-								}
-							</select>
+  <option value="" disabled>Elegí una franja horaria</option>
+  @for (slot of slotsDisponibles(); track slot.id) {
+    <option [value]="slot.id" [disabled]="slot.disabled">
+      {{ slot.label }}{{ slot.disabled ? ' (no disponible)' : '' }}
+    </option>
+  }
+</select>
 						</label>
 
 						@if (turnoLegible) {
@@ -258,14 +261,12 @@ Cargando el mapa…
 							</div>
 						} @else if (!filteredProfessionals().length) {
 							<div class="empty-profs">
-								<p class="vu-body">
-									No hay técnicos disponibles para <b>{{ selectedSpecialty() }}</b> en este momento.
-									Elegí otra especialidad para continuar.
-								</p>
-								<button type="button" class="vu-btn vu-btn--outline" (click)="goToSpecialtyStep()">
-									Elegir otra especialidad
-								</button>
-							</div>
+  <p class="vu-body">
+    No hay técnicos de <b>{{ selectedSpecialty() }}</b> disponibles el {{ turnoLegible }}, {{ selectedSlotLabel }}.
+  </p>
+  <button type="button" class="vu-btn vu-btn--outline" (click)="goToDayStep()">Elegir otro día u horario</button>
+  <button type="button" class="vu-btn vu-btn--outline" (click)="goToSpecialtyStep()">Elegir otra especialidad</button>
+</div>
 						} @else {
 							<div class="professionals__list">
 								@for (prof of filteredProfessionals(); track prof.id) {
@@ -313,7 +314,6 @@ Cargando el mapa…
 						<button type="button" class="wizard__back-btn" [class.is-hidden]="pasoActual === 1" (click)="goBack()">
 							Atrás
 						</button>
-						<a class="wizard__cancel" routerLink="/solicitudes">Cancelar solicitud</a>
 					</div>
 
 					@if (pasoActual < steps.length) {
@@ -322,18 +322,22 @@ Cargando el mapa…
 						</button>
 					} @else {
 						<button type="button" class="vu-btn vu-btn--coral" [disabled]="!canContinue || enviandoSolicitud()" (click)="submit()">
-							@if (enviandoSolicitud()) {
-								<mat-spinner class="request-spinner request-spinner--button" diameter="18" aria-label="Enviando solicitud" />
-							}
-							{{ enviandoSolicitud() ? 'Enviando...' : 'Enviar solicitud' }}
-						</button>
+	Enviar solicitud
+</button>
 					}
 				</div>
 			</div>
 		</section>
 	</div>
 }
-
+   @if (bloqueo(); as texto) {
+   	<div class="request-overlay" role="alert" aria-live="assertive" aria-busy="true">
+   		<div class="request-overlay__box">
+   			<mat-spinner class="request-spinner" diameter="44" aria-hidden="true" />
+   			<p class="request-overlay__text">{{ texto }}</p>
+   		</div>
+   	</div>
+   }
 		@if (confirmandoSalida()) {
 			<vu-confirm
 				titulo="Salir de la solicitud"

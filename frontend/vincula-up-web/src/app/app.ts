@@ -8,9 +8,10 @@ import { VuTabbar } from './shared/tabbar/tabbar';
 import { TerminosModal } from './legal/terminos-modal';
 import { AuthService } from './core/services/auth.service';
 import { AuthLoading } from './shared/auth-loading/auth-loading';
+import { VuToasts } from './shared/toasts/toasts';
 
 @Component({
-  imports: [RouterOutlet, NavbarComponent, FooterComponent, AdminFooterComponent, VuTabbar, TerminosModal, AuthLoading],
+  imports: [RouterOutlet, NavbarComponent, FooterComponent, AdminFooterComponent, VuTabbar, TerminosModal, AuthLoading, VuToasts],
   selector: 'app-root',
   styleUrl: './app.css',
   templateUrl: './app.html',
@@ -20,10 +21,6 @@ export class App {
   private readonly router = inject(Router);
   private readonly urlActual = signal(this.router.url);
 
-  /**
-   * El panel de administración usa la misma barra superior que el resto del
-   * sitio; lo único que se oculta es el footer, que no aporta en un panel.
-   */
   readonly enPanelAdmin = computed(() => this.urlActual().startsWith('/admin'));
 
   constructor() {

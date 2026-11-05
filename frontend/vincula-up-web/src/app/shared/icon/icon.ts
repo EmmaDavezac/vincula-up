@@ -38,6 +38,7 @@ export type VuIconName =
 	| 'user-round'
 	| 'users'
 	| 'wrench'
+	| 'location-crosshairs'
 	| 'x';
 
 /**

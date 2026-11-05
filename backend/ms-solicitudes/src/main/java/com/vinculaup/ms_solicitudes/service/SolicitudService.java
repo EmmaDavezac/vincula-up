@@ -54,8 +54,8 @@ public class SolicitudService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "El profesional debe tener su perfil activado para recibir solicitudes");
         }
-        if (repository.existsByClienteIdAndEspecialidadIdAndEstadoIn(
-                request.clienteId(), request.especialidadId(), ESTADOS_ACTIVOS)) {
+        if (repository.existsActiveByClienteIdAndEspecialidadId(
+                request.clienteId(), request.especialidadId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Ya tenes una solicitud activa para esta especialidad");
         }
