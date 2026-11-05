@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Vincula-UP">
+	<!--
+	Favicon del login de Keycloak.
+
+	Es la MISMA figura que frontend/vincula-up-web/public/favicon.svg y que la que
+	dibuja scripts/generate-logo.py: cuadro coral con las esquinas redondeadas y
+	la V blanca. Se replica en SVG y no se copia el PNG porque el que hay en el
+	frontend es el que se manda por correo (donde los clientes no renderizan SVG)
+	y el favicon de una pestaña sí puede ser SVG.
+
+	Los colores van escritos a propósito: el icono se pinta fuera de la página
+	del login, así que no ve los tokens del tema y necesita su propio valor.
+
+	Si cambia la marca hay que rehacer este archivo, el favicon.svg del frontend
+	y el PNG, y volver a correr scripts/generate-logo.py.
+	-->
+	<rect width="64" height="64" rx="15" fill="#e35f43" />
+	<path d="M17 18h11l4 18 4-18h11L32 46z" fill="#ffffff" />
+</svg>

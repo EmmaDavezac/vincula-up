@@ -23,6 +23,7 @@ export type VuIconName =
 	| 'message-circle'
 	| 'moon'
 	| 'navigation'
+	| 'bell'
 	| 'paperclip'
 	| 'pause'
 	| 'pencil'
@@ -37,6 +38,7 @@ export type VuIconName =
 	| 'user-round'
 	| 'users'
 	| 'wrench'
+	| 'location-crosshairs'
 	| 'x';
 
 /**

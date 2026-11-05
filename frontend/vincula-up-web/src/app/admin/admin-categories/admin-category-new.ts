@@ -4,7 +4,6 @@ import { Router, RouterLink } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 import { AdminSpecialty, avisoError, avisoExito } from '../../core/models/admin';
 import { ApiService } from '../../core/services/api.service';
-import { VuIcon } from '../../shared/icon/icon';
 
 /**
  * Alta de una categoría (especialidad), en su propia pantalla.
@@ -16,7 +15,7 @@ import { VuIcon } from '../../shared/icon/icon';
  */
 @Component({
 	selector: 'app-admin-category-new',
-	imports: [FormsModule, RouterLink, VuIcon],
+	imports: [FormsModule, RouterLink],
 	templateUrl: './admin-category-new.html',
 	styleUrl: './admin-category-new.css',
 })

@@ -5,6 +5,8 @@
     <title>Vincula-UP | Red técnica con respaldo universitario</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f6f3ec" />
+    <link rel="manifest" href="manifest.webmanifest" />
     <!--
       El icono va en los tres formatos porque los tres hacen falta y se pisarian
       entre si si faltara alguno:
@@ -41,7 +43,11 @@
        */
       (function () {
         try {
-          var guardado = localStorage.getItem('vincula-up-tema');
+          var clave = 'vincula-up-tema';
+          var cookie = document.cookie
+            .split('; ')
+            .find(function (item) { return item.indexOf(clave + '=') === 0; });
+          var guardado = cookie ? cookie.slice(clave.length + 1) : localStorage.getItem(clave);
           var oscuro =
             guardado === 'oscuro' ||
             (guardado !== 'claro' && window.matchMedia('(prefers-color-scheme: dark)').matches);

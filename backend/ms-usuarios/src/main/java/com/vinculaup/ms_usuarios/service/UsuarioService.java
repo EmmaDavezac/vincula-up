@@ -6,7 +6,9 @@ import com.vinculaup.ms_usuarios.dto.UsuarioResponse;
 import com.vinculaup.ms_usuarios.entity.EstadoUsuario;
 import com.vinculaup.ms_usuarios.entity.RolNegocio;
 import com.vinculaup.ms_usuarios.entity.Usuario;
+import com.vinculaup.ms_usuarios.entity.SuscripcionPush;
 import com.vinculaup.ms_usuarios.repository.UsuarioRepository;
+import com.vinculaup.ms_usuarios.repository.SuscripcionPushRepository;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -20,9 +22,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class UsuarioService {
 
     private final UsuarioRepository repository;
+    private final SuscripcionPushRepository suscripcionesPush;
 
-    public UsuarioService(UsuarioRepository repository) {
+    public UsuarioService(UsuarioRepository repository, SuscripcionPushRepository suscripcionesPush) {
         this.repository = repository;
+        this.suscripcionesPush = suscripcionesPush;
     }
 
     /**
@@ -213,5 +217,30 @@ public class UsuarioService {
         Usuario usuario = findUsuario(id);
         usuario.aceptarTerminos(version);
         return toResponse(usuario);
+    }
+
+    @Transactional
+    public void guardarSuscripcionPush(UUID usuarioId, String endpoint, String p256dh, String auth) {
+        findUsuario(usuarioId);
+        if (endpoint == null || !endpoint.startsWith("https://")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El endpoint de push debe usar HTTPS");
+        }
+        SuscripcionPush existente = suscripcionesPush.findByEndpoint(endpoint).orElse(null);
+        if (existente == null) {
+            suscripcionesPush.save(new SuscripcionPush(usuarioId, endpoint, p256dh, auth));
+        } else {
+            existente.actualizar(usuarioId, p256dh, auth);
+            suscripcionesPush.save(existente);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<SuscripcionPush> listarSuscripcionesPush(UUID usuarioId) {
+        return suscripcionesPush.findByUsuarioId(usuarioId);
+    }
+
+    @Transactional
+    public void eliminarSuscripcionPush(UUID usuarioId, String endpoint) {
+        suscripcionesPush.deleteByUsuarioIdAndEndpoint(usuarioId, endpoint);
     }
 }

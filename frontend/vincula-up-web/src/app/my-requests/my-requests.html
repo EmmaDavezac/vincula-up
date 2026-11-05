@@ -12,7 +12,6 @@
 			</div>
 			@if (isClient()) {
 				<a class="vu-btn vu-btn--coral requests__new" routerLink="/solicitar">
-					<vu-icon name="plus" [size]="17" />
 					Nueva solicitud
 				</a>
 			}
@@ -175,7 +174,6 @@
 						-->
 						@if (estadosDisponibles(request).length) {
 							<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="abrirActualizarEstado(request)">
-								<vu-icon name="pencil" [size]="15" />
 								Actualizar estado
 							</button>
 						}
@@ -183,7 +181,6 @@
 						<!-- El chat queda disponible para los dos lados una vez aceptada. -->
 						@if (request.status === 'ACEPTADA') {
 							<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="toggleChat(request.id)">
-								<vu-icon name="message-circle" [size]="16" />
 								{{ activeChatId() === '' + request.id ? 'Cerrar chat' : 'Ir al chat' }}
 							</button>
 						}
@@ -232,7 +229,7 @@
 								></textarea>
 								<button
 									type="button"
-									class="vu-btn vu-btn--coral vu-btn--pill vu-btn--block"
+									class="vu-btn vu-btn--coral vu-btn--block"
 									(click)="submitRating(request)"
 									[disabled]="submittingRating() || !getScore(request.id)"
 								>
@@ -244,18 +241,18 @@
 				</article>
 			}
 			</div>
-		<!-- ── Chat de coordinación (modal) ── -->
-		@if (activeRequest(); as chat) {
-			<div class="modal-overlay" (click)="toggleChat(chat.id)">
-				<section class="chat-modal" role="dialog" aria-modal="true" aria-label="Chat de la solicitud" (click)="$event.stopPropagation()">
-					<header class="chat-modal__head">
+		<!-- ── Chat de coordinación ── -->
+		<ng-template #chatDialog>
+			@if (activeRequest(); as chat) {
+				<section class="chat-modal">
+					<header mat-dialog-title class="chat-modal__head">
 						<div>
 							<p class="vu-eyebrow-sm">{{ chat.date }} · {{ horarioLabel(chat) }}</p>
 							<h2 class="chat-modal__title">Chat con {{ isProfessional() ? clienteNombre(chat) : profesionalNombre(chat) }}</h2>
 						</div>
-						<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="toggleChat(chat.id)">Cerrar</button>
+						<button type="button" mat-button class="vu-btn vu-btn--quiet vu-btn--sm" (click)="toggleChat(chat.id)">Cerrar</button>
 					</header>
-					<div class="chat-modal__messages">
+					<div mat-dialog-content class="chat-modal__messages">
 						@for (message of chatMessages()[chat.id] ?? []; track message.id) {
 							<div class="bubble-row" [class.is-mine]="message.emisorId === auth.currentUser()?.id">
 								<div class="bubble">
@@ -271,34 +268,28 @@
 						<div class="chat-modal__composer">
 							<input class="vu-input chat-modal__input" [ngModel]="chatInput()" (ngModelChange)="chatInput.set($event)"
 								placeholder="Escribí un mensaje..." (keyup.enter)="sendMessage(chat.id)" />
-							<button type="button" class="vu-btn vu-btn--ink vu-btn--icon" (click)="sendMessage(chat.id)"
+							<button type="button" mat-flat-button class="vu-btn vu-btn--ink vu-btn--icon" (click)="sendMessage(chat.id)"
 								[disabled]="sendingChat() || !chatInput().trim()" aria-label="Enviar mensaje">
 								<vu-icon name="send" [size]="16" />
 							</button>
 						</div>
 					}
 				</section>
-			</div>
-		}
+			}
+		</ng-template>
 	}
 
-		<!-- ── Actualizar estado (modal único para cliente y profesional) ── -->
-	@if (solicitudDelModal(); as solicitud) {
-		<div class="modal-overlay" (click)="cerrarActualizarEstado()">
-			<section
-				class="status-modal"
-				role="dialog"
-				aria-modal="true"
-				aria-label="Actualizar estado de la solicitud"
-				(click)="$event.stopPropagation()"
-			>
-				<header class="status-modal__head">
+		<ng-template #statusDialog>
+		@if (solicitudDelModal(); as solicitud) {
+			<section class="status-modal">
+				<header mat-dialog-title class="status-modal__head">
 					<h2 class="status-modal__title">Actualizar estado</h2>
-					<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="cerrarActualizarEstado()" aria-label="Cerrar">
+					<button type="button" mat-button class="vu-btn vu-btn--quiet vu-btn--sm" (click)="cerrarActualizarEstado()" aria-label="Cerrar">
 						<vu-icon name="x" [size]="18" />
 					</button>
 				</header>
 
+				<div mat-dialog-content class="status-modal__content">
 				<p class="status-modal__lead">
 					{{ nombreContraparte(solicitud) }} · {{ solicitud.date }} · {{ horarioLabel(solicitud) }}
 				</p>
@@ -307,39 +298,34 @@
 					@for (opcion of estadosDisponibles(solicitud); track opcion) {
 						<button
 							type="button"
+							mat-flat-button
 							class="status-option"
 							[class.is-cancel]="opcion === 'CANCELADA'"
 							[class.is-reject]="opcion === 'RECHAZADA'"
 							(click)="elegirEstado(solicitud, opcion)"
 						>
-							<vu-icon [name]="iconoEstado(opcion)" [size]="16" />
 							{{ etiquetaEstado(opcion) }}
 						</button>
 					}
 				</div>
 
-				<button type="button" class="vu-btn vu-btn--quiet vu-btn--block" (click)="cerrarActualizarEstado()">Volver</button>
+				</div>
 			</section>
-		</div>
-	}
+		}
+		</ng-template>
 
 	<!-- Cancelación: única transición que pide un mensaje, y es obligatorio. -->
-	@if (estadoAConfirmar() && solicitudDelModal(); as solicitud) {
-		<div class="modal-overlay" (click)="volverAEstadoOpciones()">
-			<section
-				class="status-modal"
-				role="dialog"
-				aria-modal="true"
-				aria-label="Motivo de la cancelación"
-				(click)="$event.stopPropagation()"
-			>
-				<header class="status-modal__head">
+	<ng-template #cancelDialog>
+		@if (estadoAConfirmar() && solicitudDelModal(); as solicitud) {
+			<section class="status-modal">
+				<header mat-dialog-title class="status-modal__head">
 					<h2 class="status-modal__title">Cancelar la solicitud</h2>
-					<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="volverAEstadoOpciones()" aria-label="Cerrar">
+					<button type="button" mat-button class="vu-btn vu-btn--quiet vu-btn--sm" (click)="volverAEstadoOpciones()" aria-label="Cerrar">
 						<vu-icon name="x" [size]="18" />
 					</button>
 				</header>
 
+				<div mat-dialog-content class="status-modal__content">
 				<p class="status-modal__lead">
 					{{ nombreContraparte(solicitud) }} · {{ solicitud.date }} · {{ horarioLabel(solicitud) }}
 				</p>
@@ -359,16 +345,16 @@
 				@if (motivoError()) {
 					<p class="status-modal__error" role="alert">{{ motivoError() }}</p>
 				}
+				</div>
 
-				<div class="status-modal__actions">
-					<button type="button" class="vu-btn vu-btn--quiet" (click)="volverAEstadoOpciones()">Volver</button>
-					<button type="button" class="vu-btn vu-btn--danger" (click)="confirmarCancelacion()">
+				<div mat-dialog-actions class="status-modal__actions">
+					<button type="button" mat-flat-button class="vu-btn vu-btn--danger" (click)="confirmarCancelacion()">
 						Confirmar cancelación
 					</button>
 				</div>
 			</section>
-		</div>
-	}
+		}
+	</ng-template>
 </section>
 </div>
 

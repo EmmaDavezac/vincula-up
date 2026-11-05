@@ -150,7 +150,10 @@ el BFF (`backend/bff-web`), que cumple cuatro funciones:
 1. **Agregación.** El listado de profesionales devuelve solo `usuarioId` (el
    nombre y apellido viven en `ms-usuarios`). El BFF los pega en cada tarjeta
    con `enriquecerConUsuarios()` (`ApiController.java:160`), en una sola pasada
-   indexada por UUID para no hacer una llamada por tarjeta.
+  indexada por UUID para no hacer una llamada por tarjeta. Para perfiles
+  históricos cuyo `usuarioId` todavía contiene el `keycloakId`, el BFF hace un
+  lookup de solo lectura por esa identidad y publica el `usuarioId` interno
+  resuelto, que es el que requiere el endpoint privado de fotos.
 2. **Autorización.** Valida el JWT contra el JWKS de Keycloak y aplica el RBAC.
    Los microservicios no exponen autenticación propia y por eso no se publican
    fuera de `127.0.0.1`.
@@ -402,6 +405,7 @@ son `UUID` en todas partes.
 | `fechaCarga` | OffsetDateTime | Alta en el padrón |
 | `fechaActivacion` | OffsetDateTime | Completó los 3 pasos de activación |
 | `especialidades` | `Set<Especialidad>` | Relación N:N |
+| `horarios` | `Array<{ diaSemana: String, horaInicio: LocalTime, horaFin: LocalTime }>` | Horarios de disponibilidad semanal configurados por el profesional. Utilizados por el frontend para filtrar técnicos según el día y hora solicitados. |
 
 ### 7.3 `ms-profesionales` — Especialidad y Disponibilidad
 
@@ -477,6 +481,8 @@ que no quede una ruta con la que pedirle la foto a cualquiera.
 8. Se guarda el access_token y el perfil en localStorage
 9. La app llama a /api/usuarios/por-keycloak con el sub del token
 10. El BFF vincula o recupera el usuario de negocio
+11. Mientras se verifica la cuenta, la SPA muestra una pantalla de carga; el
+  acceso al contenido y la comprobación legal esperan la respuesta.
 ```
 
 La URL de **registro** de Keycloak se usa por separado
@@ -587,9 +593,12 @@ que es lo único que define qué versión está vigente.
 
 **El flujo:**
 
-1. La app llama a `GET /api/usuarios/yo` (que ya hacía) y lee los tres campos.
-2. Si la versión guardada no es la vigente, `terminosPendientes` es `true`.
-3. Aparece un modal montado en `app.html`, **sin botón de cerrar**.
+1. La app muestra una pantalla de carga mientras consulta `GET /api/usuarios/yo`
+  y lee los tres campos.
+2. Solo después de que responda el backend, si la versión guardada no es la
+  vigente, `terminosPendientes` es `true`.
+3. Aparece un modal montado en `app.html`, **sin botón de cerrar**. Si la consulta
+  falla, el modal no aparece y la pantalla de carga ofrece reintentar.
 4. Al marcar el casillero, `PATCH /api/terminos/aceptar` guarda versión y fecha.
 
 **Por qué es un modal y no un guard.** Es una capa sobre toda la aplicación, no
@@ -643,6 +652,33 @@ cuentas antiguas ([§16](#16-deuda-técnica-conocida)).
 > corriendo, `scripts/{linux-macos,windows}/keycloak-bootstrap.*` lo actualizan de
 > forma idempotente ([§14.1](#141-keycloak-bootstrap-sh--ps1)).
 
+**Recuperación de contraseña.** El login ofrece «¿Olvidaste tu contraseña?» y
+Keycloak recibe el correo y emite el enlace de recuperación con caducidad; la
+persona define la nueva clave en el formulario del tema `vincula-up`. No se
+mantiene una ruta de restablecimiento paralela en Angular ni en el BFF. El flujo
+requiere SMTP operativo en el realm: el bootstrap configura esos valores desde
+`KEYCLOAK_SMTP_*` en `.env`. En la revisión del 2026-11-01, las variables locales
+de usuario, contraseña y remitente estaban configuradas y se verificó el render
+del enlace y del formulario; no se envió un correo de prueba.
+
+**Notificaciones web de solicitudes.** La navbar muestra una bandeja Angular para
+clientes y profesionales. El servicio consulta `/api/solicitudes/mias` cada 30
+segundos, compara estados con el snapshot por cuenta y crea un aviso cuando
+detecta una transición. El historial y el estado leído/no leído se guardan en
+`localStorage`; las transiciones hechas por la sesión actual actualizan el
+snapshot para evitar un duplicado en el siguiente sondeo.
+
+La aplicación declara un manifest PWA y registra un service worker. Si la persona
+concede permiso, se usa la Notification API para mostrar el aviso del sistema
+cuando la pestaña está en segundo plano; el clic abre `/solicitudes`. En primer
+plano el aviso queda en la bandeja para evitar notificaciones duplicadas.
+
+**Límite de esta fase:** no hay suscripción ni servidor Web Push. El navegador no
+puede entregar cambios hechos por otra persona cuando la aplicación está cerrada
+o el service worker está detenido; el sondeo solo funciona mientras hay una página
+abierta. El push real requiere guardar suscripciones y un emisor backend con VAPID,
+además de gestionar expiración y revocación.
+
 **Clientes:**
 
 | Client | Tipo | Uso |
@@ -672,17 +708,22 @@ cuentas antiguas ([§16](#16-deuda-técnica-conocida)).
 
 ### 9.1 Cliente: pedir un turno
 
-Ruta `/solicitar`, en **4 pasos** (wizard de 1101 líneas en `request.ts`):
+Ruta `/solicitar`, en **6 pasos** (`request.ts`):
 
 | Paso | Qué hace | Validación |
 |---|---|---|
 | 1. **Ubicación** | Escribe la dirección o la marca en el mapa. Se geocodifica a coordenadas | Obligatorio. La dirección exacta se difiere hasta que el profesional acepta |
-| 2. **Categoría** | Elige la especialidad | Obligatorio |
-| 3. **Día y horario** | Elige día de la semana y franja, contra la disponibilidad real del profesional | Obligatorio. Se filtran horarios ya pasados |
-| 4. **Profesional** | Elige entre los profesionales de esa especialidad, ordenados por cercanía | Obligatorio |
+| 2. **Categoría** | Elige una especialidad con al menos un profesional activo | Obligatorio; el catálogo se filtra para no ofrecer categorías sin profesionales |
+| 3. **Problema** | Describe brevemente el trabajo solicitado | Obligatorio; mínimo 10 caracteres |
+| 4. **Día** | Elige una fecha desde hoy hasta los próximos seis días; cada opción muestra el día de semana y el día del mes | Obligatorio |
+| 5. **Horario** | Elige una franja horaria | Obligatorio |
+| 6. **Profesional** | Elige entre los profesionales de esa categoría y ordena por cercanía o reputación | Obligatorio |
 
 Al enviar: se valida en `ms-solicitudes` que el profesional esté `ACTIVO` y que
 haya cobertura para las coordenadas del servicio. La solicitud nace `PENDIENTE`.
+El wizard indica visualmente los seis pasos y, si se intenta abandonar `/solicitar`
+antes del envío, pide confirmación para evitar perder lo completado. Las consultas
+de categorías/profesionales y el envío muestran el spinner de Angular Material.
 
 **Chat y calificación.** En `/solicitudes` el cliente ve el estado, escribe
 mensajes dentro de cada solicitud, cancela mientras siga `PENDIENTE` y, cuando el
@@ -1056,8 +1097,8 @@ correo se está mandando, así que cambiar una palabra no puede romper la maquet
 >    login sí viene; con las de correo no. Por eso el contacto y la URL se leen
 >    de `theme.properties` (vía `properties`) y no de atributos del realm.
 
-**El aviso de alta** lo escribe el BFF (`NotificacionService`), no
-Keycloak, y su maqueta está en
+**Los avisos transaccionales** los escribe el BFF (`NotificacionService`), no
+Keycloak. El aviso de alta de profesional tiene su maqueta en
 `backend/bff-web/src/main/resources/correos/prerregistro.html`.
 
 > **Por qué ese archivo va en el disco y no en el jar.** El `Dockerfile` lo copia
@@ -1089,6 +1130,15 @@ para comprobar que el tema renderiza y que el `Reply-To` sale efectivamente.
 |---|---|
 | Recuperación de contraseña (`resetPasswordAllowed`) | La persona desde "¿Olvidó su contraseña?" del login |
 | Aviso de alta | El alta de un profesional en el panel (`POST /api/profesionales/alta`) |
+| Nueva solicitud | Creación confirmada (`POST /api/solicitudes`), al profesional destinatario |
+| Solicitud aceptada o rechazada | Transición confirmada, al cliente que la creó |
+| Solicitud completada o cancelada | Transición confirmada, a la contraparte |
+
+Los avisos de solicitudes son **best-effort**: el BFF los envía después de que
+`ms-solicitudes` confirme la operación. Un problema de SMTP o la falta de email
+del destinatario se registra en el log, pero no revierte ni hace fallar una
+transición ya guardada. No se envían notificaciones dentro de la aplicación en
+esta fase.
 > **El valor nunca se versiona.** La contraseña vive solo en el `.env` local, que
 > está en `.gitignore` y no se sube al repositorio. Las tablas de arriba y el
 > `.env.example` documentan la variable, nunca su contenido.
@@ -1324,6 +1374,11 @@ Es necesario porque `start-dev --import-realm` importa el realm **solo la
 primera vez**: como Keycloak persiste en Postgres, los cambios posteriores al
 JSON (auto-registro, rol por defecto, client de servicio, SMTP) no se aplican
 solos. **Sin él, el registro de usuarios no funciona.**
+
+Además, la stack de Docker incluye un servicio `keycloak-init` que se dispara
+cada vez que arranca el entorno y vuelve a ejecutar el `kcadm update` para
+forzar `loginTheme=vincula-up` y `emailTheme=vincula-up`. Esto evita que el tema
+se pierda al recrear el contenedor o al reiniciar el entorno local.
 
 ```bash
 ./scripts/linux-macos/keycloak-bootstrap.sh                              # Linux / macOS
@@ -1575,7 +1630,8 @@ describiendo la identidad visual. El detalle del segundo tema está en el
 
 ### 17.3 Radios y sombras
 
-- Botones e inputs: `8px`–`10px`
+- Botones: radio uniforme de `8px` en todos los temas y componentes.
+- Inputs: cuadrados, según la guía visual del formulario.
 - Tarjetas y paneles: `16px`
 - Chips y badges: `999px` (píldora)
 - Sombras orgánicas: `0 2px 8px rgba(30, 41, 38, 0.04)`
@@ -1594,9 +1650,15 @@ apretar.
 |---|---|---|
 | `vu-btn--ink` | Relleno oscuro, texto claro | Acción principal de la pantalla |
 | `vu-btn--coral` | Relleno coral | Acción que crea algo nuevo |
-| `vu-btn--outline` | Fondo transparente, borde | Acciones secundarias en grupo |
+| `vu-btn--outline` | Fondo transparente con borde en claro; superficie clara y tinta oscura en oscuro | Acciones secundarias en grupo |
 | `vu-btn--quiet` | Borde tenue, sin relleno | Cancelar, cerrar, acciones terciarias |
 | `vu-btn--danger` | Relleno de alerta | Borrado y acciones irreversibles |
+
+Todos los botones HTML, enlaces-botón y toggles Material usan forma rectangular
+con radio de `8px`, incluidos los controles icon-only. En tema oscuro, `vu-btn--outline` usa fondo claro y tinta
+oscura para conservar contraste frente al primario sólido; `vu-btn--quiet`
+permanece transparente con borde más visible. Estas reglas se definen globalmente
+en `src/styles.css` y aplican en todas las páginas.
 
 **El hover solo cambia color, nunca mueve nada.** La transición es de
 `background-color`, `border-color` y `color`; no incluye `transform`. Un botón que
@@ -1740,12 +1802,18 @@ tocar estos archivos.
 
 **Cómo se decide.** Tres estados en `TemaService`: `claro`, `oscuro` y `sistema`.
 La primera visita usa `sistema` (respeta `prefers-color-scheme`); desde ahí en
-adelante manda la elección, guardada en `localStorage` bajo `vincula-up-tema`. Si
-queda en `sistema`, sigue en vivo los cambios del ajuste del sistema con la app
-abierta.
+adelante manda la elección, guardada en `localStorage` y en una cookie de mismo
+host bajo `vincula-up-tema`. La cookie comparte la preferencia con las pantallas
+de Keycloak aunque usen otro puerto. Si queda en `sistema`, sigue en vivo los
+cambios del ajuste del sistema con la app abierta.
 
 **Cómo se aplica.** Como atributo `data-tema` en `<html>`, que es lo que lee el
 bloque `[data-tema='oscuro']` de `styles.css`.
+
+El tema de acceso de Keycloak usa el mismo valor compartido: su layout ofrece un
+control accesible en login, registro y recuperación, y aplica la clase oscura de
+PatternFly junto con el atributo `data-tema`. Así el cambio elegido antes o
+durante la autenticación se conserva al volver a la SPA.
 
 **Por qué hay un script aparte en `index.html`.** Angular arranca después de que
 se pinte el primer fotograma, así que aplicar el tema desde el servicio dejaría

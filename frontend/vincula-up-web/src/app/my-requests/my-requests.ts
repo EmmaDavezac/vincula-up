@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal, TemplateRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -9,6 +9,9 @@ import { Professional } from '../core/models/professional';
 import { ApiService, ClienteInfo } from '../core/services/api.service';
 import { AuthService } from '../core/services/auth.service';
 import { RequestService } from '../core/services/request.service';
+import { NotificationService } from '../core/services/notification.service';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MatButtonModule } from '@angular/material/button';
 import { fotoUtil } from '../core/utils/photo';
 import { VuAvatar } from '../shared/avatar/avatar';
 import { VuConfirm } from '../shared/confirm/confirm';
@@ -39,15 +42,23 @@ interface RatingItem {
 }
 
 @Component({
-	imports: [CommonModule, RouterLink, FormsModule, VuAvatar, VuConfirm, VuIcon, VuSkeletonList, VuSpinner],
+	imports: [CommonModule, RouterLink, FormsModule, MatButtonModule, VuAvatar, VuConfirm, VuIcon, VuSkeletonList, VuSpinner],
 	selector: 'app-my-requests',
 	styleUrl: './my-requests.css',
 	templateUrl: './my-requests.html',
 })
 export class MyRequests {
   private readonly api = inject(ApiService);
+  private readonly dialog = inject(MatDialog);
+  @ViewChild('chatDialog') private chatDialog!: TemplateRef<unknown>;
+  @ViewChild('statusDialog') private statusDialog!: TemplateRef<unknown>;
+  @ViewChild('cancelDialog') private cancelDialog!: TemplateRef<unknown>;
+  private chatDialogRef?: MatDialogRef<unknown>;
+  private statusDialogRef?: MatDialogRef<unknown>;
+  private cancelDialogRef?: MatDialogRef<unknown>;
   readonly auth = inject(AuthService);
   private readonly requestService = inject(RequestService);
+  private readonly notifications = inject(NotificationService);
   private readonly sanitizer = inject(DomSanitizer);
 
   /** Cache de URLs de mapa: evita crear SafeResourceUrl en cada detección de cambios (ciclo NG0600). */
@@ -398,6 +409,16 @@ export class MyRequests {
     this.estadoAConfirmar.set(null);
     this.motivoError.set('');
     this.updatingRequestId.set(String(request.id));
+    this.statusDialogRef = this.dialog.open(this.statusDialog, {
+      ariaLabel: 'Actualizar estado de la solicitud',
+      ariaModal: true,
+      maxWidth: 'min(32rem, calc(100vw - 2rem))',
+      panelClass: 'vu-details-dialog',
+    });
+    this.statusDialogRef.afterClosed().subscribe(() => {
+      this.statusDialogRef = undefined;
+      this.resetEstadoDialog();
+    });
   }
 
   /** Solicitud abierta en el modal de estado (o null). */
@@ -426,6 +447,14 @@ export class MyRequests {
   }
 
   cerrarActualizarEstado(): void {
+    this.statusDialogRef?.close();
+    this.cancelDialogRef?.close();
+    this.statusDialogRef = undefined;
+    this.cancelDialogRef = undefined;
+    this.resetEstadoDialog();
+  }
+
+  private resetEstadoDialog(): void {
     this.updatingRequestId.set(null);
     this.motivoEstado.set('');
     this.estadoAConfirmar.set(null);
@@ -442,6 +471,18 @@ export class MyRequests {
       this.estadoAConfirmar.set(nuevo);
       this.motivoEstado.set('');
       this.motivoError.set('');
+      this.cancelDialogRef = this.dialog.open(this.cancelDialog, {
+        ariaLabel: 'Motivo de la cancelación',
+        ariaModal: true,
+        maxWidth: 'min(32rem, calc(100vw - 2rem))',
+        panelClass: 'vu-details-dialog',
+      });
+      this.cancelDialogRef.afterClosed().subscribe(() => {
+        this.cancelDialogRef = undefined;
+        if (this.estadoAConfirmar()) {
+          this.volverAEstadoOpciones();
+        }
+      });
       return;
     }
     this.confirmacionTransicion.set({ request, nuevo });
@@ -505,6 +546,8 @@ export class MyRequests {
 
   /** Vuelve a la lista de opciones sin cerrar el modal. */
   volverAEstadoOpciones(): void {
+    this.cancelDialogRef?.close();
+    this.cancelDialogRef = undefined;
     this.estadoAConfirmar.set(null);
     this.motivoEstado.set('');
     this.motivoError.set('');
@@ -544,6 +587,7 @@ export class MyRequests {
       this.cerrarActualizarEstado();
       if (!updated) return;
       this.requestService.updateStatus(request.id, updated.status);
+      this.notifications.markStatusHandledLocally(request.id, updated.status);
       this.successMessage.set(
         nuevo === 'COMPLETADA' ? 'La solicitud fue marcada como completada. ¡Ahora podés calificar el servicio!'
         : nuevo === 'CANCELADA' ? 'Cancelaste la solicitud. La contraparte ve el motivo que escribiste.'
@@ -558,10 +602,23 @@ export class MyRequests {
   toggleChat(requestId: string | number): void {
     const idStr = String(requestId);
     if (this.activeChatId() === idStr) {
+      this.chatDialogRef?.close();
+      this.chatDialogRef = undefined;
       this.activeChatId.set(null);
     } else {
+      this.chatDialogRef?.close();
       this.activeChatId.set(idStr);
       this.loadMessages(idStr);
+      this.chatDialogRef = this.dialog.open(this.chatDialog, {
+        ariaLabel: 'Chat de la solicitud',
+        ariaModal: true,
+        maxWidth: 'min(36rem, calc(100vw - 2rem))',
+        panelClass: 'vu-details-dialog',
+      });
+      this.chatDialogRef.afterClosed().subscribe(() => {
+        this.chatDialogRef = undefined;
+        this.activeChatId.set(null);
+      });
     }
   }
 

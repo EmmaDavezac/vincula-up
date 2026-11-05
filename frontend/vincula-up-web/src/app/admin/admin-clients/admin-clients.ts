@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, TemplateRef, ViewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -18,6 +18,9 @@ import {
 	nombreCompleto,
 } from '../../core/models/admin';
 import { ApiService } from '../../core/services/api.service';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MatButtonModule } from '@angular/material/button';
+import { MatListModule } from '@angular/material/list';
 import { VuAvatar } from '../../shared/avatar/avatar';
 import { VuConfirm } from '../../shared/confirm/confirm';
 import { VuIcon } from '../../shared/icon/icon';
@@ -30,12 +33,15 @@ import { VuSkeletonList } from '../../shared/skeleton-list/skeleton-list';
  */
 @Component({
 	selector: 'app-admin-clients',
-	imports: [DatePipe, FormsModule, RouterLink, VuAvatar, VuConfirm, VuIcon, VuSkeletonList],
+	imports: [DatePipe, FormsModule, RouterLink, MatButtonModule, MatListModule, VuAvatar, VuConfirm, VuIcon, VuSkeletonList],
 	templateUrl: './admin-clients.html',
 	styleUrl: './admin-clients.css',
 })
 export class AdminClients {
 	private readonly api = inject(ApiService);
+	private readonly dialog = inject(MatDialog);
+	@ViewChild('clientDetailDialog') private clientDetailDialog!: TemplateRef<unknown>;
+	private detailDialogRef?: MatDialogRef<unknown>;
 
 	readonly clients = signal<AdminUser[]>([]);
 	readonly loading = signal(true);
@@ -150,9 +156,17 @@ export class AdminClients {
 	abrirDetalle(client: AdminUser): void {
 		this.aviso.set({ texto: '', tipo: 'info' });
 		this.modal.set(client);
+		this.detailDialogRef = this.dialog.open(this.clientDetailDialog, {
+			ariaLabel: 'Detalle del cliente',
+			ariaModal: true,
+			maxWidth: 'min(38rem, calc(100vw - 2rem))',
+			panelClass: 'vu-details-dialog',
+		});
+		this.detailDialogRef.afterClosed().subscribe(() => this.modal.set(null));
 	}
 
 	cerrarDetalle(): void {
+		this.detailDialogRef?.close();
 		this.modal.set(null);
 	}
 

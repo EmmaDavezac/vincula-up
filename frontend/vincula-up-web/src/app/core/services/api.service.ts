@@ -183,29 +183,41 @@ export class ApiService {
     const initials = realName
       ? realName.split(/\s+/).slice(0, 2).map((parte) => parte.charAt(0).toUpperCase()).join('')
       : 'P';
-    return {
-      id: String(raw['id'] ?? ''),
-      name,
-      specialty: especialidades.map((item) => item.nombre).join(' / ') || 'Servicio técnico',
-      zone: raw['zonaCoberturaLat'] != null && raw['zonaCoberturaLng'] != null
-        ? 'Zona de cobertura activa'
-        : 'Zona no informada',
-      // La reputación llega calculada desde el backend (promedio y cantidad de
-      // reseñas). Antes venía fija en 0 y ninguna tarjeta mostraba estrellas.
-      rating: this.numero(raw['promedio']),
-      reviews: this.numero(raw['cantidadCalificaciones']),
-      availability: 'Consultar disponibilidad',
-      initials,
-      accent: 'sky',
-      usuarioId: raw['usuarioId'] ? String(raw['usuarioId']) : undefined,
-      legajo: legajo || undefined,
-      nombre: nombre || null,
-      apellido: apellido || null,
-      especialidades,
-      // La foto no viene como URL: el backend manda solo el booleano y el
-      // `vu-avatar` pide la imagen por `/api/usuarios/{usuarioId}/foto`.
-      tieneFoto: raw['tieneFoto'] === true,
-      estado: typeof raw['estado'] === 'string' ? (raw['estado'] as string) : 'ACTIVO',
+    const disponibilidad = raw['disponibilidad'];
+        const horarios = Array.isArray(disponibilidad)
+            ? disponibilidad.map((slot) => ({
+                  diaSemana: slot.diaSemana ?? slot.dia,
+                  horaInicio: slot.horaInicio ?? slot.horaInicio,
+                  horaFin: slot.horaFin ?? slot.horaFin,
+              }))
+            : [];
+
+        return {
+          id: String(raw['id'] ?? ''),
+          name,
+          specialty: especialidades.map((item) => item.nombre).join(' / ') || 'Servicio técnico',
+          zone: raw['zonaCoberturaLat'] != null && raw['zonaCoberturaLng'] != null
+            ? 'Zona de cobertura activa'
+            : 'Zona no informada',
+          // La reputación llega calculada desde el backend (promedio y cantidad de
+          // reseñas). Antes venía fija en 0 y ninguna tarjeta mostraba estrellas.
+          rating: this.numero(raw['promedio']),
+          reviews: this.numero(raw['cantidadCalificaciones']),
+          availability: horarios.length > 0 ? 'Disponible' : 'Consultar disponibilidad',
+          horarios,
+          initials,
+          accent: 'sky',
+          usuarioId: raw['usuarioId'] ? String(raw['usuarioId']) : undefined,
+          legajo: legajo || undefined,
+          nombre: nombre || null,
+          apellido: apellido || null,
+          especialidades,
+          // La foto no viene como URL: el backend manda solo el booleano y el
+          // `vu-avatar` pide la imagen por `/api/usuarios/{usuarioId}/foto`.
+          tieneFoto:
+            raw['tieneFoto'] === true ||
+            (typeof raw['fotoUrl'] === 'string' && raw['fotoUrl'].trim().length > 0),
+          estado: typeof raw['estado'] === 'string' ? (raw['estado'] as string) : 'ACTIVO',
       // Zona de cobertura: sin estos datos el directorio no puede calcular la
       // distancia ni el asistente ordenar por proximidad.
       zonaCoberturaLat: this.numeroONull(raw['zonaCoberturaLat']),

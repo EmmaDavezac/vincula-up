@@ -22,5 +22,9 @@ export interface Professional {
    * controla la visibilidad por rol.
    */
   tieneFoto?: boolean;
+  /** Recurso local de respaldo cuando el perfil de demostración no tiene foto subida. */
+  avatarFallback?: string | null;
   estado?: string;
+  /** Horarios de disponibilidad del profesional, si los provee el backend. */
+  horarios?: Array<{ diaSemana: number | string; horaInicio: string; horaFin: string }>;
 }

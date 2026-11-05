@@ -353,43 +353,12 @@
 	font-size: 0.875rem;
 }
 
-/* ── Modales ───────────────────────────────────────────────────────────── */
-
-.modal-overlay {
-	align-items: flex-end;
-	background: rgb(var(--shadow-color) / calc(0.4 * var(--shadow-strength)));
-	display: flex;
-	inset: 0;
-	justify-content: center;
-	position: fixed;
-	z-index: 60;
-}
-
-@media (min-width: 640px) {
-	.modal-overlay {
-		align-items: center;
-		padding: 1rem;
-	}
-}
-
-/* ── Modal "Actualizar estado" (estilo del prototipo) ──────────────────── */
+/* ── Diálogos Material de solicitud ────────────────────────────────────── */
 
 .status-modal {
-	background: var(--surface-card);
-	border-radius: 1rem;
-	box-shadow: var(--shadow-lg);
 	display: flex;
 	flex-direction: column;
-	max-height: 92vh;
-	overflow-y: auto;
-	padding: 1.5rem;
-	width: 100%;
-}
-
-@media (min-width: 640px) {
-	.status-modal {
-		max-width: 26rem;
-	}
+	width: min(29rem, calc(100vw - 3rem));
 }
 
 .status-modal__head {
@@ -401,6 +370,12 @@
 .status-modal__title {
 	font-family: var(--font-serif);
 	font-size: 1.5rem;
+	margin: 0;
+}
+
+.status-modal__content {
+	max-height: 65vh;
+	padding: 0;
 }
 
 .status-modal__lead {
@@ -422,7 +397,7 @@
 	align-items: center;
 	background: var(--surface-card);
 	border: 1px solid var(--line);
-	border-radius: 999px;
+	border-radius: 0.5rem;
 	color: var(--ink);
 	cursor: pointer;
 	display: flex;
@@ -482,42 +457,26 @@
 	display: flex;
 	gap: 0.5rem;
 	justify-content: flex-end;
-	margin-top: 1.25rem;
-}
-
-.chat-modal,
-.reject-modal {
-	background: var(--surface-card);
-	box-shadow: var(--shadow-lg);
-	display: flex;
-	flex-direction: column;
-	max-height: 92vh;
-	overflow: hidden;
-	padding: 1.25rem;
-	width: 100%;
+	margin: 0;
 }
 
 .chat-modal {
-	border-radius: 1rem 1rem 0 0;
-	max-width: 32rem;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	width: min(34rem, calc(100vw - 3rem));
 }
 
-.reject-modal {
-	border-radius: 1rem;
-	max-width: 26rem;
-}
-
-@media (min-width: 640px) {
-	.chat-modal,
-	.reject-modal {
-		border-radius: 1rem;
-	}
+.chat-modal {
+	max-height: 82vh;
 }
 
 .chat-modal__head {
 	align-items: flex-start;
 	display: flex;
 	justify-content: space-between;
+	margin: 0;
+	padding: 0;
 }
 
 .chat-modal__title {
@@ -533,8 +492,9 @@
 	flex: 1;
 	flex-direction: column;
 	gap: 0.75rem;
-	margin-top: 1.25rem;
+	margin: 0.75rem 0;
 	min-height: 12rem;
+	max-height: 55vh;
 	overflow-y: auto;
 	padding: 1rem;
 }
@@ -606,30 +566,6 @@
 
 .chat-modal__input {
 	flex: 1;
-}
-
-.reject-modal__title {
-	font-family: var(--font-serif);
-	font-size: 1.5rem;
-	margin: 0;
-}
-
-.reject-modal__lead {
-	color: var(--muted);
-	font-size: 0.875rem;
-	line-height: 1.5;
-	margin: 0.5rem 0 1.25rem;
-}
-
-.reject-modal__input {
-	margin-top: 0.5rem;
-}
-
-.reject-modal__actions {
-	display: flex;
-	gap: 0.75rem;
-	justify-content: flex-end;
-	margin-top: 1.25rem;
 }
 
 /* ── Vacío ─────────────────────────────────────────────────────────────── */

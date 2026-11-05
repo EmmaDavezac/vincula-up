@@ -48,6 +48,10 @@ export class DirectoryService {
           zonaCoberturaLng: professional.zonaCoberturaLng,
           radioKm: professional.radioKm,
           tieneFoto: professional.tieneFoto === true,
+          avatarFallback:
+            professional.tieneFoto !== true && professional.legajo === 'P-2001'
+              ? '/demo-luciano-benitez.svg'
+              : null,
           estado: professional.estado ?? 'ACTIVO',
         };
       })),
