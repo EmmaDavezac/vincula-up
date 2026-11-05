@@ -21,6 +21,8 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, UUID> {
      * viejas y las nuevas pueden apuntar a identificadores distintos del mismo profesional.
      */
     List<Solicitud> findByClienteIdInOrProfesionalIdIn(Collection<UUID> clienteIds, Collection<UUID> profesionalIds);
+    List<Solicitud> findByProfesionalIdAndEstadoIn(UUID profesionalId, List<EstadoSolicitud> estados);
+
     List<Solicitud> findByProfesionalIdIn(Collection<UUID> profesionalIds);
     List<Solicitud> findByClienteIdIn(Collection<UUID> clienteIds);
 

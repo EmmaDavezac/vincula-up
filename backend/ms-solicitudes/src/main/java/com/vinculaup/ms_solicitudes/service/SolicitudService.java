@@ -54,14 +54,15 @@ public class SolicitudService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "El profesional debe tener su perfil activado para recibir solicitudes");
         }
-        if (repository.existsActiveByClienteIdAndEspecialidadId(
-                request.clienteId(), request.especialidadId())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Ya tenes una solicitud activa para esta especialidad");
-        }
-        if (!estaDentroDeDisponibilidad(profesional.id(), request.fechaHoraPropuesta())) {
+        // if (repository.existsActiveByClienteIdAndEspecialidadId(
+//                request.clienteId(), request.especialidadId())) {
+//            throw new ResponseStatusException(HttpStatus.CONFLICT,
+//                    "Ya tenes una solicitud activa para esta especialidad");
+//        }
+                // Se valida la disponibilidad del profesional según sus horarios configurados.
+        if (!estaDentroDeDisponibilidad(profesional.id(), request.fechaHoraPropuesta(), request.fechaHoraFinPropuesta())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "El horario propuesto esta fuera de la disponibilidad del profesional");
+                    "El horario propuesto está fuera de la disponibilidad del profesional");
         }
 
         // Ubicación estilo MercadoLibre: si el cliente no adjunta coordenadas,
@@ -149,7 +150,13 @@ public class SolicitudService {
         } else if (soloEnviadas) {
             solicitudes = repository.findByClienteIdIn(ids);
         } else {
-            solicitudes = repository.findByClienteIdInOrProfesionalIdIn(ids, ids);
+            // combinar solicitudes tanto por cliente como por profesional
+            List<Solicitud> porCliente = repository.findByClienteIdIn(ids);
+            List<Solicitud> porProfesional = repository.findByProfesionalIdIn(ids);
+            Set<Solicitud> conjunto = new LinkedHashSet<>();
+            conjunto.addAll(porCliente);
+            conjunto.addAll(porProfesional);
+            solicitudes = new java.util.ArrayList<>(conjunto);
         }
 
         return solicitudes.stream()
@@ -318,17 +325,27 @@ public class SolicitudService {
         }
     }
 
-    private boolean estaDentroDeDisponibilidad(UUID profesionalId, LocalDateTime fechaHora) {
+    private boolean estaDentroDeDisponibilidad(UUID profesionalId, LocalDateTime inicio, LocalDateTime fin) {
         try {
             var disponibilidades = profesionalesClient.obtenerDisponibilidad(profesionalId);
             if (disponibilidades == null || disponibilidades.isEmpty()) {
-                return true;
+                return true; // Sin horarios configurados, se asume disponible
             }
-            String diaEsperado = diaEnEspanol(fechaHora.getDayOfWeek());
-            return disponibilidades.stream()
-                    .filter(item -> item.diaSemana().equalsIgnoreCase(diaEsperado))
-                    .anyMatch(item -> !fechaHora.toLocalTime().isBefore(item.horaInicio())
-                            && fechaHora.toLocalTime().isBefore(item.horaFin()));
+            // Si fin es null, usar solo inicio
+            LocalDateTime finEffective = fin != null ? fin : inicio;
+            // Verificar que ambos extremos estén dentro de algún horario del día
+            String diaInicio = diaEnEspanol(inicio.getDayOfWeek());
+            String diaFin = diaEnEspanol(finEffective.getDayOfWeek());
+            // Ambos deben coincidir en día y horario
+            boolean inicioOk = disponibilidades.stream()
+                    .filter(item -> item.diaSemana().equalsIgnoreCase(diaInicio))
+                    .anyMatch(item -> !inicio.toLocalTime().isBefore(item.horaInicio()) &&
+                                      inicio.toLocalTime().isBefore(item.horaFin()));
+            boolean finOk = disponibilidades.stream()
+                    .filter(item -> item.diaSemana().equalsIgnoreCase(diaFin))
+                    .anyMatch(item -> !finEffective.toLocalTime().isBefore(item.horaInicio()) &&
+                                      finEffective.toLocalTime().isBefore(item.horaFin()));
+            return inicioOk && finOk;
         } catch (Exception e) {
             return true;
         }

@@ -767,3 +767,12 @@
   - `frontend/vincula-up-web/src/app/admin/admin-professionals/admin-professionals.html`: `admin-professionals__row` → `admin-professionals__item`; `admin-professionals__actions` → `admin-professionals__action`; botones `Consultar` y `Reenviar invitación` con clase `__action`.
 - **Verificación:** `npm run build` en el frontend compiló correctamente sin errores de TypeScript ni plantillas.
 - **Especificación:** No requiere cambios (no se modificaron rutas, endpoints, contratos de API ni modelos de datos).
+### [2026-11-05] - fix: considerar la disponibilidad horaria al recomendar técnicos
+
+- **Objetivo:** El front no mostraba diferentes técnicos según el día u horario; recomendaba los mismos técnicos sin importar la fecha.
+- **Causa:** El método `mapProfessionalProfile` en `api.service.js` y `api.service.ts` no estaba mapeando el campo `disponibilidad` del backend al campo `horarios` del modelo Professional del frontend. Sin los horarios, el filtro `filteredProfessionals` en `request.ts` no podía filtrar por disponibilidad, y `trabajaEn` siempre retornaba `true` (disponible por defecto).
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/core/services/api.service.js`: Se agregó el mapeo de `raw['disponibilidad']` al campo `horarios` del objeto Professional, y se actualizó el campo `availability` para mostrar 'Disponible' cuando hay horarios configurados.
+  - `frontend/vincula-up-web/src/app/core/services/api.service.ts`: Se aplicó el mismo mapeo que en el archivo JavaScript correspondiente.
+- **Verificación:** `npm run build` en el frontend compiló correctamente sin errores de TypeScript ni plantillas. El backend (ms-solicitudes, ms-profesionales, bff-web) también compila correctamente.
+- **Especificación:** Actualizada en `ESPECIFICACION.md` para reflejar el nuevo campo `horarios` en el profesional y cómo se utiliza en el filtrado de disponibilidad.

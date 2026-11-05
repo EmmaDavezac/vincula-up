@@ -405,6 +405,7 @@ son `UUID` en todas partes.
 | `fechaCarga` | OffsetDateTime | Alta en el padrón |
 | `fechaActivacion` | OffsetDateTime | Completó los 3 pasos de activación |
 | `especialidades` | `Set<Especialidad>` | Relación N:N |
+| `horarios` | `Array<{ diaSemana: String, horaInicio: LocalTime, horaFin: LocalTime }>` | Horarios de disponibilidad semanal configurados por el profesional. Utilizados por el frontend para filtrar técnicos según el día y hora solicitados. |
 
 ### 7.3 `ms-profesionales` — Especialidad y Disponibilidad
 

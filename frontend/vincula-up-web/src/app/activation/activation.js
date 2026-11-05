@@ -1,0 +1,672 @@
+import { __decorate } from "tslib";
+import { Component, computed, inject, signal, ViewChild } from '@angular/core';
+import { CommonModule, DecimalPipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
+import { catchError, map, of } from 'rxjs';
+import { ApiService } from '../core/services/api.service';
+import { AuthService } from '../core/services/auth.service';
+import { MatDialog } from '@angular/material/dialog';
+import { MatButtonModule } from '@angular/material/button';
+import { VuIcon } from '../shared/icon/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+let Activation = class Activation {
+    api = inject(ApiService);
+    auth = inject(AuthService);
+    dialog = inject(MatDialog);
+    mapPickerDialog;
+    mapDialogRef;
+    step = signal(1);
+    /** Stepper del prototipo. */
+    steps = [
+        { label: 'Foto', title: 'Tu imagen profesional' },
+        { label: 'Zona', title: 'Tu zona de cobertura' },
+        { label: 'Disponibilidad', title: 'Tu disponibilidad semanal' },
+    ];
+    stepDone(index) {
+        return index + 1 < this.step();
+    }
+    irAPaso(step) {
+        if (step < this.step()) {
+            this.step.set(step);
+            if (step === 2) {
+                this.zoneMapAttempts = 0;
+                setTimeout(() => this.syncZoneMap(), 100);
+            }
+        }
+    }
+    stepTitle() {
+        return { 1: 'Tu imagen profesional', 2: 'Tu zona de cobertura', 3: 'Tu disponibilidad semanal' }[this.step()] ?? '';
+    }
+    stepLead() {
+        return {
+            1: 'Una foto clara ayuda a que los clientes reconozcan tu perfil en la comunidad.',
+            2: 'Indicá dónde trabajás para que podamos acercarte oportunidades de tu zona.',
+            3: 'Contanos en qué momentos de la semana estás disponible para trabajar.',
+        }[this.step()] ?? '';
+    }
+    // ── Paso 1: Foto y previsualización ──
+    photoName = signal('');
+    photoPreview = signal('');
+    photoLoading = signal(false);
+    photoError = signal('');
+    hasPhoto = computed(() => this.photoPreview().trim().length > 0);
+    photoReader = null;
+    /**
+     * El archivo elegido, que se sube al almacenamiento al activar. El
+     * `photoPreview` es solo la previsualización local (data URL): nunca se envía.
+     */
+    selectedPhotoFile = null;
+    activatedProfileId = null;
+    // ── Paso 2: Zona y Cobertura (con validación de ciudad / GPS / Mapa) ──
+    zoneQuery = signal('Concepción del Uruguay, Entre Ríos');
+    validatedLocation = signal({
+        lat: -32.4833,
+        lng: -58.2318,
+        displayName: 'Concepción del Uruguay, Entre Ríos, Argentina',
+    });
+    validatingLocation = signal(false);
+    locationError = signal('');
+    locationSuggestions = signal([]);
+    locationSuggestionOpen = signal(false);
+    locationSearching = signal(false);
+    radius = signal(15);
+    suggestionTimer = null;
+    // Mapa modal (Leaflet)
+    showMapModal = signal(false);
+    mapSearchQuery = signal('');
+    mapSearching = signal(false);
+    tempMapLocation = signal(null);
+    interactiveMapInstance = null;
+    interactiveMapMarker = null;
+    /*
+     * Vista de referencia del paso 2. Es un Leaflet aparte del del modal, y va en
+     * solo lectura: sin arrastre, sin zoom con rueda y sin clic, para que no compita
+     * con el input de texto ni dé la impresión de que se puede ajustar el punto acá.
+     * El ajuste real sigue siendo el del modal.
+     */
+    zoneMapInstance = null;
+    zoneMapMarker = null;
+    zoneMapAttempts = 0;
+    /**
+     * Crea (o refresca) el mapa de referencia.
+     *
+     * <p>Se llama cada vez que cambia la ubicación validada, así que tiene que
+     * tolerar que el contenedor todavía no exista (el paso 2 puede no estar montado)
+     * o que Leaflet aún no haya cargado: en ambos casos reintenta con un límite,
+     * igual que hace el mapa del wizard de solicitudes.
+     */
+    syncZoneMap() {
+        const L = window.L;
+        const container = document.getElementById('zone-map');
+        if (!L || !container) {
+            if (this.zoneMapAttempts++ < 20) {
+                setTimeout(() => this.syncZoneMap(), 150);
+            }
+            return;
+        }
+        const loc = this.validatedLocation();
+        if (!loc)
+            return;
+        if (this.zoneMapInstance && !document.body.contains(this.zoneMapInstance.getContainer())) {
+            this.zoneMapInstance.remove();
+            this.zoneMapInstance = null;
+            this.zoneMapMarker = null;
+        }
+        if (!this.zoneMapInstance) {
+            this.zoneMapInstance = L.map('zone-map', {
+                attributionControl: true,
+                dragging: true,
+                doubleClickZoom: true,
+                keyboard: true,
+                scrollWheelZoom: true,
+                zoomControl: true,
+            }).setView([loc.lat, loc.lng], 14);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap contributors',
+            }).addTo(this.zoneMapInstance);
+            this.zoneMapMarker = L.marker([loc.lat, loc.lng], { draggable: true }).addTo(this.zoneMapInstance);
+            this.zoneMapMarker.on('dragend', (e) => {
+                const p = e.target.getLatLng();
+                this.validatedLocation.set({ lat: p.lat, lng: p.lng, displayName: '' });
+            });
+            this.zoneMapInstance.on('click', (e) => {
+                const { lat, lng } = e.latlng;
+                this.zoneMapMarker?.setLatLng([lat, lng]);
+                this.validatedLocation.set({ lat, lng, displayName: '' });
+            });
+        }
+        else {
+            this.zoneMapInstance.setView([loc.lat, loc.lng], 14);
+            this.zoneMapMarker?.setLatLng([loc.lat, loc.lng]);
+        }
+        // El contenedor puede haber cambiado de tamaño (por ejemplo, al aparecer el
+        // panel de sugerencias de arriba). Sin esto las tiles quedan corridas.
+        setTimeout(() => this.zoneMapInstance?.invalidateSize(), 200);
+    }
+    presetLocations = [
+        {
+            label: 'Concepción del Uruguay',
+            hint: 'Centro / Plaza 25 de Mayo',
+            lat: -32.4833,
+            lng: -58.2318,
+            displayName: 'Concepción del Uruguay, Entre Ríos, Argentina',
+        },
+        {
+            label: 'Colón',
+            hint: 'Costanera y Centro',
+            lat: -32.2235,
+            lng: -58.1432,
+            displayName: 'Colón, Entre Ríos, Argentina',
+        },
+        {
+            label: 'Gualeguaychú',
+            hint: 'Centro / Corsódromo',
+            lat: -33.0116,
+            lng: -58.5172,
+            displayName: 'Gualeguaychú, Entre Ríos, Argentina',
+        },
+        {
+            label: 'Paraná',
+            hint: 'Paraná Capital',
+            lat: -31.7333,
+            lng: -60.5333,
+            displayName: 'Paraná, Entre Ríos, Argentina',
+        },
+        {
+            label: 'Buenos Aires (CABA)',
+            hint: 'Capital Federal',
+            lat: -34.6037,
+            lng: -58.3816,
+            displayName: 'Ciudad Autónoma de Buenos Aires, Argentina',
+        },
+    ];
+    // ── Paso 3: Disponibilidad horaria múltiple (tipo alarma de teléfono) ──
+    weekDays = [
+        { id: 'LUNES', short: 'L', name: 'Lunes' },
+        { id: 'MARTES', short: 'M', name: 'Martes' },
+        { id: 'MIERCOLES', short: 'M', name: 'Miércoles' },
+        { id: 'JUEVES', short: 'J', name: 'Jueves' },
+        { id: 'VIERNES', short: 'V', name: 'Viernes' },
+        { id: 'SABADO', short: 'S', name: 'Sábado' },
+        { id: 'DOMINGO', short: 'D', name: 'Domingo' },
+    ];
+    selectedDays = signal(['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES']);
+    start = signal('09:00');
+    end = signal('18:00');
+    selectedDaysLabel = computed(() => {
+        const sel = this.selectedDays();
+        if (sel.length === 0)
+            return 'Sin días seleccionados';
+        if (sel.length === 7)
+            return 'Todos los días (Lunes a Domingo)';
+        const weekdays = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'];
+        if (sel.length === 5 && weekdays.every((d) => sel.includes(d)))
+            return 'Lunes a Viernes';
+        const weekends = ['SABADO', 'DOMINGO'];
+        if (sel.length === 2 && weekends.every((d) => sel.includes(d)))
+            return 'Fines de semana (Sáb y Dom)';
+        return sel.map((d) => this.weekDays.find((w) => w.id === d)?.name).filter(Boolean).join(', ');
+    });
+    // Estado general
+    completed = signal(false);
+    errorMessage = signal('');
+    submitting = signal(false);
+    // ── Métodos de Foto ──
+    selectPhoto(event) {
+        const input = event.target;
+        const file = input.files?.[0];
+        if (!file)
+            return;
+        input.value = '';
+        this.photoError.set('');
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+            this.photoError.set('Elegí una imagen JPG, PNG o WebP.');
+            return;
+        }
+        if (file.size > 512 * 1024) {
+            this.photoError.set('La imagen supera 512 KiB. Elegí una foto más liviana.');
+            return;
+        }
+        this.photoReader?.abort();
+        const reader = new FileReader();
+        this.photoReader = reader;
+        this.photoLoading.set(true);
+        // Se guarda el archivo: la data URL es solo para ver la previsualización.
+        this.selectedPhotoFile = file;
+        reader.onload = () => {
+            if (this.photoReader !== reader)
+                return;
+            this.photoPreview.set(typeof reader.result === 'string' ? reader.result : '');
+            this.photoName.set(file.name);
+            this.photoLoading.set(false);
+        };
+        reader.onerror = () => {
+            this.photoLoading.set(false);
+            this.photoError.set('No se pudo leer la imagen. Elegí el archivo nuevamente.');
+        };
+        reader.readAsDataURL(file);
+    }
+    removePhoto() {
+        this.photoReader?.abort();
+        this.photoReader = null;
+        this.selectedPhotoFile = null;
+        this.photoLoading.set(false);
+        this.photoError.set('');
+        this.photoName.set('');
+        this.photoPreview.set('');
+    }
+    // ── Métodos de Ubicación / Ciudad ──
+    onZoneQueryChange(value) {
+        this.zoneQuery.set(value);
+        this.locationError.set('');
+        const currentLoc = this.validatedLocation();
+        if (currentLoc && currentLoc.displayName !== value) {
+            this.validatedLocation.set(null);
+        }
+        const q = value.trim();
+        if (q.length < 3) {
+            this.locationSuggestions.set([]);
+            this.locationSuggestionOpen.set(false);
+            return;
+        }
+        if (this.suggestionTimer)
+            clearTimeout(this.suggestionTimer);
+        this.suggestionTimer = setTimeout(() => {
+            void this.searchSuggestions(q);
+        }, 400);
+    }
+    async searchSuggestions(query) {
+        this.locationSearching.set(true);
+        try {
+            const encoded = encodeURIComponent(query);
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=5&accept-language=es`);
+            const data = (await res.json());
+            const list = (Array.isArray(data) ? data : []).map((item) => ({
+                lat: parseFloat(item.lat),
+                lng: parseFloat(item.lon),
+                displayName: item.display_name,
+            }));
+            this.locationSuggestions.set(list);
+            this.locationSuggestionOpen.set(list.length > 0);
+        }
+        catch {
+            this.locationSuggestions.set([]);
+        }
+        finally {
+            this.locationSearching.set(false);
+        }
+    }
+    hideSuggestionsLater() {
+        setTimeout(() => this.locationSuggestionOpen.set(false), 200);
+    }
+    selectSuggestion(item) {
+        this.validatedLocation.set(item);
+        this.zoneQuery.set(item.displayName);
+        this.locationSuggestions.set([]);
+        this.locationSuggestionOpen.set(false);
+        this.locationError.set('');
+        this.syncZoneMap();
+    }
+    selectPreset(preset) {
+        const loc = { lat: preset.lat, lng: preset.lng, displayName: preset.displayName };
+        this.validatedLocation.set(loc);
+        this.zoneQuery.set(preset.displayName);
+        this.locationSuggestions.set([]);
+        this.locationSuggestionOpen.set(false);
+        this.locationError.set('');
+        this.syncZoneMap();
+    }
+    validateCurrentZone(onValid) {
+        const q = this.zoneQuery().trim();
+        if (!q) {
+            this.locationError.set('Ingresá una localidad, ciudad o barrio para tu zona de cobertura.');
+            return;
+        }
+        this.validatingLocation.set(true);
+        this.locationError.set('');
+        this.api.getGpsPosition(q).pipe(catchError((err) => {
+            this.locationError.set(this.api.describeError(err, 'No se pudo conectar al servicio GPS. Verificá tu conexión o usá el mapa interactivo.'));
+            this.validatingLocation.set(false);
+            return of(null);
+        })).subscribe((gps) => {
+            this.validatingLocation.set(false);
+            if (!gps)
+                return;
+            if (gps.resolved === false || (gps.latitude == null && gps.latitud == null)) {
+                this.locationError.set(gps.error || 'No se encontró la ciudad o dirección especificada. Probá agregar provincia/país o marcala en el mapa.');
+                this.validatedLocation.set(null);
+                return;
+            }
+            const lat = (gps.latitude ?? gps.latitud);
+            const lng = (gps.longitude ?? gps.longitud);
+            const displayName = gps.address || q;
+            const loc = { lat, lng, displayName };
+            this.validatedLocation.set(loc);
+            this.zoneQuery.set(displayName);
+            this.locationError.set('');
+            this.syncZoneMap();
+            if (onValid)
+                onValid();
+        });
+    }
+    detectDeviceGps() {
+        if (!('geolocation' in navigator)) {
+            this.locationError.set('Tu navegador no cuenta con servicio de geolocalización GPS.');
+            return;
+        }
+        this.validatingLocation.set(true);
+        this.locationError.set('');
+        const onExito = (lat, lng, fallbackName, aviso = '') => {
+            this.api.getGpsPosition(`${lat.toFixed(5)}, ${lng.toFixed(5)}`).pipe(catchError(() => of(null))).subscribe((res) => {
+                this.validatingLocation.set(false);
+                const name = res?.address || fallbackName || `Coordenadas: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                const loc = { lat, lng, displayName: name };
+                this.validatedLocation.set(loc);
+                this.zoneQuery.set(name);
+                this.locationError.set(aviso);
+                this.syncZoneMap();
+            });
+        };
+        const intentarFallback = async (codigoError) => {
+            if (codigoError === 1) {
+                this.validatingLocation.set(false);
+                this.locationError.set('Permiso de ubicación denegado. Ingresá la localidad manualmente o usá el mapa.');
+                return;
+            }
+            try {
+                const ipRes = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(3000) });
+                if (ipRes.ok) {
+                    const ipData = (await ipRes.json());
+                    if (typeof ipData.latitude === 'number' && typeof ipData.longitude === 'number') {
+                        const ciudad = [ipData.city, ipData.region].filter(Boolean).join(', ');
+                        onExito(ipData.latitude, ipData.longitude, ciudad, 'Ubicación aproximada detectada por red.');
+                        return;
+                    }
+                }
+            }
+            catch {
+                // Fallback institucional
+            }
+            onExito(-32.4833, -58.2318, 'Concepción del Uruguay, Entre Ríos', 'Dispositivo sin GPS. Fijamos la ubicación base en Concepción del Uruguay.');
+        };
+        navigator.geolocation.getCurrentPosition((pos) => onExito(pos.coords.latitude, pos.coords.longitude), (err1) => {
+            if (err1.code === 1) {
+                void intentarFallback(1);
+                return;
+            }
+            navigator.geolocation.getCurrentPosition((pos) => onExito(pos.coords.latitude, pos.coords.longitude), (err2) => void intentarFallback(err2.code), { timeout: 4000, maximumAge: 60000, enableHighAccuracy: true });
+        }, { timeout: 6000, maximumAge: 300000, enableHighAccuracy: false });
+    }
+    // ── Mapa Modal (Leaflet) ──
+    openMapPicker() {
+        const loc = this.validatedLocation();
+        this.showMapModal.set(true);
+        this.mapSearchQuery.set(loc?.displayName || this.zoneQuery() || '');
+        this.tempMapLocation.set(loc ?? { lat: -32.4833, lng: -58.2318, displayName: 'Concepción del Uruguay' });
+        this.mapDialogRef = this.dialog.open(this.mapPickerDialog, {
+            ariaLabel: 'Elegir ubicación en el mapa',
+            ariaModal: true,
+            maxWidth: 'min(60rem, calc(100vw - 2rem))',
+            panelClass: 'vu-details-dialog',
+        });
+        this.mapDialogRef.afterClosed().subscribe(() => {
+            this.mapDialogRef = undefined;
+            this.showMapModal.set(false);
+            this.destroyInteractiveMap();
+        });
+        setTimeout(() => this.initInteractiveMap(), 150);
+    }
+    closeMapPicker() {
+        this.mapDialogRef?.close();
+        this.mapDialogRef = undefined;
+        this.showMapModal.set(false);
+        this.destroyInteractiveMap();
+    }
+    initInteractiveMap() {
+        const L = window.L;
+        if (!L)
+            return;
+        const container = document.getElementById('activation-map');
+        if (!container)
+            return;
+        const loc = this.tempMapLocation();
+        if (!loc)
+            return;
+        if (this.interactiveMapInstance && !document.body.contains(this.interactiveMapInstance.getContainer())) {
+            this.interactiveMapInstance.remove();
+            this.interactiveMapInstance = null;
+            this.interactiveMapMarker = null;
+        }
+        if (!this.interactiveMapInstance) {
+            this.interactiveMapInstance = L.map('activation-map').setView([loc.lat, loc.lng], 14);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap contributors',
+            }).addTo(this.interactiveMapInstance);
+            this.interactiveMapMarker = L.marker([loc.lat, loc.lng], { draggable: true }).addTo(this.interactiveMapInstance);
+            this.interactiveMapMarker.on('dragend', (e) => {
+                const p = e.target.getLatLng();
+                this.tempMapLocation.set({ lat: p.lat, lng: p.lng, displayName: '' });
+            });
+            this.interactiveMapInstance.on('click', (e) => {
+                const { lat, lng } = e.latlng;
+                this.interactiveMapMarker?.setLatLng([lat, lng]);
+                this.tempMapLocation.set({ lat, lng, displayName: '' });
+            });
+            setTimeout(() => this.interactiveMapInstance?.invalidateSize(), 200);
+        }
+        else {
+            this.interactiveMapInstance.setView([loc.lat, loc.lng], 14);
+            this.interactiveMapMarker?.setLatLng([loc.lat, loc.lng]);
+        }
+    }
+    destroyInteractiveMap() {
+        if (this.interactiveMapInstance) {
+            this.interactiveMapInstance.remove();
+            this.interactiveMapInstance = null;
+            this.interactiveMapMarker = null;
+        }
+    }
+    async searchAddressInMap() {
+        const query = this.mapSearchQuery().trim();
+        if (!query || this.mapSearching())
+            return;
+        this.mapSearching.set(true);
+        try {
+            const encoded = encodeURIComponent(query);
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1&accept-language=es`);
+            const data = (await res.json());
+            if (Array.isArray(data) && data.length > 0) {
+                const first = data[0];
+                const lat = parseFloat(first.lat);
+                const lng = parseFloat(first.lon);
+                this.tempMapLocation.set({ lat, lng, displayName: first.display_name });
+                if (this.interactiveMapInstance) {
+                    this.interactiveMapInstance.setView([lat, lng], 15);
+                    this.interactiveMapMarker?.setLatLng([lat, lng]);
+                }
+            }
+        }
+        catch {
+            // ignore
+        }
+        finally {
+            this.mapSearching.set(false);
+        }
+    }
+    confirmMapLocation() {
+        const loc = this.tempMapLocation();
+        if (!loc)
+            return;
+        const name = loc.displayName || `Ubicación seleccionada (${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)})`;
+        const finalLoc = { lat: loc.lat, lng: loc.lng, displayName: name };
+        this.validatedLocation.set(finalLoc);
+        this.zoneQuery.set(name);
+        this.locationError.set('');
+        this.closeMapPicker();
+        // El mapa de referencia corre al punto recién confirmado.
+        this.syncZoneMap();
+    }
+    // ── Métodos de Disponibilidad (Alarma) ──
+    toggleDay(dayId) {
+        const cur = this.selectedDays();
+        if (cur.includes(dayId)) {
+            this.selectedDays.set(cur.filter((d) => d !== dayId));
+        }
+        else {
+            this.selectedDays.set([...cur, dayId]);
+        }
+    }
+    isDaySelected(dayId) {
+        return this.selectedDays().includes(dayId);
+    }
+    selectWeekdays() {
+        this.selectedDays.set(['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES']);
+    }
+    selectAllDays() {
+        this.selectedDays.set(['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO']);
+    }
+    selectWeekend() {
+        this.selectedDays.set(['SABADO', 'DOMINGO']);
+    }
+    // ── Navegación entre pasos ──
+    previous() {
+        this.step.update((cur) => Math.max(1, cur - 1));
+    }
+    next() {
+        if (this.submitting() || this.photoLoading() || this.validatingLocation())
+            return;
+        this.errorMessage.set('');
+        if (!this.hasPhoto()) {
+            this.photoError.set('Subí una foto de perfil para continuar.');
+            this.step.set(1);
+            return;
+        }
+        // Paso 1: Foto
+        if (this.step() === 1) {
+            this.step.set(2);
+            // El mapa del paso 2 recién se monta con el paso, así que se pide después
+            // del cambio de signal (y reintenta solo si el contenedor aún no existe).
+            this.zoneMapAttempts = 0;
+            setTimeout(() => this.syncZoneMap(), 150);
+            return;
+        }
+        // Paso 2: Validación de Ubicación / Ciudad
+        if (this.step() === 2) {
+            const loc = this.validatedLocation();
+            if (!loc || this.radius() < 1 || this.radius() > 50) {
+                this.validateCurrentZone(() => {
+                    this.step.set(3);
+                });
+                return;
+            }
+            this.step.set(3);
+            return;
+        }
+        // Paso 3: Disponibilidad y Envío
+        if (this.step() === 3) {
+            if (this.selectedDays().length === 0) {
+                this.errorMessage.set('Seleccioná al menos un día en el que estés disponible para atender solicitudes.');
+                return;
+            }
+            if (!this.start() || !this.end() || this.start() >= this.end()) {
+                this.errorMessage.set('La hora de fin debe ser posterior a la hora de inicio.');
+                return;
+            }
+            this.submitActivation();
+        }
+    }
+    submitActivation() {
+        const usuarioId = this.auth.currentUser()?.id;
+        if (!usuarioId) {
+            this.errorMessage.set('Necesitás iniciar sesión como profesional para activar tu perfil.');
+            return;
+        }
+        const loc = this.validatedLocation() ?? {
+            lat: -32.4833,
+            lng: -58.2318,
+            displayName: 'Concepción del Uruguay',
+        };
+        const keycloakId = this.auth.getKeycloakId();
+        this.submitting.set(true);
+        // La foto se sube primero: la activación solo recibe la clave del archivo, así
+        // que el base64 deja de viajar por la API y de guardarse en la base.
+        const subirFoto$ = this.selectedPhotoFile
+            ? this.api.uploadPhoto(this.selectedPhotoFile).pipe(map((r) => r.key), catchError((error) => {
+                this.errorMessage.set(this.api.describeError(error, 'No se pudo subir la foto.'));
+                this.submitting.set(false);
+                return of(null);
+            }))
+            : of(null);
+        subirFoto$.subscribe((clave) => {
+            if (this.selectedPhotoFile && !clave) {
+                return;
+            }
+            this.activarConFoto(clave, usuarioId, keycloakId, loc);
+        });
+    }
+    activarConFoto(clave, usuarioId, keycloakId, loc) {
+        const payload = {
+            usuarioId,
+            keycloakId: keycloakId ?? undefined,
+            fotoUrl: clave ?? '',
+            zonaCoberturaLat: loc.lat,
+            zonaCoberturaLng: loc.lng,
+            radioKm: Number(this.radius()),
+        };
+        if (this.activatedProfileId) {
+            this.saveAvailability(this.activatedProfileId);
+            return;
+        }
+        this.api.activateProfessional(payload).pipe(catchError((error) => {
+            this.errorMessage.set(this.api.describeError(error, 'No se pudo activar tu perfil profesional.'));
+            this.submitting.set(false);
+            return of(null);
+        })).subscribe((result) => {
+            if (!result) {
+                this.submitting.set(false);
+                return;
+            }
+            if (!result.id) {
+                this.submitting.set(false);
+                this.errorMessage.set('El servidor no devolvió el identificador del perfil.');
+                return;
+            }
+            this.activatedProfileId = result.id;
+            this.auth.setProfessionalActive(true);
+            this.saveAvailability(result.id);
+        });
+    }
+    saveAvailability(profId) {
+        const formatTime = (t) => (t.length === 5 ? `${t}:00` : t);
+        const availability = this.selectedDays().map((day) => ({
+            diaSemana: day,
+            horaInicio: formatTime(this.start()),
+            horaFin: formatTime(this.end()),
+        }));
+        this.api.setAvailability(profId, availability).subscribe({
+            next: () => {
+                this.completed.set(true);
+                this.submitting.set(false);
+            },
+            error: () => {
+                this.submitting.set(false);
+                this.errorMessage.set('El perfil se activó, pero no se guardaron los horarios. Volvé a intentar para guardar los días seleccionados.');
+            },
+        });
+    }
+};
+__decorate([
+    ViewChild('mapPickerDialog')
+], Activation.prototype, "mapPickerDialog", void 0);
+Activation = __decorate([
+    Component({
+        imports: [CommonModule, FormsModule, RouterLink, DecimalPipe, VuIcon, MatButtonModule, MatProgressSpinnerModule],
+        selector: 'app-activation',
+        styleUrl: './activation.css',
+        templateUrl: './activation.html',
+    })
+], Activation);
+export { Activation };
