@@ -48,11 +48,11 @@ Ver [Términos, datos y cookies](#términos-datos-y-cookies) y
 ### Se accede con el email, no con nombre de usuario
 
 El login de Keycloak pide **solo el correo**. El realm tiene
-`registrationEmailAsUsername: true`, así que el formulario de registro no muestra
 campo "nombre de usuario" y usa el correo como identificador interno.
 
-> Si el realm ya venía corriendo, el cambio no se aplica solo: hay que correr el
-> bootstrap, que es idempotente y no toca usuarios.
+> En un arranque normal, `keycloak-init` aplica esta configuración automáticamente.
+> Si el realm ya existía antes de incorporar ese servicio, `docker compose up -d`
+> ejecuta el init actualizado. El reconciliador manual sigue disponible si hace falta:
 >
 > ```bash
 > ./scripts/linux-macos/keycloak-bootstrap.sh
@@ -65,7 +65,6 @@ campo "nombre de usuario" y usa el correo como identificador interno.
 La activación del perfil usa **Leaflet con tiles de OpenStreetMap**: la vista de
 referencia del paso 2 y el modal "Ajustar en el mapa". Los dos son mapas reales,
 no ilustraciones. En tema oscuro las tiles se invierten con un filtro, así que no
-se ve el cuadrado blanco de OpenStreetMap en medio de la pantalla oscura.
 
 > Leaflet se carga desde unpkg por CDN: hace falta internet para que los mapas se
 > vean. Es la única parte de la app que depende de un tercero en el cliente.
@@ -100,10 +99,7 @@ veinte tarjetas.
 ### pgAdmin — ver la base de datos
 
 1. Abrí **http://localhost:5050** e ingresá con `admin@vincula-up.com` / `admin`.
-2. Es la **primera** vez: pgAdmin no tiene servidores cargados. Menú
    **Servers → Add Server** (o el ícono de enchufe, arriba a la izquierda).
-3. Completá:
-
    | Campo | Valor |
    |---|---|
    | Name | `vincula-up` (lo que quieras) |
@@ -140,7 +136,6 @@ veinte tarjetas.
 > Las cuentas de profesional **las crea el administrador**, con el rol
 > `PROFESIONAL` ya asignado y una contraseña temporal. La promoción automática
 > de `CLIENTE` a `PROFESIONAL` sigue existiendo sólo para los prerregistros
-> antiguos, y para eso necesita el **secreto del client de servicio**, que tiene
 > que coincidir en Keycloak y en el BFF: ver
 > [El secreto del client de servicio](#el-secreto-del-client-de-servicio).
 
@@ -172,17 +167,11 @@ Email* muestra el host, el puerto y el usuario configurados.
 **Si dejás de recibir correos.** Lo más probable es que Google haya revocado la
 contraseña de aplicación. Se genera otra en *Cuenta Google → Seguridad →
 Verificación en 2 pasos → Contraseñas de aplicación*, se pega en
-`KEYCLOAK_SMTP_PASSWORD` en el `.env` y se vuelve a correr el bootstrap:
+`KEYCLOAK_SMTP_PASSWORD` en el `.env` y se ejecuta `docker compose up -d` para
+que el init actualice Keycloak:
 
-```bash
-./scripts/linux-macos/keycloak-bootstrap.sh
-# o, en Windows:
-powershell -ExecutionPolicy Bypass -File .\scripts\windows\keycloak-bootstrap.ps1
-```
-
-> El bootstrap es idempotente: se puede correr las veces que haga falta. Es
-> **obligatorio** después de cambiar esa variable, porque el script es el único
-> camino del `.env` a Keycloak (ver
+> `keycloak-init` es idempotente y aplica los cambios del `.env` al arrancar. El
+> bootstrap manual es una alternativa de reconciliación (ver
 > [El secreto del client de servicio](#el-secreto-del-client-de-servicio)).
 >
 > La contraseña no está en el repositorio: vive solo en el `.env` local, que
@@ -334,10 +323,10 @@ Keycloak. La fuente de verdad es una sola variable del `.env`:
 ```text
 .env (KEYCLOAK_ADMIN_CLIENT_SECRET)
   ├─ docker-compose.yml  →  BFF        (env del contenedor, al arrancar)
-  └─ scripts/*/keycloak-bootstrap.*  →  Keycloak   (Admin API, al correr el script)
+  └─ keycloak-init       →  Keycloak   (Admin API, antes de arrancar el BFF)
 ```
 
-**Por qué el bootstrap y no el import del realm.** Lo natural sería que
+**Por qué `keycloak-init` y no el import del realm.** Lo natural sería que
 `keycloak/import/vincula-up-realm.json` leyera el `.env`, pero no funciona: los
 placeholders `${env.*}` de ese archivo **no se resuelven** contra el entorno del
 contenedor (verificado en Keycloak 26.3.3, con las variables presentes). El
@@ -346,7 +335,8 @@ guarda la cadena literal `${env.X}` como si fuera el secreto. La tabla de la
 prueba está en [`keycloak/import/README.md`](keycloak/import/README.md).
 
 Y como el import del realm **solo corre una vez** (el realm persiste en Postgres),
-el bootstrap es lo que reconcilia un Keycloak ya en marcha.
+`keycloak-init` reconcilia automáticamente estos valores cada vez que Compose lo
+recrea. Los scripts del host siguen disponibles como fallback manual.
 
 **Si lo dejás vacío en el `.env`.** Rige el default de demo,
 `vincula-up-admin-secret`, y el stack funciona: el BFF y Keycloak quedan con el
@@ -360,15 +350,15 @@ bootstrap en su salida.
 ```bash
 openssl rand -hex 24                            # 1. generá el secreto
 #   2. pegalo en KEYCLOAK_ADMIN_CLIENT_SECRET del .env
-./scripts/linux-macos/keycloak-bootstrap.sh     # 3. es lo ÚNICO que lo copia a Keycloak
-docker compose up -d --force-recreate bff-web   # 4. que el BFF lea el valor nuevo
+docker compose up -d                            # 3. init actualiza Keycloak y Compose recrea el BFF
 ```
 
-En Windows, el paso 3 es
+Si el init no se recrea en una instalación existente, ejecutá el reconciliador
+manual: `./scripts/linux-macos/keycloak-bootstrap.sh` o, en Windows,
 `powershell -ExecutionPolicy Bypass -File .\scripts\windows\keycloak-bootstrap.ps1`.
 
-Los pasos 3 y 4 no son opcionales. Sin el 3, Keycloak sigue con el secreto viejo
-y el BFF recibe **401** al pedir el token; sin el 4, el BFF sigue con el viejo.
+Compose hace ambos pasos en el orden correcto. Sin actualizar Keycloak, el BFF
+recibe **401** al pedir el token; sin recrear el BFF, seguirá usando el valor viejo.
 El síntoma en los dos casos es el mismo y **no hay error visible**: el
 profesional invitado entra y sigue siendo CLIENTE, sin promoción de rol.
 
@@ -379,13 +369,11 @@ así:
 
 | Paso | Quién tiene el secreto |
 |---|---|
-| `docker compose up --build` | El **BFF** ya lo tiene: viene en el `.env`. Keycloak todavía tiene el **de demo**, porque el import usó el JSON versionado |
-| `./scripts/.../keycloak-bootstrap.sh` | Keycloak pasa a tener el mismo que el BFF |
+| `docker compose up --build -d` | `keycloak-init` aplica el secreto del `.env` y después arranca el BFF con el mismo valor |
+| Bootstrap manual | Fallback si un realm persistente no ejecutó la versión actualizada de `keycloak-init` |
 
-Por eso, en una máquina nueva, el bootstrap **no es opcional**: además del
-auto-registro, es lo que alinea el secreto. Si se lo saltea, el síntoma es el de
-siempre: el profesional invitado entra y sigue siendo CLIENTE, sin que aparezca
-ningún error.
+Por eso, en una máquina nueva, `docker compose up --build -d` configura el realm
+antes de dejar el BFF disponible. El bootstrap manual no forma parte del flujo normal.
 
 ---
 
