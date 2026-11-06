@@ -35,42 +35,58 @@
 			<vu-skeleton-list variant="card" [count]="4" />
 		} @else if (requests().length) {
 			<div class="requests__bar">
-				<div>
-					<p class="vu-eyebrow-sm">{{ countPending() }} {{ pendingLabel }}</p>
-					<span class="requests__total">{{ requests().length }} en total</span>
-				</div>
-
 				<div class="requests__filters">
-					<label class="requests__field">
-						<span>Filtrar por estado</span>
-						<select class="vu-select vu-select--sm" [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event)">
-							@for (option of statusOptions; track option.value) {
-								<option [value]="option.value">{{ option.label }}</option>
-							}
-						</select>
+					<label class="requests__field requests__field--search">
+						<span>{{ isProfessional() ? 'Buscar cliente o dirección' : 'Buscar profesional o dirección' }}</span>
+						<input
+							class="vu-input vu-input--sm"
+							type="search"
+							[ngModel]="requestSearch()"
+							(ngModelChange)="cambiarBusqueda($event)"
+							placeholder="Nombre o dirección"
+							[attr.aria-label]="isProfessional() ? 'Buscar por nombre de cliente o dirección' : 'Buscar por nombre de profesional o dirección'"
+						/>
 					</label>
 
-					@if (specialtyOptions().length > 1) {
-						<label class="requests__field">
-							<span>Especialidad</span>
-							<select class="vu-select vu-select--sm" [ngModel]="specialtyFilter()" (ngModelChange)="specialtyFilter.set($event)">
+					<div class="requests__filter-options">
+						<label class="requests__field requests__field--category">
+							<span>Filtrar por categoría</span>
+							<select class="vu-select vu-select--sm" [ngModel]="specialtyFilter()" (ngModelChange)="cambiarCategoriaFiltro($event)">
 								<option value="TODAS">Todas</option>
 								@for (option of specialtyOptions(); track option.value) {
 									<option [value]="option.value">{{ option.label }}</option>
 								}
 							</select>
 						</label>
-					}
 
-					@if (hasActiveFilters()) {
-						<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="clearFilters()">Limpiar</button>
-					}
+						<label class="requests__field requests__field--status">
+							<span>Filtrar por estado</span>
+							<select class="vu-select vu-select--sm" [ngModel]="statusFilter()" (ngModelChange)="cambiarEstadoFiltro($event)">
+								@for (option of statusOptions; track option.value) {
+									<option [value]="option.value">{{ option.label }}</option>
+								}
+							</select>
+						</label>
+
+						@if (hasActiveFilters()) {
+							<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="clearFilters()">Limpiar</button>
+						}
+					</div>
 				</div>
 			</div>
 
-			<div class="requests__grid">
+			@if (refreshing() || filtersRefreshing()) {
+				<div class="requests__refreshing" aria-live="polite">
+					<vu-skeleton-list variant="card" [count]="3" />
+				</div>
+			} @else if (filteredRequests().length) {
+				<div class="requests__grid">
 				@for (request of filteredRequests(); track request.id) {
-					<article class="req-card request-card">
+					<article
+						class="req-card request-card"
+						[id]="'solicitud-' + request.id"
+						[class.is-notification-target]="esSolicitudResaltada(request.id)"
+					>
 						<div class="req-card__head">
 							@if (isProfessional()) {
 								@if (clienteDe(request); as cli) {
@@ -85,7 +101,7 @@
 							} @else {
 								<vu-avatar size="md" [nombre]="profesionalNombre(request) || 'Sin asignar'" [usuarioId]="usuarioIdProfesional(request)" [tieneFoto]="tieneFotoProfesional(request)" />
 								<div class="req-card__identity">
-									<h2 class="req-card__name">{{ profesionalNombre(request) || 'Sin asignar' }}</h2>
+									<h2 class="req-card__name vu-truncate">{{ profesionalNombre(request) || 'Sin asignar' }}</h2>
 									<p class="req-card__sub vu-truncate">{{ especialidadNombre(request) }}</p>
 								</div>
 							}
@@ -95,7 +111,7 @@
 						<div class="req-card__meta">
 							<span>
 								<vu-icon name="clock" [size]="15" />
-								{{ request.date }} · {{ horarioLabel(request) }}
+								{{ fechaSolicitudLabel(request.date) }} · {{ horarioLabel(request) }}
 							</span>
 						</div>
 
@@ -114,16 +130,16 @@
 							si la zona le resulta insegura.
 						-->
 						@if (request.address) {
-							<p class="req-card__address">
-								<vu-icon name="map-pin" [size]="15" />
-								{{ isPending(request) ? 'Zona: ' + request.address : request.address }}
-							</p>
-						} @else if (isProfessional() && isPending(request)) {
-							<p class="req-card__address req-card__address--pending">
-								<vu-icon name="map-pin" [size]="15" />
-								La direccion exacta se muestra cuando aceptas el turno.
-							</p>
-						}
+	<p class="req-card__address" [attr.title]="request.address">
+		<vu-icon name="map-pin" [size]="15" />
+		<span>{{ isPending(request) ? 'Zona: ' + request.address : request.address }}</span>
+	</p>
+} @else if (isProfessional() && isPending(request)) {
+	<p class="req-card__address req-card__address--pending">
+		<vu-icon name="map-pin" [size]="15" />
+		<span>La direccion exacta se muestra cuando aceptas el turno.</span>
+	</p>
+}
 
 						<!--
 							El mapa es para el profesional: es él quien tiene que llegar al
@@ -173,20 +189,20 @@
 							acepta, rechaza, completa o cancela; el cliente completa o cancela.
 						-->
 						@if (estadosDisponibles(request).length) {
-							<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="abrirActualizarEstado(request)">
+							<button type="button" class="vu-btn vu-btn--outline vu-btn--sm req-card__action--status" (click)="abrirActualizarEstado(request)">
 								Actualizar estado
 							</button>
 						}
 
 						<!-- El chat queda disponible para los dos lados una vez aceptada. -->
 						@if (request.status === 'ACEPTADA') {
-							<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="toggleChat(request.id)">
+							<button type="button" class="vu-btn vu-btn--outline vu-btn--sm req-card__action--secondary" (click)="toggleChat(request.id)">
 								{{ activeChatId() === '' + request.id ? 'Cerrar chat' : 'Ir al chat' }}
 							</button>
 						}
 
 						@if (!isProfessional() && request.status === 'RECHAZADA') {
-							<a class="vu-btn vu-btn--outline vu-btn--sm vu-btn--coral-text" routerLink="/solicitar">Buscar otro profesional</a>
+							<a class="vu-btn vu-btn--outline vu-btn--sm vu-btn--coral-text req-card__action--secondary" routerLink="/solicitar">Buscar otro profesional</a>
 						}
 					</div>
 
@@ -239,66 +255,79 @@
 						</div>
 					}
 				</article>
+				}
+				</div>
+			} @else {
+				<div class="requests__empty-results" role="status">
+					<p>No encontramos solicitudes con esos filtros.</p>
+					<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="clearFilters()">Limpiar filtros</button>
+				</div>
 			}
-			</div>
+		}
 		<!-- ── Chat de coordinación ── -->
 		<ng-template #chatDialog>
-			@if (activeRequest(); as chat) {
-				<section class="chat-modal">
-					<header mat-dialog-title class="chat-modal__head">
-						<div>
-							<p class="vu-eyebrow-sm">{{ chat.date }} · {{ horarioLabel(chat) }}</p>
-							<h2 class="chat-modal__title">Chat con {{ isProfessional() ? clienteNombre(chat) : profesionalNombre(chat) }}</h2>
+	@if (activeRequest(); as chat) {
+		<section class="chat-modal">
+			<header class="chat-modal__head">
+				<div>
+					<p class="vu-eyebrow-sm">{{ fechaSolicitudLabel(chat.date) }} · {{ horarioLabel(chat) }}</p>
+					<h2 class="chat-modal__title">Chat con {{ isProfessional() ? clienteNombre(chat) : profesionalNombre(chat) }}</h2>
+				</div>
+				<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="toggleChat(chat.id)">Cerrar</button>
+			</header>
+
+			<div vuChatAutoScroll class="chat-modal__messages">
+				@for (message of chatMessages()[chat.id] ?? []; track message.id; let index = $index) {
+					<div class="bubble-row" [class.is-mine]="esMensajePropio(message)">
+						<div class="bubble">
+							<p class="bubble__text">{{ message.texto }}</p>
+							<span class="bubble__time">
+								@if (mostrarFechaMensaje(chatMessages()[chat.id] ?? [], index)) {
+									{{ fechaMensajeLabel(message.fechaEnvio) }} ·
+								}
+								{{ horaMensajeLabel(message.fechaEnvio) }}
+							</span>
 						</div>
-						<button type="button" mat-button class="vu-btn vu-btn--quiet vu-btn--sm" (click)="toggleChat(chat.id)">Cerrar</button>
-					</header>
-					<div mat-dialog-content class="chat-modal__messages">
-						@for (message of chatMessages()[chat.id] ?? []; track message.id) {
-							<div class="bubble-row" [class.is-mine]="message.emisorId === auth.currentUser()?.id">
-								<div class="bubble">
-									<p class="bubble__text">{{ message.texto }}</p>
-									<span class="bubble__time">{{ message.fechaEnvio | slice: 0:16 }}</span>
-								</div>
-							</div>
-						} @empty {
-							<p class="chat-modal__empty">Todavía no hay mensajes. Escribí la primera mensaje.</p>
-						}
 					</div>
-					@if (chat.status === 'ACEPTADA') {
-						<div class="chat-modal__composer">
-							<input class="vu-input chat-modal__input" [ngModel]="chatInput()" (ngModelChange)="chatInput.set($event)"
-								placeholder="Escribí un mensaje..." (keyup.enter)="sendMessage(chat.id)" />
-							<button type="button" mat-flat-button class="vu-btn vu-btn--ink vu-btn--icon" (click)="sendMessage(chat.id)"
-								[disabled]="sendingChat() || !chatInput().trim()" aria-label="Enviar mensaje">
-								<vu-icon name="send" [size]="16" />
-							</button>
-						</div>
-					}
-				</section>
+				} @empty {
+					<p class="chat-modal__empty">Todavía no hay mensajes. Escribí el primer mensaje.</p>
+				}
+			</div>
+
+			@if (chat.status === 'ACEPTADA') {
+				<div class="chat-modal__composer">
+					<input class="vu-input chat-modal__input" [ngModel]="chatInput()" (ngModelChange)="chatInput.set($event)"
+						placeholder="Escribí un mensaje..." (keyup.enter)="sendMessage(chat.id)" />
+					<button type="button" class="vu-btn vu-btn--ink vu-btn--icon" (click)="sendMessage(chat.id)"
+						[disabled]="sendingChat() || !chatInput().trim()" aria-label="Enviar mensaje">
+						<vu-icon name="send" [size]="16" />
+					</button>
+				</div>
 			}
-		</ng-template>
+		</section>
 	}
+</ng-template>
+	
 
 		<ng-template #statusDialog>
-		@if (solicitudDelModal(); as solicitud) {
-			<section class="status-modal">
-				<header mat-dialog-title class="status-modal__head">
-					<h2 class="status-modal__title">Actualizar estado</h2>
-					<button type="button" mat-button class="vu-btn vu-btn--quiet vu-btn--sm" (click)="cerrarActualizarEstado()" aria-label="Cerrar">
-						<vu-icon name="x" [size]="18" />
-					</button>
-				</header>
+	@if (solicitudDelModal(); as solicitud) {
+		<section class="status-modal">
+			<header class="status-modal__head">
+				<h2 class="status-modal__title">Actualizar estado</h2>
+				<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="cerrarActualizarEstado()" aria-label="Cerrar">
+					<vu-icon name="x" [size]="18" />
+				</button>
+			</header>
 
-				<div mat-dialog-content class="status-modal__content">
+			<div class="status-modal__content">
 				<p class="status-modal__lead">
-					{{ nombreContraparte(solicitud) }} · {{ solicitud.date }} · {{ horarioLabel(solicitud) }}
+					{{ nombreContraparte(solicitud) }} · {{ fechaSolicitudLabel(solicitud.date) }} · {{ horarioLabel(solicitud) }}
 				</p>
 
 				<div class="status-modal__options">
 					@for (opcion of estadosDisponibles(solicitud); track opcion) {
 						<button
 							type="button"
-							mat-flat-button
 							class="status-option"
 							[class.is-cancel]="opcion === 'CANCELADA'"
 							[class.is-reject]="opcion === 'RECHAZADA'"
@@ -308,11 +337,10 @@
 						</button>
 					}
 				</div>
-
-				</div>
-			</section>
-		}
-		</ng-template>
+			</div>
+		</section>
+	}
+</ng-template>
 
 	<!-- Cancelación: única transición que pide un mensaje, y es obligatorio. -->
 	<ng-template #cancelDialog>

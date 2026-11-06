@@ -25,6 +25,106 @@
 
 ## Historial
 
+### [2026-11-06] - ux: mantener Limpiar en fila y mostrar skeleton al filtrar
+- **Objetivo:** Evitar que «Limpiar» salte a otra línea en desktop y dar feedback cuando se recalculan resultados.
+- **Cambios realizados:** Se reserva una columna final alineada a la derecha para el botón en desktop; en tablet y móvil conserva su ubicación inferior alineada a la derecha. Cambios en búsqueda, categoría, estado o limpiar muestran el skeleton brevemente en la zona de resultados sin ocultar los controles.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-06] - ux: skeleton al actualizar solicitudes y estado sin resultados
+- **Objetivo:** Dar feedback durante recargas, explicar filtros sin coincidencias y alinear la acción Limpiar con los controles.
+- **Cambios realizados:** El botón Limpiar iguala la altura de inputs/selects. Tras una recarga de datos se muestra el skeleton animado solo en la zona de tarjetas, manteniendo filtros visibles. Si los filtros no encuentran solicitudes se muestra un estado vacío con acción para limpiarlos.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-06] - ux: adaptar búsqueda y filtros al rol y móvil
+- **Objetivo:** Buscar al profesional desde la vista del cliente y al cliente desde la vista profesional, manteniendo filtros compactos en móvil.
+- **Cambios realizados:** El campo de búsqueda cambia su etiqueta y nombre de contraparte según el rol, y sigue admitiendo dirección. El filtro por categoría queda visible aunque solo exista una opción. En móvil la búsqueda va en la primera fila y debajo aparecen categoría/estado; los títulos y controles tienen alturas uniformes.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-06] - ux: compactar encabezado de solicitudes
+- **Objetivo:** Adelantar el listado quitando contadores repetidos y reduciendo el espacio del título y bajada.
+- **Cambios realizados:** Se eliminaron «pendientes/en revisión» y «en total»; se redujeron tamaño y márgenes verticales del encabezado y la separación antes de los filtros.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-06] - ux: ordenar filtros de solicitudes en escritorio
+- **Objetivo:** Mostrar Buscar, Categoría y Estado en ese orden en escritorio, manteniendo Estado primero en móvil.
+- **Cambios realizados:** Se reordenaron los controles en el template; el orden responsive móvil conserva el filtro de estado a la izquierda.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.html`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-06] - ux: búsqueda y filtros de solicitudes responsive
+- **Objetivo:** Facilitar el filtrado de solicitudes en móvil y escritorio.
+- **Cambios realizados:** El filtro de estado aparece primero y alineado a la izquierda en móvil; se etiqueta el selector de especialidad como categoría y se agrega búsqueda local por nombre de profesional o dirección, combinable con los otros filtros. La búsqueda ignora mayúsculas y acentos; «Limpiar» restablece todos los criterios.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-06] - ux: alinear acciones de tarjetas de solicitudes
+- **Objetivo:** Dar media tarjeta a cada acción, fijar «Actualizar estado» a la derecha y mantener una acción única en ese lado.
+- **Cambios realizados:** Acciones de tarjetas en grilla de dos columnas iguales. Acciones secundarias (chat o buscar otro profesional) ocupan la izquierda y «Actualizar estado» la derecha; si solo hay una acción, también queda a la derecha.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-06] - feat: abrir solicitud desde su notificación
+- **Objetivo:** Al tocar una notificación, abrir la solicitud a la que corresponde.
+- **Cambios realizados:** Los avisos de la campana navegan con el ID de solicitud; los de mensaje abren directamente el chat y los de estado limpian filtros, desplazan y resaltan la tarjeta. Las notificaciones del navegador llevan el mismo destino. El aviso tocado se marca como leído.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/shared/navbar/navbar.html`, `frontend/vincula-up-web/src/app/shared/navbar/navbar.ts`, `frontend/vincula-up-web/src/app/core/services/notification.service.ts`, `frontend/vincula-up-web/public/sw.js`, `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-06] - ux: desplazar chat al mensaje más reciente
+- **Objetivo:** Mantener visible el mensaje más reciente al abrir, recibir o enviar mensajes.
+- **Cambios realizados:** Una directiva en el propio contenedor del diálogo observa cambios reales del DOM y baja al final al crearse el modal y al cargar, recibir o enviar mensajes; no depende de un `ViewChild` ubicado dentro de un `ng-template`.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/chat-auto-scroll.directive.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`, `ESPECIFICACION.md`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-06] - fix: mostrar fechas de solicitudes en formato dd/mm/aa
+- **Objetivo:** Aplicar el formato `dd/mm/aa` de forma consistente en solicitudes y chat.
+- **Cambios realizados:** Se mantiene ISO en el modelo para ordenar, y se formatea al presentar en tarjetas de solicitudes, modal de estado, encabezado del chat y resumen del turno nuevo. En mensajes se conserva fecha solo al primer mensaje del día y la hora en los siguientes; la bandeja de notificaciones también usa `dd/mm/aa`.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/request/request.ts`, `frontend/vincula-up-web/src/app/shared/navbar/navbar.html`, `ESPECIFICACION.md`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-06] - ux: identificar mensajes y mostrar bandeja en móvil
+- **Objetivo:** Quitar el texto de estado de conexión del chat, identificar al emisor en las notificaciones y evitar que el panel quede oculto en pantallas móviles.
+- **Cambios realizados:** Se retiró «Conectado en tiempo real» del modal. Las alertas ahora muestran «Mensaje de [nombre]» y conservan la vista previa del texto, resolviendo el nombre del cliente o profesional según el rol. En móvil la bandeja usa posición fija y eleva temporalmente la cabecera sobre el tabbar.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`, `frontend/vincula-up-web/src/app/shared/navbar/navbar.html`, `frontend/vincula-up-web/src/app/shared/navbar/navbar.css`, `frontend/vincula-up-web/src/app/core/services/notification.service.ts`, `ESPECIFICACION.md`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso; `git diff --check` limpio.
+
+### [2026-11-06] - feat: chat en tiempo real con WebSocket autenticado
+- **Objetivo:** Entregar nuevos mensajes al chat abierto sin sondeo y conservar la persistencia/autorización actuales.
+- **Cambios realizados:** El BFF incorpora WebSocket STOMP en `/ws`, valida JWT en `CONNECT` usando el accessor original para asociar el Principal a la sesión, autoriza suscripciones verificando participación en la solicitud y rechaza escrituras STOMP. `POST /api/solicitudes/{id}/mensajes` sigue guardando el mensaje y después lo difunde a `/topic/solicitudes/{id}`. Nginx enruta el Upgrade. Angular conecta solo al abrir el chat, reconecta automáticamente, agrega mensajes entrantes sin duplicarlos y diferencia sus propios mensajes comparando `usuarioId` y `sub` de Keycloak. Las burbujas propias/ajenas se alinean y colorean distinto; la fecha se muestra como `dd/mm/aa` solo en el primer mensaje del día y los demás llevan `HH:mm`.
+- **Archivos modificados:** `backend/bff-web/pom.xml`, `backend/bff-web/src/main/java/com/vinculaup/bff_web/config/ChatWebSocketConfig.java`, `ChatChannelInterceptor.java`, `ChatPrincipal.java`, `WebSocketAuthorizationContext.java`, `JdkHttpClientRequestFactory.java`, `SecurityConfig.java`, `backend/bff-web/src/main/java/com/vinculaup/bff_web/controller/ApiController.java`, `nginx/nginx.conf`, `frontend/vincula-up-web/package.json`, `package-lock.json`, `frontend/vincula-up-web/src/app/core/services/chat-realtime.service.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `my-requests.html`, `my-requests.css`, `ESPECIFICACION.md`.
+- **Verificación:** `cd backend/bff-web && ./mvnw clean compile` y `cd frontend/vincula-up-web && npm run build`, ambos exitosos. `curl` al endpoint HTTPS `/ws` devolvió `101 Switching Protocols`; logs posteriores confirmaron `CONNECT(2)-CONNECTED(2)` y sesiones STOMP autenticadas. BFF y Nginx saludables. No se simuló el intercambio completo de mensajes entre dos cuentas.
+
+### [2026-11-05] - feat: notificar mensajes nuevos cuando el chat está cerrado
+- **Objetivo:** Avisar a la persona cuando recibe mensajes y no está dentro de la conversación correspondiente.
+- **Cambios realizados:** `NotificationService` consulta mensajes de solicitudes aceptadas junto con el sondeo existente de 30 segundos, guarda snapshots por cuenta y solicitud, omite mensajes iniciales/históricos, propios y recibidos mientras el chat está abierto. Al cerrar el diálogo sincroniza mensajes vistos. Los avisos de mensajes pueden usar Notification API con la aplicación enfocada si el chat está cerrado. Se actualizó la documentación técnica.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/core/services/notification.service.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `ESPECIFICACION.md`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-05] - fix: resolver profesional por id de usuario al crear solicitudes
+- **Objetivo:** Corregir el `404` al enviar una solicitud desde el formulario.
+- **Causa:** El frontend enviaba `profesionalId` con el `usuarioId`, pero `ms-solicitudes` solo buscaba por id del perfil. Los logs confirmaron `404: El profesional seleccionado no existe`.
+- **Cambios realizados:** `ProfesionalesClient` intenta primero la búsqueda directa por id de perfil y, si no existe, consulta `/profesionales/por-usuario`; la especificación documenta ambos identificadores válidos.
+- **Verificación:** `cd backend/ms-solicitudes && ./mvnw clean compile` exitoso. Logs de Docker confirmaron la causa original.
+
+### [2026-11-05] - fix: conservar disponibilidad al preparar el directorio de solicitudes
+- **Objetivo:** Habilitar la selección de días en el formulario de nueva solicitud.
+- **Causa:** `DirectoryService` reconstruía cada profesional para el recomendador, pero no copiaba `horarios`; al calcular disponibilidad todos los perfiles parecían no tener franjas y los botones de día quedaban deshabilitados.
+- **Cambios realizados:** `directory.service.ts` conserva los horarios semanales y deriva la etiqueta de disponibilidad del mismo dato.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-05] - feat: considerar disponibilidad real al recomendar profesionales
+- **Objetivo:** Propagar los horarios semanales desde la API al directorio y al recomendador, validar el rango solicitado en el backend y mostrar el horario laboral al consultar el perfil.
+- **Cambios realizados:**
+  - `ms-profesionales`: cada ficha y listado de profesionales ahora incluye la colección `disponibilidad`.
+  - `ms-solicitudes`: valida que el turno completo pertenezca a una franja del mismo día; rechaza horarios faltantes y devuelve error de servicio si no puede consultar disponibilidad. Se mantienen permitidas solicitudes simultáneas para igual profesional, horario y categoría.
+  - Angular: normaliza `disponibilidad` al tipo de horario del profesional, usa cobertura completa de día y franja en el recomendador, y muestra los tramos semanales en el modal de consulta de profesionales.
+  - Especificación técnica actualizada para documentar respuesta, validación y ausencia de reserva exclusiva.
+- **Archivos modificados:** `backend/ms-profesionales/src/main/java/com/vinculaup/ms_profesionales/dto/ProfesionalResponse.java`, `backend/ms-profesionales/src/main/java/com/vinculaup/ms_profesionales/service/ProfesionalService.java`, `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/service/SolicitudService.java`, `frontend/vincula-up-web/src/app/core/models/professional.ts`, `frontend/vincula-up-web/src/app/core/services/api.service.ts`, `frontend/vincula-up-web/src/app/request/request.ts`, `frontend/vincula-up-web/src/app/core/models/admin.ts`, `frontend/vincula-up-web/src/app/admin/admin-professionals/admin-professionals.ts`, `frontend/vincula-up-web/src/app/admin/admin-professionals/admin-professionals.html`, `frontend/vincula-up-web/src/app/admin/admin-professionals/admin-professionals.css`, `ESPECIFICACION.md`.
+- **Verificación:** `backend/ms-profesionales/./mvnw clean compile`, `backend/ms-solicitudes/./mvnw clean compile` y `frontend/vincula-up-web/npm run build`, todos exitosos. No hay tests automatizados en los dos microservicios afectados.
+
 ### [2026-11-04] - fix: error 502 en POST /api/profesionales/alta (crear profesional)
 - **Objetivo:** Resolver el error HTTP 502 Bad Gateway que devolvía el endpoint `POST /api/profesionales/alta` al intentar dar de alta un profesional desde el panel de administración.
 - **Cambios realizados:**
@@ -776,3 +876,15 @@
   - `frontend/vincula-up-web/src/app/core/services/api.service.ts`: Se aplicó el mismo mapeo que en el archivo JavaScript correspondiente.
 - **Verificación:** `npm run build` en el frontend compiló correctamente sin errores de TypeScript ni plantillas. El backend (ms-solicitudes, ms-profesionales, bff-web) también compila correctamente.
 - **Especificación:** Actualizada en `ESPECIFICACION.md` para reflejar el nuevo campo `horarios` en el profesional y cómo se utiliza en el filtrado de disponibilidad.
+### [2026-11-05] - styles: ubicar y modificar el modal "Actualizar estado"
+
+- **Objetivo:** Identificar dónde se definen los estilos del modal "Actualizar estado" para su personalización.
+- **Causa:** El usuario necesitaba modificar la apariencia del modal que aparece al hacer clic en "Actualizar estado" en las solicitudes.
+- **Cambios realizados:**
+  - Localizado el modal en `frontend/vincula-up-web/src/app/my-requests/my-requests.html` (línea 284)
+  - Los estilos principales están en `frontend/vincula-up-web/src/app/my-requests/my-requests.css` (líneas 358-399)
+  - Clases CSS clave: `.status-modal`, `.status-modal__head`, `.status-modal__title`, `.status-modal__content`, `.status-modal__lead`, `.status-modal__options`, `.status-option`
+  - El modal se abre con `panelClass: 'vu-details-dialog'` en `my-requests.js` (línea 362) y `my-requests.ts` (línea 416)
+- **Verificación:**
+  - `npm run build` en el frontend compiló correctamente sin errores de TypeScript ni CSS.
+- **Especificación:** Actualizada en `ESPECIFICACION.md` con la ubicación de los estilos del modal.

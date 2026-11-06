@@ -291,8 +291,8 @@ familias. La columna **Rol** refleja la regla real de `SecurityConfig.java`;
 
 | Método | Ruta | Rol | Descripción |
 |---|---|---|---|
-| GET | `/api/profesionales` | — | Listado público del padrón. Acepta `estado` y `todos` |
-| GET | `/api/profesionales/{id}` | Autenticado | Ficha de un profesional |
+| GET | `/api/profesionales` | — | Listado público del padrón. Acepta `estado` y `todos`; cada perfil incluye `disponibilidad` semanal |
+| GET | `/api/profesionales/{id}` | Autenticado | Ficha de un profesional, incluidos sus horarios semanales en `disponibilidad` |
 | GET | `/api/profesionales/mi-perfil` | PROFESIONAL | Perfil propio |
 | POST | `/api/profesionales` | ADMIN | Alta de profesional |
 | POST | `/api/profesionales/alta` | ADMIN | Alta en un paso: cuenta de Keycloak con contraseña temporal + usuario + perfil pendiente |
@@ -307,7 +307,7 @@ familias. La columna **Rol** refleja la regla real de `SecurityConfig.java`;
 
 | Método | Ruta | Rol | Descripción |
 |---|---|---|---|
-| POST | `/api/solicitudes` | CLIENTE | Crea la solicitud (valida disponibilidad y GPS) |
+| POST | `/api/solicitudes` | CLIENTE | Crea la solicitud (acepta `profesionalId` como id de perfil o `usuarioId`, valida día y rango horario contra la disponibilidad semanal y resuelve GPS). No reserva el turno ni impide otras solicitudes en el mismo horario o categoría |
 | GET | `/api/solicitudes/mias` | Autenticado | Solicitudes del actor (cliente o profesional) |
 | GET | `/api/solicitudes/panel` | ADMIN | Indicadores de demanda y recorrido de las solicitudes |
 | PATCH | `/api/solicitudes/{id}/aceptar` | PROFESIONAL | Acepta el turno |
@@ -324,6 +324,16 @@ familias. La columna **Rol** refleja la regla real de `SecurityConfig.java`;
 | GET | `/api/calificaciones` | — | Reputación pública (promedio y cantidad) |
 | POST | `/api/solicitudes/{id}/calificacion` | CLIENTE | Califica con estrellas |
 | GET | `/api/solicitudes/{id}/calificacion` | Autenticado | Lee la calificación |
+
+**Chat en tiempo real (BFF):** el cliente abre WebSocket en `/ws`, envía el JWT
+como header STOMP `Authorization: Bearer ...` en `CONNECT` y se suscribe a
+`/topic/solicitudes/{id}`. El BFF valida el JWT y autoriza cada suscripción
+comprobando que el usuario sea participante de esa solicitud. Los mensajes se
+siguen enviando y persistiendo por `POST /api/solicitudes/{id}/mensajes`; tras
+guardar correctamente, el BFF publica la respuesta en el tópico. No se admiten
+envíos STOMP directos. Nginx transporta el upgrade WebSocket hacia el BFF.
+El panel del chat desplaza automáticamente al último mensaje al cargar el historial,
+recibir un mensaje en vivo o completar un envío.
 
 ### 6.4 Usuarios
 
@@ -405,7 +415,7 @@ son `UUID` en todas partes.
 | `fechaCarga` | OffsetDateTime | Alta en el padrón |
 | `fechaActivacion` | OffsetDateTime | Completó los 3 pasos de activación |
 | `especialidades` | `Set<Especialidad>` | Relación N:N |
-| `horarios` | `Array<{ diaSemana: String, horaInicio: LocalTime, horaFin: LocalTime }>` | Horarios de disponibilidad semanal configurados por el profesional. Utilizados por el frontend para filtrar técnicos según el día y hora solicitados. |
+| `disponibilidad` | `Array<{ id: UUID, profesionalId: UUID, diaSemana: String, horaInicio: LocalTime, horaFin: LocalTime }>` | Franjas semanales configuradas por el profesional; se incluyen tanto en el listado como en la ficha. Angular las consume como `Professional.horarios` para recomendar sólo profesionales cuya franja cubra el rango solicitado. |
 
 ### 7.3 `ms-profesionales` — Especialidad y Disponibilidad
 
@@ -413,6 +423,13 @@ son `UUID` en todas partes.
 
 **Disponibilidad:** `id` (UUID, PK), `profesionalId` (UUID), `diaSemana` (enum
 `LUNES`…`DOMINGO`), `horaInicio` (`LocalTime`), `horaFin` (`LocalTime`).
+
+Al crear una solicitud, `ms-solicitudes` exige que inicio y fin correspondan al
+mismo día calendario y que el rango completo quede dentro de una franja de ese
+día. Si no se configuraron horarios, o `ms-profesionales` no permite verificar
+la disponibilidad, la solicitud no se crea. Las solicitudes no bloquean ni
+reservan franjas: se permiten varias para un mismo profesional, horario y
+categoría, incluso del mismo cliente.
 
 ### 7.4 `ms-solicitudes` — Solicitud
 
@@ -661,17 +678,39 @@ requiere SMTP operativo en el realm: el bootstrap configura esos valores desde
 de usuario, contraseña y remitente estaban configuradas y se verificó el render
 del enlace y del formulario; no se envió un correo de prueba.
 
-**Notificaciones web de solicitudes.** La navbar muestra una bandeja Angular para
-clientes y profesionales. El servicio consulta `/api/solicitudes/mias` cada 30
-segundos, compara estados con el snapshot por cuenta y crea un aviso cuando
-detecta una transición. El historial y el estado leído/no leído se guardan en
-`localStorage`; las transiciones hechas por la sesión actual actualizan el
-snapshot para evitar un duplicado en el siguiente sondeo.
+**Notificaciones web de solicitudes y chat.** La navbar muestra una bandeja Angular
+para clientes y profesionales. El servicio consulta `/api/solicitudes/mias` cada
+30 segundos, compara estados con el snapshot por cuenta y crea un aviso cuando
+detecta una transición. Para solicitudes aceptadas también consulta los mensajes,
+detecta IDs nuevos y avisa por mensajes entrantes; la primera consulta inicializa
+el snapshot sin notificar mensajes históricos. Los IDs vistos se guardan por
+cuenta y solicitud en `localStorage`.
+
+El chat abierto actualiza sus mensajes por WebSocket/STOMP en tiempo real. La
+conexión solo permanece activa mientras el diálogo está abierto; al cerrarlo se
+desconecta. La identidad propia compara `usuarioId` y el `sub` de Keycloak para
+reconocer también mensajes históricos guardados con cualquiera de esas identidades.
+Los mensajes propios y ajenos se alinean y colorean de forma distinta. Las fechas
+de solicitudes (tarjetas, estado y encabezado del chat) y el resumen del turno
+nuevo se presentan como `dd/mm/aa`. El sello de la primera conversación de cada
+día incluye fecha `dd/mm/aa` y hora `HH:mm`; los mensajes siguientes muestran solo
+la hora. Las fechas de la bandeja de notificaciones también usan `dd/mm/aa`. El
+modelo conserva fecha ISO para ordenar correctamente. El sondeo de mensajes se
+conserva como mecanismo para las notificaciones cuando el chat está cerrado.
+
+Mientras la conversación correspondiente está abierta, los mensajes recibidos se
+marcan vistos sin crear notificación; al cerrar el chat se sincroniza el snapshot
+para evitar alertas tardías de mensajes ya leídos. Los mensajes propios tampoco
+generan avisos. El historial y el estado leído/no leído se guardan en `localStorage`.
+Cada aviso de chat identifica al remitente con su nombre y apellido, además de
+mostrar una vista previa del texto. En móvil el panel de notificaciones queda fijo
+al viewport, por encima de la barra inferior de navegación.
 
 La aplicación declara un manifest PWA y registra un service worker. Si la persona
-concede permiso, se usa la Notification API para mostrar el aviso del sistema
-cuando la pestaña está en segundo plano; el clic abre `/solicitudes`. En primer
-plano el aviso queda en la bandeja para evitar notificaciones duplicadas.
+concede permiso, se usa la Notification API para mostrar el aviso del sistema.
+Los avisos de cambio de estado aparecen cuando la pestaña está en segundo plano;
+los de mensaje pueden aparecer también en primer plano si el chat de esa solicitud
+no está abierto. El clic abre `/solicitudes`.
 
 **Límite de esta fase:** no hay suscripción ni servidor Web Push. El navegador no
 puede entregar cambios hechos por otra persona cuando la aplicación está cerrada

@@ -7,7 +7,7 @@ import { ApiService, GpsPosition } from '../core/services/api.service';
 import { AuthService } from '../core/services/auth.service';
 import { DirectoryService } from '../core/services/directory.service';
 import { RequestService } from '../core/services/request.service';
-import { Professional } from '../core/models/professional';
+import { Professional, ProfessionalAvailability } from '../core/models/professional';
 import { emptyServiceRequest } from '../core/models/service-request';
 import { VuAvatar } from '../shared/avatar/avatar';
 import { VuConfirm } from '../shared/confirm/confirm';
@@ -22,13 +22,6 @@ import { ToastService } from '../core/services/toast.service';
  */
 type Step = 'location' | 'specialty' | 'problem' | 'day' | 'time' | 'professionals';
 
-
-/** AJUSTAR al modelo real: un tramo de trabajo semanal del profesional. */
-interface HorarioProfesional {
-  diaSemana: number | string; // 1-7 (lunes=1, domingo=7) o nombre del día
-  horaInicio: string;         // 'HH:mm'
-  horaFin: string;            // 'HH:mm'
-}
 
 interface PlaceSuggestion {
   lat: number;
@@ -216,7 +209,6 @@ readonly filteredSpecialties = computed(() => {
 private readonly destroyRef = inject(DestroyRef);
 private readonly ahora = signal(new Date());
 private readonly MIN_ANTICIPACION_MIN = 60;
-private readonly MIN_SUPERPOSICION_MIN = 60;
 readonly DIAS_VISIBLES = 14;
 
 private aMinutos(hhmm: string): number {
@@ -243,22 +235,18 @@ private indiceDia(valor: number | string): number {
   return i >= 0 ? i : ingles.indexOf(v);
 }
 
-/** null = el profesional no informa horarios (no se lo bloquea). */
-private horariosDe(p: ProfWithDistance): HorarioProfesional[] | null {
-  const h = (p as any).horarios ?? (p as any).disponibilidad; // AJUSTAR al campo real
-  return Array.isArray(h) && h.length ? h : null;
+private horariosDe(p: ProfWithDistance): ProfessionalAvailability[] {
+  return p.horarios ?? [];
 }
 
 private trabajaEn(p: ProfWithDistance, dayId: string, slot: { start: string; end: string }): boolean {
   const horarios = this.horariosDe(p);
-  if (!horarios) return true;
   const dow = this.fechaDeId(dayId).getDay();
   const ini = this.aMinutos(slot.start);
   const fin = this.aMinutos(slot.end);
   return horarios.some((h) => {
     if (this.indiceDia(h.diaSemana) !== dow) return false;
-    const solape = Math.min(fin, this.aMinutos(h.horaFin)) - Math.max(ini, this.aMinutos(h.horaInicio));
-    return solape >= this.MIN_SUPERPOSICION_MIN;
+    return ini >= this.aMinutos(h.horaInicio) && fin <= this.aMinutos(h.horaFin);
   });
 }
 
@@ -357,9 +345,7 @@ elegirHorario(id: string): void {
     if (!year || !month || !day) {
       return this.date();
     }
-    const value = new Date(year, month - 1, day);
-    const texto = value.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
-    return texto.charAt(0).toUpperCase() + texto.slice(1);
+    return `${`${day}`.padStart(2, '0')}/${`${month}`.padStart(2, '0')}/${`${year}`.slice(-2)}`;
   }
 
   constructor() {

@@ -454,6 +454,17 @@ export class AdminProfessionals {
 		return this.cuenta(profesional)?.telefono ?? '';
 	}
 
+	horariosLabel(profesional: AdminProfessional): string[] {
+		const dias = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+		return (profesional.horarios ?? []).map((horario) => {
+			const dia = typeof horario.diaSemana === 'number'
+				? dias[horario.diaSemana === 7 ? 0 : horario.diaSemana]
+				: horario.diaSemana.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+			const diaLabel = dia ? `${dia[0].toUpperCase()}${dia.slice(1)}` : 'Día sin definir';
+			return `${diaLabel} · ${horario.horaInicio.slice(0, 5)} a ${horario.horaFin.slice(0, 5)}`;
+		});
+	}
+
 	/**
 	 * Usuario dueño de la foto que se muestra: el de la cuenta (la que la persona
 	 * sube y actualiza desde "Mi cuenta"). El `vu-avatar` pide la imagen por este

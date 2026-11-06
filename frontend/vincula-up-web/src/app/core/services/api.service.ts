@@ -4,7 +4,7 @@ import { Observable, catchError, of } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { AdminRequest } from '../models/admin';
-import { Professional } from '../models/professional';
+import { Professional, ProfessionalAvailability } from '../models/professional';
 import { RequestStatus, ServiceRequest } from '../models/service-request';
 import { AuthService } from './auth.service';
 
@@ -183,14 +183,14 @@ export class ApiService {
     const initials = realName
       ? realName.split(/\s+/).slice(0, 2).map((parte) => parte.charAt(0).toUpperCase()).join('')
       : 'P';
-    const disponibilidad = raw['disponibilidad'];
-        const horarios = Array.isArray(disponibilidad)
-            ? disponibilidad.map((slot) => ({
-                  diaSemana: slot.diaSemana ?? slot.dia,
-                  horaInicio: slot.horaInicio ?? slot.horaInicio,
-                  horaFin: slot.horaFin ?? slot.horaFin,
-              }))
-            : [];
+    const disponibilidad = raw['disponibilidad'] ?? raw['horarios'];
+    const horarios: ProfessionalAvailability[] = Array.isArray(disponibilidad)
+      ? disponibilidad.map((slot: Record<string, unknown>) => ({
+          diaSemana: (slot['diaSemana'] ?? slot['dia'] ?? '') as number | string,
+          horaInicio: String(slot['horaInicio'] ?? ''),
+          horaFin: String(slot['horaFin'] ?? ''),
+        }))
+      : [];
 
         return {
           id: String(raw['id'] ?? ''),

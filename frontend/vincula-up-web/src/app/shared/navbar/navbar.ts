@@ -67,9 +67,16 @@ export class NavbarComponent {
 		if (this.notificationsOpen) this.notificaciones.markAllRead();
 	}
 
-	protected abrirSolicitudes(): void {
+	protected abrirSolicitud(item: { id: string; requestId: string }): void {
 		this.notificationsOpen = false;
-		void this.router.navigateByUrl('/solicitudes');
+		this.notificaciones.markRead(item.id);
+		const esMensaje = item.id.startsWith('mensaje:');
+		void this.router.navigate(['/solicitudes'], {
+			queryParams: {
+				solicitudId: item.requestId,
+				abrirChat: esMensaje ? 'true' : null,
+			},
+		});
 	}
 
 	roleTexto(role: UserRole | undefined): string {

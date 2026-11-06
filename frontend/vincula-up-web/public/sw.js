@@ -14,7 +14,7 @@ self.addEventListener('notificationclick', (event) => {
 		for (const client of clients) {
 			if ('focus' in client) {
 				await client.focus();
-				if ('navigate' in client) await client.navigate(targetUrl);
+				if ('navigate' in client && new URL(client.url).href !== targetUrl) await client.navigate(targetUrl);
 				return;
 			}
 		}

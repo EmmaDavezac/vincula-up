@@ -38,6 +38,12 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @Component
 public class JdkHttpClientRequestFactory implements ClientHttpRequestFactory {
 
+    private final WebSocketAuthorizationContext webSocketAuthorization;
+
+    public JdkHttpClientRequestFactory(WebSocketAuthorizationContext webSocketAuthorization) {
+        this.webSocketAuthorization = webSocketAuthorization;
+    }
+
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
@@ -49,6 +55,11 @@ public class JdkHttpClientRequestFactory implements ClientHttpRequestFactory {
 
     private HttpHeaders authorizationHeaders() {
         HttpHeaders headers = new HttpHeaders();
+        String websocketToken = webSocketAuthorization.currentAuthorization();
+        if (websocketToken != null && !websocketToken.isBlank()) {
+            headers.set(HttpHeaders.AUTHORIZATION, websocketToken);
+            return headers;
+        }
         ServletRequestAttributes attrs =
                 (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         if (attrs != null) {
