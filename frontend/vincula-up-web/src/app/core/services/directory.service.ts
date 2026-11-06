@@ -36,7 +36,8 @@ export class DirectoryService {
           // Reputación real que calcula el backend (promedio y cantidad de reseñas).
           rating: professional.rating,
           reviews: professional.reviews,
-          availability: 'Consultar disponibilidad',
+          availability: professional.horarios?.length ? 'Disponible' : 'Consultar disponibilidad',
+          horarios: professional.horarios ?? [],
           initials,
           accent: ['mint', 'sun', 'sky', 'rose'][index % 4],
           usuarioId: professional.usuarioId,
@@ -48,6 +49,10 @@ export class DirectoryService {
           zonaCoberturaLng: professional.zonaCoberturaLng,
           radioKm: professional.radioKm,
           tieneFoto: professional.tieneFoto === true,
+          avatarFallback:
+            professional.tieneFoto !== true && professional.legajo === 'P-2001'
+              ? '/demo-luciano-benitez.svg'
+              : null,
           estado: professional.estado ?? 'ACTIVO',
         };
       })),

@@ -16,6 +16,7 @@ export interface AdminProfessional {
 	legajo: string;
 	estado: string;
 	especialidades: AdminSpecialty[];
+	horarios?: Array<{ diaSemana: number | string; horaInicio: string; horaFin: string }>;
 	nombre?: string | null;
 	apellido?: string | null;
 	/** Si el perfil del padrón tiene foto (respaldo de la de la cuenta). */

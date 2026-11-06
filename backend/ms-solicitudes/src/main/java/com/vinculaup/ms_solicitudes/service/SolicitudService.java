@@ -54,16 +54,6 @@ public class SolicitudService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "El profesional debe tener su perfil activado para recibir solicitudes");
         }
-        if (repository.existsByClienteIdAndEspecialidadIdAndEstadoIn(
-                request.clienteId(), request.especialidadId(), ESTADOS_ACTIVOS)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Ya tenes una solicitud activa para esta especialidad");
-        }
-        if (!estaDentroDeDisponibilidad(profesional.id(), request.fechaHoraPropuesta())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "El horario propuesto esta fuera de la disponibilidad del profesional");
-        }
-
         // Ubicación estilo MercadoLibre: si el cliente no adjunta coordenadas,
         // el backend transforma la dirección textual con el proveedor GPS
         // (Nominatim, el mismo del endpoint /api/gps) y las persiste en la solicitud.
@@ -76,6 +66,11 @@ public class SolicitudService {
                 && !request.fechaHoraFinPropuesta().isAfter(request.fechaHoraPropuesta())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "El fin del turno tiene que ser posterior al inicio");
+        }
+
+        if (!estaDentroDeDisponibilidad(profesional.id(), request.fechaHoraPropuesta(), request.fechaHoraFinPropuesta())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "El horario propuesto está fuera de la disponibilidad del profesional");
         }
 
         Solicitud solicitud = repository.save(new Solicitud(
@@ -149,7 +144,13 @@ public class SolicitudService {
         } else if (soloEnviadas) {
             solicitudes = repository.findByClienteIdIn(ids);
         } else {
-            solicitudes = repository.findByClienteIdInOrProfesionalIdIn(ids, ids);
+            // combinar solicitudes tanto por cliente como por profesional
+            List<Solicitud> porCliente = repository.findByClienteIdIn(ids);
+            List<Solicitud> porProfesional = repository.findByProfesionalIdIn(ids);
+            Set<Solicitud> conjunto = new LinkedHashSet<>();
+            conjunto.addAll(porCliente);
+            conjunto.addAll(porProfesional);
+            solicitudes = new java.util.ArrayList<>(conjunto);
         }
 
         return solicitudes.stream()
@@ -318,19 +319,25 @@ public class SolicitudService {
         }
     }
 
-    private boolean estaDentroDeDisponibilidad(UUID profesionalId, LocalDateTime fechaHora) {
+    private boolean estaDentroDeDisponibilidad(UUID profesionalId, LocalDateTime inicio, LocalDateTime fin) {
         try {
             var disponibilidades = profesionalesClient.obtenerDisponibilidad(profesionalId);
             if (disponibilidades == null || disponibilidades.isEmpty()) {
-                return true;
+                return false;
             }
-            String diaEsperado = diaEnEspanol(fechaHora.getDayOfWeek());
+            LocalDateTime finEffective = fin != null ? fin : inicio;
+            if (!inicio.toLocalDate().equals(finEffective.toLocalDate())) {
+                return false;
+            }
+            String dia = diaEnEspanol(inicio.getDayOfWeek());
             return disponibilidades.stream()
-                    .filter(item -> item.diaSemana().equalsIgnoreCase(diaEsperado))
-                    .anyMatch(item -> !fechaHora.toLocalTime().isBefore(item.horaInicio())
-                            && fechaHora.toLocalTime().isBefore(item.horaFin()));
+                    .filter(item -> item.diaSemana().equalsIgnoreCase(dia))
+                    .anyMatch(item -> !inicio.toLocalTime().isBefore(item.horaInicio())
+                            && !finEffective.toLocalTime().isAfter(item.horaFin())
+                            && (fin != null || inicio.toLocalTime().isBefore(item.horaFin())));
         } catch (Exception e) {
-            return true;
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "No se pudo verificar la disponibilidad del profesional", e);
         }
     }
 

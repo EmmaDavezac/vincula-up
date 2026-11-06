@@ -1,17 +1,21 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { filter } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { TemaService } from '../../core/services/tema.service';
+import { NotificationService } from '../../core/services/notification.service';
 import { UserRole } from '../../core/models/user-profile';
 import { VuAvatar } from '../avatar/avatar';
 import { VuConfirm } from '../confirm/confirm';
 import { VuIcon } from '../icon/icon';
+import { VuSpinner } from '../spinner/spinner';
+
 
 @Component({
 	selector: 'app-navbar',
 	standalone: true,
-	imports: [RouterLink, RouterLinkActive, VuAvatar, VuConfirm, VuIcon],
+	imports: [DatePipe, RouterLink, RouterLinkActive, VuAvatar, VuConfirm, VuIcon, VuSpinner],
 	templateUrl: './navbar.html',
 	styleUrl: './navbar.css',
 })
@@ -19,7 +23,9 @@ export class NavbarComponent {
 	protected readonly auth = inject(AuthService);
 	/** Tema claro/oscuro. El toggle vive en la barra y no pide sesión. */
 	protected readonly tema = inject(TemaService);
+	protected readonly notificaciones = inject(NotificationService);
 	protected userMenuOpen = false;
+	protected notificationsOpen = false;
 
 	private readonly router = inject(Router);
 	private readonly urlActual = signal(this.router.url);
@@ -43,14 +49,34 @@ export class NavbarComponent {
 	}
 
 	readonly confirmarSalida = signal(false);
+	/** Indica que el cierre de sesión está en curso: se muestra el spinner. */
+	readonly cerrandoSesion = signal(false);
 
 	confirmarCierreDeSesion(): void {
 		this.confirmarSalida.set(false);
+		this.cerrandoSesion.set(true);
 		this.auth.logout();
 	}
 
 	crearCuenta(): void {
 		this.auth.registerWithKeycloak();
+	}
+
+	protected alternarNotificaciones(): void {
+		this.notificationsOpen = !this.notificationsOpen;
+		if (this.notificationsOpen) this.notificaciones.markAllRead();
+	}
+
+	protected abrirSolicitud(item: { id: string; requestId: string }): void {
+		this.notificationsOpen = false;
+		this.notificaciones.markRead(item.id);
+		const esMensaje = item.id.startsWith('mensaje:');
+		void this.router.navigate(['/solicitudes'], {
+			queryParams: {
+				solicitudId: item.requestId,
+				abrirChat: esMensaje ? 'true' : null,
+			},
+		});
 	}
 
 	roleTexto(role: UserRole | undefined): string {

@@ -28,7 +28,7 @@
     - [10.1 Geocodificación](#101-geocodificación) · [10.2 Cifrado de ubicaciones](#102-cifrado-de-ubicaciones) · [10.3 Almacenamiento de fotos](#103-almacenamiento-de-fotos) · [10.4 Quién ve la foto de quién](#104-quién-ve-la-foto-de-quién) · [10.5 Privacidad de la dirección](#105-privacidad-de-la-dirección-del-cliente)
 11. [Variables de entorno](#11-variables-de-entorno)
 12. [Datos de arranque](#12-datos-de-arranque)
-13. [Infraestructura: pgAdmin, TLS, Nginx](#13-infraestructura-pgadmin-tls-nginx)
+13. [Infraestructura: TLS, Nginx](#13-infraestructura-tls-nginx)
 14. [Scripts operativos](#14-scripts-operativos)
 15. [Estado real del MVP](#15-estado-real-del-mvp)
 16. [Deuda técnica conocida](#16-deuda-técnica-conocida)
@@ -80,9 +80,10 @@ sentidos:
   Es seguro porque el registro abierto del realm asigna
   `default-roles-vincula-up` → `CLIENTE`: un auto-registrado nunca nace
   `PROFESIONAL` ni `ADMIN` por esa vía.
-- **`ms-usuarios` → Keycloak:** un profesional invitado por el administrador se
-  auto-registra en Keycloak y nace ahí con rol `CLIENTE`; el BFF lo promueve a
-  `PROFESIONAL` en su primer login (ver [§8.4](#84-promoción-de-rol-del-profesional-invitado)).
+- **`ms-usuarios` → Keycloak:** al dar de alta a un profesional, el BFF crea su
+  cuenta en Keycloak con rol `PROFESIONAL` y una contraseña temporal; el
+  profesional sólo activa su perfil (ver
+  [§8.4](#84-alta-del-profesional-sin-auto-registro)).
 
 **Por qué el frontend y el backend tienen que mirar lo mismo.** El frontend
 arma el perfil con el `rolNegocio` que devuelve `ms-usuarios`, no con el claim del
@@ -149,7 +150,10 @@ el BFF (`backend/bff-web`), que cumple cuatro funciones:
 1. **Agregación.** El listado de profesionales devuelve solo `usuarioId` (el
    nombre y apellido viven en `ms-usuarios`). El BFF los pega en cada tarjeta
    con `enriquecerConUsuarios()` (`ApiController.java:160`), en una sola pasada
-   indexada por UUID para no hacer una llamada por tarjeta.
+  indexada por UUID para no hacer una llamada por tarjeta. Para perfiles
+  históricos cuyo `usuarioId` todavía contiene el `keycloakId`, el BFF hace un
+  lookup de solo lectura por esa identidad y publica el `usuarioId` interno
+  resuelto, que es el que requiere el endpoint privado de fotos.
 2. **Autorización.** Valida el JWT contra el JWKS de Keycloak y aplica el RBAC.
    Los microservicios no exponen autenticación propia y por eso no se publican
    fuera de `127.0.0.1`.
@@ -169,15 +173,15 @@ el BFF (`backend/bff-web`), que cumple cuatro funciones:
 | `nginx` | 80 / 443 | Sí (todas las interfaces) |
 | `keycloak` | 8080 | Sí |
 | `postgres` | 5432 | Sí |
-| `pgadmin` | 5050 | Sí |
 | `bff-web` | 9001 | Sí |
-| `ms-usuarios` | 8081 | Solo `127.0.0.1` |
-| `ms-profesionales` | 8082 | Solo `127.0.0.1` |
-| `ms-solicitudes` | 8083 | Solo `127.0.0.1` |
+| `ms-usuarios` | 8081 | Sí (red interna) |
+| `ms-profesionales` | 8082 | Sí (red interna) |
+| `ms-solicitudes` | 8083 | Sí (red interna) |
 
-Los tres microservicios de dominio se publican únicamente en `127.0.0.1` a
-propósito: no implementan autenticación propia, así que no deben quedar
-alcanzables desde la red. Toda entrada del exterior pasa por nginx → BFF.
+Los tres microservicios de dominio se publican en la red interna de Docker
+porque cada uno valida el JWT de Keycloak por su cuenta (oauth2-resource-server).
+Toda entrada del exterior pasa por nginx → BFF, pero los ms-* ya no confían
+ciegamente en el perímetro: rechazan peticiones sin token válido.
 
 ### Puertos entre servicios (red interna de Docker)
 
@@ -287,11 +291,11 @@ familias. La columna **Rol** refleja la regla real de `SecurityConfig.java`;
 
 | Método | Ruta | Rol | Descripción |
 |---|---|---|---|
-| GET | `/api/profesionales` | — | Listado público del padrón. Acepta `estado` y `todos` |
-| GET | `/api/profesionales/{id}` | Autenticado | Ficha de un profesional |
+| GET | `/api/profesionales` | — | Listado público del padrón. Acepta `estado` y `todos`; cada perfil incluye `disponibilidad` semanal |
+| GET | `/api/profesionales/{id}` | Autenticado | Ficha de un profesional, incluidos sus horarios semanales en `disponibilidad` |
 | GET | `/api/profesionales/mi-perfil` | PROFESIONAL | Perfil propio |
 | POST | `/api/profesionales` | ADMIN | Alta de profesional |
-| POST | `/api/profesionales/alta` | ADMIN | Alta en un paso: usuario invitado + perfil pendiente |
+| POST | `/api/profesionales/alta` | ADMIN | Alta en un paso: cuenta de Keycloak con contraseña temporal + usuario + perfil pendiente |
 | PUT | `/api/profesionales/{id}` | ADMIN | Edición del padrón |
 | PATCH | `/api/profesionales/{id}/suspender` | ADMIN | Baja lógica. En la interfaz se llama **desactivar** |
 | PATCH | `/api/profesionales/{id}/reactivar` | ADMIN | Levanta la suspensión |
@@ -303,7 +307,7 @@ familias. La columna **Rol** refleja la regla real de `SecurityConfig.java`;
 
 | Método | Ruta | Rol | Descripción |
 |---|---|---|---|
-| POST | `/api/solicitudes` | CLIENTE | Crea la solicitud (valida disponibilidad y GPS) |
+| POST | `/api/solicitudes` | CLIENTE | Crea la solicitud (acepta `profesionalId` como id de perfil o `usuarioId`, valida día y rango horario contra la disponibilidad semanal y resuelve GPS). No reserva el turno ni impide otras solicitudes en el mismo horario o categoría |
 | GET | `/api/solicitudes/mias` | Autenticado | Solicitudes del actor (cliente o profesional) |
 | GET | `/api/solicitudes/panel` | ADMIN | Indicadores de demanda y recorrido de las solicitudes |
 | PATCH | `/api/solicitudes/{id}/aceptar` | PROFESIONAL | Acepta el turno |
@@ -320,6 +324,16 @@ familias. La columna **Rol** refleja la regla real de `SecurityConfig.java`;
 | GET | `/api/calificaciones` | — | Reputación pública (promedio y cantidad) |
 | POST | `/api/solicitudes/{id}/calificacion` | CLIENTE | Califica con estrellas |
 | GET | `/api/solicitudes/{id}/calificacion` | Autenticado | Lee la calificación |
+
+**Chat en tiempo real (BFF):** el cliente abre WebSocket en `/ws`, envía el JWT
+como header STOMP `Authorization: Bearer ...` en `CONNECT` y se suscribe a
+`/topic/solicitudes/{id}`. El BFF valida el JWT y autoriza cada suscripción
+comprobando que el usuario sea participante de esa solicitud. Los mensajes se
+siguen enviando y persistiendo por `POST /api/solicitudes/{id}/mensajes`; tras
+guardar correctamente, el BFF publica la respuesta en el tópico. No se admiten
+envíos STOMP directos. Nginx transporta el upgrade WebSocket hacia el BFF.
+El panel del chat desplaza automáticamente al último mensaje al cargar el historial,
+recibir un mensaje en vivo o completar un envío.
 
 ### 6.4 Usuarios
 
@@ -401,6 +415,7 @@ son `UUID` en todas partes.
 | `fechaCarga` | OffsetDateTime | Alta en el padrón |
 | `fechaActivacion` | OffsetDateTime | Completó los 3 pasos de activación |
 | `especialidades` | `Set<Especialidad>` | Relación N:N |
+| `disponibilidad` | `Array<{ id: UUID, profesionalId: UUID, diaSemana: String, horaInicio: LocalTime, horaFin: LocalTime }>` | Franjas semanales configuradas por el profesional; se incluyen tanto en el listado como en la ficha. Angular las consume como `Professional.horarios` para recomendar sólo profesionales cuya franja cubra el rango solicitado. |
 
 ### 7.3 `ms-profesionales` — Especialidad y Disponibilidad
 
@@ -408,6 +423,13 @@ son `UUID` en todas partes.
 
 **Disponibilidad:** `id` (UUID, PK), `profesionalId` (UUID), `diaSemana` (enum
 `LUNES`…`DOMINGO`), `horaInicio` (`LocalTime`), `horaFin` (`LocalTime`).
+
+Al crear una solicitud, `ms-solicitudes` exige que inicio y fin correspondan al
+mismo día calendario y que el rango completo quede dentro de una franja de ese
+día. Si no se configuraron horarios, o `ms-profesionales` no permite verificar
+la disponibilidad, la solicitud no se crea. Las solicitudes no bloquean ni
+reservan franjas: se permiten varias para un mismo profesional, horario y
+categoría, incluso del mismo cliente.
 
 ### 7.4 `ms-solicitudes` — Solicitud
 
@@ -476,6 +498,8 @@ que no quede una ruta con la que pedirle la foto a cualquiera.
 8. Se guarda el access_token y el perfil en localStorage
 9. La app llama a /api/usuarios/por-keycloak con el sub del token
 10. El BFF vincula o recupera el usuario de negocio
+11. Mientras se verifica la cuenta, la SPA muestra una pantalla de carga; el
+  acceso al contenido y la comprobación legal esperan la respuesta.
 ```
 
 La URL de **registro** de Keycloak se usa por separado
@@ -523,37 +547,46 @@ Además del RBAC por ruta, el BFF corta a las cuentas `SUSPENDIDO` en
 `requireActive()` antes de ejecutar cualquier operación de negocio, y resuelve la
 identidad del actor desde el token (ver [§3](#el-bff-y-por-qué-existe)).
 
-### 8.4 Promoción de rol del profesional invitado
+### 8.4 Alta del profesional sin auto-registro
 
 Este es el punto más delicado del modelo de roles, y merece su propio
 apartado. La secuencia real es:
 
 1. El **admin** da de alta un profesional con `POST /api/profesionales/alta`.
-2. El BFF crea en `ms-usuarios` un usuario con `rolNegocio = PROFESIONAL` y
-   `keycloakId = **nulo**` (es una invitación: la cuenta de Keycloak aún no existe).
-3. El profesional se **auto-registra** en Keycloak con ese email. Keycloak le
-   asigna el rol por defecto `CLIENTE`, porque el realm no puede saber que el
-   BFF lo dio de alta como profesional.
-4. En su primer login, el BFF detecta la discrepancia: `rolNegocio` dice
-   `PROFESIONAL` pero el token dice `CLIENTE`.
-5. `sincronizarRolProfesional()` (`ApiController.java:59-67`) llama a
-   `keycloakAdmin.promoverAProfesional()`, que usa el **client de servicio**
-   `vincula-up-admin` (`manage-users`, `view-users`, `query-users`, `view-realm`)
-   para promover el rol en Keycloak.
-6. El siguiente token ya trae `PROFESIONAL` y el profesional puede activar su perfil.
+2. El BFF crea la cuenta en **Keycloak** (usuario = correo) con el rol
+   `PROFESIONAL` y una **contraseña temporal** (`temporary = true` +
+   `UPDATE_PASSWORD`): el profesional **no se registra**, ya tiene cuenta.
+3. El BFF registra el usuario en `ms-usuarios` (`rolNegocio = PROFESIONAL`, ya
+   vinculado a su `keycloakId`) y el perfil `CARGADO` en `ms-profesionales`.
+4. El BFF manda por correo el usuario y la contraseña temporal. Esa contraseña
+   **no vence**: si el profesional entra una semana, un mes o un año después, el
+   primer login le exige cambiarla (`UPDATE_PASSWORD`) y recién ahí entra.
+5. El profesional **activa su perfil** (foto, zona de cobertura y horarios).
 
-**Restricción de seguridad:** la promoción solo ocurre de `CLIENTE` a
+**Por qué una contraseña temporal y no un enlace con vencimiento.** El enlace de
+un correo de Keycloak (`execute-actions-email`) caduca —por defecto a las 12
+horas— y obligaría a reenviarlo. La contraseña temporal, en cambio, espera lo que
+haga falta y se invalida sola en el primer ingreso: es la opción más tolerante
+para el caso real, donde el profesional puede tardar meses en activar.
+
+**Restricción de seguridad:** la asignación de rol sólo puede ser `CLIENTE` →
 `PROFESIONAL`. **Nunca otorga `ADMIN`**: el rol administrativo no se propaga
-desde el padrón. Un profesional dado de alta no puede convertirse en admin por
-este camino.
+desde el padrón.
 
-**La otra mitad: qué pasa cuando la fila no existe.** El paso 2 assumes que el
-administrador ya dio de alta al profesional. Si alguien entra y no hay fila, el
-rol sale del token ([§2](#2-roles-del-mvp)). Esto cubre el caso del
-**administrador institucional**: su cuenta la crea el administrador de Keycloak,
-no el padrón, así que si el auto-alta no respetara el token quedaría trancado
-—nada en la aplicación crea un `ADMIN`— y el panel `/admin` sería inalcanzable
-aunque el backend lo autorizara.
+**Qué pasa con los prerregistros antiguos.** Antes el profesional se
+auto-registraba en Keycloak y el BFF lo promovía en su primer login
+(`keycloakAdmin.promoverAProfesional()`). Ese camino se conserva como red de
+seguridad para las cuentas que hayan quedado en ese estado:
+`sincronizarRolProfesional()` (`ApiController.java`) sigue promoviendo
+`CLIENTE → PROFESIONAL` si la fila del padrón dice `PROFESIONAL` y el token
+todavía dice `CLIENTE`. Tampoco otorga `ADMIN`.
+
+**La otra mitad: qué pasa cuando la fila no existe.** Si alguien entra y no hay
+fila en el padrón, el rol sale del token ([§2](#2-roles-del-mvp)). Esto cubre el
+caso del **administrador institucional**: su cuenta la crea el administrador de
+Keycloak, no el padrón, así que si el auto-alta no respetara el token quedaría
+trancado —nada en la aplicación crea un `ADMIN`— y el panel `/admin` sería
+inalcanzable aunque el backend lo autorizara.
 
 `SEMBRAR_DEMO=true` siembra las tres cuentas de prueba (`cliente@`,
 `profesional@`, `admin@`) con su rol ya asignado, así el padrón y el panel
@@ -577,16 +610,21 @@ que es lo único que define qué versión está vigente.
 
 **El flujo:**
 
-1. La app llama a `GET /api/usuarios/yo` (que ya hacía) y lee los tres campos.
-2. Si la versión guardada no es la vigente, `terminosPendientes` es `true`.
-3. Aparece un modal montado en `app.html`, **sin botón de cerrar**.
+1. La app muestra una pantalla de carga mientras consulta `GET /api/usuarios/yo`
+  y lee los tres campos.
+2. Solo después de que responda el backend, si la versión guardada no es la
+  vigente, `terminosPendientes` es `true`.
+3. Aparece un modal montado en `app.html`, **sin botón de cerrar**. Si la consulta
+  falla, el modal no aparece y la pantalla de carga ofrece reintentar.
 4. Al marcar el casillero, `PATCH /api/terminos/aceptar` guarda versión y fecha.
 
 **Por qué es un modal y no un guard.** Es una capa sobre toda la aplicación, no
 una pantalla: escribir una URL no lo esquiva, y tampoco navegar. La única forma de
-salir es aceptar. Mientras el backend no responde, `terminosPendientes` devuelve
-`true`: se prefiere bloquear de más un instante antes que dejar pasar a alguien
-que no aceptó.
+salir es aceptar. Mientras el backend no responde, la aplicación muestra una capa de
+animación de inicio de sesión y verificación de credenciales (`app-auth-loading`):
+primero se consulta la cuenta (`GET /api/usuarios/yo`) de forma disimulada y, si
+los términos no están aceptados, se despliega el modal sin parpadeos para quienes ya
+los aceptaron.
 
 **El id sale del token.** El endpoint no acepta un id en el cuerpo; si lo
 aceptara, cualquiera con su propia sesión podría registrar la aceptación en la
@@ -595,9 +633,11 @@ cuenta de otro.
 **Si falla el registro, el modal no se cierra.** El estado solo cambia a aceptado
 cuando la llamada volvió bien.
 
-**Limitación conocida:** el realm tiene `verifyEmail: false`. Quien se registre
-con el correo de un prerregistro queda vinculado a ese prerregistro y se activa
-como profesional ([§16](#16-deuda-técnica-conocida)).
+**Limitación conocida:** el realm tiene `verifyEmail: false`. Quien se
+auto-registra con un correo que ya tiene fila de negocio queda vinculado a esa
+fila y toma su rol. Con el alta nueva eso casi no puede pasar (la cuenta de
+Keycloak ya existe, así que no hay segunda auto-registración), pero sí con las
+cuentas antiguas ([§16](#16-deuda-técnica-conocida)).
 
 ### 8.6 Configuración del realm
 
@@ -629,6 +669,55 @@ como profesional ([§16](#16-deuda-técnica-conocida)).
 > corriendo, `scripts/{linux-macos,windows}/keycloak-bootstrap.*` lo actualizan de
 > forma idempotente ([§14.1](#141-keycloak-bootstrap-sh--ps1)).
 
+**Recuperación de contraseña.** El login ofrece «¿Olvidaste tu contraseña?» y
+Keycloak recibe el correo y emite el enlace de recuperación con caducidad; la
+persona define la nueva clave en el formulario del tema `vincula-up`. No se
+mantiene una ruta de restablecimiento paralela en Angular ni en el BFF. El flujo
+requiere SMTP operativo en el realm: el bootstrap configura esos valores desde
+`KEYCLOAK_SMTP_*` en `.env`. En la revisión del 2026-11-01, las variables locales
+de usuario, contraseña y remitente estaban configuradas y se verificó el render
+del enlace y del formulario; no se envió un correo de prueba.
+
+**Notificaciones web de solicitudes y chat.** La navbar muestra una bandeja Angular
+para clientes y profesionales. El servicio consulta `/api/solicitudes/mias` cada
+30 segundos, compara estados con el snapshot por cuenta y crea un aviso cuando
+detecta una transición. Para solicitudes aceptadas también consulta los mensajes,
+detecta IDs nuevos y avisa por mensajes entrantes; la primera consulta inicializa
+el snapshot sin notificar mensajes históricos. Los IDs vistos se guardan por
+cuenta y solicitud en `localStorage`.
+
+El chat abierto actualiza sus mensajes por WebSocket/STOMP en tiempo real. La
+conexión solo permanece activa mientras el diálogo está abierto; al cerrarlo se
+desconecta. La identidad propia compara `usuarioId` y el `sub` de Keycloak para
+reconocer también mensajes históricos guardados con cualquiera de esas identidades.
+Los mensajes propios y ajenos se alinean y colorean de forma distinta. Las fechas
+de solicitudes (tarjetas, estado y encabezado del chat) y el resumen del turno
+nuevo se presentan como `dd/mm/aa`. El sello de la primera conversación de cada
+día incluye fecha `dd/mm/aa` y hora `HH:mm`; los mensajes siguientes muestran solo
+la hora. Las fechas de la bandeja de notificaciones también usan `dd/mm/aa`. El
+modelo conserva fecha ISO para ordenar correctamente. El sondeo de mensajes se
+conserva como mecanismo para las notificaciones cuando el chat está cerrado.
+
+Mientras la conversación correspondiente está abierta, los mensajes recibidos se
+marcan vistos sin crear notificación; al cerrar el chat se sincroniza el snapshot
+para evitar alertas tardías de mensajes ya leídos. Los mensajes propios tampoco
+generan avisos. El historial y el estado leído/no leído se guardan en `localStorage`.
+Cada aviso de chat identifica al remitente con su nombre y apellido, además de
+mostrar una vista previa del texto. En móvil el panel de notificaciones queda fijo
+al viewport, por encima de la barra inferior de navegación.
+
+La aplicación declara un manifest PWA y registra un service worker. Si la persona
+concede permiso, se usa la Notification API para mostrar el aviso del sistema.
+Los avisos de cambio de estado aparecen cuando la pestaña está en segundo plano;
+los de mensaje pueden aparecer también en primer plano si el chat de esa solicitud
+no está abierto. El clic abre `/solicitudes`.
+
+**Límite de esta fase:** no hay suscripción ni servidor Web Push. El navegador no
+puede entregar cambios hechos por otra persona cuando la aplicación está cerrada
+o el service worker está detenido; el sondeo solo funciona mientras hay una página
+abierta. El push real requiere guardar suscripciones y un emisor backend con VAPID,
+además de gestionar expiración y revocación.
+
 **Clientes:**
 
 | Client | Tipo | Uso |
@@ -641,23 +730,39 @@ como profesional ([§16](#16-deuda-técnica-conocida)).
 > `scripts/linux-macos/keycloak-bootstrap.sh` (o `.ps1` en Windows) — ver
 > [§14](#14-scripts-operativos).
 
+> **Los textos del import van cortos: 255 caracteres es el techo.** Las columnas
+> de texto de Keycloak 26.x en Postgres son `varchar(255)`. Si un campo del JSON
+> (por ejemplo el `description` de un client) lo supera, el import **falla
+> entero** con `ERROR: value too long for type character varying(255)`,
+> Keycloak aborta la transacción, no arranca y entra en un **loop de reinicios**
+> (`restartCount` creciendo, `exitCode=1` en los logs del contenedor). El síntoma
+> desde el host es que `http://localhost:8080` reinicia la conexión y el BFF se
+> queda sin issuer. La explicación larga de por qué `https://*` está en los
+> `redirectUris` vive en `keycloak/import/README.md`, no en el `description` del
+> client. Detalle en [§16.1](#161-prioridad-alta).
+
 ---
 
 ## 9. Los tres flujos completos
 
 ### 9.1 Cliente: pedir un turno
 
-Ruta `/solicitar`, en **4 pasos** (wizard de 1101 líneas en `request.ts`):
+Ruta `/solicitar`, en **6 pasos** (`request.ts`):
 
 | Paso | Qué hace | Validación |
 |---|---|---|
 | 1. **Ubicación** | Escribe la dirección o la marca en el mapa. Se geocodifica a coordenadas | Obligatorio. La dirección exacta se difiere hasta que el profesional acepta |
-| 2. **Categoría** | Elige la especialidad | Obligatorio |
-| 3. **Día y horario** | Elige día de la semana y franja, contra la disponibilidad real del profesional | Obligatorio. Se filtran horarios ya pasados |
-| 4. **Profesional** | Elige entre los profesionales de esa especialidad, ordenados por cercanía | Obligatorio |
+| 2. **Categoría** | Elige una especialidad con al menos un profesional activo | Obligatorio; el catálogo se filtra para no ofrecer categorías sin profesionales |
+| 3. **Problema** | Describe brevemente el trabajo solicitado | Obligatorio; mínimo 10 caracteres |
+| 4. **Día** | Elige una fecha desde hoy hasta los próximos seis días; cada opción muestra el día de semana y el día del mes | Obligatorio |
+| 5. **Horario** | Elige una franja horaria | Obligatorio |
+| 6. **Profesional** | Elige entre los profesionales de esa categoría y ordena por cercanía o reputación | Obligatorio |
 
 Al enviar: se valida en `ms-solicitudes` que el profesional esté `ACTIVO` y que
 haya cobertura para las coordenadas del servicio. La solicitud nace `PENDIENTE`.
+El wizard indica visualmente los seis pasos y, si se intenta abandonar `/solicitar`
+antes del envío, pide confirmación para evitar perder lo completado. Las consultas
+de categorías/profesionales y el envío muestran el spinner de Angular Material.
 
 **Chat y calificación.** En `/solicitudes` el cliente ve el estado, escribe
 mensajes dentro de cada solicitud, cancela mientras siga `PENDIENTE` y, cuando el
@@ -692,13 +797,14 @@ Shell propio (`/admin`) con 4 pantallas:
 | Pantalla | Qué hace |
 |---|---|
 | **Resumen** | Indicadores de demanda y recorrido de las solicitudes, sobre datos reales de `GET /api/solicitudes/panel` |
-| **Profesionales** | Padrón completo, alta de preregistros y detalle |
+| **Profesionales** | Padrón completo, alta de profesionales y detalle |
 | **Categorías** | CRUD de especialidades |
 | **Clientes** | Listado y detalle con edición de datos y gestión del acceso |
 
 El alta de un profesional usa `POST /api/profesionales/alta`, que en un solo
-paso crea el usuario invitado y su perfil pendiente (ver
-[§8.4](#84-promoción-de-rol-del-profesional-invitado)).
+paso crea la cuenta de Keycloak con contraseña temporal, el usuario de negocio y
+su perfil pendiente (ver
+[§8.4](#84-alta-del-profesional-sin-auto-registro)).
 
 **El flujo de las pantallas de detalle: entrar a consultar, y adentro
 modificar.** Las dos listas (profesionales y clientes) muestran **una sola acción
@@ -909,7 +1015,7 @@ El domicilio del cliente **no se le muestra al profesional hasta que acepta el t
 **Lo que esto no cubre:**
 
 - La **descripción** que escribe el cliente es texto libre: si la persona escribe la dirección ahí, se ve. La prevención es aclarar en el formulario que describa el problema, no la ubicación.
-- `ms-solicitudes` sigue devolviendo la dirección exacta a quien le pregunte: el filtrado vive en el BFF. Los microservicios están publicados solo en `127.0.0.1` y sin autenticación, así que el alcance es un acceso local.
+- `ms-solicitudes` sigue devolviendo la dirección exacta a quien le pregunte: el filtrado vive en el BFF. Los microservicios validan el JWT de Keycloak por su cuenta (oauth2-resource-server), así que requieren token válido en cada petición.
 - Las coordenadas siguen **cifradas en reposo** en la base: el cifrado no cambia, lo que cambia es que la API devuelve un punto redondeado.
 
 ---
@@ -957,22 +1063,121 @@ Se leen del archivo `.env` en la raíz (ignorado por git). Copiar
 | `KEYCLOAK_SMTP_AUTH` | `true` | Autenticación SMTP |
 | `KEYCLOAK_SMTP_USER` | — | Usuario (con Gmail: una dirección) |
 | `KEYCLOAK_SMTP_PASSWORD` | — | **Contraseña de aplicación**, no la de la cuenta |
-| `KEYCLOAK_SMTP_FROM` | — | Remitente |
+| `KEYCLOAK_SMTP_FROM` | — | Remitente (`From`) |
 | `KEYCLOAK_SMTP_FROM_DISPLAY_NAME` | `Vincula-UP` | Nombre visible del remitente |
+| `KEYCLOAK_SMTP_REPLY_TO` | — (cae al `From`) | **A dónde llegan las respuestas** |
+| `KEYCLOAK_CONTACTO` | — (cae al Reply-To) | Casilla que se muestra en el pie del correo |
+| `MAIL_PLANTILLA` | `/app/correos/prerregistro.html` | Ruta de la maqueta HTML del aviso |
 
-**Estado: configurado y verificado.** El correo saliente está operativo sobre
-Gmail, con una **contraseña de aplicación** vigente en
-`KEYCLOAK_SMTP_PASSWORD`. La verificación se hizo el **2 de octubre de 2026** con
-un envío real desde el flujo de "¿Olvidó su contraseña?" de la pantalla de
-ingresar: el correo llegó a la casilla y Keycloak no registró errores de SMTP.
-Con eso quedan habilitados los tres correos que manda el sistema:
+### El From y el Reply-To van separados
+
+No es duplicación: son dos cosas distintas, y separarlas es lo que permite que
+las respuestas lleguen a la casilla institucional.
+
+| | Qué es | Por qué |
+|---|---|---|
+| `From` | Quién envía | **Tiene que ser la cuenta autenticada en el SMTP.** El servidor rechaza que se envíe en nombre de otra dirección, así que con Gmail obliga a usar la casilla propia. |
+| `Reply-To` | A dónde caen las respuestas | **Puede ser cualquier dirección** y no necesita autenticarse: es solo una etiqueta del encabezado. |
+
+Con las dos separadas, el aviso sale de `lucianodavezac@gmail.com` —la cuenta con
+contraseña de aplicación— pero **cualquier respuesta del profesional cae en
+`vinculaup@gmail.com`**, la misma casilla que se publica en los términos y las
+preguntas frecuentes. `KEYCLOAK_CONTACTO` es el texto que se imprime en el pie, y
+ambos son opcionales: vacíos, el `Reply-To` cae al `From` y el pie no muestra
+contacto.
+
+### Los correos llevan la marca de la aplicación
+
+Los dos correos del sistema (el de Keycloak y el del BFF) salen con la misma
+identidad visual que la web. No es decoración: un correo pelado que le llega a
+alguien que no conoce el proyecto es indistinguible de un phishing, y en el aviso
+de alta eso es justo lo que hay que evitar.
+
+| | |
+|---|---|
+| Ancho | 600 px, con tarjeta de fondo y cabecera coral de la marca |
+| Colores | Los tokens de `src/styles.css`: `--coral #e35f43`, `--ink #1e2926`, `--muted #67716c`, `--line #d8d8ce` |
+| Modo oscuro | Una regla de `prefers-color-scheme` con clases `.vu-*` |
+| Estructura | **Tablas y estilos en línea**, no flex ni grid: Outlook no los soporta |
+| Versiones | **Siempre HTML + texto plano.** El texto plano no es adorno: los filtros antispam lo leen antes que el HTML, y un correo solo-HTML se ve más sospechoso |
+
+> **El nombre "Vincula-UP" va escrito, no solo como imagen.** Los clientes de
+> correo bloquean las imágenes remotas por defecto: si la única marca fuera el
+> logo, sin imágenes el correo se vería vacío.
+
+### Dónde vive cada cosa
+
+**Los correos de Keycloak** (recuperación de contraseña, verificación, cambio de
+correo, bienvenida, enlace vencido) usan un tema propio:
+
+```
+keycloak/themes/vincula-up/
+├── theme.properties                      parent=keycloak
+└── email/
+    ├── theme.properties                  + contacto y URL que lee el pie
+    ├── html/template.ftl                 cabecera, ancho y pie (UNO para todos)
+    └── messages/messages_es.properties   los textos de cada correo
+```
+
+Se monta en el contenedor (`./keycloak/themes/vincula-up` →
+`/opt/keycloak/themes/vincula-up:ro`) y se activa con `emailTheme=vincula-up`, que
+aplica `keycloak-bootstrap.*` por la misma razón que el SMTP: el import del realm
+solo corre la primera vez que se crea.
+
+El diseño está separado de los textos a propósito: `template.ftl` no sabe qué
+correo se está mandando, así que cambiar una palabra no puede romper la maqueta.
+
+> **Dos restricciones del motor que cortan todo el envío si no se respetan:**
+>
+> 1. **Nada de `${algo?html}`.** Keycloak 26 compila las plantillas con el
+>    auto-escape de FreeMarker prendido y rechaza ese operador con un
+>    `ParseException` que cancela el envío. Se escribe `${algo}`.
+> 2. **El contexto de las plantillas de correo no expone `realm`.** Con las del
+>    login sí viene; con las de correo no. Por eso el contacto y la URL se leen
+>    de `theme.properties` (vía `properties`) y no de atributos del realm.
+
+**Los avisos transaccionales** los escribe el BFF (`NotificacionService`), no
+Keycloak. El aviso de alta de profesional tiene su maqueta en
+`backend/bff-web/src/main/resources/correos/prerregistro.html`.
+
+> **Por qué ese archivo va en el disco y no en el jar.** El `Dockerfile` lo copia
+> aparte a `/app/correos/` y la ruta se pasa por `MAIL_PLANTILLA`. Dentro del jar
+> empaquetado de Spring Boot el recurso quedaba en `BOOT-INF/classes/` pero ni
+> `ClassPathResource` ni `@Value("classpath:...")` lo resolvían, y el correo salía
+> con el texto de repuesto. Además, así la maqueta se cambia montando un volumen
+> encima, sin recompilar.
+>
+> El aviso sale en **multipart**: el `MimeMessageHelper` tiene que crearse con el
+> `true` de multipart, o `setText(texto, html)` falla con *"Not in multipart
+> mode"*. Y es best-effort: si la maqueta no se puede leer, manda texto plano en
+> lugar de romper el alta del profesional.
+
+**El logo** (`logo-cuadrado.png`, 256×256) lo genera
+`scripts/generate-logo.py` desde la misma geometría del `favicon.svg`, sin
+dependencias: solo `zlib` y `struct` de la biblioteca estándar. Si cambia la
+marca hay que correr ese script y rehacer también los tres favicons.
+
+### Estado: configurado y verificado
+
+El correo saliente está operativo sobre Gmail, con una **contraseña de
+aplicación** vigente en `KEYCLOAK_SMTP_PASSWORD`. La verificación se hizo el
+**2 de octubre de 2026** con envíos reales desde el flujo de "¿Olvidó tu
+contraseña?" y desde el alta de un profesional, **capturando el MIME generado**
+para comprobar que el tema renderiza y que el `Reply-To` sale efectivamente.
 
 | Correo | Quién lo dispara |
 |---|---|
 | Recuperación de contraseña (`resetPasswordAllowed`) | La persona desde "¿Olvidó su contraseña?" del login |
-| Aviso de prerregistro | El alta de un profesional en el panel (`POST /api/profesionales/alta`) |
-| Enlace de activación | El mismo aviso, con la `APP_URL` del `.env` |
+| Aviso de alta | El alta de un profesional en el panel (`POST /api/profesionales/alta`) |
+| Nueva solicitud | Creación confirmada (`POST /api/solicitudes`), al profesional destinatario |
+| Solicitud aceptada o rechazada | Transición confirmada, al cliente que la creó |
+| Solicitud completada o cancelada | Transición confirmada, a la contraparte |
 
+Los avisos de solicitudes son **best-effort**: el BFF los envía después de que
+`ms-solicitudes` confirme la operación. Un problema de SMTP o la falta de email
+del destinatario se registra en el log, pero no revierte ni hace fallar una
+transición ya guardada. No se envían notificaciones dentro de la aplicación en
+esta fase.
 > **El valor nunca se versiona.** La contraseña vive solo en el `.env` local, que
 > está en `.gitignore` y no se sube al repositorio. Las tablas de arriba y el
 > `.env.example` documentan la variable, nunca su contenido.
@@ -992,6 +1197,29 @@ Con eso quedan habilitados los tres correos que manda el sistema:
 > El script es idempotente y avisa si encuentra la variable vacía. Sin ella el
 > reseteo de contraseña sigue habilitado en el realm, pero Keycloak no puede
 > enviar el correo: el resultado es que nadie recibe el mensaje.
+
+### Lo que la maqueta NO arregla
+
+Enviar desde una casilla personal y con enlaces a `.local` **se sigue viendo
+como un ejercicio local**, por más cuidada que esté la maqueta. Lo que mejora es
+todo lo que depende del código —que el mensaje se vea de una institución y no
+genérico, en español, con instrucciones claras y con las respuestas cayendo en la
+casilla correcta—, pero el mayor factor de confianza de un correo sigue siendo
+**mandar desde un dominio propio con SPF, DKIM y DMARC**: un remitente que dice
+"Vincula-UP" desde una casilla `@gmail.com` personal tiene exactamente la forma de
+un phishing, y ninguna plantilla lo arregla.
+
+Hoy eso está bien porque el uso es local. Para una salida real hacen falta un
+dominio y un servicio de correo transaccional; queda anotado en la deuda técnica
+(§16). Cuando se haga, el cambio es de `.env` y no de código:
+
+```bash
+KEYCLOAK_SMTP_USER=vinculaup@midominio.com
+KEYCLOAK_SMTP_FROM=vinculaup@midominio.com
+KEYCLOAK_SMTP_PASSWORD=clave-del-servicio
+KEYCLOAK_SMTP_REPLY_TO=vinculaup@midominio.com
+KEYCLOAK_CONTACTO=vinculaup@midominio.com
+```
 
 > **Cómo llega el SMTP a Keycloak.** El realm importado usa
 > `${env.KEYCLOAK_SMTP_*:}` (sintaxis de Keycloak), que se resuelve contra el
@@ -1068,31 +1296,22 @@ fallo de seed mande el contenedor a un bucle de reinicios con 502 en toda la app
 
 **No siembra usuarios.** Los gestiona exclusivamente Keycloak: en el primer
 login, `GET /api/usuarios/por-keycloak` crea el registro de negocio a partir de
-los claims del token.
+los claims del token. El alta administrativa, en cambio, sí escribe acá.
+
+**Vincular una cuenta ya creada.** Cuando el BFF da de alta a un profesional y
+la fila de invitación ya existe (un prerregistro anterior), no crea una fila
+nueva: la vincula con `PATCH /api/usuarios/{id}/keycloak`
+(`VincularKeycloakRequest`, campo `keycloakId`). Así el alta no duplica usuarios
+ni pierde el legajo ya asignado.
 
 ### 12.4 Migraciones best-effort al arrancar
 
 Tres scripts `ALTER TABLE` defensivos, todos toleran el fallo:
 
 
-## 13. Infraestructura: pgAdmin, TLS, Nginx
+## 13. Infraestructura: TLS, Nginx
 
-### 13.1 pgAdmin
-
-Servicio activo en el stack, publicado en `http://localhost:5050`.
-
-| Campo | Valor |
-|---|---|
-| Email | `admin@vincula-up.com` (o `PGADMIN_DEFAULT_EMAIL`) |
-| Contraseña | `admin` (o `PGADMIN_DEFAULT_PASSWORD`) |
-| Servidor de BD | host `postgres`, puerto `5432`, base `vinculaup` |
-| Usuario / contraseña BD | `postgres` / `postgres` |
-
-Se conecta al host `postgres` de la red de Docker, no a `localhost`: desde
-dentro del contenedor, `localhost` es el propio pgAdmin. El volumen
-`pgadmin_data` conserva los servidores guardados entre reinicios.
-
-### 13.2 TLS
+### 13.1 TLS
 
 El repositorio incluye una CA y un certificado de servidor en `nginx/certs/`.
 Los navegadores modernos exigen **dos certificados separados**, y hay que
@@ -1195,6 +1414,11 @@ primera vez**: como Keycloak persiste en Postgres, los cambios posteriores al
 JSON (auto-registro, rol por defecto, client de servicio, SMTP) no se aplican
 solos. **Sin él, el registro de usuarios no funciona.**
 
+Además, la stack de Docker incluye un servicio `keycloak-init` que se dispara
+cada vez que arranca el entorno y vuelve a ejecutar el `kcadm update` para
+forzar `loginTheme=vincula-up` y `emailTheme=vincula-up`. Esto evita que el tema
+se pierda al recrear el contenedor o al reiniciar el entorno local.
+
 ```bash
 ./scripts/linux-macos/keycloak-bootstrap.sh                              # Linux / macOS
 powershell -ExecutionPolicy Bypass -File .\scripts\windows\keycloak-bootstrap.ps1   # Windows
@@ -1246,45 +1470,47 @@ microservicio con `mvnw.cmd spring-boot:run` y un perfil JVM liviano
 memoria. Los servicios usan **H2 en memoria**: los datos se pierden al reiniciar.
 El frontend se levanta aparte con `npm start` en otra terminal.
 
-### 14.5 Aviso de prerregistro por correo
+### 14.5 Aviso de alta por correo
 
 No es un script: es parte del BFF, pero se documenta acá porque es el paso que
 cierra el flujo de alta de un profesional.
 
 **El flujo completo:**
 
-1. El **administrador** da de alta el profesional desde el panel
-   (`POST /api/profesionales/alta`), con sus datos, legajo y especialidad. Esto
-   crea la cuenta en `ms-usuarios` **sin cuenta de Keycloak**: es una invitación.
-2. El BFF envía un correo al profesional (`NotificacionService`) con el legajo, la
-   especialidad y los pasos numerados para activar el perfil.
-3. El **profesional** se registra en Keycloak con ese mismo correo. Al primer
-   ingreso, `ms-usuarios` lo reconoce por email y conserva su rol `PROFESIONAL`
-   (un correo no prerregistrado nace con el rol del token; ver
-   [§8.4](#84-promoción-de-rol-del-profesional-invitado)).
-4. El BFF promueve el rol en Keycloak (`KeycloakAdminService`) para que el
-   siguiente token ya traiga `PROFESIONAL`.
-5. El profesional **activa su perfil** (foto, zona de cobertura y horarios).
+1. El **administrador** da de alta al profesional desde el panel
+   (`POST /api/profesionales/alta`), con sus datos, legajo y especialidad. El BFF
+   **crea la cuenta en Keycloak** (usuario = correo) con una **contraseña
+   temporal** y el rol `PROFESIONAL`, y registra el usuario de negocio y el perfil
+   pendiente.
+2. El BFF envía un correo al profesional (`NotificacionService`) con su usuario,
+   su contraseña temporal, el legajo, la especialidad y los pasos numerados para
+   activar el perfil. **El profesional no se registra**: entra con esos datos.
+3. Al primer ingreso, Keycloak le exige **cambiar la contraseña**
+   (`UPDATE_PASSWORD`); recién ahí entra a la aplicación. Esa contraseña no vence
+   en el tiempo.
+4. El profesional **activa su perfil** (foto, zona de cobertura y horarios).
 
 **El correo no habla de la implementación.** Decirle a un profesional "se registra
 en Keycloak" o "el prerregistro se vincula por email" le da información que no
 necesita. El texto va en términos del servicio, y lo importante es que explique
-el paso que más se confunde: **entrar no alcanza, hace falta tener cuenta con ese
-mismo correo**. El correo se repite en el cuerpo por eso.
+los dos pasos que más se confunden: **se entra con la contraseña temporal que
+llega por correo, y esa contraseña hay que cambiarla en el primer ingreso**.
 
-**El prerregistro solo acepta correos sin cuenta.** Si el correo ya tiene una
-sesión —alguien se registró y usó esa dirección— el alta se rechaza con `409` y el
-mensaje *"Ese correo ya está en uso. Elegí otro para el prerregistro."* El
-criterio es `keycloakId`: si viene vacío es una invitación anterior del mismo
-administrador y se puede completar; si viene lleno, hay una persona real detrás.
+**El alta solo acepta correos sin cuenta.** Si el correo ya tiene una sesión
+—alguien se registró y usó esa dirección— el alta se rechaza con `409` y el
+mensaje *"Ese correo ya está en uso. Elegí otro."* El criterio son dos: que la fila
+de `usuarios` venga con `keycloakId` lleno, y que la cuenta no exista ya en
+Keycloak. Si la fila existe pero viene vacía, es un prerregistro anterior del
+mismo administrador: se completa en lugar de duplicarse (ver [§12.3](#123-ms-usuarios)).
 
 > **El correo es best-effort, pero el panel lo dice.** Si el SMTP no está
-> configurado o el servidor rechaza el mensaje, el prerregistro queda guardado y
-> el fallo queda en el log: dar de alta a un profesional nunca falla porque no salió
-> un correo. Para que el administrador no asuma que el profesional se enteró,
-> `avisarPrerregistro` devuelve si el mensaje salió y la respuesta del alta trae
-> `correoEnviado`: el panel dice *"Le enviamos las instrucciones por correo"* o,
-> si no salió, *"Avisale por otra vía"*.
+> configurado o el servidor rechaza el mensaje, la cuenta queda creada y el fallo
+> queda en el log: dar de alta a un profesional nunca falla porque no salió un
+> correo. Para que el administrador no asuma que el profesional se enteró,
+> `avisarAltaProfesional` devuelve si el mensaje salió y la respuesta del alta
+> trae `correoEnviado` **y** `passwordTemporal`: el panel dice *"Le enviamos por
+> correo su contraseña temporal"* o, si no salió, muestra esa contraseña para que
+> el administrador la pase por otra vía.
 
 **Configuración:** reusa el mismo SMTP que Keycloak (`KEYCLOAK_SMTP_*`), así que
 no hay credenciales duplicadas. `APP_URL` es la base del enlace del correo; si
@@ -1339,15 +1565,18 @@ Pendientes conocidos. No bloquean la demo, pero conviene tenerlos fichados.
 | 4 | **`webOrigins: ["*"]`** en el client público | Permitido en demo; en producción conviene restringirlo a los orígenes reales |
 | 5 | **`redirectUris: ["https://*"]`** en el client público | Agregado para que los túneles de Cloudflare funcionen sin reconfigurar el client cada vez que `cloudflared` genera una URL nueva: Keycloak sólo matchea comodines **al final** del patrón, así que `https://*.trycloudflare.com/*` nunca matchearía (el soporte de comodines de host sigue sin mergear). `https://*` es un prefijo y matchea **cualquier** origen https, no sólo los de Cloudflare. Cerrado en producción reemplazando ese patrón por el dominio real. Mitiga que el client sea público con PKCE S256: sin el `code_verifier` el código no se cambia por tokens |
 | 6 | **`KC_HOSTNAME` vacío (hostname dinámico)** | Con `KC_HOSTNAME_STRICT=false` y sin hostname fijo, Keycloak resuelve el host desde el request, que es lo que hace que el túnel funcione. El mismo mecanismo documenta que un atacante podría manipular el `Host` para falsificar los enlaces de recuperación de contraseña. Cerrado fijando `KEYCLOAK_HOSTNAME` en `.env` al dominio propio y con un proxy delante que no acepte `Host` arbitrarios |
+| 7 | **Textos del import sin control de longitud** | Las columnas de texto de Keycloak 26.x en Postgres son `varchar(255)`. Un `description` de 377 caracteres en `keycloak/import/vincula-up-realm.json` hizo fallar el import entero (`value too long for type character varying(255)`), con Keycloak en loop de reinicios y el BFF sin issuer. Hoy está corregido (231 caracteres), pero el JSON no tiene ninguna validación que lo impida: cualquier texto nuevo que pase de 255 rompe el arranque del stack de la misma forma. Mitigable con un check en CI que recorra el JSON y valide la longitud de cada string |
 
 ### 16.2 Prioridad media
 
 | # | Deuda | Impacto |
 |---|---|---|
-| 7 | **`verifyEmail: false`** | Un profesional puede activar su perfil con el email de otro, porque nadie confirma que la dirección sea suya. Cerrarlo requiere `verifyEmail: true` en el realm **y** `docker compose down -v`; además rompe las cuentas `@vincula-up.local` de prueba, que no son entregables |
-| 8 | **H2 por defecto en desarrollo** | Sin `DATABASE_URL`, los datos se pierden al reiniciar y el comportamiento difiere de producción |
-| 9 | **CORS con lista de orígenes fija** | `SecurityConfig.java` enumera los orígenes. Agregar un dominio es tocar código |
-| 10 | **Geocodificación puede resolver a otra ciudad** | Nominatim a veces devuelve un lugar homónimo: una dirección de Concepción del Uruguay terminó en Entre Ríos, Argentina. Es un comportamiento del servicio público, no del código; convendría validar el país del resultado |
+| 8 | **`verifyEmail: false`** | Nadie confirma que la dirección sea suya. Con el alta nueva el profesional no se auto-registra, así que el riesgo queda sobre todo en los clientes que se registran solos. Cerrarlo requiere `verifyEmail: true` en el realm **y** `docker compose down -v`; además rompe las cuentas `@vincula-up.local` de prueba, que no son entregables |
+| 9 | **H2 por defecto en desarrollo** | Sin `DATABASE_URL`, los datos se pierden al reiniciar y el comportamiento difiere de producción |
+| 10 | **CORS con lista de orígenes fija** | `SecurityConfig.java` enumera los orígenes. Agregar un dominio es tocar código |
+| 11 | **Geocodificación puede resolver a otra ciudad** | Nominatim a veces devuelve un lugar homónimo: una dirección de Concepción del Uruguay terminó en Entre Ríos, Argentina. Es un comportamiento del servicio público, no del código; convendría validar el país del resultado |
+| 12 | **Sin reenvío de la invitación** | Si el profesional pierde la contraseña temporal antes de entrar, no hay acción para emitir una nueva (`resetearContrasenaTemporal` está prevista pero **no implementada** en `KeycloakAdminService`) y hay que hacerlo desde la consola de Keycloak o dar de alta de nuevo |
+| 13 | **La contraseña temporal siempre sale en la respuesta** | `POST /api/profesionales/alta` devuelve `passwordTemporal` aunque el correo haya salido bien, para que el panel pueda mostrarlo si el aviso falla. Cualquiera con el token de admin que lea la respuesta (o un log con el body) tiene esa clave |
 
 ### 16.3 Higiene del repositorio
 
@@ -1440,7 +1669,8 @@ describiendo la identidad visual. El detalle del segundo tema está en el
 
 ### 17.3 Radios y sombras
 
-- Botones e inputs: `8px`–`10px`
+- Botones: radio uniforme de `8px` en todos los temas y componentes.
+- Inputs: cuadrados, según la guía visual del formulario.
 - Tarjetas y paneles: `16px`
 - Chips y badges: `999px` (píldora)
 - Sombras orgánicas: `0 2px 8px rgba(30, 41, 38, 0.04)`
@@ -1459,9 +1689,15 @@ apretar.
 |---|---|---|
 | `vu-btn--ink` | Relleno oscuro, texto claro | Acción principal de la pantalla |
 | `vu-btn--coral` | Relleno coral | Acción que crea algo nuevo |
-| `vu-btn--outline` | Fondo transparente, borde | Acciones secundarias en grupo |
+| `vu-btn--outline` | Fondo transparente con borde en claro; superficie clara y tinta oscura en oscuro | Acciones secundarias en grupo |
 | `vu-btn--quiet` | Borde tenue, sin relleno | Cancelar, cerrar, acciones terciarias |
 | `vu-btn--danger` | Relleno de alerta | Borrado y acciones irreversibles |
+
+Todos los botones HTML, enlaces-botón y toggles Material usan forma rectangular
+con radio de `8px`, incluidos los controles icon-only. En tema oscuro, `vu-btn--outline` usa fondo claro y tinta
+oscura para conservar contraste frente al primario sólido; `vu-btn--quiet`
+permanece transparente con borde más visible. Estas reglas se definen globalmente
+en `src/styles.css` y aplican en todas las páginas.
 
 **El hover solo cambia color, nunca mueve nada.** La transición es de
 `background-color`, `border-color` y `color`; no incluye `transform`. Un botón que
@@ -1485,7 +1721,7 @@ Los rótulos dicen la **acción**, no la aspiración. Tres reglas:
 | `Guardar` | Confirma el envío de un formulario | "Guardar", "Guardando..." mientras espera |
 | Verbo de la acción | Cuando no es alta ni guardado | "Desactivar", "Eliminar", "Confirmar esta ubicación" |
 
-Una etiqueta como "Guardar preregistro" repite el nombre de la entidad que la
+Una etiqueta como "Crear prerregistro" repite el nombre de la entidad que la
 pantalla ya dice en el título, y "Crear nueva solicitud" repite la palabra
 "nueva" que el botón ya tiene en el ícono `+`. Queda el verbo solo.
 
@@ -1605,12 +1841,18 @@ tocar estos archivos.
 
 **Cómo se decide.** Tres estados en `TemaService`: `claro`, `oscuro` y `sistema`.
 La primera visita usa `sistema` (respeta `prefers-color-scheme`); desde ahí en
-adelante manda la elección, guardada en `localStorage` bajo `vincula-up-tema`. Si
-queda en `sistema`, sigue en vivo los cambios del ajuste del sistema con la app
-abierta.
+adelante manda la elección, guardada en `localStorage` y en una cookie de mismo
+host bajo `vincula-up-tema`. La cookie comparte la preferencia con las pantallas
+de Keycloak aunque usen otro puerto. Si queda en `sistema`, sigue en vivo los
+cambios del ajuste del sistema con la app abierta.
 
 **Cómo se aplica.** Como atributo `data-tema` en `<html>`, que es lo que lee el
 bloque `[data-tema='oscuro']` de `styles.css`.
+
+El tema de acceso de Keycloak usa el mismo valor compartido: su layout ofrece un
+control accesible en login, registro y recuperación, y aplica la clase oscura de
+PatternFly junto con el atributo `data-tema`. Así el cambio elegido antes o
+durante la autenticación se conserva al volver a la SPA.
 
 **Por qué hay un script aparte en `index.html`.** Angular arranca después de que
 se pinte el primer fotograma, así que aplicar el tema desde el servicio dejaría

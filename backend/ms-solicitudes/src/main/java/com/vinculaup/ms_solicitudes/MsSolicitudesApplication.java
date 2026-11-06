@@ -6,8 +6,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class MsSolicitudesApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(MsSolicitudesApplication.class, args);
-	}
+    public static void main(String[] args) {
+        SpringApplication.run(MsSolicitudesApplication.class, args);
+    }
 
 }

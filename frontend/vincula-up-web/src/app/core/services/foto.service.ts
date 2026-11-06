@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { catchError, of } from 'rxjs';
+import { catchError, finalize, of } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
 /**
@@ -50,7 +50,14 @@ export class FotoService {
     const headers = new HttpHeaders({ Authorization: `Bearer ${this.token}` });
     this.http
       .get(`${environment.apiUrl}/usuarios/${usuarioId}/foto`, { headers, responseType: 'blob' })
-      .pipe(catchError(() => of(null)))
+      .pipe(
+        catchError(() => of(null)),
+        finalize(() => {
+          if (!this.urls()[usuarioId]) {
+            this.pedidos.delete(usuarioId);
+          }
+        }),
+      )
       .subscribe((blob) => {
         // Un 404 (no tiene foto) o un 403 (no la puede ver) llegan como null:
         // en ambos casos el avatar muestra iniciales, que es lo esperado.

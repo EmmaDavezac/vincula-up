@@ -1,13 +1,12 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { VuIcon } from '../shared/icon/icon';
 
 /**
  * Landing pública: se muestra sólo a visitantes, porque la ruta lleva el guard
  * `redirectIfAuthenticated` (con sesión se entra directo a la app).
  */
 @Component({
-	imports: [RouterLink, VuIcon],
+	imports: [RouterLink],
 	selector: 'app-home',
 	styleUrl: './home.css',
 	templateUrl: './home.html',

@@ -2,10 +2,11 @@ import { Component, inject, OnInit } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../core/services/auth.service';
 import { VuIcon } from '../shared/icon/icon';
+import { LoadingScreen } from '../shared/loading-screen/loading-screen';
 
 @Component({
 	selector: 'app-sign-in',
-	imports: [RouterLink, VuIcon],
+	imports: [RouterLink, VuIcon, LoadingScreen],
 	templateUrl: './sign-in.html',
 	styleUrl: './sign-in.css',
 })
@@ -13,6 +14,7 @@ export class SignIn implements OnInit {
 	private readonly auth = inject(AuthService);
 	private readonly router = inject(Router);
 	readonly loginError = this.auth.loginError;
+	readonly loginRedirecting = this.auth.loginRedirecting;
 
 	ngOnInit(): void {
 		if (!this.auth.isAuthenticated()) {

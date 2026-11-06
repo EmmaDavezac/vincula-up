@@ -4,7 +4,7 @@ import { Observable, catchError, of } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { AdminRequest } from '../models/admin';
-import { Professional } from '../models/professional';
+import { Professional, ProfessionalAvailability } from '../models/professional';
 import { RequestStatus, ServiceRequest } from '../models/service-request';
 import { AuthService } from './auth.service';
 
@@ -103,12 +103,27 @@ export interface MyReputation {
   resenas: ReputationReview[];
 }
 
+/**
+ * Resultado de reenviar la invitación: igual que el alta, pero sin crear nada.
+ * El correo es best-effort: si no salió, el panel muestra la contraseña para
+ * que el administrador la pase por otra vía.
+ */
+export interface ReenvioInvitacionResultado {
+  correoEnviado: boolean;
+  passwordTemporal?: string;
+}
+
 /** Resultado del alta de un profesional desde el panel de administración. */
 export interface AltaProfesionalResultado {
   usuario: { id: string };
   profesional: { id: string; legajo: string };
   /** Si el aviso por correo salió. Si es `false`, hay que avisarle por otra vía. */
   correoEnviado: boolean;
+  /**
+   * Contraseña temporal del profesional. Sólo se usa si `correoEnviado` es
+   * `false`: el panel se la muestra al administrador para que la pase a mano.
+   */
+  passwordTemporal?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -168,29 +183,41 @@ export class ApiService {
     const initials = realName
       ? realName.split(/\s+/).slice(0, 2).map((parte) => parte.charAt(0).toUpperCase()).join('')
       : 'P';
-    return {
-      id: String(raw['id'] ?? ''),
-      name,
-      specialty: especialidades.map((item) => item.nombre).join(' / ') || 'Servicio técnico',
-      zone: raw['zonaCoberturaLat'] != null && raw['zonaCoberturaLng'] != null
-        ? 'Zona de cobertura activa'
-        : 'Zona no informada',
-      // La reputación llega calculada desde el backend (promedio y cantidad de
-      // reseñas). Antes venía fija en 0 y ninguna tarjeta mostraba estrellas.
-      rating: this.numero(raw['promedio']),
-      reviews: this.numero(raw['cantidadCalificaciones']),
-      availability: 'Consultar disponibilidad',
-      initials,
-      accent: 'sky',
-      usuarioId: raw['usuarioId'] ? String(raw['usuarioId']) : undefined,
-      legajo: legajo || undefined,
-      nombre: nombre || null,
-      apellido: apellido || null,
-      especialidades,
-      // La foto no viene como URL: el backend manda solo el booleano y el
-      // `vu-avatar` pide la imagen por `/api/usuarios/{usuarioId}/foto`.
-      tieneFoto: raw['tieneFoto'] === true,
-      estado: typeof raw['estado'] === 'string' ? (raw['estado'] as string) : 'ACTIVO',
+    const disponibilidad = raw['disponibilidad'] ?? raw['horarios'];
+    const horarios: ProfessionalAvailability[] = Array.isArray(disponibilidad)
+      ? disponibilidad.map((slot: Record<string, unknown>) => ({
+          diaSemana: (slot['diaSemana'] ?? slot['dia'] ?? '') as number | string,
+          horaInicio: String(slot['horaInicio'] ?? ''),
+          horaFin: String(slot['horaFin'] ?? ''),
+        }))
+      : [];
+
+        return {
+          id: String(raw['id'] ?? ''),
+          name,
+          specialty: especialidades.map((item) => item.nombre).join(' / ') || 'Servicio técnico',
+          zone: raw['zonaCoberturaLat'] != null && raw['zonaCoberturaLng'] != null
+            ? 'Zona de cobertura activa'
+            : 'Zona no informada',
+          // La reputación llega calculada desde el backend (promedio y cantidad de
+          // reseñas). Antes venía fija en 0 y ninguna tarjeta mostraba estrellas.
+          rating: this.numero(raw['promedio']),
+          reviews: this.numero(raw['cantidadCalificaciones']),
+          availability: horarios.length > 0 ? 'Disponible' : 'Consultar disponibilidad',
+          horarios,
+          initials,
+          accent: 'sky',
+          usuarioId: raw['usuarioId'] ? String(raw['usuarioId']) : undefined,
+          legajo: legajo || undefined,
+          nombre: nombre || null,
+          apellido: apellido || null,
+          especialidades,
+          // La foto no viene como URL: el backend manda solo el booleano y el
+          // `vu-avatar` pide la imagen por `/api/usuarios/{usuarioId}/foto`.
+          tieneFoto:
+            raw['tieneFoto'] === true ||
+            (typeof raw['fotoUrl'] === 'string' && raw['fotoUrl'].trim().length > 0),
+          estado: typeof raw['estado'] === 'string' ? (raw['estado'] as string) : 'ACTIVO',
       // Zona de cobertura: sin estos datos el directorio no puede calcular la
       // distancia ni el asistente ordenar por proximidad.
       zonaCoberturaLat: this.numeroONull(raw['zonaCoberturaLat']),
@@ -298,12 +325,13 @@ export class ApiService {
   }
 
   /**
-   * Alta de un profesional con sus datos: guarda el prerregistro y el perfil
-   * pendiente de activación, y le manda al profesional las instrucciones.
+   * Alta de un profesional con sus datos: crea su cuenta con una contraseña
+   * temporal, guarda el perfil pendiente de activación y le manda el acceso por
+   * correo. El profesional ya no se registra: sólo activa su perfil.
    *
-   * <p>El backend rechaza con 409 si el correo ya tiene una cuenta: el prerregistro
-   * es solo para direcciones que todavía no se registraron. `correoEnviado` dice si
-   * el aviso salió, para que el panel no dé por hecho que el profesional se enteró.
+   * <p>El backend rechaza con 409 si el correo ya tiene una cuenta. `correoEnviado`
+   * dice si el aviso salió; si no salió, viene `passwordTemporal` para que el panel
+   * se lo muestre al administrador.
    */
   createProfessionalInvite(request: {
     nombre: string;
@@ -314,6 +342,16 @@ export class ApiService {
     especialidadIds: string[];
   }): Observable<AltaProfesionalResultado> {
     return this.http.post<AltaProfesionalResultado>(`${this.baseUrl}/profesionales/alta`, request, { headers: this.authHeaders() });
+  }
+
+  /**
+   * Reenvía la invitación a un profesional que perdió su contraseña temporal.
+   * Emite una clave nueva y avisa por correo; si el correo no sale, la
+   * respuesta trae la contraseña para pasarla por otra vía.
+   */
+  reenviarInvitacion(profesionalId: string): Observable<ReenvioInvitacionResultado> {
+    return this.http.post<ReenvioInvitacionResultado>(
+      `${this.baseUrl}/profesionales/${profesionalId}/reenviar-invitacion`, {}, { headers: this.authHeaders() });
   }
 
   /**

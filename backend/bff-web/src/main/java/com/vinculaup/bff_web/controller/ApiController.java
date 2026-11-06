@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -34,14 +36,20 @@ public class ApiController {
     private final com.vinculaup.bff_web.service.KeycloakAdminService keycloakAdmin;
     private final com.vinculaup.bff_web.service.FotoStorage fotoStorage;
     private final com.vinculaup.bff_web.service.NotificacionService notificar;
+        private final com.vinculaup.bff_web.service.WebPushService webPush;
+            private final SimpMessagingTemplate chatMessaging;
 
     public ApiController(BackendGateway gateway, com.vinculaup.bff_web.service.KeycloakAdminService keycloakAdmin,
             com.vinculaup.bff_web.service.FotoStorage fotoStorage,
-            com.vinculaup.bff_web.service.NotificacionService notificar) {
+            com.vinculaup.bff_web.service.NotificacionService notificar,
+                com.vinculaup.bff_web.service.WebPushService webPush,
+                SimpMessagingTemplate chatMessaging) {
         this.gateway = gateway;
         this.keycloakAdmin = keycloakAdmin;
         this.fotoStorage = fotoStorage;
         this.notificar = notificar;
+        this.webPush = webPush;
+        this.chatMessaging = chatMessaging;
     }
 
     private JsonNode authenticatedUser() {
@@ -57,10 +65,13 @@ public class ApiController {
     }
 
     /**
-     * El profesional invitado se auto-registra en Keycloak con el email que cargó
-     * el administrador: ms-usuarios lo reconoce como PROFESIONAL (por email) pero
-     * su token todavía dice CLIENTE. Acá se promueve el rol en Keycloak para que
-     * el próximo token lo traiga y pueda activar su perfil.
+     * Camino de compatibilidad con los prerregistros antiguos: esos profesionales
+     * se auto-registraban en Keycloak con el email que cargó el administrador y el
+     * rol nacía CLIENTE, aunque ms-usuarios ya los reconozca como PROFESIONAL. Acá
+     * se promueve el rol en Keycloak para que el próximo token lo traiga.
+     * <p>
+     * Con el alta nueva la cuenta ya nace con PROFESIONAL, así que esto no tiene
+     * nada que hacer.
      * <p>
      * Sólo promueve CLIENTE → PROFESIONAL: nunca otorga ADMIN desde el padrón.
      */
@@ -107,11 +118,40 @@ public class ApiController {
         return UUID.fromString(user.get("id").asText());
     }
 
+    @GetMapping("/notifications/vapid-public-key")
+    public ResponseEntity<Map<String, String>> clavePublicaPush() {
+        if (!webPush.configurado()) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(Map.of("publicKey", webPush.clavePublica()));
+    }
+
+    @PutMapping("/notifications/push-subscription")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void guardarSuscripcionPush(@RequestBody JsonNode subscription) {
+        JsonNode user = authenticatedUser();
+        JsonNode keys = subscription.path("keys");
+        if (subscription.path("endpoint").asText("").isBlank()
+                || keys.path("p256dh").asText("").isBlank()
+                || keys.path("auth").asText("").isBlank()) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La suscripción push está incompleta");
+        }
+        webPush.guardar(userId(user), subscription);
+    }
+
+    @DeleteMapping("/notifications/push-subscription")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void eliminarSuscripcionPush(@RequestParam String endpoint) {
+        JsonNode user = authenticatedUser();
+        webPush.eliminar(userId(user), endpoint);
+    }
+
     private JsonNode professionalProfile(JsonNode user, boolean activeRequired) {
         if (!"PROFESIONAL".equals(authenticatedRole())) {
             throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "Se requiere un perfil profesional");
         }
-        JsonNode profile = gateway.obtenerMiPerfil(userId(user), authenticatedSubject()).getBody();
+        JsonNode profile = gateway.obtenerMiPerfil(userId(user), authenticatedSubject());
         if (activeRequired && (profile == null || !"ACTIVO".equals(profile.path("estado").asText()))) {
             throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "El perfil profesional debe estar activo");
         }
@@ -177,7 +217,7 @@ public class ApiController {
             try {
                 UUID usuarioId = UUID.fromString(profesional.get("usuarioId").asText());
                 usuarios.computeIfAbsent(usuarioId, id -> {
-                    JsonNode usuario = gateway.buscarUsuarioPorId(id);
+                    JsonNode usuario = gateway.buscarUsuarioPorIdOKeycloakId(id);
                     return usuario != null && usuario.isObject() ? usuario : null;
                 });
             } catch (RuntimeException ignored) {
@@ -252,7 +292,7 @@ public class ApiController {
         JsonNode usuario = null;
         try {
             if (profesional.hasNonNull("usuarioId")) {
-                usuario = gateway.buscarUsuarioPorId(UUID.fromString(profesional.get("usuarioId").asText()));
+                usuario = gateway.buscarUsuarioPorIdOKeycloakId(UUID.fromString(profesional.get("usuarioId").asText()));
                 if (usuario != null && !usuario.isObject()) {
                     usuario = null;
                 }
@@ -269,6 +309,11 @@ public class ApiController {
         copia.setAll((tools.jackson.databind.node.ObjectNode) profesional);
         String clave = null;
         if (usuario != null) {
+            if (usuario.hasNonNull("id")) {
+                // El avatar necesita el id de ms-usuarios para el endpoint privado
+                // de foto, aunque el perfil histórico haya guardado el keycloakId.
+                copia.put("usuarioId", usuario.get("id").asText());
+            }
             if (usuario.hasNonNull("nombre")) copia.put("nombre", usuario.get("nombre").asText());
             if (usuario.hasNonNull("apellido")) copia.put("apellido", usuario.get("apellido").asText());
             // La foto que se muestra es la de la cuenta (ms-usuarios), que es la que
@@ -320,7 +365,7 @@ public class ApiController {
     public JsonNode activarProfesional(@RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
         professionalProfile(user, false);
-        JsonNode resultado = gateway.activarProfesional(identityBody(body, user, "usuarioId"));
+        JsonNode resultado = gateway.activarProfesional(UUID.fromString(user.path("id").asText()), identityBody(body, user, "usuarioId"));
         guardarFotoEnUsuario(body, user);
         return resultado;
     }
@@ -448,13 +493,17 @@ public class ApiController {
     public JsonNode crearUsuario(@RequestBody JsonNode body) { return gateway.crearUsuario(body); }
 
     /**
-     * Alta administrativa de un profesional en un solo paso: crea el usuario
-     * <b>invitado</b> en ms-usuarios (todavía sin cuenta Keycloak) y su perfil
-     * profesional pendiente de activación.
+     * Alta administrativa de un profesional en un solo paso.
      * <p>
-     * Si el email ya existe (por ejemplo una invitación previa) se reutiliza ese
-     * usuario; si la creación del perfil falla y el usuario se acababa de crear,
-     * se elimina para no dejar invitaciones huérfanas.
+     * El administrador carga los datos y el BFF deja todo listo para que el
+     * profesional <b>solo tenga que activar su perfil</b>: crea la cuenta en
+     * Keycloak con una <b>contraseña temporal</b> (que se le exige cambiar en el
+     * primer ingreso) y el rol PROFESIONAL, registra el usuario de negocio y su
+     * perfil pendiente, y le envía por correo el acceso.
+     * <p>
+     * La contraseña temporal no vence: el profesional puede entrar mucho después y
+     * el sistema igual lo obliga a definir una propia. Si el alta falla después de
+     * crear la cuenta de Keycloak, se revierte todo para no dejar cuentas huérfanas.
      */
     @PostMapping("/profesionales/alta")
     @ResponseStatus(HttpStatus.CREATED)
@@ -472,56 +521,74 @@ public class ApiController {
         var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
 
         JsonNode usuario = gateway.buscarUsuarioPorEmail(email);
-        // El prerregistro es para alguien que todavía no tiene cuenta. Si el correo
-        // ya tiene una sesión, hay una persona real detrás de esa dirección: al
-        // registrarse con ese mismo mail se quedaría con este prerregistro y su
-        // legajo sin haberlo pedido, así que se rechaza y se pide otro correo.
-        //
-        // El criterio es `keycloakId`: si viene vacío es una invitación anterior del
-        // mismo administrador (todavía sin cuenta, o sin perfil, así que se puede
-        // completar). Si viene lleno, alguien ya usó esa cuenta.
+        // El alta es para alguien que todavía no tiene cuenta. Si el correo ya tiene
+        // una cuenta con sesión (`keycloakId`), hay una persona real detrás: se
+        // rechaza. Si viene vacío, es una invitación previa del mismo administrador
+        // que todavía no se vinculó, así que se puede completar.
         if (usuario != null && !usuario.path("keycloakId").asText("").isBlank()) {
             throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT,
-                    "Ese correo ya está en uso. Elegí otro para el prerregistro.");
+                    "Ese correo ya está en uso. Elegí otro.");
         }
-        boolean usuarioNuevo = false;
-        if (usuario == null) {
-            var usuarioBody = mapper.createObjectNode();
-            usuarioBody.put("nombre", object.path("nombre").asText(""));
-            usuarioBody.put("apellido", object.path("apellido").asText(""));
-            usuarioBody.put("email", email);
-            usuarioBody.put("telefono", object.path("telefono").asText(""));
-            usuarioBody.put("rolNegocio", "PROFESIONAL");
-            usuario = gateway.crearUsuario(usuarioBody);
-            usuarioNuevo = true;
+        // Y si Keycloak ya tiene la cuenta, tampoco se puede volver a crear.
+        if (keycloakAdmin.buscarUsuarioPorEmail(email).isPresent()) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT,
+                    "Ese correo ya está en uso. Elegí otro.");
         }
 
-        var perfilBody = mapper.createObjectNode();
-        perfilBody.put("usuarioId", usuario.path("id").asText());
-        perfilBody.put("legajo", legajo);
-        var especialidades = mapper.createArrayNode();
-        for (JsonNode especialidadId : object.path("especialidadIds")) {
-            especialidades.add(especialidadId.asText());
+        // 1) Cuenta de Keycloak con contraseña temporal y rol PROFESIONAL.
+        String passwordTemporal = com.vinculaup.bff_web.service.PasswordTemporal.generar();
+        UUID keycloakId = keycloakAdmin.crearUsuarioConContrasenaTemporal(
+                email, object.path("nombre").asText(""), object.path("apellido").asText(""), passwordTemporal);
+        if (keycloakId == null) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "No se pudo crear la cuenta del profesional. Intentá de nuevo.");
         }
-        perfilBody.set("especialidadIds", especialidades);
+        keycloakAdmin.asignarRolProfesional(keycloakId);
 
+        boolean usuarioNuevo = usuario == null;
         try {
+            // 2) Usuario de negocio, ya vinculado a la cuenta de Keycloak.
+            if (usuarioNuevo) {
+                var usuarioBody = mapper.createObjectNode();
+                usuarioBody.put("nombre", object.path("nombre").asText(""));
+                usuarioBody.put("apellido", object.path("apellido").asText(""));
+                usuarioBody.put("email", email);
+                usuarioBody.put("telefono", object.path("telefono").asText(""));
+                usuarioBody.put("rolNegocio", "PROFESIONAL");
+                usuarioBody.put("keycloakId", keycloakId.toString());
+                usuario = gateway.crearUsuario(usuarioBody);
+            } else {
+                usuario = gateway.vincularKeycloakUsuario(UUID.fromString(usuario.path("id").asText()), keycloakId);
+            }
+
+            // 3) Perfil profesional pendiente de activación.
+            var perfilBody = mapper.createObjectNode();
+            perfilBody.put("usuarioId", usuario.path("id").asText());
+            perfilBody.put("legajo", legajo);
+            var especialidades = mapper.createArrayNode();
+            for (JsonNode especialidadId : object.path("especialidadIds")) {
+                especialidades.add(especialidadId.asText());
+            }
+            perfilBody.set("especialidadIds", especialidades);
             JsonNode perfil = gateway.crearProfesional(perfilBody);
-            // Aviso best-effort: si el correo no sale, el prerregistro ya quedó
-            // guardado y el administrador puede avisar por otra vía. Se le devuelve
-            // el resultado para que el panel no dé por hecho que el mail llegó.
-            boolean correoEnviado = notificar.avisarPrerregistro(
-                    email,
-                    nombreCompleto(object),
-                    legajo,
-                    primeraEspecialidad(perfil));
+
+            // 4) Aviso por correo con el acceso. Es best-effort: si el correo no
+            //    sale, la respuesta trae la contraseña temporal para que el panel se
+            //    la muestre al administrador y la pase por otra vía.
+            boolean correoEnviado = notificar.avisarAltaProfesional(
+                    email, nombreCompleto(object), legajo, primeraEspecialidad(perfil), passwordTemporal);
+
             var respuesta = mapper.createObjectNode();
             respuesta.set("usuario", usuario);
             respuesta.set("profesional", perfil);
             respuesta.put("correoEnviado", correoEnviado);
+            respuesta.put("passwordTemporal", passwordTemporal);
             return respuesta;
         } catch (RuntimeException ex) {
-            if (usuarioNuevo) {
+            // La cuenta de Keycloak se creó en esta misma petición: se revierte
+            // siempre. El usuario de negocio sólo si lo creamos nosotros.
+            keycloakAdmin.eliminarUsuario(keycloakId);
+            if (usuarioNuevo && usuario != null) {
                 try {
                     gateway.eliminarUsuario(UUID.fromString(usuario.path("id").asText()));
                 } catch (RuntimeException rollback) {
@@ -539,6 +606,84 @@ public class ApiController {
     public ResponseEntity<JsonNode> buscarUsuarioPorEmail(@RequestParam String email) {
         JsonNode usuario = gateway.buscarUsuarioPorEmail(email);
         return usuario == null ? ResponseEntity.noContent().build() : ResponseEntity.ok(usuario);
+    }
+
+    /**
+     * Reenvía la invitación a un profesional que perdió su contraseña temporal
+     * antes de entrar por primera vez. Emite una clave nueva, la pone como
+     * temporal en Keycloak (vuelve a exigir el cambio al entrar) y avisa por
+     * correo con los mismos pasos del alta.
+     * <p>
+     * Best-effort como el alta: si el correo no sale, la respuesta trae igual
+     * la contraseña para que el panel se la muestre al administrador y la pase
+     * por otra vía. Sólo funciona antes del primer ingreso: si la persona ya
+     * entró y definió su propia clave, ese acceso no se toca.
+     */
+    @PostMapping("/profesionales/{id}/reenviar-invitacion")
+    public JsonNode reenviarInvitacion(@PathVariable UUID id) {
+        var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
+
+        JsonNode perfil = gateway.buscarProfesionalPorIdOUsuario(id);
+        if (perfil == null || !perfil.isObject() || !perfil.hasNonNull("usuarioId")) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Profesional no encontrado");
+        }
+        UUID usuarioId;
+        try {
+            usuarioId = UUID.fromString(perfil.get("usuarioId").asText());
+        } catch (IllegalArgumentException ex) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Profesional no encontrado");
+        }
+        JsonNode usuario = gateway.buscarUsuarioPorId(usuarioId);
+        if (usuario == null || !usuario.isObject()) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Profesional no encontrado");
+        }
+        String keycloakIdTexto = usuario.path("keycloakId").asText("").trim();
+        if (keycloakIdTexto.isEmpty()) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT,
+                    "Ese profesional todavía no tiene cuenta: dalo de alta de nuevo.");
+        }
+        UUID keycloakId;
+        try {
+            keycloakId = UUID.fromString(keycloakIdTexto);
+        } catch (IllegalArgumentException ex) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT,
+                    "La cuenta vinculada no es válida: dalo de alta de nuevo.");
+        }
+
+        String email = usuario.path("email").asText("").trim();
+        if (email.isEmpty()) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT,
+                    "Ese profesional no tiene correo para avisarle.");
+        }
+        // Si la cuenta de Keycloak se perdió por fuera (consola, otro alta), no
+        // hay a quién ponerle la clave: mejor fallar claro que dejar un 200 falso.
+        if (keycloakAdmin.buscarUsuarioPorEmail(email).map(cuenta -> !cuenta.equals(keycloakId)).orElse(true)) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT,
+                    "La cuenta ya no existe: dalo de alta de nuevo.");
+        }
+        // Si ya entró y definió su propia clave, el acceso es suyo: reenviar le
+        // rompería el ingreso. Sólo se reemite antes del primer acceso.
+        if (Boolean.FALSE.equals(keycloakAdmin.tieneAccionPendiente(keycloakId, "UPDATE_PASSWORD"))) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT,
+                    "Ese profesional ya activó su cuenta: no hace falta reenviar la invitación.");
+        }
+
+        String passwordTemporal = com.vinculaup.bff_web.service.PasswordTemporal.generar();
+        if (!keycloakAdmin.resetearContrasenaTemporal(keycloakId, passwordTemporal)) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "No se pudo reemitir la invitación. Intentá de nuevo.");
+        }
+        String nombre = (usuario.path("nombre").asText("") + " " + usuario.path("apellido").asText("")).trim();
+        boolean correoEnviado = notificar.avisarAltaProfesional(
+                email, nombre, perfil.path("legajo").asText(""), primeraEspecialidad(perfil), passwordTemporal);
+
+        var respuesta = mapper.createObjectNode();
+        respuesta.put("correoEnviado", correoEnviado);
+        respuesta.put("passwordTemporal", passwordTemporal);
+        return respuesta;
     }
 
     /**
@@ -635,7 +780,9 @@ public class ApiController {
         if (!id.toString().equals(profile.path("id").asText())) {
             throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "El perfil no pertenece al usuario");
         }
-        return gateway.actualizarDisponibilidad(id, body);
+        List<JsonNode> disponibilidadList = new ArrayList<>();
+        body.forEach(disponibilidadList::add);
+        return gateway.actualizarDisponibilidad(id, disponibilidadList);
     }
 
     @GetMapping("/profesionales/{id}/disponibilidad")
@@ -675,7 +822,9 @@ public class ApiController {
     @ResponseStatus(HttpStatus.CREATED)
     public JsonNode crearSolicitud(@RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
-        return gateway.crearSolicitud(identityBody(body, user, "clienteId"));
+        JsonNode creada = gateway.crearSolicitud(identityBody(body, user, "clienteId"));
+        notificarCambioSolicitud(creada, "CLIENTE", null);
+        return creada;
     }
 
     @GetMapping("/usuarios/por-keycloak")
@@ -786,28 +935,136 @@ public class ApiController {
     public JsonNode aceptar(@PathVariable UUID id, @RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
         professionalProfile(user, true);
-        return gateway.aceptarSolicitud(id, actorIdentityBody(body, user));
+        JsonNode actualizada = gateway.aceptarSolicitud(id, actorIdentityBody(body, user));
+        notificarCambioSolicitud(actualizada, "PROFESIONAL", null);
+        return actualizada;
     }
 
     @PatchMapping("/solicitudes/{id}/rechazar")
     public JsonNode rechazar(@PathVariable UUID id, @RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
         professionalProfile(user, true);
-        return gateway.rechazarSolicitud(id, actorIdentityBody(body, user));
+        JsonNode actualizada = gateway.rechazarSolicitud(id, actorIdentityBody(body, user));
+        notificarCambioSolicitud(actualizada, "PROFESIONAL", body.path("motivo").asText(null));
+        return actualizada;
     }
 
     /** Cualquiera de los dos lados puede dar el turno por terminado. */
     @PatchMapping("/solicitudes/{id}/completar")
     public JsonNode completar(@PathVariable UUID id, @RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
-        return gateway.completarSolicitud(id, actorIdentityBody(body, user));
+        JsonNode actualizada = gateway.completarSolicitud(id, actorIdentityBody(body, user));
+        notificarCambioSolicitud(actualizada, authenticatedRole(), null);
+        return actualizada;
     }
 
     /** Lo mismo para cancelar: disponible para cliente y profesional. */
     @PatchMapping("/solicitudes/{id}/cancelar")
     public JsonNode cancelar(@PathVariable UUID id, @RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
-        return gateway.cancelarSolicitud(id, actorIdentityBody(body, user));
+        JsonNode actualizada = gateway.cancelarSolicitud(id, actorIdentityBody(body, user));
+        notificarCambioSolicitud(actualizada, authenticatedRole(), body.path("motivo").asText(null));
+        return actualizada;
+    }
+
+    /**
+     * Notifica por correo al participante afectado después de que ms-solicitudes
+     * confirmó el cambio. La notificación es best-effort: un fallo de SMTP o de
+     * resolución de cuenta no convierte una transición ya guardada en error HTTP.
+     */
+    private void notificarCambioSolicitud(JsonNode solicitud, String rolActor, String motivo) {
+        if (solicitud == null || !solicitud.isObject()) {
+            return;
+        }
+        try {
+            String estado = solicitud.path("estado").asText("");
+            UUID destinatarioId;
+            boolean esProfesional;
+
+            if ("PENDIENTE".equalsIgnoreCase(estado)) {
+                destinatarioId = uuidOrNull(solicitud.path("profesionalId").asText(null));
+                esProfesional = true;
+            } else if ("CLIENTE".equalsIgnoreCase(rolActor)) {
+                destinatarioId = uuidOrNull(solicitud.path("profesionalId").asText(null));
+                esProfesional = true;
+            } else {
+                destinatarioId = uuidOrNull(solicitud.path("clienteId").asText(null));
+                esProfesional = false;
+            }
+            if (destinatarioId == null) {
+                return;
+            }
+
+            JsonNode destinatario;
+            if (esProfesional) {
+                JsonNode perfil = gateway.buscarProfesionalPorIdOUsuario(destinatarioId);
+                UUID usuarioId = perfil == null ? null : uuidOrNull(perfil.path("usuarioId").asText(null));
+                destinatario = usuarioId == null ? null : gateway.buscarUsuarioPorIdOKeycloakId(usuarioId);
+            } else {
+                destinatario = gateway.buscarUsuarioPorIdOKeycloakId(destinatarioId);
+            }
+            if (destinatario == null || !destinatario.isObject()) {
+                return;
+            }
+
+            String nombre = (destinatario.path("nombre").asText("") + " "
+                    + destinatario.path("apellido").asText("")).trim();
+                try {
+                notificarPushSolicitud(destinatarioId, nombre, estado, solicitud);
+                } catch (RuntimeException pushException) {
+                org.slf4j.LoggerFactory.getLogger(ApiController.class)
+                    .warn("No se pudo enviar Web Push para solicitud {}: {}",
+                        solicitud.path("id").asText("sin-id"), pushException.getMessage());
+                }
+            notificar.avisarCambioSolicitud(
+                    destinatario.path("email").asText(null), nombre, estado, motivo);
+        } catch (RuntimeException exception) {
+            org.slf4j.LoggerFactory.getLogger(ApiController.class)
+                    .warn("No se pudo preparar el correo de cambio de estado de solicitud {}: {}",
+                            solicitud.path("id").asText("sin-id"), exception.getMessage());
+        }
+    }
+
+    private void notificarPushSolicitud(UUID destinatarioId, String nombre, String estado, JsonNode solicitud) {
+        String title;
+        String detail;
+        switch (estado == null ? "" : estado.toUpperCase(java.util.Locale.ROOT)) {
+            case "PENDIENTE" -> {
+                title = "Nueva solicitud";
+                detail = "Tenés una nueva solicitud pendiente de respuesta.";
+            }
+            case "ACEPTADA" -> {
+                title = "Solicitud aceptada";
+                detail = "Tu solicitud fue aceptada.";
+            }
+            case "RECHAZADA" -> {
+                title = "Solicitud rechazada";
+                detail = "Tu solicitud fue rechazada.";
+            }
+            case "COMPLETADA" -> {
+                title = "Solicitud completada";
+                detail = "La solicitud se marcó como completada.";
+            }
+            case "CANCELADA" -> {
+                title = "Solicitud cancelada";
+                detail = "La solicitud fue cancelada.";
+            }
+            default -> { return; }
+        }
+        String especialidad = solicitud.path("especialidadNombre").asText("");
+        String body = especialidad.isBlank() ? detail : especialidad + ": " + detail;
+        webPush.enviar(destinatarioId, title, body, "/solicitudes");
+    }
+
+    private UUID uuidOrNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 
     /**
@@ -825,7 +1082,9 @@ public class ApiController {
     @ResponseStatus(HttpStatus.CREATED)
     public JsonNode enviarMensaje(@PathVariable UUID id, @RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
-        return gateway.enviarMensaje(id, actorIdentityBody(body, user, "emisorId"));
+        JsonNode creado = gateway.enviarMensaje(id, actorIdentityBody(body, user, "emisorId"));
+        chatMessaging.convertAndSend("/topic/solicitudes/" + id, creado);
+        return creado;
     }
 
     @PostMapping("/solicitudes/{id}/calificacion")
@@ -975,6 +1234,7 @@ public class ApiController {
      */
     @GetMapping("/gps")
     public Map<String, Object> obtenerUbicacionGps(@RequestParam(required = false, defaultValue = "") String direccion) {
-        return gateway.geocodificar(direccion);
+        return tools.jackson.databind.json.JsonMapper.builder().build()
+                .convertValue(gateway.geocodificar(direccion), Map.class);
     }
 }

@@ -1,0 +1,406 @@
+import { __decorate } from "tslib";
+import { Component, computed, inject, signal, ViewChild } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
+import { catchError, forkJoin, map, of } from 'rxjs';
+import { alternarId, avisoClase, avisoError, avisoExito, coincideBusqueda, especialidadesLabel, estadoClase, estadoLabel, inicialesDe, nombreCompleto, } from '../../core/models/admin';
+import { ApiService } from '../../core/services/api.service';
+import { MatDialog } from '@angular/material/dialog';
+import { MatButtonModule } from '@angular/material/button';
+import { MatListModule } from '@angular/material/list';
+import { VuAvatar } from '../../shared/avatar/avatar';
+import { VuConfirm } from '../../shared/confirm/confirm';
+import { VuIcon } from '../../shared/icon/icon';
+import { VuSkeletonList } from '../../shared/skeleton-list/skeleton-list';
+/**
+ * Padrón de profesionales, igual al prototipo: alta de preregistros, cards con
+ * foto (o iniciales), especialidades y estado, y un detalle que se abre tanto
+ * para consultar como para actualizar.
+ */
+let AdminProfessionals = class AdminProfessionals {
+    api = inject(ApiService);
+    router = inject(Router);
+    dialog = inject(MatDialog);
+    professionalDetailDialog;
+    detailDialogRef;
+    professionals = signal([]);
+    specialties = signal([]);
+    loading = signal(true);
+    /** Aviso de la última acción: ahora distingue éxito de error. */
+    aviso = signal({ texto: '', tipo: 'info' });
+    avisoClase = avisoClase;
+    /**
+     * Acción pendiente de confirmación. Ninguna modificación o baja se aplica sin
+     * pasar por el diálogo: se declara la pregunta y la consecuencia, y recién ahí
+     * se ejecuta.
+     */
+    confirmacion = signal(null);
+    confirmarAccion() {
+        const pendiente = this.confirmacion();
+        if (!pendiente) {
+            return;
+        }
+        this.confirmacion.set(null);
+        pendiente.ejecutar();
+    }
+    cancelarAccion() {
+        this.confirmacion.set(null);
+    }
+    /** Cuentas de los profesionales: traen email, teléfono y la foto real. */
+    cuentas = signal(new Map());
+    // ── Buscador ────────────────────────────────────────────────────────
+    busqueda = signal('');
+    /** Texto de la búsqueda ya recortado. */
+    consulta = computed(() => this.busqueda().trim());
+    /**
+     * Padrón que se muestra. Busca por nombre, legajo, email, teléfono y
+     * especialidades, sin distinguir mayúsculas ni acentos. El filtrado es local:
+     * la pantalla ya carga el padrón completo.
+     */
+    profesionalesFiltrados = computed(() => {
+        const q = this.consulta();
+        if (!q) {
+            return this.professionals();
+        }
+        return this.professionals().filter((profesional) => coincideBusqueda(q, this.nombre(profesional), profesional.legajo, this.email(profesional), this.telefono(profesional), especialidadesLabel(profesional.especialidades)));
+    });
+    hayBusqueda() {
+        return this.consulta().length > 0;
+    }
+    limpiarBusqueda() {
+        this.busqueda.set('');
+    }
+    // ── Preregistros ──────────────────────────────────────────────────────
+    /*
+     * El alta de un profesional se hace en otra pantalla (`/admin/profesionales/nuevo`),
+     * así que el listado ya no abre un formulario encima de la grilla. Lo que queda
+     * acá es leer el mensaje que esa pantalla deja al volver con `navigate(..., { state })`.
+     */
+    constructor() {
+        this.leerAvisoDeAlta();
+        this.cargar();
+    }
+    leerAvisoDeAlta() {
+        const state = this.router.getCurrentNavigation()?.extras.state;
+        const mensaje = state?.['mensaje'];
+        if (!mensaje)
+            return;
+        this.aviso.set(state?.['exito'] === false ? avisoError(mensaje) : avisoExito(mensaje));
+    }
+    // ── Carga ─────────────────────────────────────────────────────────────
+    cargar() {
+        this.loading.set(true);
+        forkJoin({
+            profesionales: this.api.getProfessionals(undefined, true).pipe(map((items) => (items ?? [])), catchError((error) => {
+                this.aviso.set(avisoError(this.api.describeError(error, 'No se pudo cargar la lista de profesionales.')));
+                return of([]);
+            })),
+            especialidades: this.api.getSpecialties().pipe(map((items) => (items ?? [])), catchError((error) => {
+                this.aviso.set(avisoError(this.api.describeError(error, 'No se pudieron cargar las especialidades disponibles.')));
+                return of([]);
+            })),
+            // El email y la foto reales viven en la cuenta (ms-usuarios), no en el padrón.
+            cuentas: this.api.getUsers('PROFESIONAL').pipe(map((items) => {
+                const porId = new Map();
+                for (const usuario of (items ?? [])) {
+                    porId.set(usuario.id, usuario);
+                }
+                return porId;
+            }), catchError(() => of(new Map()))),
+        }).subscribe(({ profesionales, especialidades, cuentas }) => {
+            this.professionals.set(profesionales);
+            this.specialties.set(especialidades);
+            this.cuentas.set(cuentas);
+            this.loading.set(false);
+        });
+    }
+    // ── Detalle (consultar / actualizar) ─────────────────────────────────
+    modal = signal(null);
+    savingEdit = signal(false);
+    editForm = { legajo: '', especialidadIds: [] };
+    /** El prototipo abre el mismo detalle con "Consultar" y con "Actualizar". */
+    abrirDetalle(profesional, modo) {
+        this.aviso.set({ texto: '', tipo: 'info' });
+        this.editForm.legajo = profesional.legajo ?? '';
+        this.editForm.especialidadIds = profesional.especialidades?.map((item) => item.id) ?? [];
+        this.modal.set({ profesional, modo });
+        if (!this.detailDialogRef) {
+            this.detailDialogRef = this.dialog.open(this.professionalDetailDialog, {
+                ariaLabel: 'Detalle del profesional',
+                ariaModal: true,
+                maxWidth: 'min(38rem, calc(100vw - 2rem))',
+                panelClass: 'vu-details-dialog',
+            });
+            this.detailDialogRef.afterClosed().subscribe(() => {
+                this.detailDialogRef = undefined;
+                this.modal.set(null);
+            });
+        }
+    }
+    cerrarDetalle() {
+        this.detailDialogRef?.close();
+        this.detailDialogRef = undefined;
+        this.modal.set(null);
+    }
+    toggleEditSpecialty(id) {
+        this.editForm.especialidadIds = alternarId(this.editForm.especialidadIds, id);
+    }
+    /** Guarda una edición del padrón. Pide confirmación y resume qué cambia. */
+    guardarCambios() {
+        const abierto = this.modal();
+        if (!abierto) {
+            return;
+        }
+        const legajo = this.editForm.legajo.trim();
+        if (!legajo) {
+            this.aviso.set(avisoError('El legajo no puede quedar vacío.'));
+            return;
+        }
+        if (this.editForm.especialidadIds.length === 0) {
+            this.aviso.set(avisoError('Elegí al menos una especialidad.'));
+            return;
+        }
+        this.confirmacion.set({
+            titulo: 'Guardar los cambios',
+            mensaje: `¿Actualizás los datos de ${this.nombre(abierto.profesional)}?`,
+            detalle: this.resumenCambios(abierto.profesional, legajo),
+            confirmar: 'Guardar cambios',
+            icono: 'pencil',
+            ejecutar: () => this.ejecutarGuardado(abierto.profesional, legajo),
+        });
+    }
+    /** Qué cambia de verdad: si no hay diferencias, lo dice y no se guardan. */
+    resumenCambios(profesional, legajo) {
+        const actuales = (profesional.especialidades ?? []).map((item) => item.nombre);
+        const nuevas = this.editForm.especialidadIds
+            .map((id) => this.specialties().find((item) => item.id === id)?.nombre)
+            .filter((nombre) => !!nombre);
+        const cambios = [];
+        if ((profesional.legajo ?? '') !== legajo) {
+            cambios.push(`Legajo: de "${profesional.legajo || 'sin legajo'}" a "${legajo}".`);
+        }
+        const agrega = nuevas.filter((nombre) => !actuales.includes(nombre));
+        const quita = actuales.filter((nombre) => !nuevas.includes(nombre));
+        if (agrega.length) {
+            cambios.push(`Agrega: ${agrega.join(', ')}.`);
+        }
+        if (quita.length) {
+            cambios.push(`Quita: ${quita.join(', ')}.`);
+        }
+        return cambios.length
+            ? cambios.join(' ')
+            : 'No hay cambios: las especialidades quedan igual que están.';
+    }
+    ejecutarGuardado(profesional, legajo) {
+        // ms-profesionales sólo administra legajo y especialidades: los datos
+        // personales viven en ms-usuarios y no se editan desde este panel.
+        this.savingEdit.set(true);
+        this.api.updateProfessional(profesional.id, {
+            usuarioId: profesional.usuarioId,
+            legajo,
+            especialidadIds: this.editForm.especialidadIds,
+        }).pipe(catchError((error) => {
+            this.savingEdit.set(false);
+            this.aviso.set(avisoError(this.api.describeError(error, 'No se pudo actualizar el profesional.')));
+            return of(null);
+        })).subscribe((result) => {
+            this.savingEdit.set(false);
+            if (result) {
+                this.modal.set(null);
+                this.aviso.set(avisoExito(`${this.nombre(profesional)} quedó actualizado en el padrón.`));
+                this.cargar();
+            }
+        });
+    }
+    // ── Estado y baja ─────────────────────────────────────────────────────
+    /**
+     * El profesional todavía no activó su perfil: el padrón lo muestra
+     * pendiente (CARGADO) y ya tiene cuenta vinculada. Sin cuenta no hay a
+     * quién ponerle la clave, así que ahí no se ofrece el reenvío.
+     */
+    puedeReenviarse(profesional) {
+        return (profesional.estado ?? '').toUpperCase() === 'CARGADO';
+    }
+    /**
+     * Reenvío de la invitación: pide confirmación porque la clave anterior
+     * deja de servir en cuanto se emite la nueva.
+     */
+    reenviarInvitacion(profesional) {
+        if (!this.puedeReenviarse(profesional)) {
+            return;
+        }
+        this.confirmacion.set({
+            titulo: 'Reenviar la invitación',
+            mensaje: `¿Querés emitir una contraseña nueva para ${this.nombre(profesional)}?`,
+            detalle: 'La contraseña anterior deja de servir y el profesional recibe la nueva por correo con los pasos para activar su perfil.',
+            confirmar: 'Reenviar invitación',
+            icono: 'mail',
+            ejecutar: () => this.ejecutarReenvio(profesional),
+        });
+    }
+    ejecutarReenvio(profesional) {
+        this.busyId.set(profesional.id);
+        this.api.reenviarInvitacion(profesional.id).pipe(catchError((error) => {
+            this.busyId.set(null);
+            this.aviso.set(avisoError(this.api.describeError(error, 'No se pudo reenviar la invitación.')));
+            return of(null);
+        })).subscribe((resultado) => {
+            this.busyId.set(null);
+            if (!resultado)
+                return;
+            const clave = resultado.passwordTemporal
+                ? ` Nueva contraseña temporal: ${resultado.passwordTemporal} (debe cambiarla al entrar).`
+                : '';
+            this.aviso.set(resultado.correoEnviado
+                ? avisoExito(`Le enviamos por correo la contraseña nueva a ${this.nombre(profesional)}.`)
+                : avisoError(`No se pudo enviar el correo a ${this.nombre(profesional)}.${clave}`));
+        });
+    }
+    busyId = signal(null);
+    /**
+     * Baja lógica del padrón: se pide confirmación porque saca al profesional del
+     * directorio.
+     *
+     * <p>El panel usa "desactivar" y no "suspender" en los dos listados (clientes y
+     * profesionales) para que sea la misma palabra para la misma acción. El estado
+     * que devuelve la API sigue siendo SUSPENDIDO.
+     */
+    desactivar(profesional) {
+        this.confirmacion.set({
+            titulo: 'Desactivar al profesional',
+            mensaje: `¿Querés desactivar a ${this.nombre(profesional)}?`,
+            detalle: 'Deja de aparecer en el directorio y no puede recibir solicitudes nuevas. No se borra nada: conserva su historial, y más adelante podés reactivarlo.',
+            confirmar: 'Desactivar',
+            peligro: true,
+            icono: 'pause',
+            ejecutar: () => this.ejecutarDesactivacion(profesional),
+        });
+    }
+    ejecutarDesactivacion(profesional) {
+        this.busyId.set(profesional.id);
+        this.api.suspendProfessional(profesional.id).pipe(map(() => true), catchError((error) => {
+            this.busyId.set(null);
+            this.aviso.set(avisoError(this.api.describeError(error, 'No se pudo desactivar al profesional.')));
+            return of(false);
+        })).subscribe((ok) => {
+            this.busyId.set(null);
+            if (ok) {
+                // El backend devuelve SUSPENDIDO: desactivar no activa perfiles.
+                this.actualizarEstado(profesional.id, 'SUSPENDIDO');
+                this.reflejarEnModal(profesional.id, 'SUSPENDIDO');
+                this.aviso.set(avisoExito(`${this.nombre(profesional)} quedó desactivado y ya no recibe solicitudes.`));
+            }
+        });
+    }
+    /** Reactivar también se confirma: devuelve el acceso al directorio. */
+    reactivar(profesional) {
+        this.confirmacion.set({
+            titulo: 'Reactivar la cuenta',
+            mensaje: `¿Querés volver a habilitar a ${this.nombre(profesional)}?`,
+            detalle: 'Vuelve a aparecer en el directorio. Si todavía no completó su activación, queda como preregistro hasta que la termine.',
+            confirmar: 'Reactivar',
+            icono: 'play',
+            ejecutar: () => this.ejecutarReactivacion(profesional),
+        });
+    }
+    ejecutarReactivacion(profesional) {
+        this.busyId.set(profesional.id);
+        this.api.reactivateProfessional(profesional.id).pipe(map((result) => result?.estado ?? 'CARGADO'), catchError((error) => {
+            this.busyId.set(null);
+            this.aviso.set(avisoError(this.api.describeError(error, 'No se pudo reactivar la cuenta.')));
+            return of(null);
+        })).subscribe((estado) => {
+            this.busyId.set(null);
+            if (estado) {
+                // El backend devuelve CARGADO (no ACTIVO): reactivar no activa perfiles.
+                this.actualizarEstado(profesional.id, estado);
+                this.reflejarEnModal(profesional.id, estado);
+                this.aviso.set(avisoExito(`${this.nombre(profesional)} quedó reactivado.`));
+                this.cargar();
+            }
+        });
+    }
+    actualizarEstado(id, estado) {
+        this.professionals.update((items) => items.map((item) => (item.id === id ? { ...item, estado } : item)));
+    }
+    /**
+     * El detalle abierto muestra una copia del profesional: si se cambia el estado
+     * desde adentro del modal, se lo actualiza para que el botón no quede
+     * ofreciendo una acción que ya no corresponde.
+     */
+    reflejarEnModal(id, estado) {
+        this.modal.update((abierto) => {
+            if (!abierto || abierto.profesional.id !== id) {
+                return abierto;
+            }
+            const actualizado = this.professionals().find((item) => item.id === id) ?? abierto.profesional;
+            return { ...abierto, profesional: { ...actualizado, estado } };
+        });
+    }
+    // ── Presentación ──────────────────────────────────────────────────────
+    estadoLabel = estadoLabel;
+    estadoClase = estadoClase;
+    nombre(profesional) {
+        return nombreCompleto(this.cuenta(profesional) ?? profesional);
+    }
+    iniciales(profesional) {
+        return inicialesDe(this.nombre(profesional));
+    }
+    email(profesional) {
+        return this.cuenta(profesional)?.email ?? 'Sin email';
+    }
+    telefono(profesional) {
+        return this.cuenta(profesional)?.telefono ?? '';
+    }
+    /**
+     * Usuario dueño de la foto que se muestra: el de la cuenta (la que la persona
+     * sube y actualiza desde "Mi cuenta"). El `vu-avatar` pide la imagen por este
+     * id y el backend decide si el rol que mira puede verla.
+     */
+    usuarioIdFoto(profesional) {
+        return this.cuenta(profesional)?.id ?? profesional.usuarioId;
+    }
+    /**
+     * Si se muestra foto: la de la cuenta si la tiene, si no la del padrón, que es
+     * el respaldo de los perfiles cargados antes de que existiera la cuenta.
+     */
+    tieneFoto(profesional) {
+        const cuenta = this.cuenta(profesional);
+        if (cuenta?.tieneFoto)
+            return true;
+        return profesional.tieneFoto === true;
+    }
+    /**
+     * La cuenta de Keycloak todavía no quedó vinculada: o es un prerregistro
+     * antiguo, o el alta se cortó a mitad. El caso de `CARGADO` cubre el detalle
+     * que se abre sin fila de usuario.
+     */
+    invitacionPendiente(profesional) {
+        const cuenta = this.cuenta(profesional);
+        return cuenta ? cuenta.keycloakId == null : (profesional.estado ?? '').toUpperCase() === 'CARGADO';
+    }
+    /** El profesional está desactivado: no entra al directorio ni recibe solicitudes. */
+    estaDesactivado(profesional) {
+        return (profesional.estado ?? '').toUpperCase() === 'SUSPENDIDO';
+    }
+    /** Sólo se ofrece desactivar a los perfiles que ya pueden operar. */
+    puedeDesactivarse(profesional) {
+        const estado = (profesional.estado ?? '').toUpperCase();
+        return estado === 'ACTIVO' || estado === 'CARGADO';
+    }
+    cuenta(profesional) {
+        return this.cuentas().get(profesional.usuarioId);
+    }
+};
+__decorate([
+    ViewChild('professionalDetailDialog')
+], AdminProfessionals.prototype, "professionalDetailDialog", void 0);
+AdminProfessionals = __decorate([
+    Component({
+        selector: 'app-admin-professionals',
+        imports: [FormsModule, RouterLink, MatButtonModule, MatListModule, VuAvatar, VuConfirm, VuIcon, VuSkeletonList],
+        templateUrl: './admin-professionals.html',
+        styleUrl: './admin-professionals.css',
+    })
+], AdminProfessionals);
+export { AdminProfessionals };

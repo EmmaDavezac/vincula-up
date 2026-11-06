@@ -8,6 +8,7 @@ import {
 	requireRequestsAccess,
 	requireRole,
 } from './core/guards/role.guard';
+import { confirmarSalidaDeSolicitud } from './request/request.guard';
 
 export const routes: Routes = [
 	{
@@ -42,6 +43,7 @@ export const routes: Routes = [
 	{
 		path: 'solicitar',
 		canActivate: [requireRole('CLIENTE')],
+		canDeactivate: [confirmarSalidaDeSolicitud],
 		loadComponent: () => import('./request/request').then((module) => module.Request),
 		title: 'Vincula-UP | Solicitar turno',
 	},
@@ -69,7 +71,7 @@ export const routes: Routes = [
 		loadComponent: () => import('./access-page').then((module) => module.AccessPage),
 		data: {
 			title: 'No tenes permiso para entrar aca',
-			message: 'Inicia sesión con tu cuenta Keycloak o volve al inicio para continuar.',
+			message: 'Iniciá sesión con tu cuenta o volvé al inicio para continuar.',
 		},
 		title: 'Vincula-UP | Acceso restringido',
 	},

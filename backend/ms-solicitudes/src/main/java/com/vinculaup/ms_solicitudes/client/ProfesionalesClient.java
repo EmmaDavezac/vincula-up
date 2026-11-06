@@ -1,86 +1,100 @@
 package com.vinculaup.ms_solicitudes.client;
 
-import java.util.Arrays;
+import java.io.IOException;
+import java.net.URI;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatusCode;
-import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.ClientHttpRequest;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+/**
+ * Cliente REST hacia ms-profesionales. Usa {@link RestClient} (nativo de Spring Boot 4.x)
+ * en lugar de OpenFeign, que no es compatible con Spring Boot 4.1.1.
+ * <p>
+ * Reenvía el encabezado {@code Authorization} (JWT de Keycloak) de la petición
+ * entrante hacia ms-profesionales, mediante un {@link ClientHttpRequestFactory} personalizado.
+ */
 @Component
 public class ProfesionalesClient {
 
     private final RestClient restClient;
 
     public ProfesionalesClient(@Value("${profesionales.url}") String baseUrl) {
-        this.restClient = RestClient.builder().baseUrl(baseUrl).build();
+        ClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory() {
+            @Override
+            public ClientHttpRequest createRequest(URI url, HttpMethod method) throws IOException {
+                ClientHttpRequest request = super.createRequest(url, method);
+                ServletRequestAttributes attrs =
+                        (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+                if (attrs != null) {
+                    String auth = attrs.getRequest().getHeader(HttpHeaders.AUTHORIZATION);
+                    if (auth != null && !auth.isBlank()) {
+                        request.getHeaders().add(HttpHeaders.AUTHORIZATION, auth);
+                    }
+                }
+                return request;
+            }
+        };
+
+        this.restClient = RestClient.builder()
+                .baseUrl(baseUrl)
+                .requestFactory(requestFactory)
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+                .build();
     }
 
-    public List<DisponibilidadProfesional> obtenerDisponibilidad(UUID profesionalId) {
-        try {
-            DisponibilidadProfesional[] response = restClient.get()
-                    .uri("/profesionales/{id}/disponibilidad", profesionalId)
-                    .retrieve()
-                    .onStatus(HttpStatusCode::isError, (request, result) -> {
-                        throw new IllegalStateException("No se pudo consultar la disponibilidad del profesional");
-                    })
-                    .body(DisponibilidadProfesional[].class);
-            return response == null ? List.of() : Arrays.asList(response);
-        } catch (RestClientException | IllegalStateException exception) {
-            throw new IllegalStateException("No se pudo consultar la disponibilidad del profesional", exception);
-        }
+    public List<DisponibilidadProfesional> obtenerDisponibilidad(UUID id) {
+        return restClient.get()
+                .uri("/profesionales/{id}/disponibilidad", id)
+                .retrieve()
+                .body(new ParameterizedTypeReference<List<DisponibilidadProfesional>>() {});
     }
 
-    public List<ProfesionalIdentidad> obtenerIdentidades(Collection<UUID> ids) {
-        if (ids == null || ids.isEmpty()) {
-            return List.of();
-        }
-        try {
-            ProfesionalIdentidad[] response = restClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/profesionales/por-usuario")
-                            .queryParam("usuarioIds", ids)
-                            .build())
-                    .retrieve()
-                    .body(ProfesionalIdentidad[].class);
-            return response == null ? List.of() : Arrays.asList(response);
-        } catch (Exception ex) {
-            return List.of();
-        }
+    public List<ProfesionalIdentidad> obtenerIdentidades(Collection<UUID> usuarioIds) {
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/profesionales/por-usuario")
+                    .queryParam("usuarioIds", usuarioIds.toArray())
+                        .build())
+                .retrieve()
+                .body(new ParameterizedTypeReference<List<ProfesionalIdentidad>>() {});
     }
 
-    public java.util.Optional<ProfesionalIdentidad> obtenerPorId(UUID id) {
-        if (id == null) {
-            return java.util.Optional.empty();
-        }
+    public Optional<ProfesionalIdentidad> obtenerPorId(UUID id) {
         try {
-            ProfesionalIdentidad response = restClient.get()
+            ProfesionalIdentidad result = restClient.get()
                     .uri("/profesionales/{id}", id)
                     .retrieve()
                     .body(ProfesionalIdentidad.class);
-            return java.util.Optional.ofNullable(response);
-        } catch (Exception ex) {
-            return java.util.Optional.empty();
+            return Optional.ofNullable(result);
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
+                return Optional.empty();
+            }
+            throw e;
         }
     }
 
-    /**
-     * Resuelve el perfil profesional por cualquiera de las identidades que usa la aplicación:
-     * el id del perfil del padrón o el {@code usuarioId} de ms-usuarios (que es el id con el que
-     * el frontend arma las solicitudes). Primero se intenta el camino canónico
-     * ({@code /profesionales/{id}}) y, si no hay perfil con ese id, se busca por usuario.
-     */
-    public java.util.Optional<ProfesionalIdentidad> obtenerPorIdentidad(UUID identidad) {
+    public Optional<ProfesionalIdentidad> obtenerPorIdentidad(UUID identidad) {
         if (identidad == null) {
-            return java.util.Optional.empty();
+            return Optional.empty();
         }
-        java.util.Optional<ProfesionalIdentidad> porPerfil = obtenerPorId(identidad);
-        if (porPerfil.isPresent()) {
-            return porPerfil;
-        }
-        return obtenerIdentidades(List.of(identidad)).stream().findFirst();
+        return obtenerPorId(identidad).or(() -> obtenerIdentidades(List.of(identidad)).stream().findFirst());
     }
 }

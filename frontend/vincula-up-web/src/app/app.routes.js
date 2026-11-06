@@ -1,0 +1,69 @@
+import { adminRoutes } from './admin/admin.routes';
+import { redirectIfAuthenticated, redirectToKeycloak, requireActivationAccess, requireAnyRole, requireRequestsAccess, requireRole, } from './core/guards/role.guard';
+import { confirmarSalidaDeSolicitud } from './request/request.guard';
+export const routes = [
+    {
+        path: '',
+        canActivate: [redirectIfAuthenticated],
+        loadComponent: () => import('./home/home').then((module) => module.Home),
+        title: 'Vincula-UP | Inicio',
+    },
+    {
+        path: 'terminos',
+        loadComponent: () => import('./legal/terminos/terminos').then((module) => module.Terminos),
+        title: 'Vincula-UP | Terminos y condiciones',
+    },
+    {
+        path: 'preguntas-frecuentes',
+        loadComponent: () => import('./legal/preguntas-frecuentes/preguntas-frecuentes').then((module) => module.PreguntasFrecuentes),
+        title: 'Vincula-UP | Preguntas frecuentes',
+    },
+    {
+        path: 'ingresar',
+        canActivate: [redirectToKeycloak],
+        loadComponent: () => import('./sign-in/sign-in').then((module) => module.SignIn),
+        title: 'Vincula-UP | Ingresar',
+    },
+    {
+        path: 'solicitudes',
+        canActivate: [requireRequestsAccess],
+        loadComponent: () => import('./my-requests/my-requests').then((module) => module.MyRequests),
+        title: 'Vincula-UP | Solicitudes',
+    },
+    {
+        path: 'solicitar',
+        canActivate: [requireRole('CLIENTE')],
+        canDeactivate: [confirmarSalidaDeSolicitud],
+        loadComponent: () => import('./request/request').then((module) => module.Request),
+        title: 'Vincula-UP | Solicitar turno',
+    },
+    {
+        path: 'admin',
+        canActivate: [requireRole('ADMIN')],
+        loadComponent: () => import('./admin/admin-layout/admin-layout').then((module) => module.AdminLayout),
+        children: adminRoutes,
+        title: 'Vincula-UP | Administracion',
+    },
+    {
+        path: 'activar-perfil',
+        canActivate: [requireActivationAccess],
+        loadComponent: () => import('./activation/activation').then((module) => module.Activation),
+        title: 'Vincula-UP | Activar perfil',
+    },
+    {
+        path: 'mi-cuenta',
+        canActivate: [requireAnyRole(['CLIENTE', 'PROFESIONAL', 'ADMIN'])],
+        loadComponent: () => import('./account/account').then((module) => module.Account),
+        title: 'Vincula-UP | Mi cuenta',
+    },
+    {
+        path: 'no-autorizado',
+        loadComponent: () => import('./access-page').then((module) => module.AccessPage),
+        data: {
+            title: 'No tenes permiso para entrar aca',
+            message: 'Iniciá sesión con tu cuenta o volvé al inicio para continuar.',
+        },
+        title: 'Vincula-UP | Acceso restringido',
+    },
+    { path: '**', redirectTo: '' },
+];

@@ -1,6 +1,6 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal, TemplateRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { catchError, of } from 'rxjs';
@@ -9,11 +9,17 @@ import { Professional } from '../core/models/professional';
 import { ApiService, ClienteInfo } from '../core/services/api.service';
 import { AuthService } from '../core/services/auth.service';
 import { RequestService } from '../core/services/request.service';
+import { NotificationService } from '../core/services/notification.service';
+import { ChatRealtimeService, RealtimeChatMessage } from '../core/services/chat-realtime.service';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MatButtonModule } from '@angular/material/button';
 import { fotoUtil } from '../core/utils/photo';
 import { VuAvatar } from '../shared/avatar/avatar';
 import { VuConfirm } from '../shared/confirm/confirm';
 import { VuIcon } from '../shared/icon/icon';
 import { VuSkeletonList } from '../shared/skeleton-list/skeleton-list';
+import { VuSpinner } from '../shared/spinner/spinner';
+import { ChatAutoScrollDirective } from './chat-auto-scroll.directive';
 
 interface MessageItem {
   id: string;
@@ -38,16 +44,30 @@ interface RatingItem {
 }
 
 @Component({
-	imports: [CommonModule, RouterLink, FormsModule, VuAvatar, VuConfirm, VuIcon, VuSkeletonList],
+  imports: [CommonModule, RouterLink, FormsModule, MatButtonModule, VuAvatar, VuConfirm, VuIcon, VuSkeletonList, VuSpinner, ChatAutoScrollDirective],
 	selector: 'app-my-requests',
 	styleUrl: './my-requests.css',
 	templateUrl: './my-requests.html',
 })
 export class MyRequests {
   private readonly api = inject(ApiService);
+  private readonly dialog = inject(MatDialog);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  @ViewChild('chatDialog') private chatDialog!: TemplateRef<unknown>;
+  @ViewChild('statusDialog') private statusDialog!: TemplateRef<unknown>;
+  @ViewChild('cancelDialog') private cancelDialog!: TemplateRef<unknown>;
+  private chatDialogRef?: MatDialogRef<unknown>;
+  private statusDialogRef?: MatDialogRef<unknown>;
+  private cancelDialogRef?: MatDialogRef<unknown>;
   readonly auth = inject(AuthService);
   private readonly requestService = inject(RequestService);
+  private readonly notifications = inject(NotificationService);
+  readonly chatRealtime = inject(ChatRealtimeService);
   private readonly sanitizer = inject(DomSanitizer);
+
+  /** Cache de URLs de mapa: evita crear SafeResourceUrl en cada detección de cambios (ciclo NG0600). */
+  private readonly _urlCache = new Map<string, SafeResourceUrl>();
 
   readonly requests = this.requestService.myRequests;
   readonly errorMessage = signal('');
@@ -57,10 +77,35 @@ export class MyRequests {
    * estado vacío (que diría "todavía no tenés solicitudes" sin haber llegado nada).
    */
   readonly loading = signal(true);
+  readonly refreshing = signal(false);
+  readonly highlightedRequestId = signal<string | null>(null);
+  private pendingNotificationRequestId: string | null = null;
+  private pendingNotificationOpensChat = false;
+  private highlightTimeout?: ReturnType<typeof setTimeout>;
+  /** El mapa embebido todavía está cargando sus tiles. */
+  readonly mapaCargando = signal(false);
+
+  /**
+   * Activa el spinner de carga del mapa cuando hay solicitudes profesionales
+   * con coordenadas visibles. Se usa un `effect` (no un método de template) para
+   * evitar el ciclo de detección de cambios NG0600: `embeddedMapUrl` se evalúa en
+   * cada cambio, así que no puede activar signals por sí mismo.
+   */
+  private readonly _mapaLoadEffect = effect(() => {
+    if (this.isProfessional()) {
+      const tieneMapa = this.filteredRequests().some((r) => this.mapCoords(r) != null);
+      if (tieneMapa) {
+        this.mapaCargando.set(true);
+      }
+    }
+  });
 
   // Filtros de la lista
   readonly statusFilter = signal<'TODAS' | RequestStatus>('TODAS');
   readonly specialtyFilter = signal<string>('TODAS');
+  readonly requestSearch = signal('');
+  readonly filtersRefreshing = signal(false);
+  private filterRefreshTimeout?: ReturnType<typeof setTimeout>;
 
   readonly statusOptions: ReadonlyArray<{ value: 'TODAS' | RequestStatus; label: string }> = [
     { value: 'TODAS', label: 'Todas' },
@@ -87,6 +132,7 @@ export class MyRequests {
   readonly filteredRequests = computed(() => {
     const status = this.statusFilter();
     const specialty = this.specialtyFilter();
+    const query = this.normalizarTexto(this.requestSearch());
 
     return this.requests().filter((request) => {
       if (status !== 'TODAS' && request.status !== status) return false;
@@ -94,18 +140,52 @@ export class MyRequests {
         const key = request.especialidadId ?? request.specialty ?? '';
         if (key !== specialty) return false;
       }
+      if (query) {
+      const nombreContraparte = this.isProfessional()
+        ? this.clienteNombre(request)
+        : this.profesionalNombre(request);
+      const coincideNombre = this.normalizarTexto(nombreContraparte).includes(query);
+			const coincideDireccion = this.normalizarTexto(request.address).includes(query);
+      if (!coincideNombre && !coincideDireccion) return false;
+		}
       return true;
     });
   });
 
   readonly hasActiveFilters = computed(
-    () => this.statusFilter() !== 'TODAS' || this.specialtyFilter() !== 'TODAS',
+    () => this.statusFilter() !== 'TODAS' || this.specialtyFilter() !== 'TODAS' || !!this.requestSearch().trim(),
   );
 
   clearFilters(): void {
-    this.statusFilter.set('TODAS');
-    this.specialtyFilter.set('TODAS');
+    this.actualizarFiltros(() => {
+      this.statusFilter.set('TODAS');
+      this.specialtyFilter.set('TODAS');
+      this.requestSearch.set('');
+    });
   }
+
+  cambiarEstadoFiltro(value: 'TODAS' | RequestStatus): void {
+		this.actualizarFiltros(() => this.statusFilter.set(value));
+	}
+
+  cambiarCategoriaFiltro(value: string): void {
+		this.actualizarFiltros(() => this.specialtyFilter.set(value));
+  }
+
+  cambiarBusqueda(value: string): void {
+		this.actualizarFiltros(() => this.requestSearch.set(value));
+  }
+
+  private actualizarFiltros(update: () => void): void {
+		this.filtersRefreshing.set(true);
+		update();
+		if (this.filterRefreshTimeout) clearTimeout(this.filterRefreshTimeout);
+		this.filterRefreshTimeout = setTimeout(() => this.filtersRefreshing.set(false), 220);
+  }
+
+  private normalizarTexto(value: string | null | undefined): string {
+		return (value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('es');
+	}
 
   // Chat state
   readonly activeChatId = signal<string | null>(null);
@@ -146,11 +226,23 @@ export class MyRequests {
   readonly specialtiesError = signal('');
 
   constructor() {
+    this.route.queryParamMap.subscribe((params) => {
+      const requestId = params.get('solicitudId');
+      if (!requestId) return;
+      this.pendingNotificationRequestId = requestId;
+      this.pendingNotificationOpensChat = params.get('abrirChat') === 'true';
+      this.openNotificationTargetIfReady();
+    });
     this.reloadRequests();
     this.loadEspecialidades();
   }
 
   reloadRequests(): void {
+    if (this.requests().length > 0) {
+      this.refreshing.set(true);
+    } else {
+      this.loading.set(true);
+    }
     const userId = this.auth.currentUser()?.id;
     if (userId) {
       const isProf = this.isProfessional();
@@ -169,6 +261,7 @@ export class MyRequests {
       ).subscribe((requests) => {
         // Pase lo que pase (lista o error) la carga terminó: se oculta el skeleton.
         this.loading.set(false);
+        this.refreshing.set(false);
         if (requests) {
           const filtered = isProf
             ? requests.filter((r) => r.clienteId !== userId)
@@ -188,12 +281,48 @@ export class MyRequests {
               this.loadProfesional(req.professionalId);
             }
           }
+          this.openNotificationTargetIfReady();
         }
       });
     } else {
       // Sin sesión no se pide nada: si no, el skeleton quedaría visible para siempre.
       this.loading.set(false);
+      this.refreshing.set(false);
     }
+  }
+
+  private openNotificationTargetIfReady(): void {
+    const requestId = this.pendingNotificationRequestId;
+    if (!requestId || this.loading()) return;
+    const request = this.requests().find((item) => String(item.id) === requestId);
+    if (!request) return;
+
+    const abrirChat = this.pendingNotificationOpensChat && request.status === 'ACEPTADA';
+    this.pendingNotificationRequestId = null;
+    this.pendingNotificationOpensChat = false;
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { solicitudId: null, abrirChat: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+
+    if (abrirChat) {
+      this.toggleChat(request.id);
+      return;
+    }
+
+    this.clearFilters();
+    this.highlightedRequestId.set(requestId);
+    if (this.highlightTimeout) clearTimeout(this.highlightTimeout);
+    requestAnimationFrame(() => {
+      document.getElementById(`solicitud-${requestId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    this.highlightTimeout = setTimeout(() => this.highlightedRequestId.set(null), 3000);
+  }
+
+  esSolicitudResaltada(requestId: string | number): boolean {
+		return this.highlightedRequestId() === String(requestId);
   }
 
   // ── Ficha del cliente (quién hace la solicitud) ──
@@ -316,10 +445,20 @@ export class MyRequests {
   embeddedMapUrl(request: ServiceRequest): SafeResourceUrl | null {
     const coords = this.mapCoords(request);
     if (!coords) return null;
+    const key = `${coords.lat},${coords.lng}`;
+    const cached = this._urlCache.get(key);
+    if (cached) return cached;
     const delta = 0.008;
     const bbox = `${coords.lng - delta}%2C${coords.lat - delta}%2C${coords.lng + delta}%2C${coords.lat + delta}`;
     const url = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${coords.lat}%2C${coords.lng}`;
-    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+    const safe = this.sanitizer.bypassSecurityTrustResourceUrl(url);
+    this._urlCache.set(key, safe);
+    return safe;
+  }
+
+  /** Se dispara cuando el iframe termina de cargar sus tiles. */
+  onMapaLoad(): void {
+    this.mapaCargando.set(false);
   }
 
   isProfessional(): boolean {
@@ -367,6 +506,17 @@ export class MyRequests {
     this.estadoAConfirmar.set(null);
     this.motivoError.set('');
     this.updatingRequestId.set(String(request.id));
+    this.statusDialogRef = this.dialog.open(this.statusDialog, {
+  ariaLabel: 'Actualizar estado de la solicitud',
+  ariaModal: true,
+  width: 'min(29rem, calc(100vw - 2rem))',
+  maxWidth: 'calc(100vw - 2rem)',
+  panelClass: 'vu-details-dialog',
+});
+    this.statusDialogRef.afterClosed().subscribe(() => {
+      this.statusDialogRef = undefined;
+      this.resetEstadoDialog();
+    });
   }
 
   /** Solicitud abierta en el modal de estado (o null). */
@@ -395,6 +545,14 @@ export class MyRequests {
   }
 
   cerrarActualizarEstado(): void {
+    this.statusDialogRef?.close();
+    this.cancelDialogRef?.close();
+    this.statusDialogRef = undefined;
+    this.cancelDialogRef = undefined;
+    this.resetEstadoDialog();
+  }
+
+  private resetEstadoDialog(): void {
     this.updatingRequestId.set(null);
     this.motivoEstado.set('');
     this.estadoAConfirmar.set(null);
@@ -411,6 +569,19 @@ export class MyRequests {
       this.estadoAConfirmar.set(nuevo);
       this.motivoEstado.set('');
       this.motivoError.set('');
+      this.cancelDialogRef = this.dialog.open(this.cancelDialog, {
+        ariaLabel: 'Motivo de la cancelación',
+        ariaModal: true,
+        maxWidth: 'min(32rem, calc(100vw - 2rem))',
+        panelClass: 'vu-details-dialog',
+        width: 'min(29rem, calc(100vw - 2rem))',
+      });
+      this.cancelDialogRef.afterClosed().subscribe(() => {
+        this.cancelDialogRef = undefined;
+        if (this.estadoAConfirmar()) {
+          this.volverAEstadoOpciones();
+        }
+      });
       return;
     }
     this.confirmacionTransicion.set({ request, nuevo });
@@ -474,6 +645,8 @@ export class MyRequests {
 
   /** Vuelve a la lista de opciones sin cerrar el modal. */
   volverAEstadoOpciones(): void {
+    this.cancelDialogRef?.close();
+    this.cancelDialogRef = undefined;
     this.estadoAConfirmar.set(null);
     this.motivoEstado.set('');
     this.motivoError.set('');
@@ -513,6 +686,7 @@ export class MyRequests {
       this.cerrarActualizarEstado();
       if (!updated) return;
       this.requestService.updateStatus(request.id, updated.status);
+      this.notifications.markStatusHandledLocally(request.id, updated.status);
       this.successMessage.set(
         nuevo === 'COMPLETADA' ? 'La solicitud fue marcada como completada. ¡Ahora podés calificar el servicio!'
         : nuevo === 'CANCELADA' ? 'Cancelaste la solicitud. La contraparte ve el motivo que escribiste.'
@@ -527,11 +701,76 @@ export class MyRequests {
   toggleChat(requestId: string | number): void {
     const idStr = String(requestId);
     if (this.activeChatId() === idStr) {
+      this.chatDialogRef?.close();
       this.activeChatId.set(null);
+      this.chatRealtime.disconnect();
     } else {
+      this.chatDialogRef?.close();
       this.activeChatId.set(idStr);
+      this.notifications.openChat(idStr);
       this.loadMessages(idStr);
+      const token = this.auth.getToken();
+      if (token) this.chatRealtime.connect(idStr, token, (message) => this.recibirMensajeRealtime(message));
+      const dialogRef = this.dialog.open(this.chatDialog, {
+  ariaLabel: 'Chat de la solicitud',
+  ariaModal: true,
+  width: 'min(36rem, calc(100vw - 2rem))',
+  maxWidth: 'calc(100vw - 2rem)',
+  panelClass: 'vu-details-dialog',
+});
+      this.chatDialogRef = dialogRef;
+      dialogRef.afterClosed().subscribe(() => {
+        this.notifications.closeChat(idStr, this.auth.currentUser()?.id ?? '');
+        if (this.chatDialogRef === dialogRef) {
+          this.chatDialogRef = undefined;
+          this.chatRealtime.disconnect();
+          if (this.activeChatId() === idStr) this.activeChatId.set(null);
+        }
+      });
     }
+  }
+
+  private recibirMensajeRealtime(message: RealtimeChatMessage): void {
+		const requestId = String(message.solicitudId);
+		if (this.activeChatId() !== requestId) return;
+		this.chatMessages.update((items) => {
+			const messages = items[requestId] ?? [];
+			if (messages.some((item) => item.id === message.id)) return items;
+			return { ...items, [requestId]: [...messages, message] };
+		});
+	}
+
+  esMensajePropio(message: MessageItem): boolean {
+    const userId = this.auth.currentUser()?.id;
+    const keycloakId = this.auth.getKeycloakId();
+    return message.emisorId === userId || (!!keycloakId && message.emisorId === keycloakId);
+  }
+
+  fechaMensajeLabel(value: string): string {
+    const [datePart] = value.split('T');
+    const [year, month, day] = (datePart ?? '').split('-');
+    return year && month && day ? `${day}/${month}/${year.slice(-2)}` : '';
+  }
+
+  horaMensajeLabel(value: string): string {
+    const timePart = value.split('T')[1] ?? '';
+    return timePart.slice(0, 5);
+  }
+
+  fechaSolicitudLabel(value: string): string {
+    const datePart = value.split('T')[0] ?? '';
+    const [year, month, day] = datePart.split('-');
+    if (year && month && day) return `${day}/${month}/${year.slice(-2)}`;
+
+    const [dayValue, monthValue, yearValue] = datePart.split('/');
+    return dayValue && monthValue && yearValue
+      ? `${dayValue.padStart(2, '0')}/${monthValue.padStart(2, '0')}/${yearValue.slice(-2)}`
+      : value;
+  }
+
+  mostrarFechaMensaje(messages: MessageItem[], index: number): boolean {
+    if (index === 0) return true;
+    return messages[index - 1]?.fechaEnvio.slice(0, 10) !== messages[index]?.fechaEnvio.slice(0, 10);
   }
 
   loadMessages(requestId: string): void {

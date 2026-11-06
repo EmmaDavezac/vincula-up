@@ -1,13 +1,10 @@
-<div class="vu-confirm__overlay" (click)="cerrar()">
-	<section
+<ng-template #confirmDialog>
+	<div
 		class="vu-confirm__dialog"
 		[class.vu-confirm__dialog--danger]="peligro()"
-		role="alertdialog"
-		aria-modal="true"
-		[attr.aria-label]="titulo()"
-		(click)="$event.stopPropagation()"
+		[class.vu-confirm__dialog--cancel-primary]="cancelarPrimario()"
 	>
-		<header class="vu-confirm__head">
+		<header mat-dialog-title class="vu-confirm__head">
 			<span class="vu-confirm__icon" [class.vu-confirm__icon--danger]="peligro()">
 				<vu-icon [name]="icono()" [size]="20" />
 			</span>
@@ -17,29 +14,36 @@
 			</div>
 		</header>
 
+		<div mat-dialog-content class="vu-confirm__content">
 		@if (detalle()) {
 			<p class="vu-confirm__detail">{{ detalle() }}</p>
 		}
+		</div>
 
-		<footer class="vu-confirm__actions">
+		<footer mat-dialog-actions class="vu-confirm__actions">
 			<button
 				type="button"
-				class="vu-btn vu-btn--outline vu-confirm__cancel"
-				(click)="cancelado.emit()"
+				mat-button
+				class="vu-btn vu-confirm__cancel"
+				[class.vu-btn--outline]="!cancelarPrimario()"
+				[class.vu-btn--ink]="cancelarPrimario()"
+				(click)="cancelar()"
 				[disabled]="cargando()"
 			>
 				{{ textoCancelar() }}
 			</button>
 			<button
 				type="button"
-				class="vu-btn vu-btn--pill vu-confirm__accept"
-				[class.vu-btn--danger]="peligro()"
+				mat-flat-button
+				class="vu-btn vu-confirm__accept"
+				[class.vu-btn--danger]="peligro() && !cancelarPrimario()"
+				[class.vu-btn--outline]="peligro() && cancelarPrimario()"
 				[class.vu-btn--ink]="!peligro()"
-				(click)="confirmado.emit()"
+				(click)="confirmar()"
 				[disabled]="cargando()"
 			>
 				{{ cargando() ? 'Trabajando...' : textoConfirmar() }}
 			</button>
 		</footer>
-	</section>
-</div>
+	</div>
+</ng-template>

@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { AfterViewInit, Component, DestroyRef, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -7,17 +7,20 @@ import { ApiService, GpsPosition } from '../core/services/api.service';
 import { AuthService } from '../core/services/auth.service';
 import { DirectoryService } from '../core/services/directory.service';
 import { RequestService } from '../core/services/request.service';
-import { Professional } from '../core/models/professional';
+import { Professional, ProfessionalAvailability } from '../core/models/professional';
 import { emptyServiceRequest } from '../core/models/service-request';
 import { VuAvatar } from '../shared/avatar/avatar';
+import { VuConfirm } from '../shared/confirm/confirm';
 import { VuIcon } from '../shared/icon/icon';
-import { VuSkeletonList } from '../shared/skeleton-list/skeleton-list';
-
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { VuSpinner } from '../shared/spinner/spinner';
+import { ToastService } from '../core/services/toast.service';
 /**
  * Flujo de pasos del prototipo: ubicación → especialidad → día y horario →
  * elección del profesional (el envío cierra el flujo, sin formulario extra).
  */
-type Step = 'location' | 'specialty' | 'schedule' | 'professionals';
+type Step = 'location' | 'specialty' | 'problem' | 'day' | 'time' | 'professionals';
 
 
 interface PlaceSuggestion {
@@ -34,15 +37,12 @@ interface UserLocation {
   editing: boolean;
 }
 
-interface TempMapLocation {
-  lat: number;
-  lng: number;
-  displayName: string;
-}
+
 
 interface ProfWithDistance extends Professional {
   distanceKm: number | null;
 }
+
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
@@ -56,7 +56,7 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 }
 
 @Component({
-	imports: [CommonModule, FormsModule, RouterLink, DecimalPipe, VuAvatar, VuIcon, VuSkeletonList],
+  imports: [CommonModule, FormsModule, RouterLink, DecimalPipe, VuAvatar, VuConfirm, VuIcon, VuSpinner, MatProgressSpinnerModule, MatButtonToggleModule],
 	selector: 'app-request',
 	styleUrl: './request.css',
 	templateUrl: './request.html',
@@ -66,13 +66,23 @@ export class Request implements OnInit, AfterViewInit {
   private readonly requestService = inject(RequestService);
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
+  private readonly toast = inject(ToastService);
+  readonly specialtySearch = signal('');
+
+readonly filteredSpecialties = computed(() => {
+  const q = this.normalizarEspecialidad(this.specialtySearch());
+  const all = this.specialties();
+  return q ? all.filter((s) => this.normalizarEspecialidad(s).includes(q)) : all;
+});
 
   // ── Pasos ──────────────────────────────────────────────
   readonly step = signal<Step>('location');
   readonly steps: Array<{ key: Step; label: string; title: string }> = [
     { key: 'location', label: 'Ubicación', title: '¿Dónde necesitás el servicio?' },
     { key: 'specialty', label: 'Categoría', title: '¿Qué necesitás resolver?' },
-    { key: 'schedule', label: 'Día y horario', title: '¿Cuándo te viene bien?' },
+    { key: 'problem', label: 'Problema', title: 'Contanos qué necesitás resolver' },
+    { key: 'day', label: 'Día', title: '¿Qué día te viene bien?' },
+    { key: 'time', label: 'Horario', title: 'Elegí una franja horaria' },
     { key: 'professionals', label: 'Profesional', title: 'Elegí un profesional' },
   ];
 
@@ -93,10 +103,7 @@ export class Request implements OnInit, AfterViewInit {
   readonly locationSuggestions = signal<PlaceSuggestion[]>([]);
   readonly locationSuggestionOpen = signal(false);
   readonly locationSearching = signal(false);
-  readonly detectingGps = signal(false);
-  readonly locatorError = signal('');
   readonly pendingLocation = signal<PlaceSuggestion | null>(null);
-  readonly locationEditValue = signal('');
 
   readonly geolocationAvailable = signal<boolean | 'unknown'>('unknown');
   readonly geolocationPermission = signal<PermissionState | 'unknown'>('unknown');
@@ -106,12 +113,12 @@ export class Request implements OnInit, AfterViewInit {
   readonly address = signal('');
   readonly gpsPosition = signal<GpsPosition | null>(null);
   readonly gpsLoading = signal(false);
-  readonly gpsError = signal('');
+  readonly reverseGeocoding = signal(false);
 
   // ── Profesionales ──────────────────────────────────────
   readonly allProfessionals = signal<ProfWithDistance[]>([]);
   readonly loadingProfessionals = signal(true);
-  readonly professionalsError = signal('');
+  readonly loadingSpecialties = signal(true);
 
   /**
    * Catálogo completo de especialidades. Sin esto la lista del paso 2 salía de
@@ -120,6 +127,7 @@ export class Request implements OnInit, AfterViewInit {
    */
   readonly catalogoEspecialidades = signal<string[]>([]);
 
+  
   /** Especialidades de un profesional, con respaldo en su especialidad única. */
   private especialidadesDe(p: ProfWithDistance): string[] {
     const nombres = (p.especialidades ?? []).map((e) => e.nombre).filter((n): n is string => !!n && !!n.trim());
@@ -131,48 +139,25 @@ export class Request implements OnInit, AfterViewInit {
     return unica && unica !== 'Servicio técnico' ? [unica] : [];
   }
 
-  /**
-   * Especialidades que se ofrecen en el paso 2: el catálogo completo, para que
-   * se vean todas aunque todavía no haya técnicos para alguna.
-   */
+  /** Solo se ofrecen categorías que tienen al menos un profesional activo. */
   readonly specialties = computed(() => {
-    const catalogo = this.catalogoEspecialidades();
-    if (catalogo.length) {
-      return catalogo;
-    }
-    // Sin catálogo disponible se arma con lo que traen los profesionales.
-    const seen = new Set<string>();
-    const result: string[] = [];
-    for (const p of this.allProfessionals()) {
-      for (const s of this.especialidadesDe(p)) {
-        if (!seen.has(s)) {
-          seen.add(s);
-          result.push(s);
-        }
+    const disponibles = new Map<string, string>();
+    for (const professional of this.allProfessionals()) {
+      for (const name of this.especialidadesDe(professional)) {
+        disponibles.set(this.normalizarEspecialidad(name), name);
       }
     }
-    return result;
+    const catalogo = this.catalogoEspecialidades();
+    if (catalogo.length) {
+      return catalogo.filter((name) => disponibles.has(this.normalizarEspecialidad(name)));
+    }
+    return [...disponibles.values()].sort((a, b) => a.localeCompare(b, 'es'));
   });
 
   readonly selectedSpecialty = signal<string | null>(null);
 
-  /** Especialidades que cuentan con al menos un técnico activo. */
-  private readonly especialidadesConTecnicos = computed(() => {
-    const conTecnicos = new Set<string>();
-    for (const p of this.allProfessionals()) {
-      for (const n of this.especialidadesDe(p)) {
-        conTecnicos.add(n);
-      }
-    }
-    return conTecnicos;
-  });
-
-  /**
-   * Si la especialidad todavía no tiene técnicos lo aclara en el paso 2, para no
-   * elegirla a ciegas y frenar en el paso 4 sin opciones.
-   */
-  tieneTecnicos(specialty: string): boolean {
-    return this.especialidadesConTecnicos().has(specialty);
+  private normalizarEspecialidad(value: string): string {
+    return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('es');
   }
 
   /**
@@ -184,9 +169,14 @@ export class Request implements OnInit, AfterViewInit {
   readonly filteredProfessionals = computed(() => {
     const spec = this.selectedSpecialty();
     if (!spec) return [];
+    const especialidadSeleccionada = this.normalizarEspecialidad(spec);
     const byDistance = this.sortBy() === 'proximidad';
     return [...this.allProfessionals()]
-      .filter((p) => this.especialidadesDe(p).some((n) => n === spec))
+      .filter((p) => this.especialidadesDe(p).some((name) => this.normalizarEspecialidad(name) === especialidadSeleccionada))
+      .filter((p) => {
+  const franja = this.slotOptions.find((s) => s.id === this.selectedSlot());
+  return !this.selectedDay() || !franja || this.trabajaEn(p, this.selectedDay(), franja);
+})
       .sort((a, b) => {
         if (byDistance) {
           const distance = (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity);
@@ -205,18 +195,107 @@ export class Request implements OnInit, AfterViewInit {
   readonly date = signal('');
   readonly time = signal('');
   readonly submitted = signal(false);
-  readonly errorMessage = signal('');
+  readonly enviandoSolicitud = signal(false);
+  readonly bloqueo = computed<string | null>(() => {
+  if (this.enviandoSolicitud()) return 'Enviando tu solicitud…';
+  if (this.location().detecting) return 'Obteniendo tu ubicación…';
+  if (this.gpsLoading()) return 'Verificando la dirección…';
+  if (this.reverseGeocoding()) return 'Buscando la dirección del punto…';
+  return null;
+});
+  readonly confirmandoSalida = signal(false);
+  private resolverGuardSalida: ((permitir: boolean) => void) | null = null;
 
-  /** Días del prototipo (etiqueta corta y día de la semana real). */
-  readonly dayOptions: ReadonlyArray<{ id: string; label: string; weekday: number }> = [
-    { id: 'LUN', label: 'Lun', weekday: 1 },
-    { id: 'MAR', label: 'Mar', weekday: 2 },
-    { id: 'MIÉ', label: 'Mié', weekday: 3 },
-    { id: 'JUE', label: 'Jue', weekday: 4 },
-    { id: 'VIE', label: 'Vie', weekday: 5 },
-    { id: 'SÁB', label: 'Sáb', weekday: 6 },
-    { id: 'DOM', label: 'Dom', weekday: 0 },
-  ];
+private readonly destroyRef = inject(DestroyRef);
+private readonly ahora = signal(new Date());
+private readonly MIN_ANTICIPACION_MIN = 60;
+readonly DIAS_VISIBLES = 14;
+
+private aMinutos(hhmm: string): number {
+  const [h, m] = (hhmm ?? '').split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+private idDeFecha(d: Date): string {
+  return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, '0')}-${`${d.getDate()}`.padStart(2, '0')}`;
+}
+
+private fechaDeId(id: string): Date {
+  const [y, m, d] = id.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/** Devuelve 0=domingo ... 6=sábado, como Date.getDay(). */
+private indiceDia(valor: number | string): number {
+  if (typeof valor === 'number') return valor === 7 ? 0 : valor;
+  const nombres = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+  const ingles = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const v = valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+  const i = nombres.indexOf(v);
+  return i >= 0 ? i : ingles.indexOf(v);
+}
+
+private horariosDe(p: ProfWithDistance): ProfessionalAvailability[] {
+  return p.horarios ?? [];
+}
+
+private trabajaEn(p: ProfWithDistance, dayId: string, slot: { start: string; end: string }): boolean {
+  const horarios = this.horariosDe(p);
+  const dow = this.fechaDeId(dayId).getDay();
+  const ini = this.aMinutos(slot.start);
+  const fin = this.aMinutos(slot.end);
+  return horarios.some((h) => {
+    if (this.indiceDia(h.diaSemana) !== dow) return false;
+    return ini >= this.aMinutos(h.horaInicio) && fin <= this.aMinutos(h.horaFin);
+  });
+}
+
+private franjaVigente(dayId: string, slot: { start: string }): boolean {
+  const ahora = this.ahora();
+  const hoy = this.idDeFecha(ahora);
+  if (dayId > hoy) return true;
+  if (dayId < hoy) return false;
+  return this.aMinutos(slot.start) >= ahora.getHours() * 60 + ahora.getMinutes() + this.MIN_ANTICIPACION_MIN;
+}
+
+private profesionalesDe(spec: string | null): ProfWithDistance[] {
+  if (!spec) return this.allProfessionals();
+  const objetivo = this.normalizarEspecialidad(spec);
+  return this.allProfessionals().filter((p) =>
+    this.especialidadesDe(p).some((n) => this.normalizarEspecialidad(n) === objetivo),
+  );
+}
+
+private franjaDisponible(dayId: string, slot: { start: string; end: string }): boolean {
+  if (!this.franjaVigente(dayId, slot)) return false;
+  if (this.loadingProfessionals()) return true;
+  const profs = this.profesionalesDe(this.selectedSpecialty());
+  return profs.some((p) => this.trabajaEn(p, dayId, slot));
+}
+
+/** Dos semanas; los días sin ninguna franja disponible quedan deshabilitados. */
+readonly dayOptions = computed(() => {
+  this.ahora(); this.allProfessionals(); this.selectedSpecialty(); // dependencias
+  const today = new Date();
+  return Array.from({ length: this.DIAS_VISIBLES }, (_, offset) => {
+    const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offset);
+    const id = this.idDeFecha(date);
+    const weekday = date.toLocaleDateString('es-AR', { weekday: 'short' }).replace(/\.$/, '');
+    return {
+      id,
+      label: offset === 0 ? 'Hoy' : `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}`,
+      monthDay: date.getDate(),
+      disabled: !this.slotOptions.some((s) => this.franjaDisponible(id, s)),
+    };
+  });
+});
+
+/** Franjas del día elegido, con las no disponibles marcadas. */
+readonly slotsDisponibles = computed(() => {
+  this.ahora(); this.allProfessionals(); this.selectedSpecialty();
+  const day = this.selectedDay();
+  return this.slotOptions.map((s) => ({ ...s, disabled: !day || !this.franjaDisponible(day, s) }));
+});
 
   /** Franjas horarias del prototipo: el turno siempre es un rango. */
   readonly slotOptions: ReadonlyArray<{ id: string; label: string; start: string; end: string }> = [
@@ -230,28 +309,27 @@ export class Request implements OnInit, AfterViewInit {
   /** Fin de la franja elegida: junto con `time` forma el rango del turno. */
   readonly timeEnd = signal('');
 
-  elegirDia(id: string): void {
-    this.selectedDay.set(id);
-    this.date.set(this.proximaFecha(this.dayOptions.find((day) => day.id === id)?.weekday ?? 1));
+elegirDia(id: string): void {
+  if (this.selectedDay() === id) return;
+  this.selectedDay.set(id);
+  this.date.set(id);
+  // Si la franja ya elegida no existe ese día, se limpia.
+  const franja = this.slotOptions.find((s) => s.id === this.selectedSlot());
+  if (franja && !this.franjaDisponible(id, franja)) {
+    this.selectedSlot.set('');
+    this.time.set('');
+    this.timeEnd.set('');
   }
+  this.selectedProfessional.set(null);
+}
 
-  elegirHorario(id: string): void {
-    const franja = this.slotOptions.find((slot) => slot.id === id);
-    this.selectedSlot.set(id);
-    this.time.set(franja?.start ?? '');
-    this.timeEnd.set(franja?.end ?? '');
-  }
-
-  /** Próxima fecha (YYYY-MM-DD) del día de la semana elegido, contando desde hoy. */
-  private proximaFecha(weekday: number): string {
-    const today = new Date();
-    const diff = (weekday - today.getDay() + 7) % 7;
-    const target = new Date(today);
-    target.setDate(today.getDate() + diff);
-    const month = `${target.getMonth() + 1}`.padStart(2, '0');
-    const day = `${target.getDate()}`.padStart(2, '0');
-    return `${target.getFullYear()}-${month}-${day}`;
-  }
+elegirHorario(id: string): void {
+  const franja = this.slotOptions.find((slot) => slot.id === id);
+  this.selectedSlot.set(id);
+  this.time.set(franja?.start ?? '');
+  this.timeEnd.set(franja?.end ?? '');
+  this.selectedProfessional.set(null);
+}
 
   /** Etiqueta de la franja elegida (para el resumen del turno). */
   get selectedSlotLabel(): string {
@@ -267,12 +345,12 @@ export class Request implements OnInit, AfterViewInit {
     if (!year || !month || !day) {
       return this.date();
     }
-    const value = new Date(year, month - 1, day);
-    const texto = value.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
-    return texto.charAt(0).toUpperCase() + texto.slice(1);
+    return `${`${day}`.padStart(2, '0')}/${`${month}`.padStart(2, '0')}/${`${year}`.slice(-2)}`;
   }
 
   constructor() {
+    const timer = setInterval(() => this.ahora.set(new Date()), 60_000);
+this.destroyRef.onDestroy(() => clearInterval(timer));
     this.loadAllProfessionals();
     this.loadCatalogoEspecialidades();
 
@@ -318,9 +396,7 @@ export class Request implements OnInit, AfterViewInit {
   onLocationQueryChange(value: string): void {
     this.locationQuery.set(value);
     const q = value.trim();
-    if (q.length > 0) {
-      this.locatorError.set('');
-    }
+    
     if (q.length < 4) {
       this.locationSuggestions.set([]);
       this.locationSuggestionOpen.set(false);
@@ -341,7 +417,7 @@ export class Request implements OnInit, AfterViewInit {
     }
     this.suggestionTimer = setTimeout(() => {
       void this.searchLocationSuggestions(q);
-    }, 500);
+    }, 1000);
   }
 
   private async searchLocationSuggestions(query: string): Promise<void> {
@@ -351,6 +427,9 @@ export class Request implements OnInit, AfterViewInit {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=6&accept-language=es`,
       );
+      if (!res.ok) {
+        throw new Error(`Map search failed with status ${res.status}`);
+      }
       const data = (await res.json()) as Array<{ lat: string; lon: string; display_name: string }>;
       const sugerencias = (Array.isArray(data) ? data : []).map((item) => ({
         lat: parseFloat(item.lat),
@@ -413,123 +492,88 @@ export class Request implements OnInit, AfterViewInit {
       })
     );
     this.updateDistances(lat, lng);
-    this.locatorError.set('');
   }
 
-  startEditLocation(): void {
-    const loc = this.location();
-    this.locationEditValue.set(loc.displayName);
-    this.location.set({ ...loc, editing: true, detecting: false });
-    setTimeout(() => {
-      const input = document.getElementById('loc-input') as HTMLInputElement | null;
-      input?.focus();
-      input?.select();
-    }, 50);
-  }
 
-  confirmEditLocation(): void {
-    const value = this.locationEditValue().trim();
-    if (!value) {
-      this.locatorError.set('Escribí una dirección válida.');
-      return;
-    }
-    this.gpsLoading.set(true);
-    this.gpsError.set('');
-    this.locatorError.set('');
-    this.api.getGpsPosition(value).pipe(
-      catchError((error) => {
-        this.gpsError.set(this.api.describeError(error, 'No pudimos verificar esa dirección. Probá con el mapa.'));
-        this.gpsLoading.set(false);
-        return of(null);
-      })
-    ).subscribe((pos) => {
-      this.gpsLoading.set(false);
-      if (!pos) return;
-      this.gpsPosition.set(pos);
-      if (pos.resolved === false) {
-        this.gpsError.set(pos.error || 'No se pudo verificar la dirección. Probá con el mapa interactivo.');
-        return;
-      }
-      const lat = (pos.latitude ?? pos.latitud) ?? null;
-      const lng = (pos.longitude ?? pos.longitud) ?? null;
-      const displayName = pos.address || value;
-      if (lat == null || lng == null) {
-        this.gpsError.set(pos.error || 'No se obtuvieron coordenadas. Probá con el mapa interactivo.');
-        return;
-      }
-      this.location.set({ lat, lng, displayName, editing: false, detecting: false });
-      this.address.set(displayName);
-      this.locationQuery.set(displayName);
-      this.pendingLocation.set({ lat, lng, displayName });
-      this.form.update((f) =>
-        emptyServiceRequest({
-          ...f,
-          address: displayName,
-          latitude: lat,
-          longitude: lng,
-        })
-      );
-      this.updateDistances(lat, lng);
-    });
-  }
 
-  cancelEditLocation(): void {
-    const loc = this.location();
-    this.location.set({ ...loc, editing: false });
-  }
+
+
+
 
   retryDetectLocation(): void {
-    if (!('geolocation' in navigator)) {
-      this.locatorError.set('Tu navegador no permite acceder a la ubicación del dispositivo.');
+    if (typeof window !== 'undefined' && !window.isSecureContext && window.location.hostname !== 'localhost') {
+      this.toast.error('El navegador solo permite compartir la ubicación en una conexión segura. Usá HTTPS o ingresá la dirección manualmente.');
+      return;
+    }
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      this.toast.error('Este navegador no ofrece geolocalización. Escribí una dirección para continuar.');
       return;
     }
     this.location.set({ ...this.location(), detecting: true, editing: false });
-    this.locatorError.set('');
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        const name = await this.reverseGeocode(latitude, longitude);
-        this.location.set({ lat: latitude, lng: longitude, displayName: name, detecting: false, editing: false });
-        this.address.set(name);
-        this.locationQuery.set(name);
-        this.pendingLocation.set({ lat: latitude, lng: longitude, displayName: name });
-        this.form.update((f) =>
-          emptyServiceRequest({
-            ...f,
-            address: name,
-            latitude,
-            longitude,
-          })
-        );
-        this.updateDistances(latitude, longitude);
-        this.locatorError.set('');
-      },
-      () => {
-        this.location.set({ ...this.location(), detecting: false });
-        this.locatorError.set('No pudimos detectar tu ubicación. Escribí la dirección manualmente o usá el mapa.');
-      },
-      { timeout: 10000, maximumAge: 60000, enableHighAccuracy: true },
-    );
+    try {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          const name = await this.reverseGeocode(latitude, longitude);
+          this.aplicarUbicacionDetectada(latitude, longitude, name);
+        },
+        (error) => {
+          if (error.code === error.TIMEOUT || error.code === error.POSITION_UNAVAILABLE) {
+            navigator.geolocation.getCurrentPosition(
+              async (position) => {
+                const { latitude, longitude } = position.coords;
+                const name = await this.reverseGeocode(latitude, longitude);
+                this.aplicarUbicacionDetectada(latitude, longitude, name);
+              },
+              (fallbackError) => {
+                this.location.set({ ...this.location(), detecting: false });
+                this.toast.error(this.mensajeErrorGeolocalizacion(fallbackError));
+              },
+              { timeout: 25000, maximumAge: 300000, enableHighAccuracy: false },
+            );
+            return;
+          }
+          this.location.set({ ...this.location(), detecting: false });
+          this.toast.error(this.mensajeErrorGeolocalizacion(error));
+        },
+        { timeout: 12000, maximumAge: 300000, enableHighAccuracy: false },
+      );
+    } catch {
+      this.location.set({ ...this.location(), detecting: false });
+      this.toast.error('El navegador no pudo iniciar la geolocalización. Ingresá la dirección manualmente.');
+    }
   }
 
-  canConfirmLocation(): boolean {
-    const pending = this.pendingLocation();
-    if (pending) return true;
-    const loc = this.location();
-    return loc.lat != null && loc.lng != null && loc.displayName.length > 0;
+  private aplicarUbicacionDetectada(latitude: number, longitude: number, name: string): void {
+    this.location.set({ lat: latitude, lng: longitude, displayName: name, detecting: false, editing: false });
+    this.address.set(name);
+    this.locationQuery.set(name);
+    this.pendingLocation.set({ lat: latitude, lng: longitude, displayName: name });
+    this.form.update((current) => emptyServiceRequest({ ...current, address: name, latitude, longitude }));
+    this.updateDistances(latitude, longitude);
   }
+
+  private mensajeErrorGeolocalizacion(error: GeolocationPositionError): string {
+    if (error.code === error.PERMISSION_DENIED) {
+      return 'No tenemos permiso para usar tu ubicación. Habilitalo en el navegador o ingresá la dirección manualmente.';
+    }
+    if (error.code === error.TIMEOUT) {
+      return 'La PC no respondió con una ubicación a tiempo. Revisá el permiso del navegador o ingresá la dirección manualmente.';
+    }
+    return 'La PC no pudo determinar una ubicación (GPS, Wi-Fi o red). Permití el acceso a la ubicación o ingresá la dirección manualmente.';
+  }
+
 
   confirmLocationFromQuery(): void {
     const q = this.locationQuery().trim();
     if (q.length < 4) {
-      this.locatorError.set('Escribí al menos 4 caracteres para buscar la dirección.');
+      this.toast.error('Escribí al menos 4 caracteres para buscar la dirección.');
       return;
     }
-    this.locatorError.set('');
     this.gpsLoading.set(true);
     this.api.getGpsPosition(q).pipe(
       catchError((error) => {
-        this.locatorError.set(this.api.describeError(error, 'No pudimos verificar esa dirección. Probá con otras palabras o usá el mapa.'));
+        this.toast.error(this.api.describeError(error, 'No pudimos verificar esa dirección. Probá con otras palabras o usá el mapa.'));
         this.gpsLoading.set(false);
         return of(null);
       })
@@ -539,14 +583,14 @@ export class Request implements OnInit, AfterViewInit {
       this.gpsPosition.set(pos);
       this.locationSuggestionOpen.set(false);
       if (pos.resolved === false) {
-        this.locatorError.set(pos.error || 'No se pudieron obtener coordenadas. Probá con el mapa interactivo.');
+        this.toast.error(pos.error || 'No se pudieron obtener coordenadas. Probá con el mapa interactivo.');
         return;
       }
       const lat = (pos.latitude ?? pos.latitud) ?? null;
       const lng = (pos.longitude ?? pos.longitud) ?? null;
       const displayName = pos.address || q;
       if (lat == null || lng == null) {
-        this.locatorError.set(pos.error || 'No se obtuvieron coordenadas para esa dirección. Probá con el mapa interactivo.');
+        this.toast.error(pos.error || 'No se obtuvieron coordenadas para esa dirección. Probá con el mapa interactivo.');
         return;
       }
       this.location.set({ lat, lng, displayName, detecting: false, editing: false });
@@ -595,20 +639,7 @@ export class Request implements OnInit, AfterViewInit {
     }
   }
 
-  goToLocationStep(): void {
-    const current = this.location();
-    this.pendingLocation.set(
-      current.lat != null && current.lng != null && current.displayName
-        ? { lat: current.lat, lng: current.lng, displayName: current.displayName }
-        : null);
-    if (current.displayName) {
-      this.locationQuery.set(current.displayName);
-      this.address.set(current.displayName);
-    }
-    this.step.set('location');
-    // Vuelve al paso 1: el mapa se refresca para mostrar el punto actual.
-    this.onCambioDePaso();
-  }
+
 
   /**
    * Mapa del paso 1. Va embebido en la pantalla (no en un modal ni en un servicio
@@ -620,7 +651,7 @@ export class Request implements OnInit, AfterViewInit {
   private marcador: any = null;
   private mapaIntentos = 0;
 
-  /** Centro por defecto: Concepción del Uruguay, hasta que seija un punto. */
+  // Centro por defecto: Concepción del Uruguay
   private readonly centroPorDefecto = { lat: -32.4844, lng: -58.2328 };
 
   async ngAfterViewInit(): Promise<void> {
@@ -642,6 +673,10 @@ export class Request implements OnInit, AfterViewInit {
     const loc = this.location();
     const lat = loc.lat ?? this.centroPorDefecto.lat;
     const lng = loc.lng ?? this.centroPorDefecto.lng;
+
+    if (this.mapaInstancia && this.mapaInstancia.getContainer() !== container) {
+      this.destruirMapa();
+    }
 
     if (!this.mapaInstancia) {
       this.mapaInstancia = L.map('mapa-paso', { scrollWheelZoom: false }).setView([lat, lng], 15);
@@ -681,13 +716,32 @@ export class Request implements OnInit, AfterViewInit {
       emptyServiceRequest({ ...f, address: nombre, latitude: lat, longitude: lng }),
     );
     this.updateDistances(lat, lng);
-    this.gpsError.set('');
-    this.locatorError.set('');
   }
 
   /** El mapa del paso 1 acompaña a la pantalla mientras se está en él. */
   onCambioDePaso(): void {
     if (this.step() === 'location') {
+      setTimeout(() => void this.inicializarMapa(), 80);
+    }
+  }
+
+  private destruirMapa(): void {
+    this.mapaInstancia?.remove();
+    this.mapaInstancia = null;
+    this.marcador = null;
+    this.mapaListo.set(false);
+    this.mapaIntentos = 0;
+  }
+
+  private cambiarPaso(next: Step): void {
+      if (this.step() === next) return;
+      this.toast.clear();
+    if (this.step() === 'location') {
+      this.destruirMapa();
+    }
+    this.ahora.set(new Date());
+    this.step.set(next);
+    if (next === 'location') {
       setTimeout(() => void this.inicializarMapa(), 80);
     }
   }
@@ -713,31 +767,23 @@ export class Request implements OnInit, AfterViewInit {
     switch (this.step()) {
       case 'location': {
         const faltan: string[] = [];
-        if (!this.location().lat || !this.location().lng) {
+        if (this.location().lat == null || this.location().lng == null) {
           faltan.push('la dirección donde necesitás el servicio');
         }
         return faltan;
       }
       case 'specialty': {
-        const faltan: string[] = [];
-        if (!this.selectedSpecialty()) {
-          faltan.push('la especialidad');
-        }
-        if (!this.resumenValido()) {
-          faltan.push(`el resumen del problema (mínimo ${this.MIN_SUMMARY_LENGTH} caracteres)`);
-        }
-        return faltan;
+        return this.selectedSpecialty() ? [] : ['la categoría'];
       }
-      case 'schedule': {
-        const faltan: string[] = [];
-        if (!this.selectedDay()) {
-          faltan.push('el día');
-        }
-        if (!this.selectedSlot()) {
-          faltan.push('el horario');
-        }
-        return faltan;
-      }
+      case 'problem':
+        return this.resumenValido() ? [] : [`el resumen del problema (mínimo ${this.MIN_SUMMARY_LENGTH} caracteres)`];
+      case 'day':
+        return this.selectedDay() ? [] : ['el día'];
+      case 'time': {
+	const franja = this.slotOptions.find((s) => s.id === this.selectedSlot());
+	if (!franja) return ['el horario'];
+	return this.franjaDisponible(this.selectedDay(), franja) ? [] : ['un horario disponible'];
+}
       case 'professionals':
         return this.selectedProfessional() ? [] : ['el profesional que te atienda'];
       default:
@@ -762,29 +808,65 @@ export class Request implements OnInit, AfterViewInit {
   get canContinue(): boolean {
     switch (this.step()) {
       case 'location':
-        return Boolean(this.address().trim());
+        return Boolean(this.address().trim()) && this.location().lat != null && this.location().lng != null;
       case 'specialty':
-        // La categoría sola no alcanza: hay que describir el problema.
-        return Boolean(this.selectedSpecialty()) && this.resumenValido();
-      case 'schedule':
-        return Boolean(this.selectedDay() && this.selectedSlot());
+        return Boolean(this.selectedSpecialty());
+      case 'problem':
+        return this.resumenValido();
+      case 'day':
+        return Boolean(this.selectedDay());
+      case 'time': {
+  const franja = this.slotOptions.find((s) => s.id === this.selectedSlot());
+  return Boolean(franja) && this.franjaDisponible(this.selectedDay(), franja!);
+}
       case 'professionals':
         return Boolean(this.selectedProfessional());
       default:
         return false;
     }
   }
+/**
+ * Al cambiar de especialidad puede que el día o la franja ya elegidos no
+ * tengan profesionales disponibles: en ese caso se limpian para que el
+ * usuario vuelva a elegir.
+ */
+private revalidarTurno(): void {
+  const dia = this.selectedDay();
+  if (!dia) return;
+
+  // Si ese día ya no tiene ninguna franja disponible, se limpia todo el turno.
+  if (!this.slotOptions.some((s) => this.franjaDisponible(dia, s))) {
+    this.selectedDay.set('');
+    this.date.set('');
+    this.selectedSlot.set('');
+    this.time.set('');
+    this.timeEnd.set('');
+    return;
+  }
+
+  // El día sigue sirviendo, pero la franja elegida puede no estar disponible.
+  const franja = this.slotOptions.find((s) => s.id === this.selectedSlot());
+  if (franja && !this.franjaDisponible(dia, franja)) {
+    this.selectedSlot.set('');
+    this.time.set('');
+    this.timeEnd.set('');
+  }
+}
 
   selectSpecialty(specialty: string): void {
     this.selectedSpecialty.set(specialty);
     // Puede cambiar la lista de profesionales: se limpia la elección anterior.
     this.selectedProfessional.set(null);
+    this.revalidarTurno();
   }
 
   /** Vuelve al paso 2 para elegir otra especialidad. */
   goToSpecialtyStep(): void {
-    this.step.set('specialty');
+    this.cambiarPaso('specialty');
   }
+  goToDayStep(): void {
+  this.cambiarPaso('day');
+}
 
   selectProfessional(prof: ProfWithDistance): void {
     this.selectedProfessional.set(prof);
@@ -807,7 +889,7 @@ export class Request implements OnInit, AfterViewInit {
     const index = this.pasoActual - 1;
     const next = this.steps[index + 1];
     if (next) {
-      this.step.set(next.key);
+      this.cambiarPaso(next.key);
     }
   }
 
@@ -815,8 +897,24 @@ export class Request implements OnInit, AfterViewInit {
     const index = this.pasoActual - 1;
     const previous = this.steps[index - 1];
     if (previous) {
-      this.step.set(previous.key);
+      this.cambiarPaso(previous.key);
     }
+  }
+
+  confirmarSalidaPendiente(): boolean | Promise<boolean> {
+   if (this.submitted()) return true;
+  if (this.enviandoSolicitud()) return false;
+    this.confirmandoSalida.set(true);
+    return new Promise((resolve) => {
+      this.resolverGuardSalida = resolve;
+    });
+  }
+
+  resolverConfirmacionSalida(permitir: boolean): void {
+    this.confirmandoSalida.set(false);
+    const resolver = this.resolverGuardSalida;
+    this.resolverGuardSalida = null;
+    resolver?.(permitir);
   }
 
   // ── Envío del formulario ───────────────────────────────
@@ -824,46 +922,50 @@ export class Request implements OnInit, AfterViewInit {
   submit(): void {
     const prof = this.selectedProfessional();
     if (!prof) return;
-    this.errorMessage.set('');
 
     if (!this.date()) {
-      this.errorMessage.set('Elegí una fecha para la visita.');
+      this.toast.error('Elegí una fecha para la visita.');
+      this.cambiarPaso('day');
       return;
     }
     if (!this.time()) {
-      this.errorMessage.set('Elegí un horario aproximado.');
+      this.toast.error('Elegí un horario aproximado.');
+      this.cambiarPaso('time');
       return;
     }
+    const franja = this.slotOptions.find((s) => s.id === this.selectedSlot());
+if (!franja || !this.franjaDisponible(this.date(), franja) || !this.trabajaEn(prof, this.date(), franja)) {
+	this.toast.error('Ese turno ya no está disponible. Elegí otro día u horario.');
+	this.cambiarPaso('time');
+	return;
+}
     if (!this.address().trim()) {
-      this.errorMessage.set('Escribí una dirección antes de enviar la solicitud.');
+      this.toast.error('Escribí una dirección antes de enviar la solicitud.');
+      this.cambiarPaso('location');
       return;
     }
 
     const loc = this.location();
     if (loc.lat == null || loc.lng == null) {
       this.gpsLoading.set(true);
-      this.gpsError.set('');
-      this.errorMessage.set('');
       this.api.getGpsPosition(this.address()).pipe(
         catchError((error) => {
-          this.gpsLoading.set(false);
-          this.gpsError.set(this.api.describeError(error, 'No se pudo verificar automáticamente la dirección. Verificala manualmente con el botón correspondiente.'));
-          this.errorMessage.set('No se pudieron obtener coordenadas para esta dirección. Tocá "Verificar coordenadas" o ajustala en el mapa.');
-          return of(null);
-        })
+  this.gpsLoading.set(false);
+  this.toast.error(this.api.describeError(error, 'No se pudieron obtener coordenadas para esta dirección. Ajustala en el mapa o probá con otra dirección.'));
+  return of(null);
+})
       ).subscribe((pos) => {
         this.gpsLoading.set(false);
         if (!pos) return;
         this.gpsPosition.set(pos);
         if (pos.resolved === false) {
-          this.gpsError.set(pos.error || 'No se pudo verificar la dirección.');
-          this.errorMessage.set(pos.error || 'No se pudieron obtener coordenadas. Verificá la dirección o ajustala en el mapa.');
+          this.toast.error(pos.error || 'No se pudieron obtener coordenadas. Verificá la dirección o ajustala en el mapa.');
           return;
         }
         const lat = (pos.latitude ?? pos.latitud) ?? null;
         const lng = (pos.longitude ?? pos.longitud) ?? null;
         if (lat == null || lng == null) {
-          this.errorMessage.set(pos.error || 'No se obtuvieron coordenadas válidas.');
+          this.toast.error(pos.error || 'No se obtuvieron coordenadas válidas.');
           return;
         }
         const displayName = pos.address || this.address();
@@ -892,11 +994,20 @@ export class Request implements OnInit, AfterViewInit {
     return uuidRegex.test(value);
   }
 
-  private resolveEspecialidadId(prof: ProfWithDistance): string | null {
-    const direct = prof.especialidades?.[0]?.id;
-    if (direct && this.isValidUuid(direct)) return direct;
+ private resolveEspecialidadId(prof: ProfWithDistance): string | null {
+  const elegida = this.selectedSpecialty();
+  if (elegida) {
+    const objetivo = this.normalizarEspecialidad(elegida);
+    const match = prof.especialidades?.find(
+      (e) => this.normalizarEspecialidad(e.nombre) === objetivo,
+    );
+    if (match && this.isValidUuid(match.id)) return match.id;
+  }
 
-    const specName = (prof.specialty ?? '').trim().toLowerCase();
+  const direct = prof.especialidades?.[0]?.id;
+  if (direct && this.isValidUuid(direct)) return direct;
+
+  const specName = (elegida ?? prof.specialty ?? '').trim().toLowerCase();
     const known: Record<string, string> = {
       'electricidad domiciliaria': '33333333-3333-3333-3333-333333333333',
       'plomería y gas': '66666666-6666-6666-6666-666666666666',
@@ -917,26 +1028,26 @@ export class Request implements OnInit, AfterViewInit {
 
     // Última barrera: aunque se llegara al envío sin resumen, no sale.
     if (!this.resumenValido()) {
-      this.errorMessage.set('Contanos brevemente el problema para que el profesional pueda venir preparado.');
-      this.step.set('specialty');
+      this.toast.error('Contanos brevemente el problema para que el profesional pueda venir preparado.');
+      this.cambiarPaso('problem');
       return;
     }
 
     const clienteId = this.auth.currentUser()?.id;
     if (!clienteId || !this.isValidUuid(clienteId)) {
-      this.errorMessage.set('Necesitás iniciar sesión antes de enviar la solicitud.');
+      this.toast.error('Necesitás iniciar sesión antes de enviar la solicitud.');
       return;
     }
 
     const profesionalId = prof.usuarioId ?? prof.id;
     if (!this.isValidUuid(profesionalId)) {
-      this.errorMessage.set('El profesional seleccionado no tiene un identificador válido. Volvé a elegir un profesional.');
+      this.toast.error('El profesional seleccionado no tiene un identificador válido. Volvé a elegir un profesional.');
       return;
     }
 
     const especialidadId = this.resolveEspecialidadId(prof);
     if (!especialidadId) {
-      this.errorMessage.set('No se pudo determinar la especialidad del profesional. Elegí otra categoría o profesional.');
+      this.toast.error('No se pudo determinar la especialidad del profesional. Elegí otra categoría o profesional.');
       return;
     }
 
@@ -952,12 +1063,15 @@ export class Request implements OnInit, AfterViewInit {
       descripcion: this.problemSummary().trim(),
     };
 
+    this.enviandoSolicitud.set(true);
     this.api.createRequest(payload).pipe(
       catchError((error) => {
-        this.errorMessage.set(this.api.describeError(error, 'No se pudo enviar la solicitud.'));
+        this.enviandoSolicitud.set(false);
+        this.toast.error(this.api.describeError(error, 'No se pudo enviar la solicitud.'));
         return of(null);
       })
     ).subscribe((created) => {
+      this.enviandoSolicitud.set(false);
       if (!created) return;
       this.requestService.create({
         professionalId: prof.id,
@@ -973,78 +1087,16 @@ export class Request implements OnInit, AfterViewInit {
     });
   }
 
-  /**
-   * Verifica la dirección por texto contra el endpoint GPS del backend
-   * (estilo MercadoLibre): el server geocodifica la calle y devuelve las
-   * coordenadas + dirección canónica que se usan para la solicitud.
-   */
-  lookupGps(): void {
-    const query = this.address().trim();
-    if (!query) {
-      this.gpsError.set('Escribí una dirección para verificarla.');
-      return;
-    }
-    this.gpsLoading.set(true);
-    this.gpsError.set('');
-    this.api.getGpsPosition(query).pipe(
-      catchError((error) => {
-        this.gpsError.set(this.api.describeError(error, 'No pudimos verificar esa dirección. Probá con el mapa.'));
-        this.gpsLoading.set(false);
-        return of(null);
-      })
-    ).subscribe((pos) => {
-      this.gpsLoading.set(false);
-      if (!pos) return;
-      this.gpsPosition.set(pos);
-      if (pos.resolved === false) {
-        this.gpsError.set(pos.error || 'No se pudo verificar la dirección. Probá con el mapa interactivo.');
-        return;
-      }
-      const lat = (pos.latitude ?? pos.latitud) ?? null;
-      const lng = (pos.longitude ?? pos.longitud) ?? null;
-      const displayName = pos.address || query;
-      if (lat == null || lng == null) {
-        this.gpsError.set(pos.error || 'No se obtuvieron coordenadas. Probá con el mapa interactivo.');
-        return;
-      }
-      this.address.set(displayName);
-      this.location.set({ lat, lng, displayName, detecting: false, editing: false });
-      this.form.update((f) =>
-        emptyServiceRequest({
-          ...f,
-          address: displayName,
-          latitude: lat,
-          longitude: lng,
-        })
-      );
-      this.updateDistances(lat, lng);
-      this.gpsError.set('');
-    });
-  }
 
-  /** Devuelve un emoji representativo para cada tipo de especialidad */
-  specialtyIcon(specialty: string): string {
-    const s = specialty.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    if (s.includes('electric')) return '⚡';
-    if (s.includes('plomer') || s.includes('sanitari')) return '🔧';
-    if (s.includes('gas')) return '🔥';
-    if (s.includes('refrig') || s.includes('aire') || s.includes('frio')) return '❄️';
-    if (s.includes('electrod') || s.includes('reparaci')) return '🛠️';
-    if (s.includes('pintur')) return '🎨';
-    if (s.includes('carpint') || s.includes('madera')) return '🪚';
-    if (s.includes('albanil') || s.includes('construc') || s.includes('mampost')) return '🏗️';
-    if (s.includes('jardin') || s.includes('paisaj')) return '🌿';
-    if (s.includes('segur') || s.includes('alarm') || s.includes('camara')) return '🔒';
-    if (s.includes('cerraj')) return '🗝️';
-    return '🔨';
-  }
+
+
 
   // ── Privados ───────────────────────────────────────────
 
   private loadAllProfessionals(): void {
     this.directoryService.loadProfessionals().pipe(
       catchError(() => {
-        this.professionalsError.set('No se pudieron cargar los profesionales. Intentá nuevamente más tarde.');
+        this.toast.error('No se pudieron cargar los profesionales. Intentá nuevamente más tarde.');
         return of([]);
       }),
     ).subscribe((profs) => {
@@ -1073,6 +1125,7 @@ export class Request implements OnInit, AfterViewInit {
         .map((n) => (n ?? '').trim())
         .filter((n) => n.length > 0);
       this.catalogoEspecialidades.set([...new Set(nombres)].sort((a, b) => a.localeCompare(b, 'es')));
+      this.loadingSpecialties.set(false);
     });
   }
 
@@ -1086,18 +1139,29 @@ export class Request implements OnInit, AfterViewInit {
             : null,
       })),
     );
+  const sel = this.selectedProfessional();
+  if (sel) {
+    this.selectedProfessional.set(this.allProfessionals().find((p) => p.id === sel.id) ?? null);
+  }
+    
   }
 
   /** Geocodificación inversa usando Nominatim (OpenStreetMap, gratuito) */
   private async reverseGeocode(lat: number, lng: number): Promise<string> {
+    this.reverseGeocoding.set(true);
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=es`,
       );
+      if (!res.ok) {
+        throw new Error('No se pudo consultar el servicio de mapas.');
+      }
       const data = (await res.json()) as { display_name?: string };
       return data.display_name || 'Tu ubicación';
     } catch {
       return 'Tu ubicación';
+    } finally {
+      this.reverseGeocoding.set(false);
     }
   }
 }

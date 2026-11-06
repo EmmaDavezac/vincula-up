@@ -31,8 +31,7 @@
 
 	<div class="admin-category-new__actions">
 		<a class="vu-btn vu-btn--quiet" routerLink="/admin/categorias">Cancelar</a>
-		<button type="submit" class="vu-btn vu-btn--ink vu-btn--pill" [disabled]="busy() || loading()">
-			<vu-icon name="check" [size]="16" />
+		<button type="submit" class="vu-btn vu-btn--ink" [disabled]="busy() || loading()">
 			{{ busy() ? 'Guardando...' : 'Guardar' }}
 		</button>
 	</div>

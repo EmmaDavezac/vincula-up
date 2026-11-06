@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, TemplateRef, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { catchError, forkJoin, map, of } from 'rxjs';
@@ -20,6 +20,9 @@ import {
 	nombreCompleto,
 } from '../../core/models/admin';
 import { ApiService } from '../../core/services/api.service';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MatButtonModule } from '@angular/material/button';
+import { MatListModule } from '@angular/material/list';
 import { VuAvatar } from '../../shared/avatar/avatar';
 import { VuConfirm } from '../../shared/confirm/confirm';
 import { VuIcon } from '../../shared/icon/icon';
@@ -35,13 +38,16 @@ type ModalModo = 'consulta' | 'edicion';
  */
 @Component({
 	selector: 'app-admin-professionals',
-	imports: [FormsModule, RouterLink, VuAvatar, VuConfirm, VuIcon, VuSkeletonList],
+	imports: [FormsModule, RouterLink, MatButtonModule, MatListModule, VuAvatar, VuConfirm, VuIcon, VuSkeletonList],
 	templateUrl: './admin-professionals.html',
 	styleUrl: './admin-professionals.css',
 })
 export class AdminProfessionals {
 	private readonly api = inject(ApiService);
 	private readonly router = inject(Router);
+	private readonly dialog = inject(MatDialog);
+	@ViewChild('professionalDetailDialog') private professionalDetailDialog!: TemplateRef<unknown>;
+	private detailDialogRef?: MatDialogRef<unknown>;
 
 	readonly professionals = signal<AdminProfessional[]>([]);
 	readonly specialties = signal<AdminSpecialty[]>([]);
@@ -180,9 +186,23 @@ export class AdminProfessionals {
 		this.editForm.legajo = profesional.legajo ?? '';
 		this.editForm.especialidadIds = profesional.especialidades?.map((item) => item.id) ?? [];
 		this.modal.set({ profesional, modo });
+		if (!this.detailDialogRef) {
+			this.detailDialogRef = this.dialog.open(this.professionalDetailDialog, {
+				ariaLabel: 'Detalle del profesional',
+				ariaModal: true,
+				maxWidth: 'min(38rem, calc(100vw - 2rem))',
+				panelClass: 'vu-details-dialog',
+			});
+			this.detailDialogRef.afterClosed().subscribe(() => {
+				this.detailDialogRef = undefined;
+				this.modal.set(null);
+			});
+		}
 	}
 
 	cerrarDetalle(): void {
+		this.detailDialogRef?.close();
+		this.detailDialogRef = undefined;
 		this.modal.set(null);
 	}
 
@@ -264,6 +284,56 @@ export class AdminProfessionals {
 	}
 
 	// ── Estado y baja ─────────────────────────────────────────────────────
+
+	/**
+	 * El profesional todavía no activó su perfil: el padrón lo muestra
+	 * pendiente (CARGADO) y ya tiene cuenta vinculada. Sin cuenta no hay a
+	 * quién ponerle la clave, así que ahí no se ofrece el reenvío.
+	 */
+	puedeReenviarse(profesional: AdminProfessional): boolean {
+		return (profesional.estado ?? '').toUpperCase() === 'CARGADO';
+	}
+
+	/**
+	 * Reenvío de la invitación: pide confirmación porque la clave anterior
+	 * deja de servir en cuanto se emite la nueva.
+	 */
+	reenviarInvitacion(profesional: AdminProfessional): void {
+		if (!this.puedeReenviarse(profesional)) {
+			return;
+		}
+		this.confirmacion.set({
+			titulo: 'Reenviar la invitación',
+			mensaje: `¿Querés emitir una contraseña nueva para ${this.nombre(profesional)}?`,
+			detalle:
+				'La contraseña anterior deja de servir y el profesional recibe la nueva por correo con los pasos para activar su perfil.',
+			confirmar: 'Reenviar invitación',
+			icono: 'mail',
+			ejecutar: () => this.ejecutarReenvio(profesional),
+		});
+	}
+
+	private ejecutarReenvio(profesional: AdminProfessional): void {
+		this.busyId.set(profesional.id);
+		this.api.reenviarInvitacion(profesional.id).pipe(
+			catchError((error) => {
+				this.busyId.set(null);
+				this.aviso.set(avisoError(this.api.describeError(error, 'No se pudo reenviar la invitación.')));
+				return of(null);
+			}),
+		).subscribe((resultado) => {
+			this.busyId.set(null);
+			if (!resultado) return;
+			const clave = resultado.passwordTemporal
+				? ` Nueva contraseña temporal: ${resultado.passwordTemporal} (debe cambiarla al entrar).`
+				: '';
+			this.aviso.set(
+				resultado.correoEnviado
+					? avisoExito(`Le enviamos por correo la contraseña nueva a ${this.nombre(profesional)}.`)
+					: avisoError(`No se pudo enviar el correo a ${this.nombre(profesional)}.${clave}`),
+			);
+		});
+	}
 
 	readonly busyId = signal<string | null>(null);
 
@@ -384,6 +454,17 @@ export class AdminProfessionals {
 		return this.cuenta(profesional)?.telefono ?? '';
 	}
 
+	horariosLabel(profesional: AdminProfessional): string[] {
+		const dias = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+		return (profesional.horarios ?? []).map((horario) => {
+			const dia = typeof horario.diaSemana === 'number'
+				? dias[horario.diaSemana === 7 ? 0 : horario.diaSemana]
+				: horario.diaSemana.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+			const diaLabel = dia ? `${dia[0].toUpperCase()}${dia.slice(1)}` : 'Día sin definir';
+			return `${diaLabel} · ${horario.horaInicio.slice(0, 5)} a ${horario.horaFin.slice(0, 5)}`;
+		});
+	}
+
 	/**
 	 * Usuario dueño de la foto que se muestra: el de la cuenta (la que la persona
 	 * sube y actualiza desde "Mi cuenta"). El `vu-avatar` pide la imagen por este
@@ -403,7 +484,11 @@ export class AdminProfessionals {
 		return profesional.tieneFoto === true;
 	}
 
-	/** Todavía no creó su cuenta en Keycloak: la invitación sigue pendiente. */
+	/**
+	 * La cuenta de Keycloak todavía no quedó vinculada: o es un prerregistro
+	 * antiguo, o el alta se cortó a mitad. El caso de `CARGADO` cubre el detalle
+	 * que se abre sin fila de usuario.
+	 */
 	invitacionPendiente(profesional: AdminProfessional): boolean {
 		const cuenta = this.cuenta(profesional);
 		return cuenta ? cuenta.keycloakId == null : (profesional.estado ?? '').toUpperCase() === 'CARGADO';

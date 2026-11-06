@@ -16,11 +16,13 @@
     "user": "",
     "password": ""
   },
+  "emailTheme": "vincula-up",
+  "loginTheme": "vincula-up",
   "registrationAllowed": true,
   "registrationEmailAsUsername": true,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
-  "verifyEmail": false,
+  "verifyEmail": true,
   "resetPasswordAllowed": true,
   "defaultRoles": ["CLIENTE"],
   "roles": {
@@ -34,7 +36,7 @@
     {
       "clientId": "vincula-up-public",
       "name": "Vincula-UP Public Client",
-      "description": "Client público del frontend (PKCE S256, sin secreto). El redirectUris incluye https://* para que los túneles de Cloudflare de demo funcionen sin reconfigurar el client cada vez que cloudflared genera una URL nueva: Keycloak sólo matchea comodines al final del patrón, así que https://*.trycloudflare.com/* NO funcionaría. En producción reemplazar https://* por el dominio real.",
+      "description": "Cliente público del frontend con PKCE S256 y redirect HTTPS. Permite login local y por túneles de Cloudflare.",
       "enabled": true,
       "publicClient": true,
       "standardFlowEnabled": true,
@@ -59,7 +61,7 @@
     {
       "clientId": "vincula-up-admin",
       "name": "Vincula-UP Admin Service Account",
-      "description": "Client de servicio del BFF: promueve a PROFESIONAL al profesional invitado que se auto-registra en Keycloak con el email cargado por el administrador.",
+      "description": "Client de servicio del BFF: crea la cuenta del profesional con una contraseña temporal y le asigna el rol PROFESIONAL en el alta, y promueve a PROFESIONAL a los prerregistros antiguos que se auto-registraban.",
       "enabled": true,
       "publicClient": false,
       "secret": "vincula-up-admin-secret",

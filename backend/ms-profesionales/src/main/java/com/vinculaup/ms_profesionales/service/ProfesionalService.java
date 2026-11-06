@@ -216,9 +216,16 @@ public class ProfesionalService {
         Set<EspecialidadResponse> especialidades = profesional.getEspecialidades().stream()
                 .map(item -> new EspecialidadResponse(item.getId(), item.getNombre()))
                 .collect(Collectors.toSet());
+        List<com.vinculaup.ms_profesionales.dto.DisponibilidadResponse> disponibilidad =
+            disponibilidadRepository.findByProfesionalId(profesional.getId()).stream()
+                .map(item -> new com.vinculaup.ms_profesionales.dto.DisponibilidadResponse(
+                    item.getId(), item.getProfesionalId(), item.getDiaSemana(),
+                    item.getHoraInicio(), item.getHoraFin()))
+                .toList();
         return new ProfesionalResponse(
                 profesional.getId(), profesional.getUsuarioId(), profesional.getLegajo(), profesional.getFotoUrl(),
                 profesional.getZonaCoberturaLat(), profesional.getZonaCoberturaLng(), profesional.getRadioKm(),
-                profesional.getEstado(), profesional.getFechaCarga(), profesional.getFechaActivacion(), especialidades);
+            profesional.getEstado(), profesional.getFechaCarga(), profesional.getFechaActivacion(), especialidades,
+            disponibilidad);
     }
 }

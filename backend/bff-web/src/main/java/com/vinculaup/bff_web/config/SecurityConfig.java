@@ -43,6 +43,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(authorize -> authorize
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/actuator/health", "/error").permitAll()
+                .requestMatchers("/ws", "/ws/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/profesionales").permitAll()
                 // La reputación se muestra en el directorio y al elegir profesional: es pública.
                 .requestMatchers(HttpMethod.GET, "/api/calificaciones").permitAll()
@@ -54,6 +55,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/solicitudes/panel").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/usuarios").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/usuarios/yo", "/api/usuarios/por-keycloak").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/notifications/vapid-public-key").permitAll()
+                .requestMatchers(HttpMethod.PUT, "/api/notifications/push-subscription").authenticated()
+                .requestMatchers(HttpMethod.DELETE, "/api/notifications/push-subscription").authenticated()
                 // Ficha de la contraparte: el profesional necesita los datos del
                 // cliente (y viceversa) para coordinar la solicitud, así que la
                 // lectura de un usuario por id exige sesión válida, no un rol puntual.
@@ -67,6 +71,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.DELETE, "/api/especialidades/*", "/api/usuarios/*").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/profesionales").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/profesionales/alta").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/profesionales/*/reenviar-invitacion").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/api/profesionales/*/suspender").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/api/profesionales/*/reactivar").hasRole("ADMIN")
                 // Cualquier rol: es la aceptación de los términos, que se le pide a

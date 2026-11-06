@@ -2,6 +2,7 @@ package com.vinculaup.ms_profesionales.dto;
 
 import com.vinculaup.ms_profesionales.entity.EstadoProfesional;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -16,5 +17,6 @@ public record ProfesionalResponse(
         EstadoProfesional estado,
         OffsetDateTime fechaCarga,
         OffsetDateTime fechaActivacion,
-        Set<EspecialidadResponse> especialidades) {
+        Set<EspecialidadResponse> especialidades,
+        List<DisponibilidadResponse> disponibilidad) {
 }

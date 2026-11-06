@@ -14,20 +14,16 @@
 #  │ nginx            │ 80, 443  │ https://vincula-up.local          │ La aplicación   │
 #  │ bff-web          │ 9001     │ http://localhost:9001/api/...     │ La API          │
 #  │ keycloak         │ 8080     │ http://localhost:8080            │ Login + consola │
-#  │ pgadmin          │ 5050     │ http://localhost:5050            │ Consola de la BD│
 #  │ postgres         │ 5432     │ (no se abre en el navegador)     │ Base de datos   │
-#  │ ms-usuarios      │ 8081     │ (solo 127.0.0.1, sin interfaz)  │ Cuentas         │
-#  │ ms-profesionales │ 8082     │ (solo 127.0.0.1, sin interfaz)  │ Padrón          │
-#  │ ms-solicitudes   │ 8083     │ (solo 127.0.0.1, sin interfaz)  │ Solicitudes     │
+#  │ ms-usuarios      │ 8081     │ http://localhost:8081             │ Cuentas         │
+#  │ ms-profesionales │ 8082     │ http://localhost:8082             │ Padrón          │
+#  │ ms-solicitudes   │ 8083     │ http://localhost:8083             │ Solicitudes     │
 #  └──────────────────┴──────────┴───────────────────────────────────┴─────────────────┘
 #
-#  POR QUÉ LOS ms-* ESTÁN LIMITADOS A 127.0.0.1
-#  Los tres microservicios de dominio NO validan tokens ni aplican permisos: son
-#  internos. Publicar sus puertos en toda la red dejaría la base de datos
-#  accesible sin autenticación. Todo el tráfico del navegador entra por nginx y
-#  pasa por el bff-web, que sí valida el token de Keycloak. Por eso sus puertos
-#  se publican solo en el loopback: sirven para depurar desde la máquina, pero no
-#  son alcanzables desde la red.
+#  Los puertos de los ms-* se publican en toda la red porque cada microservicio
+#  valida el JWT de Keycloak por su cuenta (oauth2-resource-server). El BFF
+#  sigue siendo el único punto de entrada del navegador, pero los ms-* ya no
+#  confían ciegamente en el perímetro: rechazan peticiones sin token válido.
 #
 #  ── CONVENCIONES ───────────────────────────────────────────────────────────
 #  - container_name: todos empiezan con `vinculaup-` para no chocar con otras
@@ -87,10 +83,61 @@ services:
       KEYCLOAK_SMTP_PASSWORD: ${KEYCLOAK_SMTP_PASSWORD:-}
       KEYCLOAK_SMTP_FROM: ${KEYCLOAK_SMTP_FROM:-}
       KEYCLOAK_SMTP_FROM_DISPLAY_NAME: ${KEYCLOAK_SMTP_FROM_DISPLAY_NAME:-Vincula-UP}
+      # A dónde llegan las respuestas. Es opcional: si queda vacía se usa
+      # KEYCLOAK_SMTP_FROM, que es el comportamiento anterior. Permite que
+      # el From sea una casilla personal (Gmail no deja enviar como otra)
+      # y las respuestas caigan en la casilla institucional.
+      KEYCLOAK_SMTP_REPLY_TO: ${KEYCLOAK_SMTP_REPLY_TO:-}
+      # Contacto que se muestra en el pie de los correos (tema de correo).
+      KEYCLOAK_CONTACTO: ${KEYCLOAK_CONTACTO:-}
     ports:
       - "8080:8080"
     volumes:
       - ./keycloak/import:/opt/keycloak/data/import:ro
+      # Tema de correo con la marca. Se monta en el directorio de temas, que
+      # la imagen deja vacío a propósito para esto. El que trae la marca es
+      # el que dibuja la cabecera y el pie de TODOS los correos; los textos
+      # están en email/messages/messages_es.properties.
+      - ./keycloak/themes/vincula-up:/opt/keycloak/themes/vincula-up:ro
+    # La imagen de Keycloak 26.3.3 no incluye `curl`, así que el healthcheck
+    # no puede usar HTTP. Se verifica TCP sobre el puerto 8080 con bash
+    # (/dev/tcp), que sí está disponible en la imagen.
+    healthcheck:
+      test: ["CMD", "/bin/bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && exec 3>&- && exec 3<&-"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  keycloak-init:
+    image: quay.io/keycloak/keycloak:26.3.3
+    container_name: vinculaup-keycloak-init
+    depends_on:
+      keycloak:
+        condition: service_started
+    restart: "no"
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-vincula-up}
+    entrypoint: /bin/bash
+    command:
+      - -lc
+      - |
+        for i in $(seq 1 120); do
+          if curl -fsS http://keycloak:8080/health/ready >/dev/null 2>&1 && \
+             /opt/keycloak/bin/kcadm.sh config credentials \
+               --server http://keycloak:8080 \
+               --realm master \
+               --user "$${KEYCLOAK_ADMIN}" \
+               --password "$${KEYCLOAK_ADMIN_PASSWORD}" >/dev/null 2>&1; then
+            break
+          fi
+          sleep 2
+        done
+        /opt/keycloak/bin/kcadm.sh update "realms/$${KEYCLOAK_REALM:-vincula-up}" \
+          -s "emailTheme=vincula-up" \
+          -s "loginTheme=vincula-up"
 
   postgres:
     image: postgres:16
@@ -128,10 +175,12 @@ services:
       # Con false la base arranca vacia.
       SEMBRAR_DEMO: ${SEMBRAR_DEMO:-true}
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://keycloak:8080/realms/vincula-up}
+      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/vincula-up/protocol/openid-connect/certs}
     ports:
       # Sólo accesible desde el host: ms-usuarios no expone autenticación propia,
       # así que no debe quedar publicado en la red. Toda entrada pasa por nginx/BFF.
-      - "127.0.0.1:8081:8081"
+      - "8081:8081"
     # La JVM tarda ~1 minuto en levantar: sin healthcheck el BFF/nginx arrancan antes
     # y devuelven 502 "Connection refused" durante ese lapso.
     healthcheck:
@@ -160,8 +209,10 @@ services:
       SEMBRAR_DEMO: ${SEMBRAR_DEMO:-true}
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
       UBICACIONES_CLAVE: ${UBICACIONES_CLAVE:-}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://keycloak:8080/realms/vincula-up}
+      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/vincula-up/protocol/openid-connect/certs}
     ports:
-      - "127.0.0.1:8082:8082"
+      - "8082:8082"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-m", "5", "http://localhost:8082/actuator/health"]
       interval: 5s
@@ -191,8 +242,10 @@ services:
       # Misma clave que en ms-profesionales: si difieren, cada servicio descifra
       # lo que el otro cifró y las coordenadas quedan ilegibles.
       UBICACIONES_CLAVE: ${UBICACIONES_CLAVE:-}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://keycloak:8080/realms/vincula-up}
+      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/vincula-up/protocol/openid-connect/certs}
     ports:
-      - "127.0.0.1:8083:8083"
+      - "8083:8083"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-m", "5", "http://localhost:8083/actuator/health"]
       interval: 5s
@@ -248,8 +301,21 @@ services:
       KEYCLOAK_SMTP_STARTTLS: ${KEYCLOAK_SMTP_STARTTLS:-true}
       KEYCLOAK_SMTP_FROM: ${KEYCLOAK_SMTP_FROM:-}
       KEYCLOAK_SMTP_FROM_DISPLAY_NAME: ${KEYCLOAK_SMTP_FROM_DISPLAY_NAME:-Vincula-UP}
+      # Dónde está la maqueta HTML del aviso de prerregistro. Es una ruta de
+      # archivo, no un classpath: dentro del jar empaquetado el recurso no se
+      # resuelve, así que el Dockerfile la copia aparte a /app.
+      MAIL_PLANTILLA: /app/correos/prerregistro.html
+      # A dónde llegan las respuestas y qué casilla se muestra en el pie. Son
+      # opcionales: vacías, el Reply-To cae al From (que es la casilla que envía).
+      KEYCLOAK_SMTP_REPLY_TO: ${KEYCLOAK_SMTP_REPLY_TO:-}
+      KEYCLOAK_CONTACTO: ${KEYCLOAK_CONTACTO:-}
       # Enlace que va en el correo para que el profesional active su perfil.
       APP_URL: ${APP_URL:-https://vincula-up.local}
+      # Claves VAPID para notificaciones Push cuando la app está cerrada.
+      # No definir valores por defecto: si faltan, se conserva la bandeja y el polling web.
+      PUSH_VAPID_PUBLIC_KEY: ${PUSH_VAPID_PUBLIC_KEY:-}
+      PUSH_VAPID_PRIVATE_KEY: ${PUSH_VAPID_PRIVATE_KEY:-}
+      PUSH_VAPID_SUBJECT: ${PUSH_VAPID_SUBJECT:-mailto:vinculaup@gmail.com}
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
     volumes:
       - fotos_data:/data/fotos
@@ -284,26 +350,8 @@ services:
       # servir las fotos como estático: sería una URL pública para cualquier
       # foto, sin sesión ni control de rol. Las entrega el BFF, que sí valida.
 
-  pgadmin:
-    image: dpage/pgadmin4:8.12
-    container_name: vinculaup-pgadmin
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-    environment:
-      # El .local no lo acepta pgAdmin 8.12: exige un TLD real (com, net, org).
-      # Es solo la credencial de la consola web de pgAdmin, no toca la app.
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@vincula-up.com}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
-    ports:
-      - "5050:80"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-
 volumes:
   postgres_data:
-  pgadmin_data:
   # Fotos de perfil. Solo lo monta el BFF, que las escribe al subirlas y las lee
   # cuando alguien pide GET /api/usuarios/{id}/foto. nginx NO lo monta a
   # propósito: si lo sirviera como estático, cualquiera con la URL vería la foto
