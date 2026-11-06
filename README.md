@@ -15,6 +15,41 @@ y el cliente califica.
 | Identidad | Keycloak (login con email y contraseña) |
 | Datos | PostgreSQL |
 
+## Descripción del proyecto
+
+Vincula-UP es una plataforma que conecta a clientes que necesitan servicios técnicos (electricistas, plomeros, etc.) con profesionales que ofrecen dichos servicios. El flujo típico incluye:
+1. **Creación de solicitud**: el cliente ingresa una descripción del servicio requerido y elige una fecha/hora.
+2. **Asignación**: los profesionales pueden aceptar o rechazar la solicitud.
+3. **Comunicación**: se abre un chat interno para coordinar detalles.
+4. **Calificación**: al finalizar el servicio, el cliente califica al profesional.
+
+Esta arquitectura está pensada para ser extensible y reutilizable en diferentes dominios de servicio.
+
+## Arquitectura técnica
+
+- **BFF (Backend For Frontend)**: un punto de entrada único que orquesta la comunicación entre el frontend Angular y los microservicios Java.
+- **Microservicios**: separados por dominio (usuarios, turnos, chat, calificaciones) y despliegados en contenedores Docker.
+- **Keycloak**: gestión de identidad y autorización mediante OpenID Connect; los tokens JWT se validan en cada request del BFF.
+- **PostgreSQL**: base de datos relacional para persistir usuarios, turnos y mensajes.
+- **Nginx**: servidor reverse-proxy que también maneja TLS con certificados auto‑firmados para desarrollo.
+
+## Cómo funciona internamente
+
+1. El frontend realiza llamadas HTTP al BFF usando los servicios definidos en `core/services/api.service.js`.
+2. El BFF (Spring Boot) verifica el JWT enviado por Keycloak y reenvía la petición al microservicio correspondiente.
+3. Cada microservicio expone una API REST que opera sobre la base de datos PostgreSQL.
+4. Los eventos de chat se envían mediante WebSocket a través del BFF, permitiendo comunicación en tiempo real.
+
+## Stack
+
+
+| Capa | Tecnología |
+|---|---|
+| Backend | Java 21 · Spring Boot 4 · 4 microservicios detrás de un BFF |
+| Frontend | Angular 22 |
+| Identidad | Keycloak (login con email y contraseña) |
+| Datos | PostgreSQL |
+
 No hace falta Node ni Java: todo compila dentro de Docker.
 
 Todo se levanta con Docker.
@@ -78,13 +113,13 @@ Copy-Item .env.example .env
 
 ```bash
 # Despliegue rápido (importa CA, crea .env, levanta stack y bootstrap Keycloak)
-./scripts/deploy.sh
+./scripts/deploy.sh  # script que importa CA, crea .env, levanta el stack y bootstrap Keycloak en un solo paso
 ```
 
 #### Opción 1: Despliegue totalmente automatizado
 ```bash
 # Importa CA, crea .env, levanta stack y bootstrap Keycloak
-./scripts/deploy.sh
+./scripts/deploy.sh  # script que importa CA, crea .env, levanta el stack y bootstrap Keycloak en un solo paso
 ```
 
 #### Opción 2: Despliegue manual (pasos por separado)
