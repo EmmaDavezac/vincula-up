@@ -289,6 +289,20 @@
 	margin: 0 0 0.5rem;
 }
 
+.admin-professionals__schedule {
+	color: var(--ink);
+	display: grid;
+	gap: 0.35rem;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.admin-professionals__schedule li {
+	background: var(--surface-highlight);
+	padding: 0.5rem 0.75rem;
+}
+
 .admin-professionals__checks--modal {
 	margin-top: 0;
 }

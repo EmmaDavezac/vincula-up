@@ -25,6 +25,28 @@
 
 ## Historial
 
+### [2026-11-05] - fix: resolver profesional por id de usuario al crear solicitudes
+- **Objetivo:** Corregir el `404` al enviar una solicitud desde el formulario.
+- **Causa:** El frontend enviaba `profesionalId` con el `usuarioId`, pero `ms-solicitudes` solo buscaba por id del perfil. Los logs confirmaron `404: El profesional seleccionado no existe`.
+- **Cambios realizados:** `ProfesionalesClient` intenta primero la búsqueda directa por id de perfil y, si no existe, consulta `/profesionales/por-usuario`; la especificación documenta ambos identificadores válidos.
+- **Verificación:** `cd backend/ms-solicitudes && ./mvnw clean compile` exitoso. Logs de Docker confirmaron la causa original.
+
+### [2026-11-05] - fix: conservar disponibilidad al preparar el directorio de solicitudes
+- **Objetivo:** Habilitar la selección de días en el formulario de nueva solicitud.
+- **Causa:** `DirectoryService` reconstruía cada profesional para el recomendador, pero no copiaba `horarios`; al calcular disponibilidad todos los perfiles parecían no tener franjas y los botones de día quedaban deshabilitados.
+- **Cambios realizados:** `directory.service.ts` conserva los horarios semanales y deriva la etiqueta de disponibilidad del mismo dato.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-05] - feat: considerar disponibilidad real al recomendar profesionales
+- **Objetivo:** Propagar los horarios semanales desde la API al directorio y al recomendador, validar el rango solicitado en el backend y mostrar el horario laboral al consultar el perfil.
+- **Cambios realizados:**
+  - `ms-profesionales`: cada ficha y listado de profesionales ahora incluye la colección `disponibilidad`.
+  - `ms-solicitudes`: valida que el turno completo pertenezca a una franja del mismo día; rechaza horarios faltantes y devuelve error de servicio si no puede consultar disponibilidad. Se mantienen permitidas solicitudes simultáneas para igual profesional, horario y categoría.
+  - Angular: normaliza `disponibilidad` al tipo de horario del profesional, usa cobertura completa de día y franja en el recomendador, y muestra los tramos semanales en el modal de consulta de profesionales.
+  - Especificación técnica actualizada para documentar respuesta, validación y ausencia de reserva exclusiva.
+- **Archivos modificados:** `backend/ms-profesionales/src/main/java/com/vinculaup/ms_profesionales/dto/ProfesionalResponse.java`, `backend/ms-profesionales/src/main/java/com/vinculaup/ms_profesionales/service/ProfesionalService.java`, `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/service/SolicitudService.java`, `frontend/vincula-up-web/src/app/core/models/professional.ts`, `frontend/vincula-up-web/src/app/core/services/api.service.ts`, `frontend/vincula-up-web/src/app/request/request.ts`, `frontend/vincula-up-web/src/app/core/models/admin.ts`, `frontend/vincula-up-web/src/app/admin/admin-professionals/admin-professionals.ts`, `frontend/vincula-up-web/src/app/admin/admin-professionals/admin-professionals.html`, `frontend/vincula-up-web/src/app/admin/admin-professionals/admin-professionals.css`, `ESPECIFICACION.md`.
+- **Verificación:** `backend/ms-profesionales/./mvnw clean compile`, `backend/ms-solicitudes/./mvnw clean compile` y `frontend/vincula-up-web/npm run build`, todos exitosos. No hay tests automatizados en los dos microservicios afectados.
+
 ### [2026-11-04] - fix: error 502 en POST /api/profesionales/alta (crear profesional)
 - **Objetivo:** Resolver el error HTTP 502 Bad Gateway que devolvía el endpoint `POST /api/profesionales/alta` al intentar dar de alta un profesional desde el panel de administración.
 - **Cambios realizados:**
@@ -776,3 +798,15 @@
   - `frontend/vincula-up-web/src/app/core/services/api.service.ts`: Se aplicó el mismo mapeo que en el archivo JavaScript correspondiente.
 - **Verificación:** `npm run build` en el frontend compiló correctamente sin errores de TypeScript ni plantillas. El backend (ms-solicitudes, ms-profesionales, bff-web) también compila correctamente.
 - **Especificación:** Actualizada en `ESPECIFICACION.md` para reflejar el nuevo campo `horarios` en el profesional y cómo se utiliza en el filtrado de disponibilidad.
+### [2026-11-05] - styles: ubicar y modificar el modal "Actualizar estado"
+
+- **Objetivo:** Identificar dónde se definen los estilos del modal "Actualizar estado" para su personalización.
+- **Causa:** El usuario necesitaba modificar la apariencia del modal que aparece al hacer clic en "Actualizar estado" en las solicitudes.
+- **Cambios realizados:**
+  - Localizado el modal en `frontend/vincula-up-web/src/app/my-requests/my-requests.html` (línea 284)
+  - Los estilos principales están en `frontend/vincula-up-web/src/app/my-requests/my-requests.css` (líneas 358-399)
+  - Clases CSS clave: `.status-modal`, `.status-modal__head`, `.status-modal__title`, `.status-modal__content`, `.status-modal__lead`, `.status-modal__options`, `.status-option`
+  - El modal se abre con `panelClass: 'vu-details-dialog'` en `my-requests.js` (línea 362) y `my-requests.ts` (línea 416)
+- **Verificación:**
+  - `npm run build` en el frontend compiló correctamente sin errores de TypeScript ni CSS.
+- **Especificación:** Actualizada en `ESPECIFICACION.md` con la ubicación de los estilos del modal.

@@ -291,8 +291,8 @@ familias. La columna **Rol** refleja la regla real de `SecurityConfig.java`;
 
 | Método | Ruta | Rol | Descripción |
 |---|---|---|---|
-| GET | `/api/profesionales` | — | Listado público del padrón. Acepta `estado` y `todos` |
-| GET | `/api/profesionales/{id}` | Autenticado | Ficha de un profesional |
+| GET | `/api/profesionales` | — | Listado público del padrón. Acepta `estado` y `todos`; cada perfil incluye `disponibilidad` semanal |
+| GET | `/api/profesionales/{id}` | Autenticado | Ficha de un profesional, incluidos sus horarios semanales en `disponibilidad` |
 | GET | `/api/profesionales/mi-perfil` | PROFESIONAL | Perfil propio |
 | POST | `/api/profesionales` | ADMIN | Alta de profesional |
 | POST | `/api/profesionales/alta` | ADMIN | Alta en un paso: cuenta de Keycloak con contraseña temporal + usuario + perfil pendiente |
@@ -307,7 +307,7 @@ familias. La columna **Rol** refleja la regla real de `SecurityConfig.java`;
 
 | Método | Ruta | Rol | Descripción |
 |---|---|---|---|
-| POST | `/api/solicitudes` | CLIENTE | Crea la solicitud (valida disponibilidad y GPS) |
+| POST | `/api/solicitudes` | CLIENTE | Crea la solicitud (acepta `profesionalId` como id de perfil o `usuarioId`, valida día y rango horario contra la disponibilidad semanal y resuelve GPS). No reserva el turno ni impide otras solicitudes en el mismo horario o categoría |
 | GET | `/api/solicitudes/mias` | Autenticado | Solicitudes del actor (cliente o profesional) |
 | GET | `/api/solicitudes/panel` | ADMIN | Indicadores de demanda y recorrido de las solicitudes |
 | PATCH | `/api/solicitudes/{id}/aceptar` | PROFESIONAL | Acepta el turno |
@@ -405,7 +405,7 @@ son `UUID` en todas partes.
 | `fechaCarga` | OffsetDateTime | Alta en el padrón |
 | `fechaActivacion` | OffsetDateTime | Completó los 3 pasos de activación |
 | `especialidades` | `Set<Especialidad>` | Relación N:N |
-| `horarios` | `Array<{ diaSemana: String, horaInicio: LocalTime, horaFin: LocalTime }>` | Horarios de disponibilidad semanal configurados por el profesional. Utilizados por el frontend para filtrar técnicos según el día y hora solicitados. |
+| `disponibilidad` | `Array<{ id: UUID, profesionalId: UUID, diaSemana: String, horaInicio: LocalTime, horaFin: LocalTime }>` | Franjas semanales configuradas por el profesional; se incluyen tanto en el listado como en la ficha. Angular las consume como `Professional.horarios` para recomendar sólo profesionales cuya franja cubra el rango solicitado. |
 
 ### 7.3 `ms-profesionales` — Especialidad y Disponibilidad
 
@@ -413,6 +413,13 @@ son `UUID` en todas partes.
 
 **Disponibilidad:** `id` (UUID, PK), `profesionalId` (UUID), `diaSemana` (enum
 `LUNES`…`DOMINGO`), `horaInicio` (`LocalTime`), `horaFin` (`LocalTime`).
+
+Al crear una solicitud, `ms-solicitudes` exige que inicio y fin correspondan al
+mismo día calendario y que el rango completo quede dentro de una franja de ese
+día. Si no se configuraron horarios, o `ms-profesionales` no permite verificar
+la disponibilidad, la solicitud no se crea. Las solicitudes no bloquean ni
+reservan franjas: se permiten varias para un mismo profesional, horario y
+categoría, incluso del mismo cliente.
 
 ### 7.4 `ms-solicitudes` — Solicitud
 

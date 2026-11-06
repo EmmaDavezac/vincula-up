@@ -70,7 +70,7 @@ public class ProfesionalesClient {
         return restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/profesionales/por-usuario")
-                        .queryParam("usuarioIds", usuarioIds)
+                    .queryParam("usuarioIds", usuarioIds.toArray())
                         .build())
                 .retrieve()
                 .body(new ParameterizedTypeReference<List<ProfesionalIdentidad>>() {});
@@ -95,6 +95,6 @@ public class ProfesionalesClient {
         if (identidad == null) {
             return Optional.empty();
         }
-        return obtenerPorId(identidad);
+        return obtenerPorId(identidad).or(() -> obtenerIdentidades(List.of(identidad)).stream().findFirst());
     }
 }

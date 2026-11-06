@@ -410,11 +410,12 @@ export class MyRequests {
     this.motivoError.set('');
     this.updatingRequestId.set(String(request.id));
     this.statusDialogRef = this.dialog.open(this.statusDialog, {
-      ariaLabel: 'Actualizar estado de la solicitud',
-      ariaModal: true,
-      maxWidth: 'min(32rem, calc(100vw - 2rem))',
-      panelClass: 'vu-details-dialog',
-    });
+  ariaLabel: 'Actualizar estado de la solicitud',
+  ariaModal: true,
+  width: 'min(29rem, calc(100vw - 2rem))',
+  maxWidth: 'calc(100vw - 2rem)',
+  panelClass: 'vu-details-dialog',
+});
     this.statusDialogRef.afterClosed().subscribe(() => {
       this.statusDialogRef = undefined;
       this.resetEstadoDialog();
@@ -476,6 +477,7 @@ export class MyRequests {
         ariaModal: true,
         maxWidth: 'min(32rem, calc(100vw - 2rem))',
         panelClass: 'vu-details-dialog',
+        width: 'min(29rem, calc(100vw - 2rem))',
       });
       this.cancelDialogRef.afterClosed().subscribe(() => {
         this.cancelDialogRef = undefined;
@@ -609,12 +611,13 @@ export class MyRequests {
       this.chatDialogRef?.close();
       this.activeChatId.set(idStr);
       this.loadMessages(idStr);
-      this.chatDialogRef = this.dialog.open(this.chatDialog, {
-        ariaLabel: 'Chat de la solicitud',
-        ariaModal: true,
-        maxWidth: 'min(36rem, calc(100vw - 2rem))',
-        panelClass: 'vu-details-dialog',
-      });
+     this.chatDialogRef = this.dialog.open(this.chatDialog, {
+  ariaLabel: 'Chat de la solicitud',
+  ariaModal: true,
+  width: 'min(36rem, calc(100vw - 2rem))',
+  maxWidth: 'calc(100vw - 2rem)',
+  panelClass: 'vu-details-dialog',
+});
       this.chatDialogRef.afterClosed().subscribe(() => {
         this.chatDialogRef = undefined;
         this.activeChatId.set(null);

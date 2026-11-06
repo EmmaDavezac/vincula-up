@@ -85,7 +85,7 @@
 							} @else {
 								<vu-avatar size="md" [nombre]="profesionalNombre(request) || 'Sin asignar'" [usuarioId]="usuarioIdProfesional(request)" [tieneFoto]="tieneFotoProfesional(request)" />
 								<div class="req-card__identity">
-									<h2 class="req-card__name">{{ profesionalNombre(request) || 'Sin asignar' }}</h2>
+									<h2 class="req-card__name vu-truncate">{{ profesionalNombre(request) || 'Sin asignar' }}</h2>
 									<p class="req-card__sub vu-truncate">{{ especialidadNombre(request) }}</p>
 								</div>
 							}
@@ -114,16 +114,16 @@
 							si la zona le resulta insegura.
 						-->
 						@if (request.address) {
-							<p class="req-card__address">
-								<vu-icon name="map-pin" [size]="15" />
-								{{ isPending(request) ? 'Zona: ' + request.address : request.address }}
-							</p>
-						} @else if (isProfessional() && isPending(request)) {
-							<p class="req-card__address req-card__address--pending">
-								<vu-icon name="map-pin" [size]="15" />
-								La direccion exacta se muestra cuando aceptas el turno.
-							</p>
-						}
+	<p class="req-card__address" [attr.title]="request.address">
+		<vu-icon name="map-pin" [size]="15" />
+		<span>{{ isPending(request) ? 'Zona: ' + request.address : request.address }}</span>
+	</p>
+} @else if (isProfessional() && isPending(request)) {
+	<p class="req-card__address req-card__address--pending">
+		<vu-icon name="map-pin" [size]="15" />
+		<span>La direccion exacta se muestra cuando aceptas el turno.</span>
+	</p>
+}
 
 						<!--
 							El mapa es para el profesional: es él quien tiene que llegar al
@@ -240,56 +240,58 @@
 					}
 				</article>
 			}
-			</div>
+			</div>}
 		<!-- ── Chat de coordinación ── -->
 		<ng-template #chatDialog>
-			@if (activeRequest(); as chat) {
-				<section class="chat-modal">
-					<header mat-dialog-title class="chat-modal__head">
-						<div>
-							<p class="vu-eyebrow-sm">{{ chat.date }} · {{ horarioLabel(chat) }}</p>
-							<h2 class="chat-modal__title">Chat con {{ isProfessional() ? clienteNombre(chat) : profesionalNombre(chat) }}</h2>
+	@if (activeRequest(); as chat) {
+		<section class="chat-modal">
+			<header class="chat-modal__head">
+				<div>
+					<p class="vu-eyebrow-sm">{{ chat.date }} · {{ horarioLabel(chat) }}</p>
+					<h2 class="chat-modal__title">Chat con {{ isProfessional() ? clienteNombre(chat) : profesionalNombre(chat) }}</h2>
+				</div>
+				<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="toggleChat(chat.id)">Cerrar</button>
+			</header>
+
+			<div class="chat-modal__messages">
+				@for (message of chatMessages()[chat.id] ?? []; track message.id) {
+					<div class="bubble-row" [class.is-mine]="message.emisorId === auth.currentUser()?.id">
+						<div class="bubble">
+							<p class="bubble__text">{{ message.texto }}</p>
+							<span class="bubble__time">{{ message.fechaEnvio | slice: 0:16 }}</span>
 						</div>
-						<button type="button" mat-button class="vu-btn vu-btn--quiet vu-btn--sm" (click)="toggleChat(chat.id)">Cerrar</button>
-					</header>
-					<div mat-dialog-content class="chat-modal__messages">
-						@for (message of chatMessages()[chat.id] ?? []; track message.id) {
-							<div class="bubble-row" [class.is-mine]="message.emisorId === auth.currentUser()?.id">
-								<div class="bubble">
-									<p class="bubble__text">{{ message.texto }}</p>
-									<span class="bubble__time">{{ message.fechaEnvio | slice: 0:16 }}</span>
-								</div>
-							</div>
-						} @empty {
-							<p class="chat-modal__empty">Todavía no hay mensajes. Escribí la primera mensaje.</p>
-						}
 					</div>
-					@if (chat.status === 'ACEPTADA') {
-						<div class="chat-modal__composer">
-							<input class="vu-input chat-modal__input" [ngModel]="chatInput()" (ngModelChange)="chatInput.set($event)"
-								placeholder="Escribí un mensaje..." (keyup.enter)="sendMessage(chat.id)" />
-							<button type="button" mat-flat-button class="vu-btn vu-btn--ink vu-btn--icon" (click)="sendMessage(chat.id)"
-								[disabled]="sendingChat() || !chatInput().trim()" aria-label="Enviar mensaje">
-								<vu-icon name="send" [size]="16" />
-							</button>
-						</div>
-					}
-				</section>
+				} @empty {
+					<p class="chat-modal__empty">Todavía no hay mensajes. Escribí el primer mensaje.</p>
+				}
+			</div>
+
+			@if (chat.status === 'ACEPTADA') {
+				<div class="chat-modal__composer">
+					<input class="vu-input chat-modal__input" [ngModel]="chatInput()" (ngModelChange)="chatInput.set($event)"
+						placeholder="Escribí un mensaje..." (keyup.enter)="sendMessage(chat.id)" />
+					<button type="button" class="vu-btn vu-btn--ink vu-btn--icon" (click)="sendMessage(chat.id)"
+						[disabled]="sendingChat() || !chatInput().trim()" aria-label="Enviar mensaje">
+						<vu-icon name="send" [size]="16" />
+					</button>
+				</div>
 			}
-		</ng-template>
+		</section>
 	}
+</ng-template>
+	
 
 		<ng-template #statusDialog>
-		@if (solicitudDelModal(); as solicitud) {
-			<section class="status-modal">
-				<header mat-dialog-title class="status-modal__head">
-					<h2 class="status-modal__title">Actualizar estado</h2>
-					<button type="button" mat-button class="vu-btn vu-btn--quiet vu-btn--sm" (click)="cerrarActualizarEstado()" aria-label="Cerrar">
-						<vu-icon name="x" [size]="18" />
-					</button>
-				</header>
+	@if (solicitudDelModal(); as solicitud) {
+		<section class="status-modal">
+			<header class="status-modal__head">
+				<h2 class="status-modal__title">Actualizar estado</h2>
+				<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="cerrarActualizarEstado()" aria-label="Cerrar">
+					<vu-icon name="x" [size]="18" />
+				</button>
+			</header>
 
-				<div mat-dialog-content class="status-modal__content">
+			<div class="status-modal__content">
 				<p class="status-modal__lead">
 					{{ nombreContraparte(solicitud) }} · {{ solicitud.date }} · {{ horarioLabel(solicitud) }}
 				</p>
@@ -298,7 +300,6 @@
 					@for (opcion of estadosDisponibles(solicitud); track opcion) {
 						<button
 							type="button"
-							mat-flat-button
 							class="status-option"
 							[class.is-cancel]="opcion === 'CANCELADA'"
 							[class.is-reject]="opcion === 'RECHAZADA'"
@@ -308,11 +309,10 @@
 						</button>
 					}
 				</div>
-
-				</div>
-			</section>
-		}
-		</ng-template>
+			</div>
+		</section>
+	}
+</ng-template>
 
 	<!-- Cancelación: única transición que pide un mensaje, y es obligatorio. -->
 	<ng-template #cancelDialog>

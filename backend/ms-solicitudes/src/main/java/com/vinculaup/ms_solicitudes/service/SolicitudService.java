@@ -54,17 +54,6 @@ public class SolicitudService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "El profesional debe tener su perfil activado para recibir solicitudes");
         }
-        // if (repository.existsActiveByClienteIdAndEspecialidadId(
-//                request.clienteId(), request.especialidadId())) {
-//            throw new ResponseStatusException(HttpStatus.CONFLICT,
-//                    "Ya tenes una solicitud activa para esta especialidad");
-//        }
-                // Se valida la disponibilidad del profesional según sus horarios configurados.
-        if (!estaDentroDeDisponibilidad(profesional.id(), request.fechaHoraPropuesta(), request.fechaHoraFinPropuesta())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "El horario propuesto está fuera de la disponibilidad del profesional");
-        }
-
         // Ubicación estilo MercadoLibre: si el cliente no adjunta coordenadas,
         // el backend transforma la dirección textual con el proveedor GPS
         // (Nominatim, el mismo del endpoint /api/gps) y las persiste en la solicitud.
@@ -77,6 +66,11 @@ public class SolicitudService {
                 && !request.fechaHoraFinPropuesta().isAfter(request.fechaHoraPropuesta())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "El fin del turno tiene que ser posterior al inicio");
+        }
+
+        if (!estaDentroDeDisponibilidad(profesional.id(), request.fechaHoraPropuesta(), request.fechaHoraFinPropuesta())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "El horario propuesto está fuera de la disponibilidad del profesional");
         }
 
         Solicitud solicitud = repository.save(new Solicitud(
@@ -329,25 +323,21 @@ public class SolicitudService {
         try {
             var disponibilidades = profesionalesClient.obtenerDisponibilidad(profesionalId);
             if (disponibilidades == null || disponibilidades.isEmpty()) {
-                return true; // Sin horarios configurados, se asume disponible
+                return false;
             }
-            // Si fin es null, usar solo inicio
             LocalDateTime finEffective = fin != null ? fin : inicio;
-            // Verificar que ambos extremos estén dentro de algún horario del día
-            String diaInicio = diaEnEspanol(inicio.getDayOfWeek());
-            String diaFin = diaEnEspanol(finEffective.getDayOfWeek());
-            // Ambos deben coincidir en día y horario
-            boolean inicioOk = disponibilidades.stream()
-                    .filter(item -> item.diaSemana().equalsIgnoreCase(diaInicio))
-                    .anyMatch(item -> !inicio.toLocalTime().isBefore(item.horaInicio()) &&
-                                      inicio.toLocalTime().isBefore(item.horaFin()));
-            boolean finOk = disponibilidades.stream()
-                    .filter(item -> item.diaSemana().equalsIgnoreCase(diaFin))
-                    .anyMatch(item -> !finEffective.toLocalTime().isBefore(item.horaInicio()) &&
-                                      finEffective.toLocalTime().isBefore(item.horaFin()));
-            return inicioOk && finOk;
+            if (!inicio.toLocalDate().equals(finEffective.toLocalDate())) {
+                return false;
+            }
+            String dia = diaEnEspanol(inicio.getDayOfWeek());
+            return disponibilidades.stream()
+                    .filter(item -> item.diaSemana().equalsIgnoreCase(dia))
+                    .anyMatch(item -> !inicio.toLocalTime().isBefore(item.horaInicio())
+                            && !finEffective.toLocalTime().isAfter(item.horaFin())
+                            && (fin != null || inicio.toLocalTime().isBefore(item.horaFin())));
         } catch (Exception e) {
-            return true;
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "No se pudo verificar la disponibilidad del profesional", e);
         }
     }
 

@@ -196,6 +196,19 @@
 				</div>
 
 				@if (abierto.modo !== 'edicion') {
+					<div>
+						<p class="admin-professionals__modal-label">Horario de trabajo</p>
+						<ul class="admin-professionals__schedule">
+							@for (horario of horariosLabel(abierto.profesional); track $index) {
+								<li>{{ horario }}</li>
+							} @empty {
+								<li>Sin horario configurado</li>
+							}
+						</ul>
+					</div>
+				}
+
+				@if (abierto.modo !== 'edicion') {
 					<div class="admin-professionals__modal-danger">
 						<p class="admin-professionals__modal-label">Acceso al padrón</p>
 
