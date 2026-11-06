@@ -95,7 +95,7 @@
 						<div class="req-card__meta">
 							<span>
 								<vu-icon name="clock" [size]="15" />
-								{{ request.date }} · {{ horarioLabel(request) }}
+								{{ fechaSolicitudLabel(request.date) }} · {{ horarioLabel(request) }}
 							</span>
 						</div>
 
@@ -247,18 +247,23 @@
 		<section class="chat-modal">
 			<header class="chat-modal__head">
 				<div>
-					<p class="vu-eyebrow-sm">{{ chat.date }} · {{ horarioLabel(chat) }}</p>
+					<p class="vu-eyebrow-sm">{{ fechaSolicitudLabel(chat.date) }} · {{ horarioLabel(chat) }}</p>
 					<h2 class="chat-modal__title">Chat con {{ isProfessional() ? clienteNombre(chat) : profesionalNombre(chat) }}</h2>
 				</div>
 				<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="toggleChat(chat.id)">Cerrar</button>
 			</header>
 
-			<div class="chat-modal__messages">
-				@for (message of chatMessages()[chat.id] ?? []; track message.id) {
-					<div class="bubble-row" [class.is-mine]="message.emisorId === auth.currentUser()?.id">
+			<div vuChatAutoScroll class="chat-modal__messages">
+				@for (message of chatMessages()[chat.id] ?? []; track message.id; let index = $index) {
+					<div class="bubble-row" [class.is-mine]="esMensajePropio(message)">
 						<div class="bubble">
 							<p class="bubble__text">{{ message.texto }}</p>
-							<span class="bubble__time">{{ message.fechaEnvio | slice: 0:16 }}</span>
+							<span class="bubble__time">
+								@if (mostrarFechaMensaje(chatMessages()[chat.id] ?? [], index)) {
+									{{ fechaMensajeLabel(message.fechaEnvio) }} ·
+								}
+								{{ horaMensajeLabel(message.fechaEnvio) }}
+							</span>
 						</div>
 					</div>
 				} @empty {
@@ -293,7 +298,7 @@
 
 			<div class="status-modal__content">
 				<p class="status-modal__lead">
-					{{ nombreContraparte(solicitud) }} · {{ solicitud.date }} · {{ horarioLabel(solicitud) }}
+					{{ nombreContraparte(solicitud) }} · {{ fechaSolicitudLabel(solicitud.date) }} · {{ horarioLabel(solicitud) }}
 				</p>
 
 				<div class="status-modal__options">

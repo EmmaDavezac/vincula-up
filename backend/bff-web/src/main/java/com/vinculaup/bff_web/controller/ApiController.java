@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -36,16 +37,19 @@ public class ApiController {
     private final com.vinculaup.bff_web.service.FotoStorage fotoStorage;
     private final com.vinculaup.bff_web.service.NotificacionService notificar;
         private final com.vinculaup.bff_web.service.WebPushService webPush;
+            private final SimpMessagingTemplate chatMessaging;
 
     public ApiController(BackendGateway gateway, com.vinculaup.bff_web.service.KeycloakAdminService keycloakAdmin,
             com.vinculaup.bff_web.service.FotoStorage fotoStorage,
             com.vinculaup.bff_web.service.NotificacionService notificar,
-            com.vinculaup.bff_web.service.WebPushService webPush) {
+                com.vinculaup.bff_web.service.WebPushService webPush,
+                SimpMessagingTemplate chatMessaging) {
         this.gateway = gateway;
         this.keycloakAdmin = keycloakAdmin;
         this.fotoStorage = fotoStorage;
         this.notificar = notificar;
         this.webPush = webPush;
+        this.chatMessaging = chatMessaging;
     }
 
     private JsonNode authenticatedUser() {
@@ -1078,7 +1082,9 @@ public class ApiController {
     @ResponseStatus(HttpStatus.CREATED)
     public JsonNode enviarMensaje(@PathVariable UUID id, @RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
-        return gateway.enviarMensaje(id, actorIdentityBody(body, user, "emisorId"));
+        JsonNode creado = gateway.enviarMensaje(id, actorIdentityBody(body, user, "emisorId"));
+        chatMessaging.convertAndSend("/topic/solicitudes/" + id, creado);
+        return creado;
     }
 
     @PostMapping("/solicitudes/{id}/calificacion")

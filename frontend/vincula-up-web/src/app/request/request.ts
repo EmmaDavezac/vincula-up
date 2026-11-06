@@ -345,9 +345,7 @@ elegirHorario(id: string): void {
     if (!year || !month || !day) {
       return this.date();
     }
-    const value = new Date(year, month - 1, day);
-    const texto = value.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
-    return texto.charAt(0).toUpperCase() + texto.slice(1);
+    return `${`${day}`.padStart(2, '0')}/${`${month}`.padStart(2, '0')}/${`${year}`.slice(-2)}`;
   }
 
   constructor() {

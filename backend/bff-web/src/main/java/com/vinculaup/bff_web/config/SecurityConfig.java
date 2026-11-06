@@ -43,6 +43,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(authorize -> authorize
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/actuator/health", "/error").permitAll()
+                .requestMatchers("/ws", "/ws/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/profesionales").permitAll()
                 // La reputación se muestra en el directorio y al elegir profesional: es pública.
                 .requestMatchers(HttpMethod.GET, "/api/calificaciones").permitAll()

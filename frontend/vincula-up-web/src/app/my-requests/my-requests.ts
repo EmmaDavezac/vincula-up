@@ -10,6 +10,7 @@ import { ApiService, ClienteInfo } from '../core/services/api.service';
 import { AuthService } from '../core/services/auth.service';
 import { RequestService } from '../core/services/request.service';
 import { NotificationService } from '../core/services/notification.service';
+import { ChatRealtimeService, RealtimeChatMessage } from '../core/services/chat-realtime.service';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { fotoUtil } from '../core/utils/photo';
@@ -18,6 +19,7 @@ import { VuConfirm } from '../shared/confirm/confirm';
 import { VuIcon } from '../shared/icon/icon';
 import { VuSkeletonList } from '../shared/skeleton-list/skeleton-list';
 import { VuSpinner } from '../shared/spinner/spinner';
+import { ChatAutoScrollDirective } from './chat-auto-scroll.directive';
 
 interface MessageItem {
   id: string;
@@ -42,7 +44,7 @@ interface RatingItem {
 }
 
 @Component({
-	imports: [CommonModule, RouterLink, FormsModule, MatButtonModule, VuAvatar, VuConfirm, VuIcon, VuSkeletonList, VuSpinner],
+  imports: [CommonModule, RouterLink, FormsModule, MatButtonModule, VuAvatar, VuConfirm, VuIcon, VuSkeletonList, VuSpinner, ChatAutoScrollDirective],
 	selector: 'app-my-requests',
 	styleUrl: './my-requests.css',
 	templateUrl: './my-requests.html',
@@ -59,6 +61,7 @@ export class MyRequests {
   readonly auth = inject(AuthService);
   private readonly requestService = inject(RequestService);
   private readonly notifications = inject(NotificationService);
+  readonly chatRealtime = inject(ChatRealtimeService);
   private readonly sanitizer = inject(DomSanitizer);
 
   /** Cache de URLs de mapa: evita crear SafeResourceUrl en cada detección de cambios (ciclo NG0600). */
@@ -605,24 +608,75 @@ export class MyRequests {
     const idStr = String(requestId);
     if (this.activeChatId() === idStr) {
       this.chatDialogRef?.close();
-      this.chatDialogRef = undefined;
       this.activeChatId.set(null);
+      this.chatRealtime.disconnect();
     } else {
       this.chatDialogRef?.close();
       this.activeChatId.set(idStr);
+      this.notifications.openChat(idStr);
       this.loadMessages(idStr);
-     this.chatDialogRef = this.dialog.open(this.chatDialog, {
+      const token = this.auth.getToken();
+      if (token) this.chatRealtime.connect(idStr, token, (message) => this.recibirMensajeRealtime(message));
+      const dialogRef = this.dialog.open(this.chatDialog, {
   ariaLabel: 'Chat de la solicitud',
   ariaModal: true,
   width: 'min(36rem, calc(100vw - 2rem))',
   maxWidth: 'calc(100vw - 2rem)',
   panelClass: 'vu-details-dialog',
 });
-      this.chatDialogRef.afterClosed().subscribe(() => {
-        this.chatDialogRef = undefined;
-        this.activeChatId.set(null);
+      this.chatDialogRef = dialogRef;
+      dialogRef.afterClosed().subscribe(() => {
+        this.notifications.closeChat(idStr, this.auth.currentUser()?.id ?? '');
+        if (this.chatDialogRef === dialogRef) {
+          this.chatDialogRef = undefined;
+          this.chatRealtime.disconnect();
+          if (this.activeChatId() === idStr) this.activeChatId.set(null);
+        }
       });
     }
+  }
+
+  private recibirMensajeRealtime(message: RealtimeChatMessage): void {
+		const requestId = String(message.solicitudId);
+		if (this.activeChatId() !== requestId) return;
+		this.chatMessages.update((items) => {
+			const messages = items[requestId] ?? [];
+			if (messages.some((item) => item.id === message.id)) return items;
+			return { ...items, [requestId]: [...messages, message] };
+		});
+	}
+
+  esMensajePropio(message: MessageItem): boolean {
+    const userId = this.auth.currentUser()?.id;
+    const keycloakId = this.auth.getKeycloakId();
+    return message.emisorId === userId || (!!keycloakId && message.emisorId === keycloakId);
+  }
+
+  fechaMensajeLabel(value: string): string {
+    const [datePart] = value.split('T');
+    const [year, month, day] = (datePart ?? '').split('-');
+    return year && month && day ? `${day}/${month}/${year.slice(-2)}` : '';
+  }
+
+  horaMensajeLabel(value: string): string {
+    const timePart = value.split('T')[1] ?? '';
+    return timePart.slice(0, 5);
+  }
+
+  fechaSolicitudLabel(value: string): string {
+    const datePart = value.split('T')[0] ?? '';
+    const [year, month, day] = datePart.split('-');
+    if (year && month && day) return `${day}/${month}/${year.slice(-2)}`;
+
+    const [dayValue, monthValue, yearValue] = datePart.split('/');
+    return dayValue && monthValue && yearValue
+      ? `${dayValue.padStart(2, '0')}/${monthValue.padStart(2, '0')}/${yearValue.slice(-2)}`
+      : value;
+  }
+
+  mostrarFechaMensaje(messages: MessageItem[], index: number): boolean {
+    if (index === 0) return true;
+    return messages[index - 1]?.fechaEnvio.slice(0, 10) !== messages[index]?.fechaEnvio.slice(0, 10);
   }
 
   loadMessages(requestId: string): void {

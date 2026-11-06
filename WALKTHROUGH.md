@@ -25,6 +25,36 @@
 
 ## Historial
 
+### [2026-11-06] - ux: desplazar chat al mensaje más reciente
+- **Objetivo:** Mantener visible el mensaje más reciente al abrir, recibir o enviar mensajes.
+- **Cambios realizados:** Una directiva en el propio contenedor del diálogo observa cambios reales del DOM y baja al final al crearse el modal y al cargar, recibir o enviar mensajes; no depende de un `ViewChild` ubicado dentro de un `ng-template`.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/chat-auto-scroll.directive.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`, `ESPECIFICACION.md`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-06] - fix: mostrar fechas de solicitudes en formato dd/mm/aa
+- **Objetivo:** Aplicar el formato `dd/mm/aa` de forma consistente en solicitudes y chat.
+- **Cambios realizados:** Se mantiene ISO en el modelo para ordenar, y se formatea al presentar en tarjetas de solicitudes, modal de estado, encabezado del chat y resumen del turno nuevo. En mensajes se conserva fecha solo al primer mensaje del día y la hora en los siguientes; la bandeja de notificaciones también usa `dd/mm/aa`.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/request/request.ts`, `frontend/vincula-up-web/src/app/shared/navbar/navbar.html`, `ESPECIFICACION.md`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-06] - ux: identificar mensajes y mostrar bandeja en móvil
+- **Objetivo:** Quitar el texto de estado de conexión del chat, identificar al emisor en las notificaciones y evitar que el panel quede oculto en pantallas móviles.
+- **Cambios realizados:** Se retiró «Conectado en tiempo real» del modal. Las alertas ahora muestran «Mensaje de [nombre]» y conservan la vista previa del texto, resolviendo el nombre del cliente o profesional según el rol. En móvil la bandeja usa posición fija y eleva temporalmente la cabecera sobre el tabbar.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`, `frontend/vincula-up-web/src/app/shared/navbar/navbar.html`, `frontend/vincula-up-web/src/app/shared/navbar/navbar.css`, `frontend/vincula-up-web/src/app/core/services/notification.service.ts`, `ESPECIFICACION.md`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso; `git diff --check` limpio.
+
+### [2026-11-06] - feat: chat en tiempo real con WebSocket autenticado
+- **Objetivo:** Entregar nuevos mensajes al chat abierto sin sondeo y conservar la persistencia/autorización actuales.
+- **Cambios realizados:** El BFF incorpora WebSocket STOMP en `/ws`, valida JWT en `CONNECT` usando el accessor original para asociar el Principal a la sesión, autoriza suscripciones verificando participación en la solicitud y rechaza escrituras STOMP. `POST /api/solicitudes/{id}/mensajes` sigue guardando el mensaje y después lo difunde a `/topic/solicitudes/{id}`. Nginx enruta el Upgrade. Angular conecta solo al abrir el chat, reconecta automáticamente, agrega mensajes entrantes sin duplicarlos y diferencia sus propios mensajes comparando `usuarioId` y `sub` de Keycloak. Las burbujas propias/ajenas se alinean y colorean distinto; la fecha se muestra como `dd/mm/aa` solo en el primer mensaje del día y los demás llevan `HH:mm`.
+- **Archivos modificados:** `backend/bff-web/pom.xml`, `backend/bff-web/src/main/java/com/vinculaup/bff_web/config/ChatWebSocketConfig.java`, `ChatChannelInterceptor.java`, `ChatPrincipal.java`, `WebSocketAuthorizationContext.java`, `JdkHttpClientRequestFactory.java`, `SecurityConfig.java`, `backend/bff-web/src/main/java/com/vinculaup/bff_web/controller/ApiController.java`, `nginx/nginx.conf`, `frontend/vincula-up-web/package.json`, `package-lock.json`, `frontend/vincula-up-web/src/app/core/services/chat-realtime.service.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `my-requests.html`, `my-requests.css`, `ESPECIFICACION.md`.
+- **Verificación:** `cd backend/bff-web && ./mvnw clean compile` y `cd frontend/vincula-up-web && npm run build`, ambos exitosos. `curl` al endpoint HTTPS `/ws` devolvió `101 Switching Protocols`; logs posteriores confirmaron `CONNECT(2)-CONNECTED(2)` y sesiones STOMP autenticadas. BFF y Nginx saludables. No se simuló el intercambio completo de mensajes entre dos cuentas.
+
+### [2026-11-05] - feat: notificar mensajes nuevos cuando el chat está cerrado
+- **Objetivo:** Avisar a la persona cuando recibe mensajes y no está dentro de la conversación correspondiente.
+- **Cambios realizados:** `NotificationService` consulta mensajes de solicitudes aceptadas junto con el sondeo existente de 30 segundos, guarda snapshots por cuenta y solicitud, omite mensajes iniciales/históricos, propios y recibidos mientras el chat está abierto. Al cerrar el diálogo sincroniza mensajes vistos. Los avisos de mensajes pueden usar Notification API con la aplicación enfocada si el chat está cerrado. Se actualizó la documentación técnica.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/core/services/notification.service.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `ESPECIFICACION.md`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
 ### [2026-11-05] - fix: resolver profesional por id de usuario al crear solicitudes
 - **Objetivo:** Corregir el `404` al enviar una solicitud desde el formulario.
 - **Causa:** El frontend enviaba `profesionalId` con el `usuarioId`, pero `ms-solicitudes` solo buscaba por id del perfil. Los logs confirmaron `404: El profesional seleccionado no existe`.
