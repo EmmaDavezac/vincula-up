@@ -1,6 +1,6 @@
 import { Component, computed, effect, inject, signal, TemplateRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { catchError, of } from 'rxjs';
@@ -52,6 +52,8 @@ interface RatingItem {
 export class MyRequests {
   private readonly api = inject(ApiService);
   private readonly dialog = inject(MatDialog);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   @ViewChild('chatDialog') private chatDialog!: TemplateRef<unknown>;
   @ViewChild('statusDialog') private statusDialog!: TemplateRef<unknown>;
   @ViewChild('cancelDialog') private cancelDialog!: TemplateRef<unknown>;
@@ -75,6 +77,11 @@ export class MyRequests {
    * estado vacío (que diría "todavía no tenés solicitudes" sin haber llegado nada).
    */
   readonly loading = signal(true);
+  readonly refreshing = signal(false);
+  readonly highlightedRequestId = signal<string | null>(null);
+  private pendingNotificationRequestId: string | null = null;
+  private pendingNotificationOpensChat = false;
+  private highlightTimeout?: ReturnType<typeof setTimeout>;
   /** El mapa embebido todavía está cargando sus tiles. */
   readonly mapaCargando = signal(false);
 
@@ -96,6 +103,9 @@ export class MyRequests {
   // Filtros de la lista
   readonly statusFilter = signal<'TODAS' | RequestStatus>('TODAS');
   readonly specialtyFilter = signal<string>('TODAS');
+  readonly requestSearch = signal('');
+  readonly filtersRefreshing = signal(false);
+  private filterRefreshTimeout?: ReturnType<typeof setTimeout>;
 
   readonly statusOptions: ReadonlyArray<{ value: 'TODAS' | RequestStatus; label: string }> = [
     { value: 'TODAS', label: 'Todas' },
@@ -122,6 +132,7 @@ export class MyRequests {
   readonly filteredRequests = computed(() => {
     const status = this.statusFilter();
     const specialty = this.specialtyFilter();
+    const query = this.normalizarTexto(this.requestSearch());
 
     return this.requests().filter((request) => {
       if (status !== 'TODAS' && request.status !== status) return false;
@@ -129,18 +140,52 @@ export class MyRequests {
         const key = request.especialidadId ?? request.specialty ?? '';
         if (key !== specialty) return false;
       }
+      if (query) {
+      const nombreContraparte = this.isProfessional()
+        ? this.clienteNombre(request)
+        : this.profesionalNombre(request);
+      const coincideNombre = this.normalizarTexto(nombreContraparte).includes(query);
+			const coincideDireccion = this.normalizarTexto(request.address).includes(query);
+      if (!coincideNombre && !coincideDireccion) return false;
+		}
       return true;
     });
   });
 
   readonly hasActiveFilters = computed(
-    () => this.statusFilter() !== 'TODAS' || this.specialtyFilter() !== 'TODAS',
+    () => this.statusFilter() !== 'TODAS' || this.specialtyFilter() !== 'TODAS' || !!this.requestSearch().trim(),
   );
 
   clearFilters(): void {
-    this.statusFilter.set('TODAS');
-    this.specialtyFilter.set('TODAS');
+    this.actualizarFiltros(() => {
+      this.statusFilter.set('TODAS');
+      this.specialtyFilter.set('TODAS');
+      this.requestSearch.set('');
+    });
   }
+
+  cambiarEstadoFiltro(value: 'TODAS' | RequestStatus): void {
+		this.actualizarFiltros(() => this.statusFilter.set(value));
+	}
+
+  cambiarCategoriaFiltro(value: string): void {
+		this.actualizarFiltros(() => this.specialtyFilter.set(value));
+  }
+
+  cambiarBusqueda(value: string): void {
+		this.actualizarFiltros(() => this.requestSearch.set(value));
+  }
+
+  private actualizarFiltros(update: () => void): void {
+		this.filtersRefreshing.set(true);
+		update();
+		if (this.filterRefreshTimeout) clearTimeout(this.filterRefreshTimeout);
+		this.filterRefreshTimeout = setTimeout(() => this.filtersRefreshing.set(false), 220);
+  }
+
+  private normalizarTexto(value: string | null | undefined): string {
+		return (value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('es');
+	}
 
   // Chat state
   readonly activeChatId = signal<string | null>(null);
@@ -181,11 +226,23 @@ export class MyRequests {
   readonly specialtiesError = signal('');
 
   constructor() {
+    this.route.queryParamMap.subscribe((params) => {
+      const requestId = params.get('solicitudId');
+      if (!requestId) return;
+      this.pendingNotificationRequestId = requestId;
+      this.pendingNotificationOpensChat = params.get('abrirChat') === 'true';
+      this.openNotificationTargetIfReady();
+    });
     this.reloadRequests();
     this.loadEspecialidades();
   }
 
   reloadRequests(): void {
+    if (this.requests().length > 0) {
+      this.refreshing.set(true);
+    } else {
+      this.loading.set(true);
+    }
     const userId = this.auth.currentUser()?.id;
     if (userId) {
       const isProf = this.isProfessional();
@@ -204,6 +261,7 @@ export class MyRequests {
       ).subscribe((requests) => {
         // Pase lo que pase (lista o error) la carga terminó: se oculta el skeleton.
         this.loading.set(false);
+        this.refreshing.set(false);
         if (requests) {
           const filtered = isProf
             ? requests.filter((r) => r.clienteId !== userId)
@@ -223,12 +281,48 @@ export class MyRequests {
               this.loadProfesional(req.professionalId);
             }
           }
+          this.openNotificationTargetIfReady();
         }
       });
     } else {
       // Sin sesión no se pide nada: si no, el skeleton quedaría visible para siempre.
       this.loading.set(false);
+      this.refreshing.set(false);
     }
+  }
+
+  private openNotificationTargetIfReady(): void {
+    const requestId = this.pendingNotificationRequestId;
+    if (!requestId || this.loading()) return;
+    const request = this.requests().find((item) => String(item.id) === requestId);
+    if (!request) return;
+
+    const abrirChat = this.pendingNotificationOpensChat && request.status === 'ACEPTADA';
+    this.pendingNotificationRequestId = null;
+    this.pendingNotificationOpensChat = false;
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { solicitudId: null, abrirChat: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+
+    if (abrirChat) {
+      this.toggleChat(request.id);
+      return;
+    }
+
+    this.clearFilters();
+    this.highlightedRequestId.set(requestId);
+    if (this.highlightTimeout) clearTimeout(this.highlightTimeout);
+    requestAnimationFrame(() => {
+      document.getElementById(`solicitud-${requestId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    this.highlightTimeout = setTimeout(() => this.highlightedRequestId.set(null), 3000);
+  }
+
+  esSolicitudResaltada(requestId: string | number): boolean {
+		return this.highlightedRequestId() === String(requestId);
   }
 
   // ── Ficha del cliente (quién hace la solicitud) ──

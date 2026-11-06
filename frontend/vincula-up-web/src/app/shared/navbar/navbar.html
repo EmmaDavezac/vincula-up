@@ -92,7 +92,7 @@
 									<ul class="notification-list">
 										@for (item of notificaciones.notifications(); track item.id) {
 											<li>
-												<button type="button" class="notification-item" [class.is-unread]="!item.read" (click)="abrirSolicitudes()">
+													<button type="button" class="notification-item" [class.is-unread]="!item.read" (click)="abrirSolicitud(item)">
 													<span class="notification-item__title">{{ item.title }}</span>
 													<span class="notification-item__body">{{ item.body }}</span>
 													<time [attr.datetime]="item.createdAt">{{ item.createdAt | date: 'dd/MM/yy, HH:mm' }}</time>

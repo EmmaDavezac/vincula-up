@@ -25,6 +25,54 @@
 
 ## Historial
 
+### [2026-11-06] - ux: mantener Limpiar en fila y mostrar skeleton al filtrar
+- **Objetivo:** Evitar que «Limpiar» salte a otra línea en desktop y dar feedback cuando se recalculan resultados.
+- **Cambios realizados:** Se reserva una columna final alineada a la derecha para el botón en desktop; en tablet y móvil conserva su ubicación inferior alineada a la derecha. Cambios en búsqueda, categoría, estado o limpiar muestran el skeleton brevemente en la zona de resultados sin ocultar los controles.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-06] - ux: skeleton al actualizar solicitudes y estado sin resultados
+- **Objetivo:** Dar feedback durante recargas, explicar filtros sin coincidencias y alinear la acción Limpiar con los controles.
+- **Cambios realizados:** El botón Limpiar iguala la altura de inputs/selects. Tras una recarga de datos se muestra el skeleton animado solo en la zona de tarjetas, manteniendo filtros visibles. Si los filtros no encuentran solicitudes se muestra un estado vacío con acción para limpiarlos.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-06] - ux: adaptar búsqueda y filtros al rol y móvil
+- **Objetivo:** Buscar al profesional desde la vista del cliente y al cliente desde la vista profesional, manteniendo filtros compactos en móvil.
+- **Cambios realizados:** El campo de búsqueda cambia su etiqueta y nombre de contraparte según el rol, y sigue admitiendo dirección. El filtro por categoría queda visible aunque solo exista una opción. En móvil la búsqueda va en la primera fila y debajo aparecen categoría/estado; los títulos y controles tienen alturas uniformes.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-06] - ux: compactar encabezado de solicitudes
+- **Objetivo:** Adelantar el listado quitando contadores repetidos y reduciendo el espacio del título y bajada.
+- **Cambios realizados:** Se eliminaron «pendientes/en revisión» y «en total»; se redujeron tamaño y márgenes verticales del encabezado y la separación antes de los filtros.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-06] - ux: ordenar filtros de solicitudes en escritorio
+- **Objetivo:** Mostrar Buscar, Categoría y Estado en ese orden en escritorio, manteniendo Estado primero en móvil.
+- **Cambios realizados:** Se reordenaron los controles en el template; el orden responsive móvil conserva el filtro de estado a la izquierda.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.html`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-06] - ux: búsqueda y filtros de solicitudes responsive
+- **Objetivo:** Facilitar el filtrado de solicitudes en móvil y escritorio.
+- **Cambios realizados:** El filtro de estado aparece primero y alineado a la izquierda en móvil; se etiqueta el selector de especialidad como categoría y se agrega búsqueda local por nombre de profesional o dirección, combinable con los otros filtros. La búsqueda ignora mayúsculas y acentos; «Limpiar» restablece todos los criterios.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-06] - ux: alinear acciones de tarjetas de solicitudes
+- **Objetivo:** Dar media tarjeta a cada acción, fijar «Actualizar estado» a la derecha y mantener una acción única en ese lado.
+- **Cambios realizados:** Acciones de tarjetas en grilla de dos columnas iguales. Acciones secundarias (chat o buscar otro profesional) ocupan la izquierda y «Actualizar estado» la derecha; si solo hay una acción, también queda a la derecha.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
+### [2026-11-06] - feat: abrir solicitud desde su notificación
+- **Objetivo:** Al tocar una notificación, abrir la solicitud a la que corresponde.
+- **Cambios realizados:** Los avisos de la campana navegan con el ID de solicitud; los de mensaje abren directamente el chat y los de estado limpian filtros, desplazan y resaltan la tarjeta. Las notificaciones del navegador llevan el mismo destino. El aviso tocado se marca como leído.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/shared/navbar/navbar.html`, `frontend/vincula-up-web/src/app/shared/navbar/navbar.ts`, `frontend/vincula-up-web/src/app/core/services/notification.service.ts`, `frontend/vincula-up-web/public/sw.js`, `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
+- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+
 ### [2026-11-06] - ux: desplazar chat al mensaje más reciente
 - **Objetivo:** Mantener visible el mensaje más reciente al abrir, recibir o enviar mensajes.
 - **Cambios realizados:** Una directiva en el propio contenedor del diálogo observa cambios reales del DOM y baja al final al crearse el modal y al cargar, recibir o enviar mensajes; no depende de un `ViewChild` ubicado dentro de un `ng-template`.

@@ -148,6 +148,13 @@ export class NotificationService {
 		this.persistNotifications();
 	}
 
+	markRead(notificationId: string): void {
+		this.notifications.update((items) => items.map((item) =>
+			item.id === notificationId ? { ...item, read: true } : item,
+		));
+		this.persistNotifications();
+	}
+
 	clear(): void {
 		this.notifications.set([]);
 		this.persistNotifications();
@@ -245,6 +252,7 @@ export class NotificationService {
 	private async showBrowserNotification(item: AppNotification, showInForeground = false): Promise<void> {
 		if (this.permission() !== 'granted'
 			|| (!showInForeground && document.visibilityState === 'visible' && document.hasFocus())) return;
+		const url = this.urlDeNotificacion(item);
 		try {
 			const registration = await this.registerWorker();
 			if (registration) {
@@ -253,14 +261,25 @@ export class NotificationService {
 					icon: '/logo-cuadrado.png',
 					badge: '/favicon.ico',
 					tag: item.id,
-					data: { url: '/solicitudes' },
+					data: { url },
 				});
 			} else if (typeof Notification !== 'undefined') {
-				new Notification(item.title, { body: item.body, icon: '/logo-cuadrado.png', tag: `solicitud-${item.requestId}` });
+				const browserNotification = new Notification(item.title, {
+					body: item.body,
+					icon: '/logo-cuadrado.png',
+					tag: `solicitud-${item.requestId}`,
+				});
+				browserNotification.onclick = () => window.location.assign(url);
 			}
 		} catch {
 			// La bandeja Angular permanece disponible aunque el navegador bloquee notificaciones.
 		}
+	}
+
+	private urlDeNotificacion(item: AppNotification): string {
+		const query = new URLSearchParams({ solicitudId: item.requestId });
+		if (item.id.startsWith('mensaje:')) query.set('abrirChat', 'true');
+		return `/solicitudes?${query.toString()}`;
 	}
 
 	private async registerWorker(): Promise<ServiceWorkerRegistration | null> {
