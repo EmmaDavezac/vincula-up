@@ -23,7 +23,10 @@ Todo se levanta con Docker.
 
 ## Deploy local desde cero
 
-Son 5 pasos y la primera vez tarda unos minutos.
+La configuración del realm de Keycloak se aplica automáticamente al levantar
+Docker. Para el entorno local solo hay que preparar el host y confiar en la CA
+de desarrollo; `.env` es opcional si se usan los valores de demo. Después, un
+único comando construye y arranca todo el stack.
 
 ### 1. Requisitos
 
@@ -54,12 +57,19 @@ El repositorio trae una CA de desarrollo (`nginx/certs/ca.crt`). Instalala asi:
 
 > Importa siempre `ca.crt` (la CA), nunca `server.crt`.
 
-### 3. Preparar el `.env`
+### 3. Configuración opcional
 
-El `.env` guarda los secretos y **no se versiona**:
+Compose trae valores por defecto para desarrollo local. Si querés personalizarlos,
+creá `.env` desde la plantilla; el archivo real guarda secretos y **no se versiona**.
 
+**Linux / macOS:**
 ```bash
 cp .env.example .env
+```
+
+**Windows PowerShell:**
+```powershell
+Copy-Item .env.example .env
 ```
 
 > Si te pasaron un `.env` ya configurado, usa ese.
@@ -67,22 +77,45 @@ cp .env.example .env
 ### 4. Levantar la aplicación
 
 ```bash
-docker compose up --build
+# Despliegue rápido (importa CA, crea .env, levanta stack y bootstrap Keycloak)
+./scripts/deploy.sh
 ```
 
-La primera vez tarda unos minutos. Para dejarlo en segundo plano, agrega `-d`.
+#### Opción 1: Despliegue totalmente automatizado
+```bash
+# Importa CA, crea .env, levanta stack y bootstrap Keycloak
+./scripts/deploy.sh
+```
 
-### 5. Importar el realm de Keycloak
+#### Opción 2: Despliegue manual (pasos por separado)
+```bash
+# Importar la CA (Linux/macOS)
+bash scripts/linux-macos/import-ca.sh
 
-Con los contenedores ya arriba (el script aplica el auto-registro, el rol por
-defecto, el client de servicio y el SMTP):
+# Crear .env si no existe (usar la plantilla)
+cp .env.example .env   # o ajusta según necesites
+
+# Levantar el stack (rebuild)
+docker compose up --build -d
+
+# Ejecutar bootstrap de Keycloak (opcional, para realms existentes)
+bash scripts/linux-macos/keycloak-bootstrap.sh
+```
+
+La primera vez puede tardar varios minutos: Docker compila los microservicios y
+Angular, inicia PostgreSQL y Keycloak, importa el realm, ejecuta `keycloak-init`
+(registro, roles, client de servicio, permisos, SMTP y temas) y, al finalizar,
+arranca el BFF y Nginx. El init es idempotente y se ejecuta antes del BFF. En
+una instalación nueva no hay que correr el bootstrap de Keycloak manualmente.
+
+Para revisar el progreso: `docker compose ps` y `docker compose logs -f keycloak-init`.
+
+El bootstrap del host queda como herramienta de recuperación para realms existentes
+que no hayan ejecutado el init actualizado, o para sincronizar manualmente los
+redirects del cliente público:
 
 **Linux:** `./scripts/linux-macos/keycloak-bootstrap.sh`
 **Windows:** `powershell -ExecutionPolicy Bypass -File .\scripts\windows\keycloak-bootstrap.ps1`
-
-> Sin este paso, el registro de usuarios no funciona. Es idempotente: se puede
-> volver a correr sin romper nada. Tambien hay que repetirlo despues de un
-> `docker compose down -v`.
 
 ### Cómo entrar
 
@@ -101,7 +134,8 @@ docker compose down       # apaga todo (conserva los datos)
 ```
 
 > `docker compose down -v` además borra la base de datos. Después hay que
-> repetir el paso 5.
+> volver a levantar el stack; Keycloak importará el realm y `keycloak-init`
+> aplicará automáticamente su configuración.
 
 ---
 
