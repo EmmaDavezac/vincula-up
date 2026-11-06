@@ -54,8 +54,15 @@ acá y no en el `description` del client.
 
 ## Entonces, ¿cómo se configura el realm?
 
-Con los scripts de reconciliación, que usan la Admin API (`kcadm.sh`) y **sí**
-leen el `.env`:
+En el flujo normal, el servicio `keycloak-init` de Docker Compose espera a que
+Keycloak esté listo y reconcilia automáticamente el auto-registro, el rol
+`CLIENTE` por defecto, el client de servicio y permisos, el SMTP y los temas.
+Lee las variables del `.env` y se completa antes de que arranque el BFF.
+
+Los scripts del host siguen disponibles como reconciliación manual: vuelven a
+aplicar la configuración y sincronizan la lista de `redirectUris` y `webOrigins`
+del client público con el JSON, útil si ya había una instalación persistente o
+cambió esa lista:
 
 ```bash
 ./scripts/linux-macos/keycloak-bootstrap.sh
@@ -65,12 +72,12 @@ leen el `.env`:
 powershell -ExecutionPolicy Bypass -File .\scripts\windows\keycloak-bootstrap.ps1
 ```
 
-Son idempotentes y aplican, sobre un realm ya en marcha: el auto-registro, el rol
-`CLIENTE` por defecto, el client de servicio `vincula-up-admin` (con su **secret**
-tomado de `KEYCLOAK_ADMIN_CLIENT_SECRET`) y el **SMTP**.
+Son idempotentes y no borran usuarios ni datos.
 
-**Regla práctica:** si cambiás algo de identidad o de SMTP en el `.env`, volvé a
-correr el bootstrap. Es el único camino del `.env` a Keycloak.
+**Regla práctica:** si cambiás una variable de identidad o SMTP en `.env`, ejecutá
+`docker compose up -d`; Compose vuelve a correr `keycloak-init` cuando cambia su
+configuración. Si no se ejecuta por una instalación ya existente, corré el
+bootstrap del host.
 
 ## Si querés que el import vuelva a correr
 
@@ -81,15 +88,15 @@ mandar hay que borrar el realm junto con el volumen:
 docker compose down -v && docker compose up --build
 ```
 
-Perdés todos los usuarios y los datos cargados. Para cambios incrementales, el
-bootstrap es el camino.
+Perdés todos los usuarios y los datos cargados. En el siguiente `docker compose up`
+se importa el realm y `keycloak-init` aplica la configuración ambiental.
 
 ## Credenciales de demo que viven acá
 
 | Qué | Valor | Nota |
 |---|---|---|
 | `secret` de `vincula-up-admin` | `vincula-up-admin-secret` | **Público**: rotar antes de exponer el stack (ver el README principal) |
-| `smtpServer` | vacío salvo host y puerto | El bootstrap lo completa desde el `.env` |
+| `smtpServer` | vacío salvo host y puerto | `keycloak-init` lo completa desde el `.env` |
 | `cliente@vincula-up.local` | contraseña `password` | Cuenta de prueba del seed |
 | `profesional@vincula-up.local` | contraseña `password` | Cuenta de prueba del seed |
 | `admin@vincula-up.local` | contraseña `password` | Cuenta de prueba del seed |

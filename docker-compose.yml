@@ -67,14 +67,9 @@ services:
       # Necesario para que Keycloak sepa que está detrás de un proxy HTTPS
       KC_PROXY: edge
       KC_PROXY_HEADERS: xforwarded
-      # SMTP del realm (recupero de contraseña). Como queda configurado de
-      # verdad: lo aplica scripts/*/keycloak-bootstrap.* leyendo KEYCLOAK_SMTP_*
-      # del .env. El import del realm NO resuelve sus placeholders ${env.*}
-      # (ver keycloak/import/README.md), así que estas variables, por sí solas,
-      # no configuran el SMTP. Se pasan igual, con el nombre que usan esos
-      # placeholders, para que el contenedor ya tenga los valores el día que el
-      # import los pueda resolver. Sin KEYCLOAK_SMTP_PASSWORD el reseteo queda
-      # habilitado pero Keycloak no puede enviar el email.
+      # El import-realm no resuelve placeholders ${env.*}. keycloak-init aplica
+      # estas variables por Admin API cuando Keycloak está listo. Sin password,
+      # el reseteo queda habilitado pero Keycloak no puede enviar correos.
       KEYCLOAK_SMTP_HOST: ${KEYCLOAK_SMTP_HOST:-smtp.gmail.com}
       KEYCLOAK_SMTP_PORT: ${KEYCLOAK_SMTP_PORT:-587}
       KEYCLOAK_SMTP_STARTTLS: ${KEYCLOAK_SMTP_STARTTLS:-true}
@@ -111,33 +106,28 @@ services:
 
   keycloak-init:
     image: quay.io/keycloak/keycloak:26.3.3
-    container_name: vinculaup-keycloak-init
     depends_on:
       keycloak:
-        condition: service_started
+        condition: service_healthy
     restart: "no"
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-vincula-up}
-    entrypoint: /bin/bash
-    command:
-      - -lc
-      - |
-        for i in $(seq 1 120); do
-          if curl -fsS http://keycloak:8080/health/ready >/dev/null 2>&1 && \
-             /opt/keycloak/bin/kcadm.sh config credentials \
-               --server http://keycloak:8080 \
-               --realm master \
-               --user "$${KEYCLOAK_ADMIN}" \
-               --password "$${KEYCLOAK_ADMIN_PASSWORD}" >/dev/null 2>&1; then
-            break
-          fi
-          sleep 2
-        done
-        /opt/keycloak/bin/kcadm.sh update "realms/$${KEYCLOAK_REALM:-vincula-up}" \
-          -s "emailTheme=vincula-up" \
-          -s "loginTheme=vincula-up"
+      KEYCLOAK_ADMIN_CLIENT_ID: ${KEYCLOAK_ADMIN_CLIENT_ID:-vincula-up-admin}
+      KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-vincula-up-admin-secret}
+      KEYCLOAK_SMTP_HOST: ${KEYCLOAK_SMTP_HOST:-smtp.gmail.com}
+      KEYCLOAK_SMTP_PORT: ${KEYCLOAK_SMTP_PORT:-587}
+      KEYCLOAK_SMTP_STARTTLS: ${KEYCLOAK_SMTP_STARTTLS:-true}
+      KEYCLOAK_SMTP_AUTH: ${KEYCLOAK_SMTP_AUTH:-true}
+      KEYCLOAK_SMTP_USER: ${KEYCLOAK_SMTP_USER:-}
+      KEYCLOAK_SMTP_PASSWORD: ${KEYCLOAK_SMTP_PASSWORD:-}
+      KEYCLOAK_SMTP_FROM: ${KEYCLOAK_SMTP_FROM:-}
+      KEYCLOAK_SMTP_FROM_DISPLAY_NAME: ${KEYCLOAK_SMTP_FROM_DISPLAY_NAME:-Vincula-UP}
+      KEYCLOAK_SMTP_REPLY_TO: ${KEYCLOAK_SMTP_REPLY_TO:-}
+    entrypoint: ["/bin/bash", "/opt/keycloak-bootstrap-container.sh"]
+    volumes:
+      - ./scripts/keycloak-bootstrap-container.sh:/opt/keycloak-bootstrap-container.sh:ro
 
   postgres:
     image: postgres:16
@@ -266,6 +256,8 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_started
+      keycloak-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     environment:
       PORT: 9001
@@ -279,9 +271,9 @@ services:
       KEYCLOAK_ADMIN_BASE_URL: ${KEYCLOAK_ADMIN_BASE_URL:-http://keycloak:8080}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-vincula-up}
       KEYCLOAK_ADMIN_CLIENT_ID: ${KEYCLOAK_ADMIN_CLIENT_ID:-vincula-up-admin}
-      # Este es el valor que ve el BFF. El otro lado (Keycloak) lo setea el
-      # bootstrap a partir del MISMO valor del .env: el import del realm no lo
-      # lee. El default de abajo es el secreto de demo, que es PÚBLICO, y está
+      # Este es el valor que ve el BFF. keycloak-init aplica el mismo secreto
+      # a Keycloak por Admin API; el import del realm no lo lee. El default de
+      # abajo es el secreto de demo, que es PÚBLICO, y está
       # para que `docker compose up` funcione recién clonado. Rotarlo antes de
       # exponer el stack (ver MANUAL.md, "El secreto del client de servicio").
       KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-vincula-up-admin-secret}
