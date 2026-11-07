@@ -303,6 +303,8 @@ familias. La columna **Rol** refleja la regla real de `SecurityConfig.java`;
 | GET | `/api/profesionales/{id}/disponibilidad` | Autenticado | Lee horarios |
 | GET | `/api/mi-reputacion` | PROFESIONAL | Reputación del propio profesional |
 
+**Notas de implementación (2026-11-06):** La función `abrirNuevoProfesional()` en el componente `AdminProfessionals` (`frontend/vincula-up-web/src/app/admin/admin-professionals/admin-professionals.ts`) sufrió una refactorización para eliminar ~90 declaraciones duplicadas que causaban errores TS2393 "Duplicate function implementation". Se mantuvo una única declaración standalone que navega a `/admin/profesionales/nuevo`.
+
 ### 6.2 Solicitudes
 
 | Método | Ruta | Rol | Descripción |
