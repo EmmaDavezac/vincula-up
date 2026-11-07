@@ -25,22 +25,32 @@
 
 ## Historial
 
-### [2026-11-06] - ux: mantener Limpiar en fila y mostrar skeleton al filtrar
-- **Objetivo:** Evitar que «Limpiar» salte a otra línea en desktop y dar feedback cuando se recalculan resultados.
-- **Cambios realizados:** Se reserva una columna final alineada a la derecha para el botón en desktop; en tablet y móvil conserva su ubicación inferior alineada a la derecha. Cambios en búsqueda, categoría, estado o limpiar muestran el skeleton brevemente en la zona de resultados sin ocultar los controles.
-- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
-- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+### [2026-11-07] - fix: quitar botón espurio y restaurar barra de búsqueda en admin profesionales
+- **Objetivo:** Eliminar el botón “Buscar otro profesional” que se filtró dentro de la barra de búsqueda del padrón de profesionales y restablecer su diseño original.
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/admin/admin-professionals/admin-professionals.html`: se eliminó el botón espurio y se restauró la estructura original de la barra de búsqueda.
+  - `frontend/vincula-up-web/src/app/admin/admin-professionals/admin-professionals.css`: se eliminaron las reglas `.search-actions` agregadas por error.
+- **Verificación:** `npm run build` exitoso; reconstrucción y recreación del contenedor `nginx`.
+- **Especificación:** Sin cambios en rutas ni contratos.
 
-### [2026-11-06] - ux: skeleton al actualizar solicitudes y estado sin resultados
-- **Objetivo:** Dar feedback durante recargas, explicar filtros sin coincidencias y alinear la acción Limpiar con los controles.
-- **Cambios realizados:** El botón Limpiar iguala la altura de inputs/selects. Tras una recarga de datos se muestra el skeleton animado solo en la zona de tarjetas, manteniendo filtros visibles. Si los filtros no encuentran solicitudes se muestra un estado vacío con acción para limpiarlos.
-- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
-- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
 
-### [2026-11-06] - ux: adaptar búsqueda y filtros al rol y móvil
-- **Objetivo:** Buscar al profesional desde la vista del cliente y al cliente desde la vista profesional, manteniendo filtros compactos en móvil.
-- **Cambios realizados:** El campo de búsqueda cambia su etiqueta y nombre de contraparte según el rol, y sigue admitiendo dirección. El filtro por categoría queda visible aunque solo exista una opción. En móvil la búsqueda va en la primera fila y debajo aparecen categoría/estado; los títulos y controles tienen alturas uniformes.
-- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
+### [2026-11-07] - fix: 404 en POST /api/profesionales/alta por usuario inexistente no tratado como null
+- **Objetivo:** Resolver el error HTTP 404 "Usuario no encontrado" que devolvía `POST /api/profesionales/alta` al dar de alta un profesional cuyo correo no existía aún en `ms-usuarios`.
+- **Causa:** `BackendGateway.buscarUsuarioPorEmail()` propagaba el 404 de `ms-usuarios` (`/usuarios/por-email`) en vez de traducirlo a `null`, aunque `altaProfesional()` esperaba `null` para el caso de invitación nueva. El mismo problema afectaba al endpoint BFF `GET /api/usuarios/por-email`.
+- **Cambios realizados:**
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/BackendGateway.java`: `buscarUsuarioPorEmail()` ahora captura `ResponseStatusException` con estado 404 y devuelve `null`.
+- **Verificación:** `./mvnw clean compile` exitoso; reconstrucción y recreación de `bff-web`; `POST https://vincula-up.local/api/profesionales/alta` con token de ADMIN devuelve ahora `HTTP 201 Created`.
+- **Especificación:** Sin cambios en rutas ni contratos de API.
+
+
+
+### [2026-11-06] - fix: resolver duplicados de abrirNuevoProfesional en admin-professionals
+- **Objetivo:** Corregir el error TS2393 "Duplicate function implementation" causado por múltiples declaraciones de la función `abrirNuevoProfesional` en el componente `AdminProfessionals`.
+- **Cambios realizados:**
+  - Eliminadas ~90 declaraciones duplicadas de la función `abrirNuevoProfesional()` en `frontend/vincula-up-web/src/app/admin/admin-professionals/admin-professionals.ts`
+  - Mantener una única declaración standalone de `abrirNuevoProfesional(): void` que navega a `/admin/profesionales/nuevo`
+  - Removida la llamada incorrecta a `abrirNuevoProfesional()` dentro de `confirmarAccion()`
+- **Verificación:** `npm run build -- --configuration production` exitoso sin errores TS2393, TS1005 o TS2554requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
 - **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
 
 ### [2026-11-06] - ux: compactar encabezado de solicitudes
@@ -888,3 +898,10 @@
 - **Verificación:**
   - `npm run build` en el frontend compiló correctamente sin errores de TypeScript ni CSS.
 - **Especificación:** Actualizada en `ESPECIFICACION.md` con la ubicación de los estilos del modal.
+### [2026-11-07] - docs: corregir documentación de verifyEmail y confirmación de correo
+- **Objetivo:** Actualizar `ESPECIFICACION.md` para reflejar que el realm tiene `verifyEmail: true` y documentar la confirmación directa (clientes) e indirecta (profesionales por contraseña temporal).
+- **Cambios realizados:**
+  - `ESPECIFICACION.md`: tabla del realm (`verifyEmail: true`), bloque de verificación de correo, nota de limitación en el alta y fila de deuda técnica #8 actualizados.
+- **Verificación:** Revisión de consistencia con `keycloak/import/vincula-up-realm.json` y `KeycloakAdminService`.
+- **Especificación:** Actualizada en este mismo cambio.
+

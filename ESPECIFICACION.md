@@ -303,6 +303,8 @@ familias. La columna **Rol** refleja la regla real de `SecurityConfig.java`;
 | GET | `/api/profesionales/{id}/disponibilidad` | Autenticado | Lee horarios |
 | GET | `/api/mi-reputacion` | PROFESIONAL | Reputación del propio profesional |
 
+**Notas de implementación (2026-11-06):** La función `abrirNuevoProfesional()` en el componente `AdminProfessionals` (`frontend/vincula-up-web/src/app/admin/admin-professionals/admin-professionals.ts`) sufrió una refactorización para eliminar ~90 declaraciones duplicadas que causaban errores TS2393 "Duplicate function implementation". Se mantuvo una única declaración standalone que navega a `/admin/profesionales/nuevo`.
+
 ### 6.2 Solicitudes
 
 | Método | Ruta | Rol | Descripción |
@@ -633,11 +635,14 @@ cuenta de otro.
 **Si falla el registro, el modal no se cierra.** El estado solo cambia a aceptado
 cuando la llamada volvió bien.
 
-**Limitación conocida:** el realm tiene `verifyEmail: false`. Quien se
-auto-registra con un correo que ya tiene fila de negocio queda vinculado a esa
-fila y toma su rol. Con el alta nueva eso casi no puede pasar (la cuenta de
-Keycloak ya existe, así que no hay segunda auto-registración), pero sí con las
-cuentas antiguas ([§16](#16-deuda-técnica-conocida)).
+**Verificación de correo.** El realm tiene `verifyEmail: true`: quien se
+auto-registra (cliente) debe confirmar su correo antes de poder entrar. Las
+cuentas de profesionales creadas por el administrador se marcan
+`emailVerified: true` en Keycloak (la dirección la carga el admin), pero el
+profesional confirma indirectamente la posesión del correo porque la contraseña
+temporal y los pasos de activación llegan a esa dirección. Con el alta nueva, la
+auto-registración ya no crea una segunda cuenta sobre una fila de negocio
+existente: la cuenta de Keycloak se crea en el mismo paso del alta.
 
 ### 8.6 Configuración del realm
 
@@ -651,7 +656,7 @@ cuentas antiguas ([§16](#16-deuda-técnica-conocida)).
 | `loginWithEmailAllowed` | `true` — se accede con el email, sin nombre de usuario aparte |
 | `duplicateEmailsAllowed` | `false` |
 | `resetPasswordAllowed` | `true` (requiere SMTP configurado) |
-| `verifyEmail` | `false` |
+| `verifyEmail` | `true` — el auto-registro de clientes exige confirmar el correo antes de poder entrar |
 | `sslRequired` | `none` (el TLS lo termina nginx) |
 | Roles de realm | `CLIENTE`, `PROFESIONAL`, `ADMIN` |
 
@@ -1516,9 +1521,12 @@ mismo administrador: se completa en lugar de duplicarse (ver [§12.3](#123-ms-us
 no hay credenciales duplicadas. `APP_URL` es la base del enlace del correo; si
 se despliega en otro dominio, hay que cambiarla.
 
-> **Limitación conocida:** con `verifyEmail: false` (el estado actual del realm),
-> el paso 3 no verifica que el correo sea del propio profesional. Alguien con
-> acceso a su casilla puede activarlo primero. Ver §16.2.
+> **Verificación de correo:** con `verifyEmail: true` (estado actual del realm),
+> el auto-registro de clientes exige confirmar el correo antes de entrar. En el
+> alta de profesionales el BFF marca la cuenta como `emailVerified: true` porque la
+> dirección la carga el administrador, y el profesional confirma indirectamente la
+> posesión del correo al recibir ahí la contraseña temporal y los pasos de
+> activación. Ver §16.2.
 
 ---
 
@@ -1571,7 +1579,7 @@ Pendientes conocidos. No bloquean la demo, pero conviene tenerlos fichados.
 
 | # | Deuda | Impacto |
 |---|---|---|
-| 8 | **`verifyEmail: false`** | Nadie confirma que la dirección sea suya. Con el alta nueva el profesional no se auto-registra, así que el riesgo queda sobre todo en los clientes que se registran solos. Cerrarlo requiere `verifyEmail: true` en el realm **y** `docker compose down -v`; además rompe las cuentas `@vincula-up.local` de prueba, que no son entregables |
+| 8 | **Verificación de correo activada (`verifyEmail: true`)** | El auto-registro de clientes exige confirmar el correo antes de entrar. Las cuentas de profesionales creadas por el admin se marcan `emailVerified: true` (la dirección la carga el admin) y el profesional confirma indirectamente la posesión al recibir ahí la contraseña temporal. Ya no es una deuda abierta; se documenta como estado actual del realm |
 | 9 | **H2 por defecto en desarrollo** | Sin `DATABASE_URL`, los datos se pierden al reiniciar y el comportamiento difiere de producción |
 | 10 | **CORS con lista de orígenes fija** | `SecurityConfig.java` enumera los orígenes. Agregar un dominio es tocar código |
 | 11 | **Geocodificación puede resolver a otra ciudad** | Nominatim a veces devuelve un lugar homónimo: una dirección de Concepción del Uruguay terminó en Entre Ríos, Argentina. Es un comportamiento del servicio público, no del código; convendría validar el país del resultado |
