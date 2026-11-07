@@ -61,12 +61,12 @@
 							</button>
 							<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="cancelRename()">Cancelar</button>
 						} @else {
-							<button type="button" class="vu-btn vu-btn--ink vu-btn--sm" (click)="startRename(category)" [disabled]="busy()">
-								Renombrar
-							</button>
-							<button type="button" class="vu-btn vu-btn--danger vu-btn--sm" (click)="deleteCategory(category)" [disabled]="busy()">
-								Eliminar
-							</button>
+							<button type="button" mat-flat-button class="vu-btn vu-btn--ink vu-btn--sm" (click)="startRename(category)" [disabled]="busy()">
+	Renombrar
+</button>
+<button type="button" mat-flat-button class="vu-btn vu-btn--danger vu-btn--sm" (click)="deleteCategory(category)" [disabled]="busy()">
+	Eliminar
+</button>
 						}
 					</div>
 				</li>

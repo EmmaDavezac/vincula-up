@@ -24,7 +24,7 @@
 	border-radius: 0.75rem;
 	display: grid;
 	gap: 0.85rem;
-	grid-template-columns: minmax(0, 1fr);
+grid-template-columns: minmax(0, 1fr);
 	min-width: 0;
 	padding: 1rem;
 }
@@ -73,7 +73,7 @@
 
 /* ===== Tablet: botones en fila dentro de la tarjeta ===== */
 @media (min-width: 560px) {
-	.admin-categories__actions {
+.admin-categories__actions {
 		flex-direction: row;
 	}
 
@@ -96,7 +96,7 @@
 		border-radius: 0;
 		border-width: 0 0 1px;
 		gap: 1rem;
-		grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+		grid-template-columns: minmax(0, 2fr) minmax(0, 0.8fr);
 		padding: 0.9rem 0.5rem;
 	}
 
@@ -120,14 +120,19 @@
 		font-size: 1.0625rem;
 	}
 
-	.admin-categories__actions {
-		justify-content: flex-end;
+		.admin-categories__actions {
+		align-items: stretch;
+		flex-direction: column;
+		justify-content: center;
 	}
 
-	.admin-categories__actions .vu-btn {
-		flex: 0 0 auto;
-		width: auto;
-	}
+.admin-categories__actions .vu-btn {
+flex: 0 0 auto;
+justify-content: center;
+text-align: center;
+white-space: nowrap;
+width: 100%;
+    }
 }
 
 .admin-categories__search {

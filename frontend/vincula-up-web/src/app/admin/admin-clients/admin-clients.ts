@@ -123,7 +123,7 @@ export class AdminClients {
 				map(users => users.map(u => ({
 					...u,
 					fotoUrl: u.fotoUrl?.trim() || '',
-					tieneFoto: u.tieneFoto ?? false,
+					tieneFoto: Boolean(u.tieneFoto) || Boolean(u.fotoUrl && u.fotoUrl.trim().length > 0),
 				}))),
 				catchError((error) => {
 					this.aviso.set(avisoError(this.api.describeError(error, 'No se pudo cargar la lista de clientes.')));

@@ -183,15 +183,17 @@
 		display: none;
 	}
 
-	.admin-professionals__actions {
-		align-items: center;
-		flex-direction: row;
-		flex-wrap: wrap;
-		justify-content: flex-end;
+		.admin-professionals__actions {
+		align-items: stretch;
+		flex-direction: column;
+		justify-content: center;
 	}
 
 	.admin-professionals__actions .vu-btn {
-		width: auto;
+		justify-content: center;
+		text-align: center;
+		white-space: nowrap;
+		width: 100%;
 	}
 }
 .admin-professionals__search {

@@ -135,14 +135,17 @@
 		display: none;
 	}
 
-	.admin-clients__actions {
-		align-items: center;
-		flex-direction: row;
-		justify-content: flex-end;
+		.admin-clients__actions {
+		align-items: stretch;
+		flex-direction: column;
+		justify-content: center;
 	}
 
 	.admin-clients__actions .vu-btn {
-		width: auto;
+		justify-content: center;
+		text-align: center;
+		white-space: nowrap;
+		width: 100%;
 	}
 }
 .admin-clients__search {
