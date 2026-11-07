@@ -898,3 +898,10 @@
 - **Verificación:**
   - `npm run build` en el frontend compiló correctamente sin errores de TypeScript ni CSS.
 - **Especificación:** Actualizada en `ESPECIFICACION.md` con la ubicación de los estilos del modal.
+### [2026-11-07] - docs: corregir documentación de verifyEmail y confirmación de correo
+- **Objetivo:** Actualizar `ESPECIFICACION.md` para reflejar que el realm tiene `verifyEmail: true` y documentar la confirmación directa (clientes) e indirecta (profesionales por contraseña temporal).
+- **Cambios realizados:**
+  - `ESPECIFICACION.md`: tabla del realm (`verifyEmail: true`), bloque de verificación de correo, nota de limitación en el alta y fila de deuda técnica #8 actualizados.
+- **Verificación:** Revisión de consistencia con `keycloak/import/vincula-up-realm.json` y `KeycloakAdminService`.
+- **Especificación:** Actualizada en este mismo cambio.
+
