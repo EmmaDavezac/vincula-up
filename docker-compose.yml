@@ -98,7 +98,7 @@ services:
     # no puede usar HTTP. Se verifica TCP sobre el puerto 8080 con bash
     # (/dev/tcp), que sí está disponible en la imagen.
     healthcheck:
-      test: ["CMD-SHELL", "cat < /dev/tcp/127.0.0.1/8080 > /dev/null"]
+      test: ["CMD", "/bin/bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && exec 3>&- && exec 3<&-"]
       interval: 5s
       timeout: 5s
       retries: 12
