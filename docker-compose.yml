@@ -98,11 +98,11 @@ services:
     # no puede usar HTTP. Se verifica TCP sobre el puerto 8080 con bash
     # (/dev/tcp), que sí está disponible en la imagen.
     healthcheck:
-      test: ["CMD", "/bin/bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && exec 3>&- && exec 3<&-"]
+      test: ["CMD-SHELL", "cat < /dev/tcp/127.0.0.1/8080 > /dev/null"]
       interval: 5s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 12
+      start_period: 60s
 
   keycloak-init:
     image: quay.io/keycloak/keycloak:26.3.3
