@@ -101,8 +101,8 @@ services:
       test: ["CMD", "/bin/bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && exec 3>&- && exec 3<&-"]
       interval: 5s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 12
+      start_period: 60s
 
   keycloak-init:
     image: quay.io/keycloak/keycloak:26.3.3

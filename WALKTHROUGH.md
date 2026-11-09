@@ -25,6 +25,21 @@
 
 ## Historial
 
+### [2026-11-09] - fix: healthcheck de Keycloak con start_period insuficiente (flapping al arrancar)
+- **Objetivo:** Corregir el estado `unhealthy` persistente del contenedor `vinculaup-keycloak` al iniciar el stack, que impedía que `keycloak-init` ejecutara el bootstrap del realm y hacía fallar a los servicios dependientes (`dependency failed to start`).
+- **Causa:** Keycloak 26.3.3 tarda ~40 segundos en escuchar en el puerto 8080 (augmentación Quarkus + Liquibase + import del realm). El healthcheck tenía `start_period: 30s` y `retries: 5` (margen total ~55s), insuficiente: Docker lo marcaba `unhealthy` antes de que estuviera listo, y con `restart: unless-stopped` entraba en bucle de flapping. Además, el test del healthcheck (`cat < /dev/tcp/127.0.0.1/8080 > /dev/null`) podía bloquearse leyendo la conexión TCP hasta el `timeout`, sumando fallos falsos.
+- **Cambios realizados:**
+  - `docker-compose.yml`: servicio `keycloak`, `healthcheck`:
+    - `start_period: 30s` → `60s` (gracia suficiente para el arranque en frío).
+    - `retries: 5` → `12` (60s adicionales de sondeo tras la gracia).
+    - `test`: se restauró a `exec 3<>/dev/tcp/127.0.0.1/8080 && exec 3>&- && exec 3<&-` (abre y cierra la conexión TCP inmediatamente, sin bloquear), en vez de `cat < /dev/tcp/...` que se quedaba colgado esperando EOF.
+- **Verificación:**
+  - `docker compose up -d keycloak` → `vinculaup-keycloak` pasa a `(healthy)` con `RestartCount=0` (sin bucle de reinicio).
+  - `docker compose up -d keycloak-init` → script de bootstrap completa: "Keycloak realm vincula-up initialized." (cliente de servicio, roles y SMTP configurados).
+  - `docker compose ps`: todos los servicios (`postgres`, `keycloak`, `ms-usuarios`, `ms-profesionales`, `ms-solicitudes`) en `(healthy)`.
+- **Especificación:** Sin cambios en rutas ni contratos de API. Solo ajuste de temporización del healthcheck.
+
+
 ### [2026-11-07] - fix: quitar botón espurio y restaurar barra de búsqueda en admin profesionales
 - **Objetivo:** Eliminar el botón “Buscar otro profesional” que se filtró dentro de la barra de búsqueda del padrón de profesionales y restablecer su diseño original.
 - **Cambios realizados:**
