@@ -920,3 +920,13 @@
 - **Verificación:** Revisión de consistencia con `keycloak/import/vincula-up-realm.json` y `KeycloakAdminService`.
 - **Especificación:** Actualizada en este mismo cambio.
 
+### [2026-11-10] - fix: 401 al cambiar la contraseña en la consola de cuenta (usuarios de demo)
+
+- **Objetivo:** Los usuarios de demo no podían cambiar la contraseña desde `/realms/vincula-up/account` ("Algo salió mal", 401).
+- **Causa:** El import del realm crea a los usuarios de demo con `realmRoles` explícitos y Keycloak no les asigna `default-roles-vincula-up`, el rol compuesto que trae `manage-account`/`view-profile` del client `account`. Sin esos roles el token no incluye `account` en `aud` y la API de cuenta lo rechaza con 401.
+- **Cambios realizados:**
+  - `keycloak/import/vincula-up-realm.json`: se agrega `default-roles-vincula-up` a los `realmRoles` de los 3 usuarios de demo (instalaciones nuevas).
+  - `scripts/linux-macos/keycloak-bootstrap.sh` y `scripts/windows/keycloak-bootstrap.ps1`: asignan ese rol a los usuarios de demo existentes, de forma idempotente (instalaciones ya creadas).
+  - `ESPECIFICACION.md` (§14.1) y `keycloak/import/README.md`: documentan el cambio.
+- **Verificación:** `python3 -m json.tool` sobre el JSON y `bash -n` sobre el `.sh` pasan. No hay cambios de backend ni frontend. Falta la prueba en vivo (Docker estaba apagado): `docker compose up -d`, correr el bootstrap, entrar a `/realms/vincula-up/account` como `cliente@vincula-up.local` y cambiar la contraseña.
+- **Especificación:** Actualizada en este mismo cambio.
