@@ -1429,9 +1429,19 @@ se pierda al recrear el contenedor o al reiniciar el entorno local.
 powershell -ExecutionPolicy Bypass -File .\scripts\windows\keycloak-bootstrap.ps1   # Windows
 ```
 
-Qué aplica: auto-registro de clientes · rol `CLIENTE` por defecto · client de
-servicio `vincula-up-admin` con sus permisos (`manage-users`, `view-users`,
-`query-users`, `view-realm`) · configuración SMTP.
+Qué aplica: auto-registro de clientes · rol `CLIENTE` por defecto · rol
+`default-roles-vincula-up` a los usuarios de demo (`cliente@`, `profesional@`,
+`admin@vincula-up.local`) · client de servicio `vincula-up-admin` con sus
+permisos (`manage-users`, `view-users`, `query-users`, `view-realm`) ·
+configuración SMTP.
+
+> **Por qué se asigna `default-roles-vincula-up` a los usuarios de demo.** El
+> import los crea con `realmRoles` explícitos y Keycloak no les suma ese rol
+> compuesto, que es el que trae los roles del client `account`
+> (`manage-account`, `view-profile`). Sin ellos, el token no lleva `account` en
+> el `aud` y la consola de cuenta (`/realms/vincula-up/account`) responde
+> **401** al cambiar la contraseña. El JSON del import ya los incluye para
+> instalaciones nuevas; el bootstrap corrige las existentes.
 
 Carga el `.env` de la raíz automáticamente (`set -a` + `source` en bash;
 parseo línea por línea en PowerShell) y funciona sin él usando defaults.

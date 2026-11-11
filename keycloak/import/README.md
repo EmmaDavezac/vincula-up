@@ -56,7 +56,8 @@ acá y no en el `description` del client.
 
 En el flujo normal, el servicio `keycloak-init` de Docker Compose espera a que
 Keycloak esté listo y reconcilia automáticamente el auto-registro, el rol
-`CLIENTE` por defecto, el client de servicio y permisos, el SMTP y los temas.
+`CLIENTE` por defecto, el rol `default-roles-<realm>` en los usuarios de demo
+(sin él la consola de cuenta da 401 al cambiar la contraseña), el client de servicio y permisos, el SMTP y los temas.
 Lee las variables del `.env` y se completa antes de que arranque el BFF.
 
 Los scripts del host siguen disponibles como reconciliación manual: vuelven a
