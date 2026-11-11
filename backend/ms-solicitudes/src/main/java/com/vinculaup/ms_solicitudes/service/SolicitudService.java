@@ -10,7 +10,9 @@ import com.vinculaup.ms_solicitudes.dto.SolicitudResponse;
 import com.vinculaup.ms_solicitudes.entity.EstadoSolicitud;
 import com.vinculaup.ms_solicitudes.entity.RolCancelacion;
 import com.vinculaup.ms_solicitudes.entity.Solicitud;
+import com.vinculaup.ms_solicitudes.entity.SolicitudExpiradaException;
 import com.vinculaup.ms_solicitudes.repository.SolicitudRepository;
+import com.vinculaup.ms_solicitudes.config.SolicitudExpiradaException;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -28,6 +30,29 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 @Transactional
 public class SolicitudService {
+
+    private static final List<EstadoSolicitud> ESTADOS_ACTIVOS = List.of(
+            EstadoSolicitud.PENDIENTE, EstadoSolicitud.ACEPTADA);
+
+    private final SolicitudRepository repository;
+    private final ProfesionalesClient profesionalesClient;
+    private final GeocodingClient geocodingClient;
+
+    public SolicitudService(SolicitudRepository repository, ProfesionalesClient profesionalesClient,
+            GeocodingClient geocodingClient) {
+        this.repository = repository;
+        this.profesionalesClient = profesionalesClient;
+        this.geocodingClient = geocodingClient;
+    }
+
+    /** Verifica que la solicitud no haya expirado antes de operar */
+    private void verificarExpiracion(Solicitud solicitud) {
+        if (solicitud.getEsVencible() && solicitud.getFechaExpiracion() != null
+                && LocalDateTime.now().isAfter(solicitud.getFechaExpiracion())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Esta solicitud ha expirado por estar demasiado tiempo en estado PENDIENTE");
+        }
+    }
 
     private static final List<EstadoSolicitud> ESTADOS_ACTIVOS = List.of(
             EstadoSolicitud.PENDIENTE, EstadoSolicitud.ACEPTADA);

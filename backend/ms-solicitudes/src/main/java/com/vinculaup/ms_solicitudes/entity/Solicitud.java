@@ -91,7 +91,13 @@ public class Solicitud {
     @Column(nullable = false)
     private EstadoSolicitud estado;
 
-    private String motivoCancelacion;
+    /** Fecha y hora en que la solicitud expirará si permanece PENDIENTE. Nula = sin vencimiento. */
+    @Column(name = "fecha_expiracion", nullable = true, columnDefinition = "TIMESTAMP")
+    private LocalDateTime fechaExpiracion;
+
+    /** Indica si la solicitud debe considerarse vencida automáticamente */
+    @Column(name = "es_vencible", nullable = false)
+    private Boolean esVencible = true;
 
     /**
      * Identificador de quien canceló (el {@code clienteId} o el {@code profesionalId}
@@ -133,6 +139,9 @@ public class Solicitud {
         this.estado = EstadoSolicitud.PENDIENTE;
         this.fechaCreacion = LocalDateTime.now();
         this.fechaCambioEstado = this.fechaCreacion;
+        this.esVencible = true;
+        // Por defecto, una solicitud nueva vence a las 48 horas si no es atendida
+        this.fechaExpiracion = LocalDateTime.now().plusHours(48);
     }
 
     public UUID getId() { return id; }
@@ -180,8 +189,13 @@ public class Solicitud {
     public UUID getCanceladaPor() { return canceladaPor; }
     public LocalDateTime getFechaCreacion() { return fechaCreacion; }
     public LocalDateTime getFechaCambioEstado() { return fechaCambioEstado; }
+    public LocalDateTime getFechaExpiracion() { return fechaExpiracion; }
+    public Boolean getEsVencible() { return esVencible; }
 
     public void cambiarEstado(EstadoSolicitud nuevoEstado) {
+        if (this.esVencible && this.fechaExpiracion != null && LocalDateTime.now().isAfter(this.fechaExpiracion)) {
+            throw new SolicitudExpiradaException("Esta solicitud ha expirado y no puede tener su estado modificado");
+        }
         this.estado = nuevoEstado;
         this.fechaCambioEstado = LocalDateTime.now();
     }
