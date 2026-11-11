@@ -298,6 +298,9 @@
 [data-tema='oscuro'] .leaflet-control-attribution a {
 	color: var(--coral);
 }
+[data-tema='oscuro'] .map-modal__frame .embedded-map {
+	filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92) saturate(0.75);
+}
 
 * {
 	box-sizing: border-box;

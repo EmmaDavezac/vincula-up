@@ -147,15 +147,21 @@
 						-->
 						@if (isProfessional()) {
 							@if (embeddedMapUrl(request); as mapUrl) {
-								<div class="req-card__map mapa-embed-container" [class.mapa-embed--cargando]="mapaCargando()">
-									<iframe class="embedded-map" title="Mapa de la ubicación: {{ request.address }}" [src]="mapUrl" loading="lazy" (load)="onMapaLoad()"></iframe>
-									@if (mapaCargando()) {
-										<div class="mapa-embed__spinner">
-											<vu-spinner [etiqueta]="'Cargando mapa…'" [size]="'md'" />
-											<span class="mapa-embed__texto">Cargando mapa…</span>
-										</div>
-									}
-								</div>
+					<div class="req-card__map mapa-embed-container" [class.mapa-embed--cargando]="mapaCargando()">
+	<iframe class="embedded-map embedded-map--static" title="Mapa de la ubicación: {{ request.address }}" [src]="mapUrl" loading="lazy" scrolling="no" tabindex="-1" (load)="onMapaLoad()"></iframe>
+	<button type="button" class="req-card__map-hit" (click)="abrirMapa(request)" aria-label="Ver mapa ampliado"></button>
+	<button type="button" class="req-card__map-expand" (click)="abrirMapa(request)" aria-label="Ver mapa en pantalla completa" title="Pantalla completa">
+		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3" />
+		</svg>
+	</button>
+	@if (mapaCargando()) {
+		<div class="mapa-embed__spinner">
+			<vu-spinner [etiqueta]="'Cargando mapa…'" [size]="'md'" />
+			<span class="mapa-embed__texto">Cargando mapa…</span>
+		</div>
+	}
+</div>
 							} @else {
 								<!--
 									Sin coordenadas no hay nada que dibujar: la solicitud se
@@ -383,6 +389,36 @@
 			</section>
 		}
 	</ng-template>
+	<ng-template #mapDialog>
+	@if (solicitudDelMapa(); as solicitud) {
+		<section class="status-modal">
+			<header class="status-modal__head">
+				<h2 class="status-modal__title">Ubicación</h2>
+				<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="cerrarMapa()" aria-label="Cerrar">
+					<vu-icon name="x" [size]="18" />
+				</button>
+			</header>
+
+			<p class="status-modal__lead">
+				{{ isPending(solicitud) ? 'Zona aproximada: ' : '' }}{{ solicitud.address }}
+			</p>
+
+			@if (embeddedMapUrl(solicitud); as mapUrl) {
+				<div class="map-modal__frame">
+					<iframe class="embedded-map" title="Mapa ampliado: {{ solicitud.address }}" [src]="mapUrl"></iframe>
+				</div>
+			}
+
+			@if (googleMapsUrl(solicitud); as gmaps) {
+				<div class="status-modal__actions">
+					<a class="vu-btn vu-btn--coral" [href]="gmaps" target="_blank" rel="noopener noreferrer">
+						Abrir en Google Maps
+					</a>
+				</div>
+			}
+		</section>
+	}
+</ng-template>
 </section>
 </div>
 

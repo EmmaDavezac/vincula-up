@@ -25,7 +25,15 @@
 
 ## Historial
 
-### [2026-11-09] - fix: healthcheck de Keycloak con start_period insuficiente (flapping al arrancar)
+### [2026-11-11] - feat: mapa estático en solicitudes con mejor visualización y tema oscuro
+- **Objetivo:** Mejorar la visualización del mapa en la tarjeta de solicitudes, agregar soporte para modo oscuro y hacer el mapa más prominente sin controles de zoom ni arrastre.
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/my-requests/my-requests.css`: Agregado estilo `.embedded-map--static` con `height: calc(100% + 180px)` y `inset: -90px -60px` para expandir el mapa fuera del contenedor, sin controles de zoom ni arrastre.
+  - `frontend/vincula-up-web/src/app/my-requests/my-requests.html`: Reemplazado el contenedor de mapa para usar la nueva clase `.embedded-map--static`; el iframe ahora se agranda dentro del contenedor con `overflow: hidden` que recorta el zoom y la atribución.
+  - `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`: Agregado `mapRequestId` signal y `solicitudDelMapa` computed para gestionar qué solicitud mostrar en el mapa. Agregado `@ViewChild('mapDialog')` para abrir el diálogo del mapa.
+  - `frontend/vincula-up-web/src/styles.css`: Ajuste de filtro para `.map-modal__frame .embedded-map` en modo oscuro: `invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92) saturate(0.75)` para invertir colores y adaptar al tema oscuro.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` exitoso; revisión visual en modo claro y oscuro.
+- **Especificación:** Sin cambios en rutas ni contratos de API. Mejoras de UX en la presentación del mapa.
 - **Objetivo:** Corregir el estado `unhealthy` persistente del contenedor `vinculaup-keycloak` al iniciar el stack, que impedía que `keycloak-init` ejecutara el bootstrap del realm y hacía fallar a los servicios dependientes (`dependency failed to start`).
 - **Causa:** Keycloak 26.3.3 tarda ~40 segundos en escuchar en el puerto 8080 (augmentación Quarkus + Liquibase + import del realm). El healthcheck tenía `start_period: 30s` y `retries: 5` (margen total ~55s), insuficiente: Docker lo marcaba `unhealthy` antes de que estuviera listo, y con `restart: unless-stopped` entraba en bucle de flapping. Además, el test del healthcheck (`cat < /dev/tcp/127.0.0.1/8080 > /dev/null`) podía bloquearse leyendo la conexión TCP hasta el `timeout`, sumando fallos falsos.
 - **Cambios realizados:**
