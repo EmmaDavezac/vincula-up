@@ -141,6 +141,10 @@ public class NotificacionService {
                 asunto = "Vincula-UP · El profesional no respondió a tu solicitud";
                 detalle = "El profesional no respondió dentro del plazo estimado. Podés volver a la aplicación y solicitar a otro profesional para realizar el trabajo.";
             }
+            case "VENCIDA_PROFESIONAL" -> {
+                asunto = "Vincula-UP · Solicitud vencida por falta de respuesta";
+                detalle = "Una solicitud de servicio que recibiste venció porque no fue respondida dentro del plazo límite. Si el cliente todavía necesita el servicio, puede volver a contactarte desde la aplicación.";
+            }
             default -> {
                 log.warn("No se envió aviso de solicitud: estado no reconocido ({})", estadoNormalizado);
                 return false;

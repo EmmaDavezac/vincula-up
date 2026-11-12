@@ -25,6 +25,27 @@
 
 ## Historial
 
+### [2026-11-12] - fix: notificaciones de vencimiento con autenticación de servicio y aviso al profesional
+- **Objetivo:**
+  1. Corregir el error `401 UNAUTHORIZED` que impedía que el `SolicitudExpiracionScheduler` enviara mails al vencer solicitudes: el hilo de fondo no tenía contexto HTTP ni sesión WebSocket, por lo que `JdkHttpClientRequestFactory` no adjuntaba el header `Authorization` al llamar a `ms-usuarios` y `ms-profesionales`.
+  2. Notificar al **profesional** además del cliente cuando una solicitud vence por falta de respuesta.
+- **Causa del fallo:**
+  - El scheduler corría en un thread de fondo (`@Scheduled`) sin `HttpServletRequest` ni sesión WebSocket activa. `JdkHttpClientRequestFactory.authorizationHeaders()` devolvía headers vacíos → 401 en `ms-usuarios`.
+  - El scheduler solo notificaba al cliente; el profesional no recibía ningún aviso.
+- **Cambios realizados:**
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/SolicitudExpiracionScheduler.java`:
+    - Inyectados `KeycloakAdminService` y `WebSocketAuthorizationContext`.
+    - Se obtiene un token de cuenta de servicio (`client_credentials`) una vez por ciclo del scheduler.
+    - Todas las notificaciones de cada solicitud se envuelven en `authContext.withAuthorization("Bearer " + token, ...)` para que `JdkHttpClientRequestFactory` propague el token a `ms-usuarios` y `ms-profesionales`.
+    - Se agrega lógica para notificar al **profesional**: resuelve `profesionalId` → `buscarProfesionalPorIdOUsuario` → `usuarioId` → `buscarUsuarioPorIdOKeycloakId` → correo + WebPush.
+    - Cada bloque (cliente / profesional) tiene su propio `try/catch` para que un fallo al notificar a uno no impida notificar al otro.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/NotificacionService.java`:
+    - Agregado caso `VENCIDA_PROFESIONAL` en el switch de `avisarCambioSolicitud` con asunto `"Vincula-UP · Solicitud vencida por falta de respuesta"` y texto que informa al profesional que la solicitud venció por no responder a tiempo.
+- **Verificación:**
+  - Compilación `bff-web`: `./mvnw clean compile` → BUILD SUCCESS.
+  - Imagen Docker reconstruida y contenedor reiniciado: `docker compose build bff-web && docker compose up -d bff-web` → todos los contenedores `(healthy)`.
+  - Logs del scheduler sin errores 401; `INFO` de aviso enviado a cliente y profesional.
+
 ### [2026-11-12] - feat: aviso por correo de solicitud vencida y alta precisión en detección de ubicación
 - **Objetivo:**
   1. Enviar automáticamente el correo transaccional y la notificación WebPush al cliente cuando una solicitud pasa a estado `VENCIDA` ("El profesional no respondió, tienes que solicitar otro profesional").
