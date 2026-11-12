@@ -512,32 +512,66 @@ this.destroyRef.onDestroy(() => clearInterval(timer));
       return;
     }
     this.location.set({ ...this.location(), detecting: true, editing: false });
+
+    // Umbral de precisión aceptable en metros. El GPS tarda algunos segundos en
+    // fijar satélites; con watchPosition esperamos hasta tener una lectura buena
+    // o agotar el tiempo máximo (12 s).
+    const ACCURACY_THRESHOLD_M = 80;
+    const MAX_WAIT_MS = 12000;
+
     try {
-      navigator.geolocation.getCurrentPosition(
+      let watchId: number | null = null;
+      let resolved = false;
+      const deadline = setTimeout(() => {
+        // Si no llegó una lectura precisa a tiempo, cancelamos el watch.
+        // La última posición recibida ya fue aplicada (si hubo alguna).
+        if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      }, MAX_WAIT_MS);
+
+      watchId = navigator.geolocation.watchPosition(
         async (position) => {
-          const { latitude, longitude } = position.coords;
-          const name = await this.reverseGeocode(latitude, longitude);
-          this.aplicarUbicacionDetectada(latitude, longitude, name);
+          const { latitude, longitude, accuracy } = position.coords;
+
+          // Siempre mostramos la primera lectura para dar feedback rápido al usuario,
+          // pero seguimos observando hasta lograr precisión suficiente.
+          if (!resolved) {
+            resolved = true;
+            const name = await this.reverseGeocode(latitude, longitude);
+            this.aplicarUbicacionDetectada(latitude, longitude, name);
+          }
+
+          if (accuracy <= ACCURACY_THRESHOLD_M) {
+            // Precisión aceptable: dejamos de observar y refinamos si cambió.
+            clearTimeout(deadline);
+            navigator.geolocation.clearWatch(watchId!);
+            watchId = null;
+            const name = await this.reverseGeocode(latitude, longitude);
+            this.aplicarUbicacionDetectada(latitude, longitude, name);
+          }
         },
         (error) => {
-          if (error.code === error.TIMEOUT || error.code === error.POSITION_UNAVAILABLE) {
-            // Reintento con fallback si falla la alta precisión
-            navigator.geolocation.getCurrentPosition(
-              async (position) => {
-                const { latitude, longitude } = position.coords;
-                const name = await this.reverseGeocode(latitude, longitude);
-                this.aplicarUbicacionDetectada(latitude, longitude, name);
-              },
-              (fallbackError) => {
-                this.location.set({ ...this.location(), detecting: false });
-                this.toast.error(this.mensajeErrorGeolocalizacion(fallbackError));
-              },
-              { timeout: 20000, maximumAge: 60000, enableHighAccuracy: false },
-            );
-            return;
+          clearTimeout(deadline);
+          if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+          if (!resolved) {
+            if (error.code === error.TIMEOUT || error.code === error.POSITION_UNAVAILABLE) {
+              // Fallback con baja precisión (IP/WiFi)
+              navigator.geolocation.getCurrentPosition(
+                async (pos) => {
+                  const { latitude, longitude } = pos.coords;
+                  const name = await this.reverseGeocode(latitude, longitude);
+                  this.aplicarUbicacionDetectada(latitude, longitude, name);
+                },
+                (fallbackError) => {
+                  this.location.set({ ...this.location(), detecting: false });
+                  this.toast.error(this.mensajeErrorGeolocalizacion(fallbackError));
+                },
+                { timeout: 20000, maximumAge: 60000, enableHighAccuracy: false },
+              );
+              return;
+            }
+            this.location.set({ ...this.location(), detecting: false });
+            this.toast.error(this.mensajeErrorGeolocalizacion(error));
           }
-          this.location.set({ ...this.location(), detecting: false });
-          this.toast.error(this.mensajeErrorGeolocalizacion(error));
         },
         { timeout: 15000, maximumAge: 0, enableHighAccuracy: true },
       );
@@ -1155,7 +1189,7 @@ if (!franja || !this.franjaDisponible(this.date(), franja) || !this.trabajaEn(pr
     this.reverseGeocoding.set(true);
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=es&addressdetails=1`,
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=es&addressdetails=1&zoom=18`,
       );
       if (!res.ok) {
         throw new Error('No se pudo consultar el servicio de mapas.');
