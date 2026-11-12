@@ -34,15 +34,17 @@ public class SolicitudExpiracionScheduler {
 
     @Scheduled(fixedDelay = 15000, initialDelay = 10000)
     public void verificarSolicitudesExpiradas() {
+        log.debug("Verificando solicitudes pendientes expiradas...");
         try {
             JsonNode expiradas = gateway.expirarSolicitudesPendientes();
-            if (expiradas != null && expiradas.isArray()) {
+            if (expiradas != null && expiradas.isArray() && !expiradas.isEmpty()) {
+                log.info("Scheduler: {} solicitud(es) expirada(s) encontrada(s)", expiradas.size());
                 for (JsonNode solicitud : expiradas) {
                     notificarSolicitudExpirada(solicitud);
                 }
             }
         } catch (Exception ex) {
-            log.debug("Verificación de solicitudes expiradas: {}", ex.getMessage());
+            log.warn("Error al verificar solicitudes expiradas: {}", ex.getMessage());
         }
     }
 

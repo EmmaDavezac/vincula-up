@@ -82,6 +82,22 @@
   - Compilación exitosa en `backend/bff-web` mediante `./mvnw clean compile` (BUILD SUCCESS en 5.7s).
 - **Especificación:** Actualizada sección 11 con la nueva variable de entorno y comportamiento de expiración.
 
+### [2026-11-12] - fix: autenticación del scheduler de expiración (error 401 en llamada interna)
+- **Objetivo:** El scheduler `SolicitudExpiracionScheduler` recibía HTTP 401 al llamar internamente a `POST /solicitudes/expirar-pendientes` porque `SolicitudesClient` no adjuntaba ningún token de autorización.
+- **Causa raíz:** `SolicitudesClient` reenvía el JWT del usuario entrante mediante `JdkHttpClientRequestFactory`, pero la llamada del scheduler no tiene request entrante → no había token que reenviar.
+- **Solución:**
+  - `KeycloakAdminService.token()` renombrado a `tokenDeServicio()` y su visibilidad cambiada de `private` a `public`, reutilizando el flujo `client_credentials` ya existente con caché de 30s antes de expirar.
+  - `SolicitudesClient` inyecta `KeycloakAdminService` y en `expirarPendientes()` adjunta `Authorization: Bearer <token>` usando `tokenDeServicio()` si está disponible.
+  - `SolicitudExpiracionScheduler`: logging mejorado (`log.warn` en lugar de `log.debug` para errores; `log.info` cuando hay solicitudes procesadas).
+- **Archivos modificados:**
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/KeycloakAdminService.java`
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/client/SolicitudesClient.java`
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/SolicitudExpiracionScheduler.java`
+- **Verificación:**
+  - `./mvnw clean compile` en `bff-web` → BUILD SUCCESS.
+  - `docker compose build bff-web && docker compose up -d bff-web` → container sano.
+  - Logs del BFF sin errores 401/403; el scheduler dispara sin WARN de autenticación.
+
 ### [2026-11-11] - feat: mapa estático en solicitudes con mejor visualización y tema oscuro
 - **Objetivo:** Mejorar la visualización del mapa en la tarjeta de solicitudes, agregar soporte para modo oscuro y hacer el mapa más prominente sin controles de zoom ni arrastre.
 - **Cambios realizados:**

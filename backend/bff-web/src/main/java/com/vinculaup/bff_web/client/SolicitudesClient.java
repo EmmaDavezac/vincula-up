@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import com.vinculaup.bff_web.config.JdkHttpClientRequestFactory;
+import com.vinculaup.bff_web.service.KeycloakAdminService;
 
 import tools.jackson.databind.JsonNode;
 
@@ -25,15 +26,18 @@ import tools.jackson.databind.JsonNode;
 public class SolicitudesClient {
 
     private final RestClient restClient;
+    private final KeycloakAdminService keycloakAdminService;
 
     public SolicitudesClient(@Value("${solicitudes.url}") String baseUrl,
-            JdkHttpClientRequestFactory requestFactory) {
+            JdkHttpClientRequestFactory requestFactory,
+            KeycloakAdminService keycloakAdminService) {
         this.restClient = RestClient.builder()
                 .baseUrl(baseUrl)
                 .requestFactory(requestFactory)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
                 .build();
+        this.keycloakAdminService = keycloakAdminService;
     }
 
     public JsonNode geocodificar(String direccion) {
@@ -170,9 +174,12 @@ public class SolicitudesClient {
     }
 
     public JsonNode expirarPendientes() {
-        return restClient.post()
-                .uri("/solicitudes/expirar-pendientes")
-                .retrieve()
+        var spec = restClient.post()
+                .uri("/solicitudes/expirar-pendientes");
+        // Llamada interna de scheduler: se autentica con el token de cuenta de servicio
+        keycloakAdminService.tokenDeServicio()
+                .ifPresent(t -> spec.header(HttpHeaders.AUTHORIZATION, "Bearer " + t));
+        return spec.retrieve()
                 .body(JsonNode.class);
     }
 
