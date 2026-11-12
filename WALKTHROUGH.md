@@ -82,6 +82,16 @@
   - Compilación exitosa en `backend/bff-web` mediante `./mvnw clean compile` (BUILD SUCCESS en 5.7s).
 - **Especificación:** Actualizada sección 11 con la nueva variable de entorno y comportamiento de expiración.
 
+### [2026-11-12] - fix: botón "Buscar otro profesional" en VENCIDA y dirección completa para el cliente
+- **Objetivo:** Corregir dos problemas de UI en la pantalla "Mis solicitudes":
+  1. El botón "Buscar otro profesional" no aparecía cuando la solicitud estaba en estado `VENCIDA`.
+  2. El cliente veía su propia dirección con el prefijo `Zona:` (ocultamiento parcial pensado solo para el profesional).
+- **Cambios realizados:**
+  - `my-requests.html` línea 214: condición del botón extendida a `RECHAZADA || VENCIDA`.
+  - `my-requests.html` línea 135: prefijo `Zona:` condicionado a `isProfessional() && isPending()` (solo profesional, solo pendiente).
+  - `my-requests.html` línea 403 (modal de mapa): misma corrección para el diálogo de mapa ampliado.
+- **Verificación:** `npm run build` → BUILD SUCCESS (sin errores nuevos).
+
 ### [2026-11-12] - fix: autenticación del scheduler de expiración (error 401 en llamada interna)
 - **Objetivo:** El scheduler `SolicitudExpiracionScheduler` recibía HTTP 401 al llamar internamente a `POST /solicitudes/expirar-pendientes` porque `SolicitudesClient` no adjuntaba ningún token de autorización.
 - **Causa raíz:** `SolicitudesClient` reenvía el JWT del usuario entrante mediante `JdkHttpClientRequestFactory`, pero la llamada del scheduler no tiene request entrante → no había token que reenviar.
