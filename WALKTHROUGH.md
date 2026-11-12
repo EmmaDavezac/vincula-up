@@ -25,6 +25,31 @@
 
 ## Historial
 
+### [2026-11-12] - feat: aviso por correo de solicitud vencida y alta precisión en detección de ubicación
+- **Objetivo:**
+  1. Enviar automáticamente el correo transaccional y la notificación WebPush al cliente cuando una solicitud pasa a estado `VENCIDA` ("El profesional no respondió, tienes que solicitar otro profesional").
+  2. Implementar un scheduler periódico en el BFF que detecte y actualice las solicitudes pendientes que superaron su tiempo de vencimiento sin requerir interacción manual.
+  3. Mejorar la detección de geolocalización en el navegador activando alta precisión (`enableHighAccuracy: true`, `maximumAge: 0`), zoom de calle en Leaflet y geocodificación inversa detallada con altura de calle.
+  4. Realizar auto-logout en el frontend si el backend responde 401 o 404 en `/usuarios/yo` tras reiniciar la base de datos, evitando que el usuario quede bloqueado con tokens caducos.
+- **Cambios realizados:**
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/entity/Solicitud.java`: Permitido cambio de estado a `VENCIDA` y agregado método `expirar(String motivo)`.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/repository/SolicitudRepository.java`: Agregada consulta `findPendientesExpiradas` para solicitudes pendientes cuyo `fechaExpiracion` ya venció.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/service/SolicitudService.java`: Implementado `expirarPendientes()` que pasa las solicitudes expiradas a `VENCIDA` y las persiste.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/controller/SolicitudController.java`: Expuesto endpoint interno `POST /solicitudes/expirar-pendientes`.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/config/SecurityConfig.java`: Permitido `/solicitudes/expirar-pendientes` en llamadas internas.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/BffWebApplication.java`: Habilitado `@EnableScheduling`.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/client/SolicitudesClient.java` y `BackendGateway.java`: Agregado cliente para `expirarPendientes()`.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/NotificacionService.java`: Agregado caso `VENCIDA` con asunto `"Vincula-UP · El profesional no respondió a tu solicitud"` y cuerpo explicando que puede solicitar a otro profesional.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/controller/ApiController.java`: Ajustado `notificarCambioSolicitud` y `notificarPushSolicitud` para enviar avisos de solicitudes vencidas al cliente.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/SolicitudExpiracionScheduler.java`: Nuevo componente programado cada 15s que consulta solicitudes vencidas y despacha correos y notificaciones WebPush.
+  - `frontend/vincula-up-web/src/app/core/services/auth.service.ts`: Auto-logout en `loadOwnPhoto()` ante códigos HTTP 401 o 404.
+  - `frontend/vincula-up-web/src/app/request/request.ts` y `activation.ts`: Geolocalización con `enableHighAccuracy: true`, `maximumAge: 0`, centrado dinámico en el mapa con nivel de zoom 16+ y reverse geocoding con calle y numeración.
+  - `ESPECIFICACION.md`: Actualizada documentación del ciclo de vida de solicitudes y detección de ubicación.
+- **Verificación:**
+  - Compilación backend `ms-solicitudes`: `./mvnw clean compile` exitoso (BUILD SUCCESS).
+  - Compilación backend `bff-web`: `./mvnw clean compile` exitoso (BUILD SUCCESS).
+  - Compilación frontend `vincula-up-web`: `npm run build` exitoso (BUILD SUCCESS).
+
 ### [2026-11-12] - fix: soporte a horas decimales de expiración y corrección de arranque de ms-solicitudes
 - **Objetivo:** Permitir configurar tiempos de expiración inferiores a 1 hora (ej: 0.5 para 30 minutos, 0.25 para 15 minutos) para pruebas y demostraciones, y solucionar el error de contenedor `vinculaup-ms-solicitudes is unhealthy` en Docker Compose.
 - **Causa del fallo:**

@@ -462,7 +462,9 @@ this.destroyRef.onDestroy(() => clearInterval(timer));
       return;
     }
     this.marcador?.setLatLng([lat, lng]);
-    this.mapaInstancia?.setView([lat, lng], this.mapaInstancia.getZoom() ?? 15);
+    const zoomActual = this.mapaInstancia?.getZoom();
+    const nuevoZoom = zoomActual && zoomActual > 16 ? zoomActual : 16;
+    this.mapaInstancia?.setView([lat, lng], nuevoZoom);
   }
 
   hideSuggestionLater(): void {
@@ -519,6 +521,7 @@ this.destroyRef.onDestroy(() => clearInterval(timer));
         },
         (error) => {
           if (error.code === error.TIMEOUT || error.code === error.POSITION_UNAVAILABLE) {
+            // Reintento con fallback si falla la alta precisión
             navigator.geolocation.getCurrentPosition(
               async (position) => {
                 const { latitude, longitude } = position.coords;
@@ -529,14 +532,14 @@ this.destroyRef.onDestroy(() => clearInterval(timer));
                 this.location.set({ ...this.location(), detecting: false });
                 this.toast.error(this.mensajeErrorGeolocalizacion(fallbackError));
               },
-              { timeout: 25000, maximumAge: 300000, enableHighAccuracy: false },
+              { timeout: 20000, maximumAge: 60000, enableHighAccuracy: false },
             );
             return;
           }
           this.location.set({ ...this.location(), detecting: false });
           this.toast.error(this.mensajeErrorGeolocalizacion(error));
         },
-        { timeout: 12000, maximumAge: 300000, enableHighAccuracy: false },
+        { timeout: 15000, maximumAge: 0, enableHighAccuracy: true },
       );
     } catch {
       this.location.set({ ...this.location(), detecting: false });
@@ -551,6 +554,7 @@ this.destroyRef.onDestroy(() => clearInterval(timer));
     this.pendingLocation.set({ lat: latitude, lng: longitude, displayName: name });
     this.form.update((current) => emptyServiceRequest({ ...current, address: name, latitude, longitude }));
     this.updateDistances(latitude, longitude);
+    this.previsualizarPunto(latitude, longitude);
   }
 
   private mensajeErrorGeolocalizacion(error: GeolocationPositionError): string {
@@ -1151,12 +1155,25 @@ if (!franja || !this.franjaDisponible(this.date(), franja) || !this.trabajaEn(pr
     this.reverseGeocoding.set(true);
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=es`,
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=es&addressdetails=1`,
       );
       if (!res.ok) {
         throw new Error('No se pudo consultar el servicio de mapas.');
       }
-      const data = (await res.json()) as { display_name?: string };
+      const data = (await res.json()) as { display_name?: string; address?: Record<string, string> };
+      if (data.address) {
+        const road = data.address['road'] || data.address['pedestrian'] || data.address['street'] || '';
+        const houseNumber = data.address['house_number'] || '';
+        const suburb = data.address['suburb'] || data.address['neighbourhood'] || data.address['city_district'] || '';
+        const city = data.address['city'] || data.address['town'] || data.address['village'] || '';
+        if (road && houseNumber) {
+          const parts = [`${road} ${houseNumber}`, suburb, city].filter(Boolean);
+          return parts.join(', ');
+        } else if (road) {
+          const parts = [road, suburb, city].filter(Boolean);
+          return parts.join(', ');
+        }
+      }
       return data.display_name || 'Tu ubicación';
     } catch {
       return 'Tu ubicación';

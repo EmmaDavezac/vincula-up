@@ -169,4 +169,11 @@ public class SolicitudesClient {
                 .body(JsonNode.class);
     }
 
+    public JsonNode expirarPendientes() {
+        return restClient.post()
+                .uri("/solicitudes/expirar-pendientes")
+                .retrieve()
+                .body(JsonNode.class);
+    }
+
 }

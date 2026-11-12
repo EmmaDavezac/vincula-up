@@ -458,11 +458,17 @@ categoría, incluso del mismo cliente.
 **Transiciones válidas** (validadas en `SolicitudService`):
 
 ```
-PENDIENTE ──aceptar──▶ ACEPTADA ──completar──▶ COMPLETADA
-    │                     │
-    ├──rechazar──▶ RECHAZADA
-    └──cancelar──▶ CANCELADA ◀──cancelar── (desde ACEPTADA)
+PENDIENTE ──aceptar──────▶ ACEPTADA ──completar──▶ COMPLETADA
+    │                         │
+    ├──rechazar─────▶ RECHAZADA
+    ├──cancelar─────▶ CANCELADA ◀──cancelar── (desde ACEPTADA)
+    └──expiración───▶ VENCIDA
 ```
+
+**Expiración automática y notificación:**
+Cuando una solicitud en estado `PENDIENTE` supera su tiempo de expiración (`SOLICITUDES_TIEMPO_EXPIRACION_HOURS`), `SolicitudExpiracionScheduler` en `bff-web` (ejecutado cada 15 segundos) invoca `POST /solicitudes/expirar-pendientes` en `ms-solicitudes`. El estado pasa a `VENCIDA` y se despacha automáticamente:
+- **Correo transaccional:** Con asunto `Vincula-UP · El profesional no respondió a tu solicitud` y detalle explicando que el profesional no respondió en tiempo y forma, invitando al cliente a solicitar otro profesional.
+- **Notificación WebPush:** Al cliente con título `Solicitud vencida`.
 
 ### 7.5 `ms-solicitudes` — Mensaje y Calificacion
 
@@ -881,6 +887,11 @@ evita consultas repetidas contra un proveedor que limita a 1 req/s.
 devuelve lo mismo con `source: servicio-no-disponible` en vez de cortar con 502:
 una falla del backend de solicitudes no debe dejar sin geocodificar a toda la
 app. En ninguno de los dos casos se lanza excepción.
+
+**Detección de ubicación en el navegador (Frontend):**
+- Tanto en la creación de solicitud (`/solicitar`) como en la activación de profesionales (`/activar-perfil`), se utiliza la Geolocation API del navegador configurada con alta precisión (`enableHighAccuracy: true`, `maximumAge: 0`, `timeout: 15s`) para activar el hardware GPS y/o triangulación Wi-Fi precisa en lugar de depender de la aproximación gruesa por IP.
+- Si el hardware GPS no está disponible o da timeout, se realiza un segundo intento de fallback con menor precisión.
+- Al obtener las coordenadas, se centra inmediatamente el mapa interactivo (Leaflet) en nivel de zoom de calle (16+) y se realiza geocodificación inversa detallada (`reverseGeocode` con `addressdetails=1`) para extraer calle y número exactos.
 
 ### 10.2 Cifrado de ubicaciones
 

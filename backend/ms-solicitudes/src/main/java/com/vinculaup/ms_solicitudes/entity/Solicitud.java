@@ -217,10 +217,16 @@ public class Solicitud {
     }
 
     public void cambiarEstado(EstadoSolicitud nuevoEstado) {
-        if (isExpirada()) {
+        if (isExpirada() && nuevoEstado != EstadoSolicitud.VENCIDA) {
             throw new SolicitudExpiradaException("Esta solicitud ha expirado y no puede tener su estado modificado");
         }
         this.estado = nuevoEstado;
+        this.fechaCambioEstado = LocalDateTime.now();
+    }
+
+    public void expirar(String motivo) {
+        this.motivoCancelacion = motivo;
+        this.estado = EstadoSolicitud.VENCIDA;
         this.fechaCambioEstado = LocalDateTime.now();
     }
 

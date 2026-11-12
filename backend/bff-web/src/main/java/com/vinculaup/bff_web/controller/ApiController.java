@@ -984,6 +984,9 @@ public class ApiController {
             if ("PENDIENTE".equalsIgnoreCase(estado)) {
                 destinatarioId = uuidOrNull(solicitud.path("profesionalId").asText(null));
                 esProfesional = true;
+            } else if ("VENCIDA".equalsIgnoreCase(estado)) {
+                destinatarioId = uuidOrNull(solicitud.path("clienteId").asText(null));
+                esProfesional = false;
             } else if ("CLIENTE".equalsIgnoreCase(rolActor)) {
                 destinatarioId = uuidOrNull(solicitud.path("profesionalId").asText(null));
                 esProfesional = true;
@@ -1048,6 +1051,10 @@ public class ApiController {
             case "CANCELADA" -> {
                 title = "Solicitud cancelada";
                 detail = "La solicitud fue cancelada.";
+            }
+            case "VENCIDA" -> {
+                title = "Solicitud vencida";
+                detail = "El profesional no respondió a tiempo. Podés solicitar a otro profesional.";
             }
             default -> { return; }
         }

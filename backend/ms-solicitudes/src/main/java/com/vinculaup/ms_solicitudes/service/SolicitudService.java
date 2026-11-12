@@ -56,6 +56,24 @@ public class SolicitudService {
         }
     }
 
+    /**
+     * Pasa a estado VENCIDA todas las solicitudes pendientes cuyo tiempo límite ya venció.
+     * Retorna las solicitudes actualizadas para que puedan ser notificadas.
+     */
+    @Transactional
+    public List<SolicitudResponse> expirarPendientes() {
+        LocalDateTime ahora = LocalDateTime.now();
+        List<Solicitud> expiradas = repository.findPendientesExpiradas(ahora);
+        if (expiradas.isEmpty()) {
+            return List.of();
+        }
+        for (Solicitud s : expiradas) {
+            s.expirar("El profesional no respondió dentro del plazo límite.");
+        }
+        repository.saveAll(expiradas);
+        return expiradas.stream().map(this::toResponse).toList();
+    }
+
     public SolicitudResponse crear(CrearSolicitudRequest request) {
         // El frontend puede enviar el id del perfil del padrón o el usuarioId de ms-usuarios:
         // se resuelve el perfil y se persiste siempre su id canónico para que la validación de

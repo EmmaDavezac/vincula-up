@@ -109,4 +109,13 @@ public class SolicitudController {
     public SolicitudResponse cancelar(@PathVariable UUID id, @Valid @RequestBody CambiarEstadoRequest request) {
         return service.cancelar(id, request);
     }
+
+    /**
+     * Pasa a estado VENCIDA todas las solicitudes pendientes que superaron su tiempo límite.
+     * Retorna la lista de solicitudes vencidas para su notificación.
+     */
+    @PostMapping("/expirar-pendientes")
+    public List<SolicitudResponse> expirarPendientes() {
+        return service.expirarPendientes();
+    }
 }
