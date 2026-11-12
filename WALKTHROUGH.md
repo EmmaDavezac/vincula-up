@@ -25,6 +25,19 @@
 
 ## Historial
 
+### [2026-11-12] - fix: soporte a horas decimales de expiración y corrección de arranque de ms-solicitudes
+- **Objetivo:** Permitir configurar tiempos de expiración inferiores a 1 hora (ej: 0.5 para 30 minutos, 0.25 para 15 minutos) para pruebas y demostraciones, y solucionar el error de contenedor `vinculaup-ms-solicitudes is unhealthy` en Docker Compose.
+- **Causa del fallo:**
+  - `SolicitudService` tenía dos constructores sobrecargados; Spring Boot fallaba al resolver la inyección sin `@Autowired` explícito (`No default constructor found` / `BeanInstantiationException`).
+  - La expiración solo aceptaba `long` y sumaba horas enteras (`plusHours`), sin admitir fracciones de hora.
+- **Cambios realizados:**
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/service/SolicitudService.java`: Se unificó a un único constructor que inyecta `double tiempoExpiracionHours`, eliminando la ambigüedad para Spring.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/entity/Solicitud.java`: Se cambió `tiempoExpiracionHours` a `double` y el cálculo a minutos (`Math.round(tiempoExpiracionHours * 60.0)` con `plusMinutes`).
+  - `.env.example` y `ESPECIFICACION.md`: Documentado el soporte a valores decimales (`0.5`, `0.25`).
+- **Verificación:**
+  - Compilación exitosa en `backend/ms-solicitudes` con `./mvnw clean compile`.
+  - Reconstrucción de la imagen Docker de `ms-solicitudes` y verificación del stack completo con `docker compose ps`: todos los contenedores (`vinculaup-postgres`, `vinculaup-keycloak`, `vinculaup-ms-usuarios`, `vinculaup-ms-profesionales`, `vinculaup-ms-solicitudes`, `vinculaup-bff-web`, `vinculaup-nginx`) en estado `(healthy)` y activos.
+
 ### [2026-11-12] - fix: corregir errores de compilación en ms-solicitudes por expiración de solicitudes
 - **Objetivo:** Resolver los fallos de compilación de Maven en `ms-solicitudes` producidos durante la compilación en Docker/local tras la introducción de la expiración de solicitudes PENDIENTE.
 - **Causa:**

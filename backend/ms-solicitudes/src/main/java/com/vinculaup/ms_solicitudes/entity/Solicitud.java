@@ -123,19 +123,19 @@ public class Solicitud {
             Double latitud, Double longitud, LocalDateTime fechaHoraPropuesta, String descripcion,
             LocalDateTime fechaHoraFinPropuesta) {
         this(clienteId, profesionalId, especialidadId, direccionServicio, null,
-                latitud, longitud, fechaHoraPropuesta, descripcion, fechaHoraFinPropuesta, 24);
+                latitud, longitud, fechaHoraPropuesta, descripcion, fechaHoraFinPropuesta, 24.0);
     }
 
     public Solicitud(UUID clienteId, UUID profesionalId, UUID especialidadId, String direccionServicio,
             String zonaAproximada, Double latitud, Double longitud, LocalDateTime fechaHoraPropuesta,
             String descripcion, LocalDateTime fechaHoraFinPropuesta) {
         this(clienteId, profesionalId, especialidadId, direccionServicio, zonaAproximada,
-                latitud, longitud, fechaHoraPropuesta, descripcion, fechaHoraFinPropuesta, 24);
+                latitud, longitud, fechaHoraPropuesta, descripcion, fechaHoraFinPropuesta, 24.0);
     }
 
     public Solicitud(UUID clienteId, UUID profesionalId, UUID especialidadId, String direccionServicio,
             String zonaAproximada, Double latitud, Double longitud, LocalDateTime fechaHoraPropuesta,
-            String descripcion, LocalDateTime fechaHoraFinPropuesta, long tiempoExpiracionHours) {
+            String descripcion, LocalDateTime fechaHoraFinPropuesta, double tiempoExpiracionHours) {
         this.clienteId = clienteId;
         this.profesionalId = profesionalId;
         this.especialidadId = especialidadId;
@@ -150,8 +150,9 @@ public class Solicitud {
         this.fechaCreacion = LocalDateTime.now();
         this.fechaCambioEstado = this.fechaCreacion;
         this.esVencible = tiempoExpiracionHours > 0;
-        this.fechaExpiracion = tiempoExpiracionHours > 0
-                ? this.fechaCreacion.plusHours(tiempoExpiracionHours)
+        long minutos = Math.round(tiempoExpiracionHours * 60.0);
+        this.fechaExpiracion = (tiempoExpiracionHours > 0 && minutos > 0)
+                ? this.fechaCreacion.plusMinutes(minutos)
                 : null;
     }
 

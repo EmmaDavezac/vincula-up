@@ -1265,7 +1265,7 @@ Generar con `openssl rand -base64 32`.
 
 | Variable | Default | Descripción |
 |---|---|---|
-| `SOLICITUDES_TIEMPO_EXPIRACION_HOURS` | `24` | Horas de vigencia para solicitudes en estado `PENDIENTE`. Cumplido este plazo, la solicitud se considera `VENCIDA` y no admite transiciones |
+| `SOLICITUDES_TIEMPO_EXPIRACION_HOURS` | `24` | Horas de vigencia para solicitudes en estado `PENDIENTE`. Admite valores enteros o decimales (ej: `0.5` para 30 minutos, `0.25` para 15 minutos). Cumplido este plazo, la solicitud se considera `VENCIDA` y no admite transiciones |
 
 ### pgAdmin
 

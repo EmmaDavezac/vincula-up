@@ -37,20 +37,15 @@ public class SolicitudService {
     private final SolicitudRepository repository;
     private final ProfesionalesClient profesionalesClient;
     private final GeocodingClient geocodingClient;
-    private final long tiempoExpiracionHours;
+    private final double tiempoExpiracionHours;
 
     public SolicitudService(SolicitudRepository repository, ProfesionalesClient profesionalesClient,
             GeocodingClient geocodingClient,
-            @Value("${solicitudes.tiempo-expiracion-hours:24}") long tiempoExpiracionHours) {
+            @Value("${solicitudes.tiempo-expiracion-hours:24}") double tiempoExpiracionHours) {
         this.repository = repository;
         this.profesionalesClient = profesionalesClient;
         this.geocodingClient = geocodingClient;
         this.tiempoExpiracionHours = tiempoExpiracionHours;
-    }
-
-    public SolicitudService(SolicitudRepository repository, ProfesionalesClient profesionalesClient,
-            GeocodingClient geocodingClient) {
-        this(repository, profesionalesClient, geocodingClient, 24);
     }
 
     /** Verifica que la solicitud no haya expirado antes de operar */
