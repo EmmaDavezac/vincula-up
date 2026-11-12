@@ -1261,6 +1261,12 @@ credenciales de la cuenta. El código no cambia.
 
 Generar con `openssl rand -base64 32`.
 
+### Tiempo de expiración de solicitudes
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `SOLICITUDES_TIEMPO_EXPIRACION_HOURS` | `24` | Horas de vigencia para solicitudes en estado `PENDIENTE`. Cumplido este plazo, la solicitud se considera `VENCIDA` y no admite transiciones |
+
 ### pgAdmin
 
 

@@ -234,6 +234,7 @@ services:
       UBICACIONES_CLAVE: ${UBICACIONES_CLAVE:-}
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://keycloak:8080/realms/vincula-up}
       KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/vincula-up/protocol/openid-connect/certs}
+      SOLICITUDES_TIEMPO_EXPIRACION_HOURS: ${SOLICITUDES_TIEMPO_EXPIRACION_HOURS:-24}
     ports:
       - "8083:8083"
     healthcheck:

@@ -25,6 +25,25 @@
 
 ## Historial
 
+### [2026-11-12] - fix: corregir errores de compilación en ms-solicitudes por expiración de solicitudes
+- **Objetivo:** Resolver los fallos de compilación de Maven en `ms-solicitudes` producidos durante la compilación en Docker/local tras la introducción de la expiración de solicitudes PENDIENTE.
+- **Causa:**
+  - `Solicitud.java`: Se había eliminado por error el campo `motivoCancelacion` al agregar `fechaExpiracion` y `esVencible`, y faltaba el import de `SolicitudExpiradaException`.
+  - `SolicitudService.java`: Import incorrecto de `com.vinculaup.ms_solicitudes.entity.SolicitudExpiradaException` (la excepción vive en `.config`), y duplicación de variables de instancia y constructor.
+  - Faltaba inyectar y pasar el valor configurable `SOLICITUDES_TIEMPO_EXPIRACION_HOURS` a `application.properties`, `docker-compose.yml` y a la entidad `Solicitud`.
+  - En `SolicitudExceptionHandler`: Se añadió el `@ExceptionHandler` explícito para `SolicitudExpiradaException` evitando respuestas 500 no controladas y devolviendo 409 Conflict.
+- **Cambios realizados:**
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/entity/Solicitud.java`: Restaurado campo `motivoCancelacion`, agregado import `SolicitudExpiradaException`, constructor con `tiempoExpiracionHours`, y método `isExpirada()` con retorno dinámico de `VENCIDA` en `getEstado()`.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/service/SolicitudService.java`: Eliminadas declaraciones duplicadas e import erróneo, inyectada `@Value("${solicitudes.tiempo-expiracion-hours:24}")` y validación `verificarExpiracion` en transiciones.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/config/SolicitudExceptionHandler.java`: Manejador `@ExceptionHandler(SolicitudExpiradaException.class)` para retornar HTTP 409 Conflict con mensaje descriptivo.
+  - `backend/ms-solicitudes/src/main/resources/application.properties`: Agregada propiedad `solicitudes.tiempo-expiracion-hours=${SOLICITUDES_TIEMPO_EXPIRACION_HOURS:24}`.
+  - `docker-compose.yml`: Mapeada la variable `SOLICITUDES_TIEMPO_EXPIRACION_HOURS` en el servicio `ms-solicitudes`.
+  - `ESPECIFICACION.md`: Documentada la variable de entorno `SOLICITUDES_TIEMPO_EXPIRACION_HOURS`.
+- **Verificación:**
+  - Compilación exitosa en `backend/ms-solicitudes` mediante `./mvnw clean compile` (BUILD SUCCESS en 5s).
+  - Compilación exitosa en `backend/bff-web` mediante `./mvnw clean compile` (BUILD SUCCESS en 5.7s).
+- **Especificación:** Actualizada sección 11 con la nueva variable de entorno y comportamiento de expiración.
+
 ### [2026-11-11] - feat: mapa estático en solicitudes con mejor visualización y tema oscuro
 - **Objetivo:** Mejorar la visualización del mapa en la tarjeta de solicitudes, agregar soporte para modo oscuro y hacer el mapa más prominente sin controles de zoom ni arrastre.
 - **Cambios realizados:**

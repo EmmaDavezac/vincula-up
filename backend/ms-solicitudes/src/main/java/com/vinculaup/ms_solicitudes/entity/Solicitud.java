@@ -1,5 +1,6 @@
 package com.vinculaup.ms_solicitudes.entity;
 
+import com.vinculaup.ms_solicitudes.config.SolicitudExpiradaException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -91,6 +92,8 @@ public class Solicitud {
     @Column(nullable = false)
     private EstadoSolicitud estado;
 
+    private String motivoCancelacion;
+
     /** Fecha y hora en que la solicitud expirará si permanece PENDIENTE. Nula = sin vencimiento. */
     @Column(name = "fecha_expiracion", nullable = true, columnDefinition = "TIMESTAMP")
     private LocalDateTime fechaExpiracion;
@@ -120,12 +123,19 @@ public class Solicitud {
             Double latitud, Double longitud, LocalDateTime fechaHoraPropuesta, String descripcion,
             LocalDateTime fechaHoraFinPropuesta) {
         this(clienteId, profesionalId, especialidadId, direccionServicio, null,
-                latitud, longitud, fechaHoraPropuesta, descripcion, fechaHoraFinPropuesta);
+                latitud, longitud, fechaHoraPropuesta, descripcion, fechaHoraFinPropuesta, 24);
     }
 
     public Solicitud(UUID clienteId, UUID profesionalId, UUID especialidadId, String direccionServicio,
             String zonaAproximada, Double latitud, Double longitud, LocalDateTime fechaHoraPropuesta,
             String descripcion, LocalDateTime fechaHoraFinPropuesta) {
+        this(clienteId, profesionalId, especialidadId, direccionServicio, zonaAproximada,
+                latitud, longitud, fechaHoraPropuesta, descripcion, fechaHoraFinPropuesta, 24);
+    }
+
+    public Solicitud(UUID clienteId, UUID profesionalId, UUID especialidadId, String direccionServicio,
+            String zonaAproximada, Double latitud, Double longitud, LocalDateTime fechaHoraPropuesta,
+            String descripcion, LocalDateTime fechaHoraFinPropuesta, long tiempoExpiracionHours) {
         this.clienteId = clienteId;
         this.profesionalId = profesionalId;
         this.especialidadId = especialidadId;
@@ -139,9 +149,10 @@ public class Solicitud {
         this.estado = EstadoSolicitud.PENDIENTE;
         this.fechaCreacion = LocalDateTime.now();
         this.fechaCambioEstado = this.fechaCreacion;
-        this.esVencible = true;
-        // Por defecto, una solicitud nueva vence a las 48 horas si no es atendida
-        this.fechaExpiracion = LocalDateTime.now().plusHours(48);
+        this.esVencible = tiempoExpiracionHours > 0;
+        this.fechaExpiracion = tiempoExpiracionHours > 0
+                ? this.fechaCreacion.plusHours(tiempoExpiracionHours)
+                : null;
     }
 
     public UUID getId() { return id; }
@@ -184,7 +195,12 @@ public class Solicitud {
     }
     public LocalDateTime getFechaHoraPropuesta() { return fechaHoraPropuesta; }
     public LocalDateTime getFechaHoraFinPropuesta() { return fechaHoraFinPropuesta; }
-    public EstadoSolicitud getEstado() { return estado; }
+    public EstadoSolicitud getEstado() {
+        if (isExpirada()) {
+            return EstadoSolicitud.VENCIDA;
+        }
+        return estado;
+    }
     public String getMotivoCancelacion() { return motivoCancelacion; }
     public UUID getCanceladaPor() { return canceladaPor; }
     public LocalDateTime getFechaCreacion() { return fechaCreacion; }
@@ -192,8 +208,15 @@ public class Solicitud {
     public LocalDateTime getFechaExpiracion() { return fechaExpiracion; }
     public Boolean getEsVencible() { return esVencible; }
 
+    public boolean isExpirada() {
+        return this.estado == EstadoSolicitud.PENDIENTE
+                && Boolean.TRUE.equals(this.esVencible)
+                && this.fechaExpiracion != null
+                && LocalDateTime.now().isAfter(this.fechaExpiracion);
+    }
+
     public void cambiarEstado(EstadoSolicitud nuevoEstado) {
-        if (this.esVencible && this.fechaExpiracion != null && LocalDateTime.now().isAfter(this.fechaExpiracion)) {
+        if (isExpirada()) {
             throw new SolicitudExpiradaException("Esta solicitud ha expirado y no puede tener su estado modificado");
         }
         this.estado = nuevoEstado;
