@@ -465,10 +465,17 @@ PENDIENTE ──aceptar──────▶ ACEPTADA ──completar──▶ C
     └──expiración───▶ VENCIDA
 ```
 
-**Expiración automática y notificación:**
-Cuando una solicitud en estado `PENDIENTE` supera su tiempo de expiración (`SOLICITUDES_TIEMPO_EXPIRACION_HOURS`), `SolicitudExpiracionScheduler` en `bff-web` (ejecutado cada 15 segundos) invoca `POST /solicitudes/expirar-pendientes` en `ms-solicitudes`. El estado pasa a `VENCIDA` y se despacha automáticamente:
-- **Correo transaccional:** Con asunto `Vincula-UP · El profesional no respondió a tu solicitud` y detalle explicando que el profesional no respondió en tiempo y forma, invitando al cliente a solicitar otro profesional.
-- **Notificación WebPush:** Al cliente con título `Solicitud vencida`.
+**Expiración automática y notificaciones:**
+Cuando una solicitud en estado `PENDIENTE` supera su tiempo de expiración (`SOLICITUDES_TIEMPO_EXPIRACION_HOURS`), `SolicitudExpiracionScheduler` en `bff-web` (ejecutado cada 15 segundos) invoca `POST /solicitudes/expirar-pendientes` en `ms-solicitudes`. El estado pasa a `VENCIDA` y se notifica automáticamente a **ambas partes**:
+
+| Destinatario | Canal | Asunto / Título |
+|---|---|---|
+| **Cliente** | Correo transaccional | `Vincula-UP · El profesional no respondió a tu solicitud` — el profesional no respondió en tiempo y forma; puede solicitar otro profesional desde la aplicación |
+| **Cliente** | WebPush | `Solicitud vencida` — ídem con enlace a `/solicitudes` |
+| **Profesional** | Correo transaccional | `Vincula-UP · Solicitud vencida por falta de respuesta` — la solicitud venció porque no fue respondida dentro del plazo límite |
+| **Profesional** | WebPush | `Solicitud vencida sin respuesta` — ídem con enlace a `/solicitudes` |
+
+> **Autenticación del scheduler.** El hilo de fondo no tiene contexto HTTP ni sesión WebSocket, por lo que `JdkHttpClientRequestFactory` no puede propagar el JWT del usuario. El scheduler obtiene un token `client_credentials` de Keycloak a través de `KeycloakAdminService.tokenDeServicio()` y lo inyecta en el `WebSocketAuthorizationContext` antes de llamar a `ms-usuarios` y `ms-profesionales`. Cada bloque de notificación (cliente / profesional) tiene su propio `try/catch` para que un fallo al notificar a una parte no impida notificar a la otra.
 
 ### 7.5 `ms-solicitudes` — Mensaje y Calificacion
 
@@ -1181,19 +1188,21 @@ aplicación** vigente en `KEYCLOAK_SMTP_PASSWORD`. La verificación se hizo el
 contraseña?" y desde el alta de un profesional, **capturando el MIME generado**
 para comprobar que el tema renderiza y que el `Reply-To` sale efectivamente.
 
-| Correo | Quién lo dispara |
-|---|---|
-| Recuperación de contraseña (`resetPasswordAllowed`) | La persona desde "¿Olvidó su contraseña?" del login |
-| Aviso de alta | El alta de un profesional en el panel (`POST /api/profesionales/alta`) |
-| Nueva solicitud | Creación confirmada (`POST /api/solicitudes`), al profesional destinatario |
-| Solicitud aceptada o rechazada | Transición confirmada, al cliente que la creó |
-| Solicitud completada o cancelada | Transición confirmada, a la contraparte |
+| Correo | Quién lo dispara | Destinatario |
+|---|---|---|
+| Recuperación de contraseña (`resetPasswordAllowed`) | La persona desde "¿Olvidó su contraseña?" del login | Usuario que lo pidió |
+| Aviso de alta | El alta de un profesional en el panel (`POST /api/profesionales/alta`) | Profesional dado de alta |
+| Nueva solicitud | Creación confirmada (`POST /api/solicitudes`) | Profesional destinatario |
+| Solicitud aceptada o rechazada | Transición confirmada | Cliente que la creó |
+| Solicitud completada o cancelada | Transición confirmada | Contraparte |
+| **Solicitud vencida — cliente** | `SolicitudExpiracionScheduler` (hilo de fondo, cada 15 s) | Cliente — el profesional no respondió en tiempo |
+| **Solicitud vencida — profesional** | `SolicitudExpiracionScheduler` (hilo de fondo, cada 15 s) | Profesional — la solicitud venció por falta de respuesta |
 
 Los avisos de solicitudes son **best-effort**: el BFF los envía después de que
 `ms-solicitudes` confirme la operación. Un problema de SMTP o la falta de email
 del destinatario se registra en el log, pero no revierte ni hace fallar una
-transición ya guardada. No se envían notificaciones dentro de la aplicación en
-esta fase.
+transición ya guardada.
+
 > **El valor nunca se versiona.** La contraseña vive solo en el `.env` local, que
 > está en `.gitignore` y no se sube al repositorio. Las tablas de arriba y el
 > `.env.example` documentan la variable, nunca su contenido.
