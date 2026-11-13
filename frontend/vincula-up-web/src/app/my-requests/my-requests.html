@@ -132,7 +132,11 @@
 						@if (request.address) {
 	<p class="req-card__address" [attr.title]="request.address">
 		<vu-icon name="map-pin" [size]="15" />
-		<span>{{ isPending(request) ? 'Zona: ' + request.address : request.address }}</span>
+		<!--
+			Al profesional se le muestra solo la zona mientras la solicitud está pendiente.
+			Al cliente siempre se le muestra su dirección completa (él la ingresó).
+		-->
+		<span>{{ (isProfessional() && isPending(request)) ? 'Zona: ' + request.address : request.address }}</span>
 	</p>
 } @else if (isProfessional() && isPending(request)) {
 	<p class="req-card__address req-card__address--pending">
@@ -207,8 +211,8 @@
 							</button>
 						}
 
-						@if (!isProfessional() && request.status === 'RECHAZADA') {
-							<a class="vu-btn vu-btn--outline vu-btn--sm vu-btn--coral-text req-card__action--secondary" routerLink="/solicitar">Buscar otro profesional</a>
+						@if (!isProfessional() && (request.status === 'RECHAZADA' || request.status === 'VENCIDA')) {
+							<a class="vu-btn vu-btn--outline vu-btn--sm vu-btn--coral-text req-card__action--status" routerLink="/solicitar">Buscar otro profesional</a>
 						}
 					</div>
 
@@ -400,7 +404,7 @@
 			</header>
 
 			<p class="status-modal__lead">
-				{{ isPending(solicitud) ? 'Zona aproximada: ' : '' }}{{ solicitud.address }}
+				{{ (isProfessional() && isPending(solicitud)) ? 'Zona aproximada: ' : '' }}{{ solicitud.address }}
 			</p>
 
 			@if (embeddedMapUrl(solicitud); as mapUrl) {

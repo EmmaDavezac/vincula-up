@@ -458,11 +458,24 @@ categoría, incluso del mismo cliente.
 **Transiciones válidas** (validadas en `SolicitudService`):
 
 ```
-PENDIENTE ──aceptar──▶ ACEPTADA ──completar──▶ COMPLETADA
-    │                     │
-    ├──rechazar──▶ RECHAZADA
-    └──cancelar──▶ CANCELADA ◀──cancelar── (desde ACEPTADA)
+PENDIENTE ──aceptar──────▶ ACEPTADA ──completar──▶ COMPLETADA
+    │                         │
+    ├──rechazar─────▶ RECHAZADA
+    ├──cancelar─────▶ CANCELADA ◀──cancelar── (desde ACEPTADA)
+    └──expiración───▶ VENCIDA
 ```
+
+**Expiración automática y notificaciones:**
+Cuando una solicitud en estado `PENDIENTE` supera su tiempo de expiración (`SOLICITUDES_TIEMPO_EXPIRACION_HOURS`), `SolicitudExpiracionScheduler` en `bff-web` (ejecutado cada 15 segundos) invoca `POST /solicitudes/expirar-pendientes` en `ms-solicitudes`. El estado pasa a `VENCIDA` y se notifica automáticamente a **ambas partes**:
+
+| Destinatario | Canal | Asunto / Título |
+|---|---|---|
+| **Cliente** | Correo transaccional | `Vincula-UP · El profesional no respondió a tu solicitud` — el profesional no respondió en tiempo y forma; puede solicitar otro profesional desde la aplicación |
+| **Cliente** | WebPush | `Solicitud vencida` — ídem con enlace a `/solicitudes` |
+| **Profesional** | Correo transaccional | `Vincula-UP · Solicitud vencida por falta de respuesta` — la solicitud venció porque no fue respondida dentro del plazo límite |
+| **Profesional** | WebPush | `Solicitud vencida sin respuesta` — ídem con enlace a `/solicitudes` |
+
+> **Autenticación del scheduler.** El hilo de fondo no tiene contexto HTTP ni sesión WebSocket, por lo que `JdkHttpClientRequestFactory` no puede propagar el JWT del usuario. El scheduler obtiene un token `client_credentials` de Keycloak a través de `KeycloakAdminService.tokenDeServicio()` y lo inyecta en el `WebSocketAuthorizationContext` antes de llamar a `ms-usuarios` y `ms-profesionales`. Cada bloque de notificación (cliente / profesional) tiene su propio `try/catch` para que un fallo al notificar a una parte no impida notificar a la otra.
 
 ### 7.5 `ms-solicitudes` — Mensaje y Calificacion
 
@@ -882,6 +895,11 @@ devuelve lo mismo con `source: servicio-no-disponible` en vez de cortar con 502:
 una falla del backend de solicitudes no debe dejar sin geocodificar a toda la
 app. En ninguno de los dos casos se lanza excepción.
 
+**Detección de ubicación en el navegador (Frontend):**
+- Tanto en la creación de solicitud (`/solicitar`) como en la activación de profesionales (`/activar-perfil`), se utiliza la Geolocation API del navegador configurada con alta precisión (`enableHighAccuracy: true`, `maximumAge: 0`, `timeout: 15s`) para activar el hardware GPS y/o triangulación Wi-Fi precisa en lugar de depender de la aproximación gruesa por IP.
+- Si el hardware GPS no está disponible o da timeout, se realiza un segundo intento de fallback con menor precisión.
+- Al obtener las coordenadas, se centra inmediatamente el mapa interactivo (Leaflet) en nivel de zoom de calle (16+) y se realiza geocodificación inversa detallada (`reverseGeocode` con `addressdetails=1`) para extraer calle y número exactos.
+
 ### 10.2 Cifrado de ubicaciones
 
 Las coordenadas se cifran **en reposo** con **AES-256-GCM**, en la capa de
@@ -1170,19 +1188,21 @@ aplicación** vigente en `KEYCLOAK_SMTP_PASSWORD`. La verificación se hizo el
 contraseña?" y desde el alta de un profesional, **capturando el MIME generado**
 para comprobar que el tema renderiza y que el `Reply-To` sale efectivamente.
 
-| Correo | Quién lo dispara |
-|---|---|
-| Recuperación de contraseña (`resetPasswordAllowed`) | La persona desde "¿Olvidó su contraseña?" del login |
-| Aviso de alta | El alta de un profesional en el panel (`POST /api/profesionales/alta`) |
-| Nueva solicitud | Creación confirmada (`POST /api/solicitudes`), al profesional destinatario |
-| Solicitud aceptada o rechazada | Transición confirmada, al cliente que la creó |
-| Solicitud completada o cancelada | Transición confirmada, a la contraparte |
+| Correo | Quién lo dispara | Destinatario |
+|---|---|---|
+| Recuperación de contraseña (`resetPasswordAllowed`) | La persona desde "¿Olvidó su contraseña?" del login | Usuario que lo pidió |
+| Aviso de alta | El alta de un profesional en el panel (`POST /api/profesionales/alta`) | Profesional dado de alta |
+| Nueva solicitud | Creación confirmada (`POST /api/solicitudes`) | Profesional destinatario |
+| Solicitud aceptada o rechazada | Transición confirmada | Cliente que la creó |
+| Solicitud completada o cancelada | Transición confirmada | Contraparte |
+| **Solicitud vencida — cliente** | `SolicitudExpiracionScheduler` (hilo de fondo, cada 15 s) | Cliente — el profesional no respondió en tiempo |
+| **Solicitud vencida — profesional** | `SolicitudExpiracionScheduler` (hilo de fondo, cada 15 s) | Profesional — la solicitud venció por falta de respuesta |
 
 Los avisos de solicitudes son **best-effort**: el BFF los envía después de que
 `ms-solicitudes` confirme la operación. Un problema de SMTP o la falta de email
 del destinatario se registra en el log, pero no revierte ni hace fallar una
-transición ya guardada. No se envían notificaciones dentro de la aplicación en
-esta fase.
+transición ya guardada.
+
 > **El valor nunca se versiona.** La contraseña vive solo en el `.env` local, que
 > está en `.gitignore` y no se sube al repositorio. Las tablas de arriba y el
 > `.env.example` documentan la variable, nunca su contenido.
@@ -1260,6 +1280,12 @@ credenciales de la cuenta. El código no cambia.
 | `UBICACIONES_CLAVE` | (vacío) | Clave AES-256 de 32 bytes en Base64. **Debe ser la misma en `ms-solicitudes` y `ms-profesionales`.** Vacía = se guarda sin cifrar, con aviso en el log |
 
 Generar con `openssl rand -base64 32`.
+
+### Tiempo de expiración de solicitudes
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `SOLICITUDES_TIEMPO_EXPIRACION_HOURS` | `24` | Horas de vigencia para solicitudes en estado `PENDIENTE`. Admite valores enteros o decimales (ej: `0.5` para 30 minutos, `0.25` para 15 minutos). Cumplido este plazo, la solicitud se considera `VENCIDA` y no admite transiciones |
 
 ### pgAdmin
 

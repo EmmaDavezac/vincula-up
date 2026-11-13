@@ -232,6 +232,10 @@ public class BackendGateway {
         return ejecutar(() -> solicitudes.cancelar(id, body));
     }
 
+    public JsonNode expirarSolicitudesPendientes() {
+        return ejecutar(() -> solicitudes.expirarPendientes());
+    }
+
     /* ── Utilidades ───────────────────────────────────────────────────── */
 
     private interface FeignCallable<T> {

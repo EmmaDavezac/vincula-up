@@ -25,6 +25,110 @@
 
 ## Historial
 
+### [2026-11-12] - fix: notificaciones de vencimiento con autenticación de servicio y aviso al profesional
+- **Objetivo:**
+  1. Corregir el error `401 UNAUTHORIZED` que impedía que el `SolicitudExpiracionScheduler` enviara mails al vencer solicitudes: el hilo de fondo no tenía contexto HTTP ni sesión WebSocket, por lo que `JdkHttpClientRequestFactory` no adjuntaba el header `Authorization` al llamar a `ms-usuarios` y `ms-profesionales`.
+  2. Notificar al **profesional** además del cliente cuando una solicitud vence por falta de respuesta.
+- **Causa del fallo:**
+  - El scheduler corría en un thread de fondo (`@Scheduled`) sin `HttpServletRequest` ni sesión WebSocket activa. `JdkHttpClientRequestFactory.authorizationHeaders()` devolvía headers vacíos → 401 en `ms-usuarios`.
+  - El scheduler solo notificaba al cliente; el profesional no recibía ningún aviso.
+- **Cambios realizados:**
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/SolicitudExpiracionScheduler.java`:
+    - Inyectados `KeycloakAdminService` y `WebSocketAuthorizationContext`.
+    - Se obtiene un token de cuenta de servicio (`client_credentials`) una vez por ciclo del scheduler.
+    - Todas las notificaciones de cada solicitud se envuelven en `authContext.withAuthorization("Bearer " + token, ...)` para que `JdkHttpClientRequestFactory` propague el token a `ms-usuarios` y `ms-profesionales`.
+    - Se agrega lógica para notificar al **profesional**: resuelve `profesionalId` → `buscarProfesionalPorIdOUsuario` → `usuarioId` → `buscarUsuarioPorIdOKeycloakId` → correo + WebPush.
+    - Cada bloque (cliente / profesional) tiene su propio `try/catch` para que un fallo al notificar a uno no impida notificar al otro.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/NotificacionService.java`:
+    - Agregado caso `VENCIDA_PROFESIONAL` en el switch de `avisarCambioSolicitud` con asunto `"Vincula-UP · Solicitud vencida por falta de respuesta"` y texto que informa al profesional que la solicitud venció por no responder a tiempo.
+- **Verificación:**
+  - Compilación `bff-web`: `./mvnw clean compile` → BUILD SUCCESS.
+  - Imagen Docker reconstruida y contenedor reiniciado: `docker compose build bff-web && docker compose up -d bff-web` → todos los contenedores `(healthy)`.
+  - Logs del scheduler sin errores 401; `INFO` de aviso enviado a cliente y profesional.
+
+### [2026-11-12] - feat: aviso por correo de solicitud vencida y alta precisión en detección de ubicación
+- **Objetivo:**
+  1. Enviar automáticamente el correo transaccional y la notificación WebPush al cliente cuando una solicitud pasa a estado `VENCIDA` ("El profesional no respondió, tienes que solicitar otro profesional").
+  2. Implementar un scheduler periódico en el BFF que detecte y actualice las solicitudes pendientes que superaron su tiempo de vencimiento sin requerir interacción manual.
+  3. Mejorar la detección de geolocalización en el navegador activando alta precisión (`enableHighAccuracy: true`, `maximumAge: 0`), zoom de calle en Leaflet y geocodificación inversa detallada con altura de calle.
+  4. Realizar auto-logout en el frontend si el backend responde 401 o 404 en `/usuarios/yo` tras reiniciar la base de datos, evitando que el usuario quede bloqueado con tokens caducos.
+- **Cambios realizados:**
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/entity/Solicitud.java`: Permitido cambio de estado a `VENCIDA` y agregado método `expirar(String motivo)`.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/repository/SolicitudRepository.java`: Agregada consulta `findPendientesExpiradas` para solicitudes pendientes cuyo `fechaExpiracion` ya venció.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/service/SolicitudService.java`: Implementado `expirarPendientes()` que pasa las solicitudes expiradas a `VENCIDA` y las persiste.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/controller/SolicitudController.java`: Expuesto endpoint interno `POST /solicitudes/expirar-pendientes`.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/config/SecurityConfig.java`: Permitido `/solicitudes/expirar-pendientes` en llamadas internas.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/BffWebApplication.java`: Habilitado `@EnableScheduling`.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/client/SolicitudesClient.java` y `BackendGateway.java`: Agregado cliente para `expirarPendientes()`.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/NotificacionService.java`: Agregado caso `VENCIDA` con asunto `"Vincula-UP · El profesional no respondió a tu solicitud"` y cuerpo explicando que puede solicitar a otro profesional.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/controller/ApiController.java`: Ajustado `notificarCambioSolicitud` y `notificarPushSolicitud` para enviar avisos de solicitudes vencidas al cliente.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/SolicitudExpiracionScheduler.java`: Nuevo componente programado cada 15s que consulta solicitudes vencidas y despacha correos y notificaciones WebPush.
+  - `frontend/vincula-up-web/src/app/core/services/auth.service.ts`: Auto-logout en `loadOwnPhoto()` ante códigos HTTP 401 o 404.
+  - `frontend/vincula-up-web/src/app/request/request.ts` y `activation.ts`: Geolocalización con `enableHighAccuracy: true`, `maximumAge: 0`, centrado dinámico en el mapa con nivel de zoom 16+ y reverse geocoding con calle y numeración.
+  - `ESPECIFICACION.md`: Actualizada documentación del ciclo de vida de solicitudes y detección de ubicación.
+- **Verificación:**
+  - Compilación backend `ms-solicitudes`: `./mvnw clean compile` exitoso (BUILD SUCCESS).
+  - Compilación backend `bff-web`: `./mvnw clean compile` exitoso (BUILD SUCCESS).
+  - Compilación frontend `vincula-up-web`: `npm run build` exitoso (BUILD SUCCESS).
+
+### [2026-11-12] - fix: soporte a horas decimales de expiración y corrección de arranque de ms-solicitudes
+- **Objetivo:** Permitir configurar tiempos de expiración inferiores a 1 hora (ej: 0.5 para 30 minutos, 0.25 para 15 minutos) para pruebas y demostraciones, y solucionar el error de contenedor `vinculaup-ms-solicitudes is unhealthy` en Docker Compose.
+- **Causa del fallo:**
+  - `SolicitudService` tenía dos constructores sobrecargados; Spring Boot fallaba al resolver la inyección sin `@Autowired` explícito (`No default constructor found` / `BeanInstantiationException`).
+  - La expiración solo aceptaba `long` y sumaba horas enteras (`plusHours`), sin admitir fracciones de hora.
+- **Cambios realizados:**
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/service/SolicitudService.java`: Se unificó a un único constructor que inyecta `double tiempoExpiracionHours`, eliminando la ambigüedad para Spring.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/entity/Solicitud.java`: Se cambió `tiempoExpiracionHours` a `double` y el cálculo a minutos (`Math.round(tiempoExpiracionHours * 60.0)` con `plusMinutes`).
+  - `.env.example` y `ESPECIFICACION.md`: Documentado el soporte a valores decimales (`0.5`, `0.25`).
+- **Verificación:**
+  - Compilación exitosa en `backend/ms-solicitudes` con `./mvnw clean compile`.
+  - Reconstrucción de la imagen Docker de `ms-solicitudes` y verificación del stack completo con `docker compose ps`: todos los contenedores (`vinculaup-postgres`, `vinculaup-keycloak`, `vinculaup-ms-usuarios`, `vinculaup-ms-profesionales`, `vinculaup-ms-solicitudes`, `vinculaup-bff-web`, `vinculaup-nginx`) en estado `(healthy)` y activos.
+
+### [2026-11-12] - fix: corregir errores de compilación en ms-solicitudes por expiración de solicitudes
+- **Objetivo:** Resolver los fallos de compilación de Maven en `ms-solicitudes` producidos durante la compilación en Docker/local tras la introducción de la expiración de solicitudes PENDIENTE.
+- **Causa:**
+  - `Solicitud.java`: Se había eliminado por error el campo `motivoCancelacion` al agregar `fechaExpiracion` y `esVencible`, y faltaba el import de `SolicitudExpiradaException`.
+  - `SolicitudService.java`: Import incorrecto de `com.vinculaup.ms_solicitudes.entity.SolicitudExpiradaException` (la excepción vive en `.config`), y duplicación de variables de instancia y constructor.
+  - Faltaba inyectar y pasar el valor configurable `SOLICITUDES_TIEMPO_EXPIRACION_HOURS` a `application.properties`, `docker-compose.yml` y a la entidad `Solicitud`.
+  - En `SolicitudExceptionHandler`: Se añadió el `@ExceptionHandler` explícito para `SolicitudExpiradaException` evitando respuestas 500 no controladas y devolviendo 409 Conflict.
+- **Cambios realizados:**
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/entity/Solicitud.java`: Restaurado campo `motivoCancelacion`, agregado import `SolicitudExpiradaException`, constructor con `tiempoExpiracionHours`, y método `isExpirada()` con retorno dinámico de `VENCIDA` en `getEstado()`.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/service/SolicitudService.java`: Eliminadas declaraciones duplicadas e import erróneo, inyectada `@Value("${solicitudes.tiempo-expiracion-hours:24}")` y validación `verificarExpiracion` en transiciones.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/config/SolicitudExceptionHandler.java`: Manejador `@ExceptionHandler(SolicitudExpiradaException.class)` para retornar HTTP 409 Conflict con mensaje descriptivo.
+  - `backend/ms-solicitudes/src/main/resources/application.properties`: Agregada propiedad `solicitudes.tiempo-expiracion-hours=${SOLICITUDES_TIEMPO_EXPIRACION_HOURS:24}`.
+  - `docker-compose.yml`: Mapeada la variable `SOLICITUDES_TIEMPO_EXPIRACION_HOURS` en el servicio `ms-solicitudes`.
+  - `ESPECIFICACION.md`: Documentada la variable de entorno `SOLICITUDES_TIEMPO_EXPIRACION_HOURS`.
+- **Verificación:**
+  - Compilación exitosa en `backend/ms-solicitudes` mediante `./mvnw clean compile` (BUILD SUCCESS en 5s).
+  - Compilación exitosa en `backend/bff-web` mediante `./mvnw clean compile` (BUILD SUCCESS en 5.7s).
+- **Especificación:** Actualizada sección 11 con la nueva variable de entorno y comportamiento de expiración.
+
+### [2026-11-12] - fix: botón "Buscar otro profesional" en VENCIDA y dirección completa para el cliente
+- **Objetivo:** Corregir dos problemas de UI en la pantalla "Mis solicitudes":
+  1. El botón "Buscar otro profesional" no aparecía cuando la solicitud estaba en estado `VENCIDA`.
+  2. El cliente veía su propia dirección con el prefijo `Zona:` (ocultamiento parcial pensado solo para el profesional).
+- **Cambios realizados:**
+  - `my-requests.html` línea 214: condición del botón extendida a `RECHAZADA || VENCIDA`.
+  - `my-requests.html` línea 135: prefijo `Zona:` condicionado a `isProfessional() && isPending()` (solo profesional, solo pendiente).
+  - `my-requests.html` línea 403 (modal de mapa): misma corrección para el diálogo de mapa ampliado.
+- **Verificación:** `npm run build` → BUILD SUCCESS (sin errores nuevos).
+
+### [2026-11-12] - fix: autenticación del scheduler de expiración (error 401 en llamada interna)
+- **Objetivo:** El scheduler `SolicitudExpiracionScheduler` recibía HTTP 401 al llamar internamente a `POST /solicitudes/expirar-pendientes` porque `SolicitudesClient` no adjuntaba ningún token de autorización.
+- **Causa raíz:** `SolicitudesClient` reenvía el JWT del usuario entrante mediante `JdkHttpClientRequestFactory`, pero la llamada del scheduler no tiene request entrante → no había token que reenviar.
+- **Solución:**
+  - `KeycloakAdminService.token()` renombrado a `tokenDeServicio()` y su visibilidad cambiada de `private` a `public`, reutilizando el flujo `client_credentials` ya existente con caché de 30s antes de expirar.
+  - `SolicitudesClient` inyecta `KeycloakAdminService` y en `expirarPendientes()` adjunta `Authorization: Bearer <token>` usando `tokenDeServicio()` si está disponible.
+  - `SolicitudExpiracionScheduler`: logging mejorado (`log.warn` en lugar de `log.debug` para errores; `log.info` cuando hay solicitudes procesadas).
+- **Archivos modificados:**
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/KeycloakAdminService.java`
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/client/SolicitudesClient.java`
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/SolicitudExpiracionScheduler.java`
+- **Verificación:**
+  - `./mvnw clean compile` en `bff-web` → BUILD SUCCESS.
+  - `docker compose build bff-web && docker compose up -d bff-web` → container sano.
+  - Logs del BFF sin errores 401/403; el scheduler dispara sin WARN de autenticación.
+
 ### [2026-11-11] - feat: mapa estático en solicitudes con mejor visualización y tema oscuro
 - **Objetivo:** Mejorar la visualización del mapa en la tarjeta de solicitudes, agregar soporte para modo oscuro y hacer el mapa más prominente sin controles de zoom ni arrastre.
 - **Cambios realizados:**
