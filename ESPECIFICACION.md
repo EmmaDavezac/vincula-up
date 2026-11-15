@@ -3,6 +3,8 @@
 > **Documento único de referencia del proyecto.** Si algo no está aquí, no está documentado.
 >
 > El [`README.md`](README.md) tiene el resumen: qué hace el sistema, el stack y el deploy local desde cero. El [`MANUAL.md`](MANUAL.md) tiene el uso y la operación: los servicios, el secreto del client de servicio, los certificados, el desarrollo y el tema. Este archivo contiene la especificación funcional, el relevamiento formal, el modelado, los requisitos, la arquitectura y el detalle técnico completo.
+>
+> Los informes académicos formales se encuentran en [`Entrega Proyecto Final Grupo 5.md`](Entrega%20Proyecto%20Final%20Grupo%205.md) (PFC — entrega parcial final) y [`MVP Grupo 8- DACS.md`](MVP%20Grupo%208-%20DACS.md) (DACS — informe del MVP), ambos actualizados al 15/11/2026.
 
 ---
 

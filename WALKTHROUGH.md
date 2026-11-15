@@ -1092,3 +1092,22 @@
   - Compilación de los 4 microservicios backend (`ms-usuarios`, `ms-profesionales`, `ms-solicitudes`, `bff-web`) con `./mvnw clean compile` → BUILD SUCCESS en todos.
   - Compilación del frontend Angular con `npm run build` → Generación exitosa de bundle con 0 advertencias y 0 errores.
   - Verificación de árbol limpio y sin archivos huérfanos.
+
+
+### [2026-11-15] - docs: agregar informes de referencia académicos actualizados (PFC y DACS)
+- **Objetivo:** Incorporar al repositorio los dos informes académicos formales —la entrega parcial final del Proyecto Final de Carrera (PFC, Grupo 5) y el informe del MVP de DACS (Grupo 8)— con metadatos actualizados al 15/11/2026, anotaciones de estado de avance y referencias cruzadas con la documentación existente.
+- **Cambios realizados:**
+  - **`Entrega Proyecto Final Grupo 5.md` (nuevo):**
+    - Encabezado institucional con cátedra, entrega, grupo, fecha (15/11/2026) y enlace al repositorio.
+    - RF14 actualizado: tiempo de expiración configurable vía `SOLICITUDES_TIEMPO_EXPIRACION_HOURS` (24h por defecto), notificación dual (usuario + profesional), estado Fase 1.
+    - Tabla de limitaciones con columna "Estado al 15/11/2026" con progreso de cada ítem.
+    - Anotaciones de estado en tabla de sprints de Fase 2.
+  - **`MVP Grupo 8- DACS.md` (nuevo):**
+    - Encabezado institucional con cátedra (DACS), proyecto, grupo, fecha (15/11/2026) y enlace al repositorio.
+    - Estado "Completado" anotado en cada sprint (1-4).
+    - Sprint 4 expandido con funcionalidades finales (expiración, chat STOMP, mapa interactivo, calificaciones).
+    - Sección "Puntos a revisar de la arquitectura" resuelta con referencias a ESPECIFICACION.md §6.3.1-6.3.3.
+  - **`README.md`:** Agregadas referencias a ambos informes en la sección Documentación.
+  - **`ESPECIFICACION.md`:** Agregada mención de los informes académicos formales en el bloque introductorio.
+  - **`WALKTHROUGH.md`:** Esta entrada.
+- **Verificación:** `git diff --stat` confirma que solo se modifican archivos `.md`. No hay cambios de código, por lo que no aplica compilación backend/frontend.

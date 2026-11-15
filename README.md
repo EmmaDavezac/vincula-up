@@ -164,3 +164,5 @@ docker compose down       # apaga todo (conserva los datos)
 
 - [`MANUAL.md`](MANUAL.md)
 - [`ESPECIFICACION.md`](ESPECIFICACION.md)
+- [`Entrega Proyecto Final Grupo 5.md`](Entrega%20Proyecto%20Final%20Grupo%205.md) — Informe de la entrega parcial final del Proyecto Final de Carrera (PFC)
+- [`MVP Grupo 8- DACS.md`](MVP%20Grupo%208-%20DACS.md) — Informe del MVP desarrollado en DACS
