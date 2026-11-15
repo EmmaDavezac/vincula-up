@@ -380,16 +380,28 @@ antes de dejar el BFF disponible. El bootstrap manual no forma parte del flujo n
 ## Certificados TLS
 
 `nginx/certs/` contiene una **CA de desarrollo auto-firmada** y un certificado
-de servidor válido hasta **diciembre de 2028**. No sirven para producción: si
-el repositorio fuera público, cualquiera con la clave podría suplantar
-`vincula-up.local` para todos los que instalen esa CA.
+de servidor válido hasta **diciembre de 2028**. Los certificados fueron generados
+directamente con **OpenSSL**.
 
-**Renovarlos** (por vencimiento, o si preferís que cada máquina tenga su propia CA):
+Si necesitaras regenerarlos (por vencimiento o para una CA propia), se ejecutan
+los siguientes comandos OpenSSL estándar dentro de `nginx/certs/`:
 
-**🐧 Linux** · `bash scripts/linux-macos/generate-certs.sh`
-**🪟 Windows** · `powershell -ExecutionPolicy Bypass -File .\scripts\generate-certs.ps1`
+```bash
+# 1. CA
+openssl genrsa -out ca.key 2048
+openssl req -x509 -new -nodes -key ca.key -sha256 -days 825 -out ca.crt -subj "/CN=VinculaUP-CA" \
+  -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign"
 
-Después hay que **volver a importar la CA nueva** en los navegadores. Si tenías
+# 2. Servidor
+openssl genrsa -out server.key 2048
+openssl req -new -key server.key -out server.csr -subj "/CN=vincula-up.local/O=VinculaUP Dev/C=AR"
+
+# 3. Firma con SAN
+openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 825 -sha256 \
+  -extfile <(printf "subjectAltName=DNS:vincula-up.local,DNS:localhost,IP:127.0.0.1\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth")
+```
+
+Después hay que **volver a importar la CA nueva** en los navegadores (usando `scripts/linux-macos/import-ca.sh` o `scripts/windows/import-ca.ps1`). Si tenías
 la anterior instalada, eliminá `VinculaUP-CA` de los almacenes de confianza
 primero.
 
@@ -437,11 +449,9 @@ cd frontend/vincula-up-web && npm test
 > Usá `npm test` y no `npx vitest run`: el runner directo no carga la configuración
 > de Angular y falla con `describe is not defined`.
 
-### Sin Docker
+### Despliegue y ejecución
 
-En Windows, `.\scripts\start-local.ps1` levanta los cuatro microservicios con H2
-en memoria (los datos se pierden al reiniciar) y el frontend aparte con
-`npm start` en otra terminal.
+Todo el sistema corre de forma homogénea mediante Docker (`docker compose up --build -d`). No se requiere configuración local de bases de datos ni herramientas fuera de Docker.
 
 ### Comandos de uso diario
 

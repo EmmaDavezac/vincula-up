@@ -1128,7 +1128,21 @@ Configuradas en el archivo `.env` en la raíz del repositorio (ignorado en git; 
   - `client_max_body_size 3m;` (3 MB otorga margen de seguridad sobre el límite de 2 MB del BFF para fotos de perfil multipart).
   - `proxy_buffer_size 128k`, `proxy_buffers 4 256k`, `proxy_busy_buffers_size 256k` (soporte para cabeceras y tokens JWT voluminosos).
   - `resolver 127.0.0.11 valid=10s` (resolución dinámica de contenedores Docker).
-- **Certificados y CA:** CA de desarrollo en `nginx/certs/ca.crt` y certificado del servidor `server.crt` con SAN para `vincula-up.local`, `localhost` y `127.0.0.1`.
+- **Certificados y CA:** CA de desarrollo en `nginx/certs/ca.crt` y certificado del servidor `server.crt` con SAN para `vincula-up.local`, `localhost` y `127.0.0.1`. Fueron creados directamente mediante **OpenSSL**:
+  ```bash
+  # 1. Autoridad Certificadora (CA):
+  openssl genrsa -out ca.key 2048
+  openssl req -x509 -new -nodes -key ca.key -sha256 -days 825 -out ca.crt -subj "/CN=VinculaUP-CA" \
+    -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign"
+
+  # 2. Clave y CSR del servidor:
+  openssl genrsa -out server.key 2048
+  openssl req -new -key server.key -out server.csr -subj "/CN=vincula-up.local/O=VinculaUP Dev/C=AR"
+
+  # 3. Certificado firmado con SAN (Subject Alternative Names):
+  openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 825 -sha256 \
+    -extfile <(printf "subjectAltName=DNS:vincula-up.local,DNS:localhost,IP:127.0.0.1\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth")
+  ```
 
 ---
 
@@ -1139,8 +1153,8 @@ Configuradas en el archivo `.env` en la raíz del repositorio (ignorado en git; 
 | **Despliegue automatizado completo** | `./scripts/deploy.sh` | — |
 | **Bootstrap del realm de Keycloak** | `./scripts/linux-macos/keycloak-bootstrap.sh` | `.\scripts\windows\keycloak-bootstrap.ps1` |
 | **Instalación de la CA en navegadores y sistema**| `bash scripts/linux-macos/import-ca.sh` | `.\scripts\windows\import-ca.ps1` |
-| **Regeneración de CA y certificados TLS** | `bash scripts/linux-macos/generate-certs.sh` | `.\scripts\windows\generate-certs.ps1` |
-| **Desarrollo local sin Docker (H2)** | — | `.\scripts\windows\start-local.ps1` |
+
+> Todo el stack se ejecuta de forma homogénea y estandarizada mediante contenedores Docker (`docker compose`). No se soportan ni requieren ejecuciones locales sueltas.
 
 Comando de inicio con Docker Compose:
 ```bash

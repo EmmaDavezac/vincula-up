@@ -3,6 +3,7 @@ node_modules/
 dist/
 .angular/
 .sass-cache/
+frontend/**/src/**/*.js
 
 
 # Build de Java

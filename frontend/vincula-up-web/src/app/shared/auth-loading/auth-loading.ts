@@ -1,11 +1,10 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { AuthService } from '../../core/services/auth.service';
-import { VuIcon } from '../icon/icon';
 
 @Component({
 	selector: 'app-auth-loading',
 	changeDetection: ChangeDetectionStrategy.OnPush,
-	imports: [VuIcon],
+	imports: [],
 	templateUrl: './auth-loading.html',
 	styleUrl: './auth-loading.css',
 })
