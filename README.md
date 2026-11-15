@@ -1,58 +1,44 @@
-# Vincula-UP
+# Vincula-UP — Red Técnica con Respaldo Universitario
 
-Plataforma de vinculación entre clientes y profesionales de oficios técnicos, con
-respaldo institucional de la Universidad Popular de Concepción del Uruguay.
+> *“Antes de que entre a tu casa, ya lo conocemos nosotros”*
 
-Un cliente pide un turno, un profesional lo acepta o rechaza, coordinan por chat
-y el cliente califica.
+Plataforma web (PWA) de inserción laboral para egresados de oficios técnicos de la **Universidad Popular de Concepción del Uruguay (UP)**, desarrollada en el marco del **Proyecto Final de Carrera (PFC) de Ingeniería en Sistemas de Información** en la **Universidad Tecnológica Nacional — Facultad Regional Concepción del Uruguay (UTN - FRCU)**.
 
-## Stack
+### Equipo del Proyecto
+- **Docentes:** Lucas Scheider · Adrian Tournour
+- **Alumnos:**
+  - Davezac, Luciano Emmanuel (`LD`) — Backend
+  - Morales, Nicolas (`NM`) — Infraestructura, integración en BFF y pruebas
+  - Velazquez, Julian (`JV`) — Historias de usuario
+  - Vergara, Agustin (`AV`) — Frontend
+  - Villanueva, Antonio Nicolas (`NV`) — Relevamiento, modelado de datos y testing
 
-| Capa | Tecnología |
-|---|---|
-| Backend | Java 21 · Spring Boot 4 · 4 microservicios detrás de un BFF |
-| Frontend | Angular 22 |
-| Identidad | Keycloak (login con email y contraseña) |
-| Datos | PostgreSQL |
+---
 
-## Descripción del proyecto
+## Descripción del Proyecto y Problemática
 
-Vincula-UP es una plataforma que conecta a clientes que necesitan servicios técnicos (electricistas, plomeros, etc.) con profesionales que ofrecen dichos servicios. El flujo típico incluye:
-1. **Creación de solicitud**: el cliente ingresa una descripción del servicio requerido y elige una fecha/hora.
-2. **Asignación**: los profesionales pueden aceptar o rechazar la solicitud.
-3. **Comunicación**: se abre un chat interno para coordinar detalles.
-4. **Calificación**: al finalizar el servicio, el cliente califica al profesional.
+Hoy, cuando un vecino o una empresa busca un técnico egresado en la región, el proceso es analógico y desestructurado (consulta manual del Libro Matriz y triangulación con docentes), demorando entre 2 y 3 días hábiles.
+Vincula-UP sistematiza y moderniza esta vinculación:
+1. **Búsqueda y solicitud:** El cliente busca por oficio y cercanía geográfica, describe el trabajo y elige día/horario.
+2. **Privacidad:** La dirección exacta permanece oculta al profesional hasta que acepta el turno (ve solo zona y punto aproximado a ~1.1 km).
+3. **Gestión de turnos:** El profesional acepta o rechaza indicando motivo obligatorio, validando no superposición de horarios.
+4. **Coordinación:** Ambos participantes coordinan detalles mediante chat en tiempo real por WebSocket.
+5. **Cierre y reputación:** Al completarse el trabajo, el cliente califica el servicio con estrellas y comentario.
 
-Esta arquitectura está pensada para ser extensible y reutilizable en diferentes dominios de servicio.
+## Stack Tecnológico
 
-## Arquitectura técnica
+| Capa | Tecnología | Detalle |
+|---|---|---|
+| **Backend** | Java 21 · Spring Boot 4 | 3 microservicios de dominio (`ms-usuarios`, `ms-profesionales`, `ms-solicitudes`) detrás de un BFF (`bff-web`) |
+| **Frontend** | Angular 22 | PWA con componentes standalone, signals y Angular Material |
+| **Identidad** | Keycloak 26 | Autenticación OIDC + PKCE S256, roles y validación JWKS |
+| **Persistencia** | PostgreSQL 16 | Base de datos relacional para datos de negocio |
+| **Archivos** | Volumen Docker `fotos_data` | Almacenamiento privado de fotos fuera de la base de datos relacional |
+| **Tiempo Real** | WebSocket + STOMP | Mensajería de chat en vivo y notificaciones reactivas |
+| **Geolocalización** | OpenStreetMap / Nominatim | Geocodificación y orden por cercanía con caché y rate limiting |
+| **Infraestructura** | Docker Compose + Nginx 1.27 | Proxy inverso, terminación TLS y enrutamiento con buffers |
 
-- **BFF (Backend For Frontend)**: un punto de entrada único que orquesta la comunicación entre el frontend Angular y los microservicios Java.
-- **Microservicios**: separados por dominio (usuarios, turnos, chat, calificaciones) y despliegados en contenedores Docker.
-- **Keycloak**: gestión de identidad y autorización mediante OpenID Connect; los tokens JWT se validan en cada request del BFF.
-- **PostgreSQL**: base de datos relacional para persistir usuarios, turnos y mensajes.
-- **Nginx**: servidor reverse-proxy que también maneja TLS con certificados auto‑firmados para desarrollo.
-
-## Cómo funciona internamente
-
-1. El frontend realiza llamadas HTTP al BFF usando los servicios definidos en `core/services/api.service.js`.
-2. El BFF (Spring Boot) verifica el JWT enviado por Keycloak y reenvía la petición al microservicio correspondiente.
-3. Cada microservicio expone una API REST que opera sobre la base de datos PostgreSQL.
-4. Los eventos de chat se envían mediante WebSocket a través del BFF, permitiendo comunicación en tiempo real.
-
-## Stack
-
-
-| Capa | Tecnología |
-|---|---|
-| Backend | Java 21 · Spring Boot 4 · 4 microservicios detrás de un BFF |
-| Frontend | Angular 22 |
-| Identidad | Keycloak (login con email y contraseña) |
-| Datos | PostgreSQL |
-
-No hace falta Node ni Java: todo compila dentro de Docker.
-
-Todo se levanta con Docker.
+Todo el entorno se ejecuta mediante Docker: no se requiere instalar Node ni Java en la máquina host.
 
 ---
 

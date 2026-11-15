@@ -1042,3 +1042,33 @@
   - `ESPECIFICACION.md` (§14.1) y `keycloak/import/README.md`: documentan el cambio.
 - **Verificación:** `python3 -m json.tool` sobre el JSON y `bash -n` sobre el `.sh` pasan. No hay cambios de backend ni frontend. Falta la prueba en vivo (Docker estaba apagado): `docker compose up -d`, correr el bootstrap, entrar a `/realms/vincula-up/account` como `cliente@vincula-up.local` y cambiar la contraseña.
 - **Especificación:** Actualizada en este mismo cambio.
+
+
+### [2026-11-15] - docs: actualización integral de la especificación técnica y documentación institucional del MVP
+
+- **Objetivo:** Actualizar de manera completa e integral la especificación técnica (`ESPECIFICACION.md`) y la documentación del repositorio (`README.md`) incorporando la información formal de referencia del Proyecto Final de Carrera (PFC Fase 1 - MVP) de la UTN FRCU y la Universidad Popular de Concepción del Uruguay, subsanando todas las inconsistencias, contradicciones y vacíos identificados previamente.
+- **Información incorporada y cambios principales:**
+  - **Contexto institucional y equipo:** Documentados los docentes (Lucas Scheider, Adrian Tournour), los autores y sus responsabilidades (`LD` Backend, `NM` Infraestructura, `JV` Historias de usuario, `AV` Frontend, `NV` Relevamiento y testing).
+  - **Problemática y razón de ser:** Tabla de actores y consecuencias frente a la demora analógica de 2 a 3 días hábiles en la consulta del Libro Matriz, y lema institucional *“Antes de que entre a tu casa, ya lo conocemos nosotros”*.
+  - **Organización Scrum:** Detalle de épicas (Gestión de usuarios, Gestión de solicitudes), sprints 1 al 4 con fechas y subtareas formales, y Definition of Done (DoD).
+  - **Relevamiento formal completo:**
+    - 15 Historias de Usuario de Gestión de Usuarios (`HU-U01` a `HU-U15`) con escenarios Given/When/Then en formato Gherkin.
+    - 17 Historias de Usuario de Gestión de Solicitudes (`HU-S01` a `HU-S17`, épica SCRUM-15) con escenarios Given/When/Then.
+    - Requisitos Funcionales (`RF-01` a `RF-17`) y No Funcionales (`RNF-01` a `RNF-06`).
+    - Matriz de trazabilidad integral (HU vs Actor vs RF vs Sprint).
+  - **Modelado:**
+    - Casos de uso y Diagrama de clases con enlaces directos a Google Drive.
+    - Diagramas de estados y tablas de transiciones formales para el ciclo de vida de la Solicitud (`PENDIENTE`, `ACEPTADA`, `RECHAZADA`, `COMPLETADA`, `CANCELADA`, `VENCIDA`) y para los estados de Cuenta (`CARGADO`, `ACTIVO`, `SUSPENDIDO`, `INACTIVO`).
+  - **Análisis de arquitectura y resolución de puntos clave:**
+    - *Conector a API externa:* Especificación técnica de OpenStreetMap / Nominatim con caché LRU de 500 entradas (TTL 10 min), rate-limiting y degradación en 2 capas.
+    - *Conector SMTP:* Contrato de infraestructura con variables `KEYCLOAK_SMTP_*`, STARTTLS, separación de `From` y `Reply-To`, retry policy y tolerancia a fallos.
+    - *Persistencia de fotos y SMTP en microservicios:* Fundamentación arquitectónica de por qué NO violan los principios de microservicios (desacoplamiento de binarios fuera de Postgres mediante volumen nombrado `fotos_data`, interfaz extensible a S3/MinIO, y notificaciones desacopladas en BFF).
+  - **Corrección de inconsistencias del modelo:** Unificada la definición de `fotoUrl` en `Usuario` y `Profesional` (ambas guardan la clave textual `perfiles/<uuid>.jpg` en el volumen privado, nunca una URL pública directa).
+  - **Prototipos y diseño visual:** Enlace al prototipo interactivo en Vercel, enlaces a las figuras en Drive y formalización de tokens de diseño y reglas de botones.
+- **Archivos modificados:**
+  - `ESPECIFICACION.md`
+  - `README.md`
+  - `WALKTHROUGH.md`
+- **Verificación:**
+  - Verificación de consistencia de sintaxis markdown en `ESPECIFICACION.md` y `README.md`.
+  - Verificación de estado del repositorio con `git status`.
