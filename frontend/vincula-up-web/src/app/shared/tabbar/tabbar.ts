@@ -36,20 +36,19 @@ export class VuTabbar {
 				{ path: '/admin/profesionales', label: 'Profesionales', icon: 'users', exact: false },
 				{ path: '/admin/categorias', label: 'Categorías', icon: 'tag', exact: false },
 				{ path: '/admin/clientes', label: 'Clientes', icon: 'user-round', exact: false },
+				{ path: '/mi-cuenta', label: 'Mi cuenta', icon: 'user-round', exact: false },
 			];
 		}
 		if (this.auth.hasRole('CLIENTE')) {
 			return [
-				{ path: '/', label: 'Inicio', icon: 'home', exact: true },
-				{ path: '/solicitudes', label: 'Mis solicitudes', icon: 'clock', exact: false },
+				{ path: '/solicitudes', label: 'Enviadas', icon: 'clock', exact: false },
 				{ path: '/solicitar', label: 'Solicitar', icon: 'wrench', exact: false },
 				{ path: '/mi-cuenta', label: 'Mi cuenta', icon: 'user-round', exact: false },
 			];
 		}
 		if (this.auth.hasRole('PROFESIONAL')) {
 			const secciones: TabSection[] = [
-				{ path: '/', label: 'Inicio', icon: 'home', exact: true },
-				{ path: '/solicitudes', label: 'Mis solicitudes', icon: 'clock', exact: false },
+				{ path: '/solicitudes', label: 'Recibidas', icon: 'clock', exact: false },
 			];
 			// Mientras el perfil no está activo, la sección de más valor es completarlo.
 			if (!this.auth.isProfessionalActive()) {
