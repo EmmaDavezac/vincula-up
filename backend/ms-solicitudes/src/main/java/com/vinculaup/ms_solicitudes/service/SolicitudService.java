@@ -11,6 +11,7 @@ import com.vinculaup.ms_solicitudes.entity.EstadoSolicitud;
 import com.vinculaup.ms_solicitudes.entity.RolCancelacion;
 import com.vinculaup.ms_solicitudes.entity.Solicitud;
 import com.vinculaup.ms_solicitudes.repository.SolicitudRepository;
+import com.vinculaup.ms_solicitudes.config.SolicitudExpiradaException;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,12 +37,41 @@ public class SolicitudService {
     private final SolicitudRepository repository;
     private final ProfesionalesClient profesionalesClient;
     private final GeocodingClient geocodingClient;
+    private final double tiempoExpiracionHours;
 
     public SolicitudService(SolicitudRepository repository, ProfesionalesClient profesionalesClient,
-            GeocodingClient geocodingClient) {
+            GeocodingClient geocodingClient,
+            @Value("${solicitudes.tiempo-expiracion-hours:24}") double tiempoExpiracionHours) {
         this.repository = repository;
         this.profesionalesClient = profesionalesClient;
         this.geocodingClient = geocodingClient;
+        this.tiempoExpiracionHours = tiempoExpiracionHours;
+    }
+
+    /** Verifica que la solicitud no haya expirado antes de operar */
+    private void verificarExpiracion(Solicitud solicitud) {
+        if (solicitud.isExpirada()) {
+            throw new SolicitudExpiradaException(
+                    "Esta solicitud ha expirado por estar demasiado tiempo en estado PENDIENTE");
+        }
+    }
+
+    /**
+     * Pasa a estado VENCIDA todas las solicitudes pendientes cuyo tiempo límite ya venció.
+     * Retorna las solicitudes actualizadas para que puedan ser notificadas.
+     */
+    @Transactional
+    public List<SolicitudResponse> expirarPendientes() {
+        LocalDateTime ahora = LocalDateTime.now();
+        List<Solicitud> expiradas = repository.findPendientesExpiradas(ahora);
+        if (expiradas.isEmpty()) {
+            return List.of();
+        }
+        for (Solicitud s : expiradas) {
+            s.expirar("El profesional no respondió dentro del plazo límite.");
+        }
+        repository.saveAll(expiradas);
+        return expiradas.stream().map(this::toResponse).toList();
     }
 
     public SolicitudResponse crear(CrearSolicitudRequest request) {
@@ -77,7 +108,8 @@ public class SolicitudService {
                 request.clienteId(), profesional.id(), request.especialidadId(),
                 ubicacion.direccion(), ubicacion.zona(), ubicacion.latitud(), ubicacion.longitud(),
                 request.fechaHoraPropuesta(), request.descripcion().trim(),
-                request.fechaHoraFinPropuesta()));
+                request.fechaHoraFinPropuesta(),
+                this.tiempoExpiracionHours));
         return toResponse(solicitud);
     }
 
@@ -161,6 +193,7 @@ public class SolicitudService {
 
     public SolicitudResponse aceptar(UUID id, CambiarEstadoRequest request) {
         Solicitud solicitud = find(id);
+        verificarExpiracion(solicitud);
         ensureProfessionalActor(solicitud, request);
         ensureState(solicitud, EstadoSolicitud.PENDIENTE);
         solicitud.cambiarEstado(EstadoSolicitud.ACEPTADA);
@@ -169,6 +202,7 @@ public class SolicitudService {
 
     public SolicitudResponse rechazar(UUID id, CambiarEstadoRequest request) {
         Solicitud solicitud = find(id);
+        verificarExpiracion(solicitud);
         ensureProfessionalActor(solicitud, request);
         ensureState(solicitud, EstadoSolicitud.PENDIENTE);
         solicitud.rechazar(request.motivo());
@@ -197,6 +231,7 @@ public class SolicitudService {
      */
     public SolicitudResponse cancelar(UUID id, CambiarEstadoRequest request) {
         Solicitud solicitud = find(id);
+        verificarExpiracion(solicitud);
         RolCancelacion rol = rolDeParticipante(solicitud, request,
                 "Solo el cliente o el profesional pueden cancelar la solicitud");
         if (solicitud.getEstado() != EstadoSolicitud.PENDIENTE

@@ -57,6 +57,14 @@ export class MyRequests {
   @ViewChild('chatDialog') private chatDialog!: TemplateRef<unknown>;
   @ViewChild('statusDialog') private statusDialog!: TemplateRef<unknown>;
   @ViewChild('cancelDialog') private cancelDialog!: TemplateRef<unknown>;
+  @ViewChild('mapDialog') private mapDialog!: TemplateRef<unknown>;
+  private mapDialogRef?: MatDialogRef<unknown>;
+
+  readonly mapRequestId = signal<string | null>(null);
+  readonly solicitudDelMapa = computed(() => {
+    const id = this.mapRequestId();
+    return id ? (this.requests().find((r) => String(r.id) === id) ?? null) : null;
+  });
   private chatDialogRef?: MatDialogRef<unknown>;
   private statusDialogRef?: MatDialogRef<unknown>;
   private cancelDialogRef?: MatDialogRef<unknown>;
@@ -423,20 +431,54 @@ export class MyRequests {
     return this.loadingSpecialties() ? 'Cargando especialidad...' : 'Especialidad no disponible';
   }
 
-  // ── Ubicación: dirección + mapa embebido OSM (sin exponer coordenadas) ──
-  /** Coordenadas válidas solo para construir el mapa; nunca se muestran en el texto. */
-  private mapCoords(request: ServiceRequest): { lat: number; lng: number } | null {
-    const lat = Number(request.latitude);
-    const lng = Number(request.longitude);
-    if (
-      request.latitude == null || request.longitude == null ||
-      Number.isNaN(lat) || Number.isNaN(lng) ||
-      lat < -90 || lat > 90 || lng < -180 || lng > 180
-    ) {
-      return null;
-    }
-    return { lat, lng };
+/** Coordenadas reales, solo validadas. */
+private exactCoords(request: ServiceRequest): { lat: number; lng: number } | null {
+  const lat = Number(request.latitude);
+  const lng = Number(request.longitude);
+  if (
+    request.latitude == null || request.longitude == null ||
+    Number.isNaN(lat) || Number.isNaN(lng) ||
+    lat < -90 || lat > 90 || lng < -180 || lng > 180
+  ) {
+    return null;
   }
+  return { lat, lng };
+}
+
+/** Hash FNV-1a → número en [0, 1). Estable para el mismo texto. */
+private seededUnit(seed: string, salt: string): number {
+  let h = 2166136261;
+  const text = `${seed}:${salt}`;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) / 4294967296;
+}
+
+/**
+ * Coordenadas que se dibujan en el mapa. Si la solicitud está pendiente se
+ * desplaza el punto entre 8 y 20 m en una dirección fija por solicitud.
+ */
+private mapCoords(request: ServiceRequest): { lat: number; lng: number } | null {
+  const exact = this.exactCoords(request);
+  if (!exact) return null;
+  if (request.status !== 'PENDIENTE') return exact;
+
+  const seed = String(request.id);
+  const angle = this.seededUnit(seed, 'a') * 2 * Math.PI;
+  const meters = 8 + this.seededUnit(seed, 'd') * 12;
+  const dLat = (meters * Math.cos(angle)) / 111_320;
+  const dLng = (meters * Math.sin(angle)) / (111_320 * Math.cos((exact.lat * Math.PI) / 180));
+  return { lat: exact.lat + dLat, lng: exact.lng + dLng };
+}
+
+/** Solo con la solicitud aceptada: lleva a la ubicación real. */
+googleMapsUrl(request: ServiceRequest): string | null {
+  if (request.status !== 'ACEPTADA') return null;
+  const c = this.exactCoords(request);
+  return c ? `https://www.google.com/maps/search/?api=1&query=${c.lat},${c.lng}` : null;
+}
 
   /**
    * URL del mapa embebido de OpenStreetMap centrada en la ubicación del servicio.
@@ -967,6 +1009,24 @@ export class MyRequests {
   countPending(): number {
     return this.requests().filter((request) => request.status === 'PENDIENTE').length;
   }
+  abrirMapa(request: ServiceRequest): void {
+  this.mapRequestId.set(String(request.id));
+  this.mapDialogRef = this.dialog.open(this.mapDialog, {
+    ariaLabel: 'Mapa de la ubicación',
+    ariaModal: true,
+    width: 'min(44rem, calc(100vw - 2rem))',
+    maxWidth: 'calc(100vw - 2rem)',
+    panelClass: 'vu-details-dialog',
+  });
+  this.mapDialogRef.afterClosed().subscribe(() => {
+    this.mapDialogRef = undefined;
+    this.mapRequestId.set(null);
+  });
+}
+
+cerrarMapa(): void {
+  this.mapDialogRef?.close();
+}
 
   /** Clase del badge según el estado, con los colores del prototipo. */
   statusClass(status: RequestStatus): string {
@@ -987,4 +1047,6 @@ export class MyRequests {
         return 'vu-badge--neutro';
     }
   }
+  
 }
+

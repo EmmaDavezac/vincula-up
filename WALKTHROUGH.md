@@ -25,22 +25,208 @@
 
 ## Historial
 
-### [2026-11-06] - ux: mantener Limpiar en fila y mostrar skeleton al filtrar
-- **Objetivo:** Evitar que «Limpiar» salte a otra línea en desktop y dar feedback cuando se recalculan resultados.
-- **Cambios realizados:** Se reserva una columna final alineada a la derecha para el botón en desktop; en tablet y móvil conserva su ubicación inferior alineada a la derecha. Cambios en búsqueda, categoría, estado o limpiar muestran el skeleton brevemente en la zona de resultados sin ocultar los controles.
-- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
-- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+### [2026-11-16] - ux: unificar botones de acción en listados de administración
+- **Objetivo:** Dar una presentación consistente a las acciones de las filas de profesionales, categorías y clientes.
+- **Cambios realizados:**
+  - Se agrega el estilo compartido `.vu-admin-row-actions` para apilar los botones, igualar ancho, alineación, separación y altura mínima.
+  - Se conservan las variantes semánticas existentes para acciones primarias, secundarias y destructivas.
+  - Se eliminan reglas locales redundantes de los tres listados.
+  - Archivos modificados: `frontend/vincula-up-web/src/styles.css` y los templates/estilos de profesionales, categorías y clientes bajo `frontend/vincula-up-web/src/app/admin/`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build`.
 
-### [2026-11-06] - ux: skeleton al actualizar solicitudes y estado sin resultados
-- **Objetivo:** Dar feedback durante recargas, explicar filtros sin coincidencias y alinear la acción Limpiar con los controles.
-- **Cambios realizados:** El botón Limpiar iguala la altura de inputs/selects. Tras una recarga de datos se muestra el skeleton animado solo en la zona de tarjetas, manteniendo filtros visibles. Si los filtros no encuentran solicitudes se muestra un estado vacío con acción para limpiarlos.
-- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
-- **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
+### [2026-11-16] - fix: agregar mi cuenta a la barra móvil de administración
+- **Objetivo:** Mantener accesible la cuenta del administrador en móvil tras ocultar el acceso duplicado del menú superior.
+- **Cambios realizados:**
+  - Se agrega «Mi cuenta» a la barra inferior de administración, que enlaza a `/mi-cuenta`.
+  - Archivo modificado: `frontend/vincula-up-web/src/app/shared/tabbar/tabbar.ts`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build`.
 
-### [2026-11-06] - ux: adaptar búsqueda y filtros al rol y móvil
-- **Objetivo:** Buscar al profesional desde la vista del cliente y al cliente desde la vista profesional, manteniendo filtros compactos en móvil.
-- **Cambios realizados:** El campo de búsqueda cambia su etiqueta y nombre de contraparte según el rol, y sigue admitiendo dirección. El filtro por categoría queda visible aunque solo exista una opción. En móvil la búsqueda va en la primera fila y debajo aparecen categoría/estado; los títulos y controles tienen alturas uniformes.
-- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
+### [2026-11-16] - fix: evitar duplicar mi cuenta en navegación móvil
+- **Objetivo:** Evitar que «Mi cuenta» aparezca simultáneamente en el menú superior y en la barra inferior de móvil.
+- **Cambios realizados:**
+  - El acceso «Mi cuenta» del menú de usuario se oculta en móvil, donde permanece disponible en la barra inferior según el rol.
+  - En escritorio el acceso del menú superior se mantiene, ya que la barra inferior no se muestra.
+  - Archivos modificados: `frontend/vincula-up-web/src/app/shared/navbar/navbar.html` y `frontend/vincula-up-web/src/app/shared/navbar/navbar.css`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build`.
+
+### [2026-11-16] - ux: priorizar solicitudes en la barra inferior
+- **Objetivo:** Facilitar el acceso a la tarea principal de clientes y profesionales desde la navegación móvil.
+- **Cambios realizados:**
+  - Se elimina «Inicio» de la barra inferior para clientes y profesionales.
+  - Se etiqueta `/solicitudes` como «Enviadas» para clientes y «Recibidas» para profesionales.
+  - Visitantes y administradores conservan sus secciones actuales.
+  - Archivo modificado: `frontend/vincula-up-web/src/app/shared/tabbar/tabbar.ts`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build`.
+
+### [2026-11-16] - ux: agregar descripciones a las secciones de mi cuenta
+- **Objetivo:** Explicar brevemente qué información contiene cada sección de «Mi cuenta».
+- **Cambios realizados:**
+  - Se agregan o afinan descripciones para el perfil, la reputación, los datos personales, el contacto y la seguridad.
+  - Se reutiliza el estilo de ayuda existente sin introducir colores ni estilos nuevos.
+  - Archivo modificado: `frontend/vincula-up-web/src/app/account/account.html`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build`.
+
+### [2026-11-16] - fix: dar estilo de botón secundario a crear cuenta
+- **Objetivo:** Hacer que «Crear cuenta» se reconozca como una acción y acompañe visualmente al acceso primario.
+- **Cambios realizados:**
+  - Se reemplaza el enlace sin destino por un botón de acción con estilo outline.
+  - Se ajusta el tamaño para móvil y escritorio usando los estilos y tokens globales.
+  - Archivos modificados: `frontend/vincula-up-web/src/app/shared/navbar/navbar.html` y `frontend/vincula-up-web/src/app/shared/navbar/navbar.css`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build`.
+
+### [2026-11-12] - fix: notificaciones de vencimiento con autenticación de servicio y aviso al profesional
+- **Objetivo:**
+  1. Corregir el error `401 UNAUTHORIZED` que impedía que el `SolicitudExpiracionScheduler` enviara mails al vencer solicitudes: el hilo de fondo no tenía contexto HTTP ni sesión WebSocket, por lo que `JdkHttpClientRequestFactory` no adjuntaba el header `Authorization` al llamar a `ms-usuarios` y `ms-profesionales`.
+  2. Notificar al **profesional** además del cliente cuando una solicitud vence por falta de respuesta.
+- **Causa del fallo:**
+  - El scheduler corría en un thread de fondo (`@Scheduled`) sin `HttpServletRequest` ni sesión WebSocket activa. `JdkHttpClientRequestFactory.authorizationHeaders()` devolvía headers vacíos → 401 en `ms-usuarios`.
+  - El scheduler solo notificaba al cliente; el profesional no recibía ningún aviso.
+- **Cambios realizados:**
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/SolicitudExpiracionScheduler.java`:
+    - Inyectados `KeycloakAdminService` y `WebSocketAuthorizationContext`.
+    - Se obtiene un token de cuenta de servicio (`client_credentials`) una vez por ciclo del scheduler.
+    - Todas las notificaciones de cada solicitud se envuelven en `authContext.withAuthorization("Bearer " + token, ...)` para que `JdkHttpClientRequestFactory` propague el token a `ms-usuarios` y `ms-profesionales`.
+    - Se agrega lógica para notificar al **profesional**: resuelve `profesionalId` → `buscarProfesionalPorIdOUsuario` → `usuarioId` → `buscarUsuarioPorIdOKeycloakId` → correo + WebPush.
+    - Cada bloque (cliente / profesional) tiene su propio `try/catch` para que un fallo al notificar a uno no impida notificar al otro.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/NotificacionService.java`:
+    - Agregado caso `VENCIDA_PROFESIONAL` en el switch de `avisarCambioSolicitud` con asunto `"Vincula-UP · Solicitud vencida por falta de respuesta"` y texto que informa al profesional que la solicitud venció por no responder a tiempo.
+- **Verificación:**
+  - Compilación `bff-web`: `./mvnw clean compile` → BUILD SUCCESS.
+  - Imagen Docker reconstruida y contenedor reiniciado: `docker compose build bff-web && docker compose up -d bff-web` → todos los contenedores `(healthy)`.
+  - Logs del scheduler sin errores 401; `INFO` de aviso enviado a cliente y profesional.
+
+### [2026-11-12] - feat: aviso por correo de solicitud vencida y alta precisión en detección de ubicación
+- **Objetivo:**
+  1. Enviar automáticamente el correo transaccional y la notificación WebPush al cliente cuando una solicitud pasa a estado `VENCIDA` ("El profesional no respondió, tienes que solicitar otro profesional").
+  2. Implementar un scheduler periódico en el BFF que detecte y actualice las solicitudes pendientes que superaron su tiempo de vencimiento sin requerir interacción manual.
+  3. Mejorar la detección de geolocalización en el navegador activando alta precisión (`enableHighAccuracy: true`, `maximumAge: 0`), zoom de calle en Leaflet y geocodificación inversa detallada con altura de calle.
+  4. Realizar auto-logout en el frontend si el backend responde 401 o 404 en `/usuarios/yo` tras reiniciar la base de datos, evitando que el usuario quede bloqueado con tokens caducos.
+- **Cambios realizados:**
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/entity/Solicitud.java`: Permitido cambio de estado a `VENCIDA` y agregado método `expirar(String motivo)`.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/repository/SolicitudRepository.java`: Agregada consulta `findPendientesExpiradas` para solicitudes pendientes cuyo `fechaExpiracion` ya venció.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/service/SolicitudService.java`: Implementado `expirarPendientes()` que pasa las solicitudes expiradas a `VENCIDA` y las persiste.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/controller/SolicitudController.java`: Expuesto endpoint interno `POST /solicitudes/expirar-pendientes`.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/config/SecurityConfig.java`: Permitido `/solicitudes/expirar-pendientes` en llamadas internas.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/BffWebApplication.java`: Habilitado `@EnableScheduling`.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/client/SolicitudesClient.java` y `BackendGateway.java`: Agregado cliente para `expirarPendientes()`.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/NotificacionService.java`: Agregado caso `VENCIDA` con asunto `"Vincula-UP · El profesional no respondió a tu solicitud"` y cuerpo explicando que puede solicitar a otro profesional.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/controller/ApiController.java`: Ajustado `notificarCambioSolicitud` y `notificarPushSolicitud` para enviar avisos de solicitudes vencidas al cliente.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/SolicitudExpiracionScheduler.java`: Nuevo componente programado cada 15s que consulta solicitudes vencidas y despacha correos y notificaciones WebPush.
+  - `frontend/vincula-up-web/src/app/core/services/auth.service.ts`: Auto-logout en `loadOwnPhoto()` ante códigos HTTP 401 o 404.
+  - `frontend/vincula-up-web/src/app/request/request.ts` y `activation.ts`: Geolocalización con `enableHighAccuracy: true`, `maximumAge: 0`, centrado dinámico en el mapa con nivel de zoom 16+ y reverse geocoding con calle y numeración.
+  - `ESPECIFICACION.md`: Actualizada documentación del ciclo de vida de solicitudes y detección de ubicación.
+- **Verificación:**
+  - Compilación backend `ms-solicitudes`: `./mvnw clean compile` exitoso (BUILD SUCCESS).
+  - Compilación backend `bff-web`: `./mvnw clean compile` exitoso (BUILD SUCCESS).
+  - Compilación frontend `vincula-up-web`: `npm run build` exitoso (BUILD SUCCESS).
+
+### [2026-11-12] - fix: soporte a horas decimales de expiración y corrección de arranque de ms-solicitudes
+- **Objetivo:** Permitir configurar tiempos de expiración inferiores a 1 hora (ej: 0.5 para 30 minutos, 0.25 para 15 minutos) para pruebas y demostraciones, y solucionar el error de contenedor `vinculaup-ms-solicitudes is unhealthy` en Docker Compose.
+- **Causa del fallo:**
+  - `SolicitudService` tenía dos constructores sobrecargados; Spring Boot fallaba al resolver la inyección sin `@Autowired` explícito (`No default constructor found` / `BeanInstantiationException`).
+  - La expiración solo aceptaba `long` y sumaba horas enteras (`plusHours`), sin admitir fracciones de hora.
+- **Cambios realizados:**
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/service/SolicitudService.java`: Se unificó a un único constructor que inyecta `double tiempoExpiracionHours`, eliminando la ambigüedad para Spring.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/entity/Solicitud.java`: Se cambió `tiempoExpiracionHours` a `double` y el cálculo a minutos (`Math.round(tiempoExpiracionHours * 60.0)` con `plusMinutes`).
+  - `.env.example` y `ESPECIFICACION.md`: Documentado el soporte a valores decimales (`0.5`, `0.25`).
+- **Verificación:**
+  - Compilación exitosa en `backend/ms-solicitudes` con `./mvnw clean compile`.
+  - Reconstrucción de la imagen Docker de `ms-solicitudes` y verificación del stack completo con `docker compose ps`: todos los contenedores (`vinculaup-postgres`, `vinculaup-keycloak`, `vinculaup-ms-usuarios`, `vinculaup-ms-profesionales`, `vinculaup-ms-solicitudes`, `vinculaup-bff-web`, `vinculaup-nginx`) en estado `(healthy)` y activos.
+
+### [2026-11-12] - fix: corregir errores de compilación en ms-solicitudes por expiración de solicitudes
+- **Objetivo:** Resolver los fallos de compilación de Maven en `ms-solicitudes` producidos durante la compilación en Docker/local tras la introducción de la expiración de solicitudes PENDIENTE.
+- **Causa:**
+  - `Solicitud.java`: Se había eliminado por error el campo `motivoCancelacion` al agregar `fechaExpiracion` y `esVencible`, y faltaba el import de `SolicitudExpiradaException`.
+  - `SolicitudService.java`: Import incorrecto de `com.vinculaup.ms_solicitudes.entity.SolicitudExpiradaException` (la excepción vive en `.config`), y duplicación de variables de instancia y constructor.
+  - Faltaba inyectar y pasar el valor configurable `SOLICITUDES_TIEMPO_EXPIRACION_HOURS` a `application.properties`, `docker-compose.yml` y a la entidad `Solicitud`.
+  - En `SolicitudExceptionHandler`: Se añadió el `@ExceptionHandler` explícito para `SolicitudExpiradaException` evitando respuestas 500 no controladas y devolviendo 409 Conflict.
+- **Cambios realizados:**
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/entity/Solicitud.java`: Restaurado campo `motivoCancelacion`, agregado import `SolicitudExpiradaException`, constructor con `tiempoExpiracionHours`, y método `isExpirada()` con retorno dinámico de `VENCIDA` en `getEstado()`.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/service/SolicitudService.java`: Eliminadas declaraciones duplicadas e import erróneo, inyectada `@Value("${solicitudes.tiempo-expiracion-hours:24}")` y validación `verificarExpiracion` en transiciones.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/config/SolicitudExceptionHandler.java`: Manejador `@ExceptionHandler(SolicitudExpiradaException.class)` para retornar HTTP 409 Conflict con mensaje descriptivo.
+  - `backend/ms-solicitudes/src/main/resources/application.properties`: Agregada propiedad `solicitudes.tiempo-expiracion-hours=${SOLICITUDES_TIEMPO_EXPIRACION_HOURS:24}`.
+  - `docker-compose.yml`: Mapeada la variable `SOLICITUDES_TIEMPO_EXPIRACION_HOURS` en el servicio `ms-solicitudes`.
+  - `ESPECIFICACION.md`: Documentada la variable de entorno `SOLICITUDES_TIEMPO_EXPIRACION_HOURS`.
+- **Verificación:**
+  - Compilación exitosa en `backend/ms-solicitudes` mediante `./mvnw clean compile` (BUILD SUCCESS en 5s).
+  - Compilación exitosa en `backend/bff-web` mediante `./mvnw clean compile` (BUILD SUCCESS en 5.7s).
+- **Especificación:** Actualizada sección 11 con la nueva variable de entorno y comportamiento de expiración.
+
+### [2026-11-12] - fix: botón "Buscar otro profesional" en VENCIDA y dirección completa para el cliente
+- **Objetivo:** Corregir dos problemas de UI en la pantalla "Mis solicitudes":
+  1. El botón "Buscar otro profesional" no aparecía cuando la solicitud estaba en estado `VENCIDA`.
+  2. El cliente veía su propia dirección con el prefijo `Zona:` (ocultamiento parcial pensado solo para el profesional).
+- **Cambios realizados:**
+  - `my-requests.html` línea 214: condición del botón extendida a `RECHAZADA || VENCIDA`.
+  - `my-requests.html` línea 135: prefijo `Zona:` condicionado a `isProfessional() && isPending()` (solo profesional, solo pendiente).
+  - `my-requests.html` línea 403 (modal de mapa): misma corrección para el diálogo de mapa ampliado.
+- **Verificación:** `npm run build` → BUILD SUCCESS (sin errores nuevos).
+
+### [2026-11-12] - fix: autenticación del scheduler de expiración (error 401 en llamada interna)
+- **Objetivo:** El scheduler `SolicitudExpiracionScheduler` recibía HTTP 401 al llamar internamente a `POST /solicitudes/expirar-pendientes` porque `SolicitudesClient` no adjuntaba ningún token de autorización.
+- **Causa raíz:** `SolicitudesClient` reenvía el JWT del usuario entrante mediante `JdkHttpClientRequestFactory`, pero la llamada del scheduler no tiene request entrante → no había token que reenviar.
+- **Solución:**
+  - `KeycloakAdminService.token()` renombrado a `tokenDeServicio()` y su visibilidad cambiada de `private` a `public`, reutilizando el flujo `client_credentials` ya existente con caché de 30s antes de expirar.
+  - `SolicitudesClient` inyecta `KeycloakAdminService` y en `expirarPendientes()` adjunta `Authorization: Bearer <token>` usando `tokenDeServicio()` si está disponible.
+  - `SolicitudExpiracionScheduler`: logging mejorado (`log.warn` en lugar de `log.debug` para errores; `log.info` cuando hay solicitudes procesadas).
+- **Archivos modificados:**
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/KeycloakAdminService.java`
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/client/SolicitudesClient.java`
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/SolicitudExpiracionScheduler.java`
+- **Verificación:**
+  - `./mvnw clean compile` en `bff-web` → BUILD SUCCESS.
+  - `docker compose build bff-web && docker compose up -d bff-web` → container sano.
+  - Logs del BFF sin errores 401/403; el scheduler dispara sin WARN de autenticación.
+
+### [2026-11-11] - feat: mapa estático en solicitudes con mejor visualización y tema oscuro
+- **Objetivo:** Mejorar la visualización del mapa en la tarjeta de solicitudes, agregar soporte para modo oscuro y hacer el mapa más prominente sin controles de zoom ni arrastre.
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/my-requests/my-requests.css`: Agregado estilo `.embedded-map--static` con `height: calc(100% + 180px)` y `inset: -90px -60px` para expandir el mapa fuera del contenedor, sin controles de zoom ni arrastre.
+  - `frontend/vincula-up-web/src/app/my-requests/my-requests.html`: Reemplazado el contenedor de mapa para usar la nueva clase `.embedded-map--static`; el iframe ahora se agranda dentro del contenedor con `overflow: hidden` que recorta el zoom y la atribución.
+  - `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`: Agregado `mapRequestId` signal y `solicitudDelMapa` computed para gestionar qué solicitud mostrar en el mapa. Agregado `@ViewChild('mapDialog')` para abrir el diálogo del mapa.
+  - `frontend/vincula-up-web/src/styles.css`: Ajuste de filtro para `.map-modal__frame .embedded-map` en modo oscuro: `invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92) saturate(0.75)` para invertir colores y adaptar al tema oscuro.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` exitoso; revisión visual en modo claro y oscuro.
+- **Especificación:** Sin cambios en rutas ni contratos de API. Mejoras de UX en la presentación del mapa.
+- **Objetivo:** Corregir el estado `unhealthy` persistente del contenedor `vinculaup-keycloak` al iniciar el stack, que impedía que `keycloak-init` ejecutara el bootstrap del realm y hacía fallar a los servicios dependientes (`dependency failed to start`).
+- **Causa:** Keycloak 26.3.3 tarda ~40 segundos en escuchar en el puerto 8080 (augmentación Quarkus + Liquibase + import del realm). El healthcheck tenía `start_period: 30s` y `retries: 5` (margen total ~55s), insuficiente: Docker lo marcaba `unhealthy` antes de que estuviera listo, y con `restart: unless-stopped` entraba en bucle de flapping. Además, el test del healthcheck (`cat < /dev/tcp/127.0.0.1/8080 > /dev/null`) podía bloquearse leyendo la conexión TCP hasta el `timeout`, sumando fallos falsos.
+- **Cambios realizados:**
+  - `docker-compose.yml`: servicio `keycloak`, `healthcheck`:
+    - `start_period: 30s` → `60s` (gracia suficiente para el arranque en frío).
+    - `retries: 5` → `12` (60s adicionales de sondeo tras la gracia).
+    - `test`: se restauró a `exec 3<>/dev/tcp/127.0.0.1/8080 && exec 3>&- && exec 3<&-` (abre y cierra la conexión TCP inmediatamente, sin bloquear), en vez de `cat < /dev/tcp/...` que se quedaba colgado esperando EOF.
+- **Verificación:**
+  - `docker compose up -d keycloak` → `vinculaup-keycloak` pasa a `(healthy)` con `RestartCount=0` (sin bucle de reinicio).
+  - `docker compose up -d keycloak-init` → script de bootstrap completa: "Keycloak realm vincula-up initialized." (cliente de servicio, roles y SMTP configurados).
+  - `docker compose ps`: todos los servicios (`postgres`, `keycloak`, `ms-usuarios`, `ms-profesionales`, `ms-solicitudes`) en `(healthy)`.
+- **Especificación:** Sin cambios en rutas ni contratos de API. Solo ajuste de temporización del healthcheck.
+
+
+### [2026-11-07] - fix: quitar botón espurio y restaurar barra de búsqueda en admin profesionales
+- **Objetivo:** Eliminar el botón “Buscar otro profesional” que se filtró dentro de la barra de búsqueda del padrón de profesionales y restablecer su diseño original.
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/admin/admin-professionals/admin-professionals.html`: se eliminó el botón espurio y se restauró la estructura original de la barra de búsqueda.
+  - `frontend/vincula-up-web/src/app/admin/admin-professionals/admin-professionals.css`: se eliminaron las reglas `.search-actions` agregadas por error.
+- **Verificación:** `npm run build` exitoso; reconstrucción y recreación del contenedor `nginx`.
+- **Especificación:** Sin cambios en rutas ni contratos.
+
+
+### [2026-11-07] - fix: 404 en POST /api/profesionales/alta por usuario inexistente no tratado como null
+- **Objetivo:** Resolver el error HTTP 404 "Usuario no encontrado" que devolvía `POST /api/profesionales/alta` al dar de alta un profesional cuyo correo no existía aún en `ms-usuarios`.
+- **Causa:** `BackendGateway.buscarUsuarioPorEmail()` propagaba el 404 de `ms-usuarios` (`/usuarios/por-email`) en vez de traducirlo a `null`, aunque `altaProfesional()` esperaba `null` para el caso de invitación nueva. El mismo problema afectaba al endpoint BFF `GET /api/usuarios/por-email`.
+- **Cambios realizados:**
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/BackendGateway.java`: `buscarUsuarioPorEmail()` ahora captura `ResponseStatusException` con estado 404 y devuelve `null`.
+- **Verificación:** `./mvnw clean compile` exitoso; reconstrucción y recreación de `bff-web`; `POST https://vincula-up.local/api/profesionales/alta` con token de ADMIN devuelve ahora `HTTP 201 Created`.
+- **Especificación:** Sin cambios en rutas ni contratos de API.
+
+
+
+### [2026-11-06] - fix: resolver duplicados de abrirNuevoProfesional en admin-professionals
+- **Objetivo:** Corregir el error TS2393 "Duplicate function implementation" causado por múltiples declaraciones de la función `abrirNuevoProfesional` en el componente `AdminProfessionals`.
+- **Cambios realizados:**
+  - Eliminadas ~90 declaraciones duplicadas de la función `abrirNuevoProfesional()` en `frontend/vincula-up-web/src/app/admin/admin-professionals/admin-professionals.ts`
+  - Mantener una única declaración standalone de `abrirNuevoProfesional(): void` que navega a `/admin/profesionales/nuevo`
+  - Removida la llamada incorrecta a `abrirNuevoProfesional()` dentro de `confirmarAccion()`
+- **Verificación:** `npm run build -- --configuration production` exitoso sin errores TS2393, TS1005 o TS2554requests.html`, `frontend/vincula-up-web/src/app/my-requests/my-requests.css`.
 - **Verificación:** `cd frontend/vincula-up-web && npm run build` exitoso.
 
 ### [2026-11-06] - ux: compactar encabezado de solicitudes
@@ -888,3 +1074,89 @@
 - **Verificación:**
   - `npm run build` en el frontend compiló correctamente sin errores de TypeScript ni CSS.
 - **Especificación:** Actualizada en `ESPECIFICACION.md` con la ubicación de los estilos del modal.
+### [2026-11-07] - docs: corregir documentación de verifyEmail y confirmación de correo
+- **Objetivo:** Actualizar `ESPECIFICACION.md` para reflejar que el realm tiene `verifyEmail: true` y documentar la confirmación directa (clientes) e indirecta (profesionales por contraseña temporal).
+- **Cambios realizados:**
+  - `ESPECIFICACION.md`: tabla del realm (`verifyEmail: true`), bloque de verificación de correo, nota de limitación en el alta y fila de deuda técnica #8 actualizados.
+- **Verificación:** Revisión de consistencia con `keycloak/import/vincula-up-realm.json` y `KeycloakAdminService`.
+- **Especificación:** Actualizada en este mismo cambio.
+
+### [2026-11-10] - fix: 401 al cambiar la contraseña en la consola de cuenta (usuarios de demo)
+
+- **Objetivo:** Los usuarios de demo no podían cambiar la contraseña desde `/realms/vincula-up/account` ("Algo salió mal", 401).
+- **Causa:** El import del realm crea a los usuarios de demo con `realmRoles` explícitos y Keycloak no les asigna `default-roles-vincula-up`, el rol compuesto que trae `manage-account`/`view-profile` del client `account`. Sin esos roles el token no incluye `account` en `aud` y la API de cuenta lo rechaza con 401.
+- **Cambios realizados:**
+  - `keycloak/import/vincula-up-realm.json`: se agrega `default-roles-vincula-up` a los `realmRoles` de los 3 usuarios de demo (instalaciones nuevas).
+  - `scripts/linux-macos/keycloak-bootstrap.sh` y `scripts/windows/keycloak-bootstrap.ps1`: asignan ese rol a los usuarios de demo existentes, de forma idempotente (instalaciones ya creadas).
+  - `ESPECIFICACION.md` (§14.1) y `keycloak/import/README.md`: documentan el cambio.
+- **Verificación:** `python3 -m json.tool` sobre el JSON y `bash -n` sobre el `.sh` pasan. No hay cambios de backend ni frontend. Falta la prueba en vivo (Docker estaba apagado): `docker compose up -d`, correr el bootstrap, entrar a `/realms/vincula-up/account` como `cliente@vincula-up.local` y cambiar la contraseña.
+- **Especificación:** Actualizada en este mismo cambio.
+
+
+### [2026-11-15] - docs: actualización integral de la especificación técnica y documentación institucional del MVP
+
+- **Objetivo:** Actualizar de manera completa e integral la especificación técnica (`ESPECIFICACION.md`) y la documentación del repositorio (`README.md`) incorporando la información formal de referencia del Proyecto Final de Carrera (PFC Fase 1 - MVP) de la UTN FRCU y la Universidad Popular de Concepción del Uruguay, subsanando todas las inconsistencias, contradicciones y vacíos identificados previamente.
+- **Información incorporada y cambios principales:**
+  - **Contexto institucional y equipo:** Documentados los docentes (Lucas Scheider, Adrian Tournour), los autores y sus responsabilidades (`LD` Backend, `NM` Infraestructura, `JV` Historias de usuario, `AV` Frontend, `NV` Relevamiento y testing).
+  - **Problemática y razón de ser:** Tabla de actores y consecuencias frente a la demora analógica de 2 a 3 días hábiles en la consulta del Libro Matriz, y lema institucional *“Antes de que entre a tu casa, ya lo conocemos nosotros”*.
+  - **Organización Scrum:** Detalle de épicas (Gestión de usuarios, Gestión de solicitudes), sprints 1 al 4 con fechas y subtareas formales, y Definition of Done (DoD).
+  - **Relevamiento formal completo:**
+    - 15 Historias de Usuario de Gestión de Usuarios (`HU-U01` a `HU-U15`) con escenarios Given/When/Then en formato Gherkin.
+    - 17 Historias de Usuario de Gestión de Solicitudes (`HU-S01` a `HU-S17`, épica SCRUM-15) con escenarios Given/When/Then.
+    - Requisitos Funcionales (`RF-01` a `RF-17`) y No Funcionales (`RNF-01` a `RNF-06`).
+    - Matriz de trazabilidad integral (HU vs Actor vs RF vs Sprint).
+  - **Modelado:**
+    - Casos de uso y Diagrama de clases con enlaces directos a Google Drive.
+    - Diagramas de estados y tablas de transiciones formales para el ciclo de vida de la Solicitud (`PENDIENTE`, `ACEPTADA`, `RECHAZADA`, `COMPLETADA`, `CANCELADA`, `VENCIDA`) y para los estados de Cuenta (`CARGADO`, `ACTIVO`, `SUSPENDIDO`, `INACTIVO`).
+  - **Análisis de arquitectura y resolución de puntos clave:**
+    - *Conector a API externa:* Especificación técnica de OpenStreetMap / Nominatim con caché LRU de 500 entradas (TTL 10 min), rate-limiting y degradación en 2 capas.
+    - *Conector SMTP:* Contrato de infraestructura con variables `KEYCLOAK_SMTP_*`, STARTTLS, separación de `From` y `Reply-To`, retry policy y tolerancia a fallos.
+    - *Persistencia de fotos y SMTP en microservicios:* Fundamentación arquitectónica de por qué NO violan los principios de microservicios (desacoplamiento de binarios fuera de Postgres mediante volumen nombrado `fotos_data`, interfaz extensible a S3/MinIO, y notificaciones desacopladas en BFF).
+  - **Corrección de inconsistencias del modelo:** Unificada la definición de `fotoUrl` en `Usuario` y `Profesional` (ambas guardan la clave textual `perfiles/<uuid>.jpg` en el volumen privado, nunca una URL pública directa).
+  - **Prototipos y diseño visual:** Enlace al prototipo interactivo en Vercel, enlaces a las figuras en Drive y formalización de tokens de diseño y reglas de botones.
+- **Archivos modificados:**
+  - `ESPECIFICACION.md`
+  - `README.md`
+  - `WALKTHROUGH.md`
+- **Verificación:**
+  - Verificación de consistencia de sintaxis markdown en `ESPECIFICACION.md` y `README.md`.
+  - Verificación de estado del repositorio con `git status`.
+
+### [2026-11-15] - chore: limpieza profunda de scripts obsoletos y archivos redundantes en el repositorio
+
+- **Objetivo:** Dejar el repositorio lo más limpio posible, eliminando scripts de un solo uso o migración pasada, artefactos compilados redundantes y configurando salvaguardas para mantener el código fuente impoluto.
+- **Cambios realizados:**
+  - **Eliminación de scripts en desuso:**
+    - `scripts/arreglar-ruta-plantilla.py`: Script temporal de corrección de rutas de maquetas ya ejecutado.
+    - `scripts/generate-logo.py`: Script utilitario de generación del logo PNG ya incorporado en `public/logo-cuadrado.png`.
+    - `scripts/linux-macos/generate-certs.sh` y `scripts/windows/generate-certs.ps1`: Eliminados scripts envoltorios; los certificados TLS ya están generados en `nginx/certs/` y su proceso de creación/renovación con comandos directos de OpenSSL quedó documentado en `ESPECIFICACION.md` y `MANUAL.md`.
+    - `scripts/windows/start-local.ps1`: Eliminado script de ejecución local; la arquitectura se estandariza y unifica exclusivamente en despliegue con contenedores Docker (`docker compose`).
+  - **Eliminación de artefactos compilados redundantes en frontend:**
+    - Eliminados los 53 archivos `.js` generados en `frontend/vincula-up-web/src/` por ejecuciones previas de `tsc` sin `--noEmit`, los cuales duplicaban innecesariamente los archivos `.ts`.
+  - **Salvaguardas de compilación e higiene:**
+    - Añadido `"noEmit": true` en `frontend/vincula-up-web/tsconfig.json` para evitar que herramientas locales o editores vuelvan a emitir archivos `.js` en `src/`.
+    - Añadida la regla `frontend/**/src/**/*.js` a `.gitignore`.
+    - Eliminado el import no utilizado de `VuIcon` en `frontend/vincula-up-web/src/app/shared/auth-loading/auth-loading.ts`, logrando compilación de Angular con 0 advertencias.
+- **Verificación:**
+  - Compilación de los 4 microservicios backend (`ms-usuarios`, `ms-profesionales`, `ms-solicitudes`, `bff-web`) con `./mvnw clean compile` → BUILD SUCCESS en todos.
+  - Compilación del frontend Angular con `npm run build` → Generación exitosa de bundle con 0 advertencias y 0 errores.
+  - Verificación de árbol limpio y sin archivos huérfanos.
+
+
+### [2026-11-15] - docs: agregar informes de referencia académicos actualizados (PFC y DACS)
+- **Objetivo:** Incorporar al repositorio los dos informes académicos formales —la entrega parcial final del Proyecto Final de Carrera (PFC, Grupo 5) y el informe del MVP de DACS (Grupo 8)— con metadatos actualizados al 15/11/2026, anotaciones de estado de avance y referencias cruzadas con la documentación existente.
+- **Cambios realizados:**
+  - **`Entrega Proyecto Final Grupo 5.md` (nuevo):**
+    - Encabezado institucional con cátedra, entrega, grupo, fecha (15/11/2026) y enlace al repositorio.
+    - RF14 actualizado: tiempo de expiración configurable vía `SOLICITUDES_TIEMPO_EXPIRACION_HOURS` (24h por defecto), notificación dual (usuario + profesional), estado Fase 1.
+    - Tabla de limitaciones con columna "Estado al 15/11/2026" con progreso de cada ítem.
+    - Anotaciones de estado en tabla de sprints de Fase 2.
+  - **`MVP Grupo 8- DACS.md` (nuevo):**
+    - Encabezado institucional con cátedra (DACS), proyecto, grupo, fecha (15/11/2026) y enlace al repositorio.
+    - Estado "Completado" anotado en cada sprint (1-4).
+    - Sprint 4 expandido con funcionalidades finales (expiración, chat STOMP, mapa interactivo, calificaciones).
+    - Sección "Puntos a revisar de la arquitectura" resuelta con referencias a ESPECIFICACION.md §6.3.1-6.3.3.
+  - **`README.md`:** Agregadas referencias a ambos informes en la sección Documentación.
+  - **`ESPECIFICACION.md`:** Agregada mención de los informes académicos formales en el bloque introductorio.
+  - **`WALKTHROUGH.md`:** Esta entrada.
+- **Verificación:** `git diff --stat` confirma que solo se modifican archivos `.md`. No hay cambios de código, por lo que no aplica compilación backend/frontend.

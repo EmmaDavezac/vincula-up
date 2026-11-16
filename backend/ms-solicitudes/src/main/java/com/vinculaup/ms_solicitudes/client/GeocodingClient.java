@@ -13,6 +13,8 @@ import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.event.ContextRefreshedEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 /**
@@ -62,6 +64,31 @@ public class GeocodingClient {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(6))
                 .build();
+    }
+
+    /**
+     * Warm-up: establece la conexión TCP/TLS con Nominatim al arranque para que
+     * la primera geocodificación real del usuario no sufra la latencia del
+     * handshake TLS (típicamente 300–800 ms extra en frío).
+     * Se hace en hilo virtual para no bloquear el arranque de la aplicación.
+     */
+    @EventListener(ContextRefreshedEvent.class)
+    public void calentarConexion() {
+        Thread.ofVirtual().name("nominatim-warmup").start(() -> {
+            try {
+                HttpRequest req = HttpRequest.newBuilder()
+                        .uri(URI.create(URL_BASE + "?q=Buenos+Aires&format=json&limit=1"))
+                        .header("User-Agent", USER_AGENT)
+                        .header("Referer", "https://vincula-up.local/")
+                        .timeout(Duration.ofSeconds(10))
+                        .GET()
+                        .build();
+                httpClient.send(req, HttpResponse.BodyHandlers.discarding());
+                log.debug("Warm-up de Nominatim completado");
+            } catch (Exception ex) {
+                log.debug("Warm-up de Nominatim falló (no es crítico): {}", ex.getMessage());
+            }
+        });
     }
 
     /** Resultado de la consulta, con el origen para diagnostico. */

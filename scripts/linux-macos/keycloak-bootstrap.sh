@@ -92,6 +92,22 @@ kcadm update "realms/$REALM" \
 # que se auto-registre entra como cliente y el BFF acepta su rol de negocio.
 kcadm add-roles -r "$REALM" --rname "default-roles-$REALM" --rolename CLIENTE
 
+# Los usuarios de demo vienen del import con realmRoles explícitos y, sin este
+# rol compuesto, no tienen los roles del client `account` (manage-account). Sin
+# ellos el token no lleva `account` en el `aud` y la consola de cuenta
+# (/realms/<realm>/account) responde 401 al cambiar la contraseña. Es idempotente
+# y se saltea a los que no existan.
+echo "==> Asignando default-roles-$REALM a los usuarios de demo (consola de cuenta)"
+for DEMO_USER in cliente@vincula-up.local profesional@vincula-up.local admin@vincula-up.local; do
+  DEMO_ID="$(kcadm get users -r "$REALM" -q username="$DEMO_USER" --fields id --format csv --noquotes | tail -n 1 | tr -d '\r' || true)"
+  if [ -z "${DEMO_ID:-}" ]; then
+    echo "    $DEMO_USER no existe en el realm: se omite."
+    continue
+  fi
+  kcadm add-roles -r "$REALM" --uusername "$DEMO_USER" --rolename "default-roles-$REALM"
+  echo "    $DEMO_USER: ok"
+done
+
 echo "==> Verificando el client de servicio $ADMIN_CLIENT_ID"
 CLIENT_UUID="$(kcadm get clients -r "$REALM" -q clientId="$ADMIN_CLIENT_ID" --fields id --format csv --noquotes | tail -n 1 || true)"
 if [ -z "${CLIENT_UUID:-}" ]; then
@@ -158,6 +174,56 @@ kcadm add-roles -r "$REALM" \
   --uusername "service-account-$ADMIN_CLIENT_ID" \
   --cclientid realm-management \
   --rolename manage-users --rolename view-users --rolename query-users --rolename view-realm
+
+# -------------------------------------------------
+# 1️⃣ Asegurar rol PROFESIONAL (si no existe)
+if ! kcadm get roles -r "$REALM" -q name=PROFESIONAL --fields id --format csv --noquotes | grep -q .; then
+  kcadm create roles -r "$REALM" -s name=PROFESIONAL -s description="Usuario con capacidad de ofrecer servicios"
+  echo "    rol PROFESIONAL creado"
+else
+  echo "    rol PROFESIONAL ya existía"
+fi
+
+# -------------------------------------------------
+# 2️⃣ Crear/actualizar usuario PROFESIONAL
+PROF_USER="profesional@vincula-up.local"
+PROF_PASS="password"
+echo "==> Creando/actualizando usuario PROFESIONAL ($PROF_USER)"
+PROF_ID=$(kcadm get users -r "$REALM" -q username="$PROF_USER" --fields id --format csv --noquotes | tail -n 1 || true)
+if [ -z "$PROF_ID" ]; then
+  kcadm create users -r "$REALM" \
+    -s username="$PROF_USER" \
+    -s email="$PROF_USER" \
+    -s enabled=true \
+    -s emailVerified=true
+  echo "    usuario PROFESIONAL creado"
+else
+  echo "    usuario PROFESIONAL ya existía (id=$PROF_ID)"
+fi
+kcadm set-password -r "$REALM" --username "$PROF_USER" --new-password "$PROF_PASS"
+kcadm add-roles -r "$REALM" --uusername "$PROF_USER" --rolename CLIENTE --rolename PROFESIONAL
+echo "    roles CLIENTE y PROFESIONAL asignados"
+
+# -------------------------------------------------
+# 3️⃣ Crear/actualizar usuario ADMIN en realm master
+ADMIN_USER="admin@vincula-up.local"
+ADMIN_PASS="admin"
+echo "==> Creando/actualizando usuario ADMIN ($ADMIN_USER)"
+ADMIN_ID=$(kcadm get users -r master -q username="$ADMIN_USER" --fields id --format csv --noquotes | tail -n 1 || true)
+if [ -z "$ADMIN_ID" ]; then
+  kcadm create users -r master \
+    -s username="$ADMIN_USER" \
+    -s email="$ADMIN_USER" \
+    -s enabled=true \
+    -s emailVerified=true
+  echo "    usuario ADMIN creado"
+else
+  echo "    usuario ADMIN ya existía (id=$ADMIN_ID)"
+fi
+kcadm set-password -r master --username "$ADMIN_USER" --new-password "$ADMIN_PASS"
+kcadm add-roles -r master --uusername "$ADMIN_USER" --rolename admin
+echo "    rol admin asignado"
+
 
 echo "==> Configurando SMTP del realm $REALM (recupero de contraseña)"
 echo "    Lee KEYCLOAK_SMTP_* del entorno (.env). Sin password, el reseteo"

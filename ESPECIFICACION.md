@@ -1,120 +1,675 @@
 # Especificación Técnica — Vincula-UP
 
-> **Documento único de referencia del proyecto.** Si algo no está aquí, no está
-> documentado.
+> **Documento único de referencia del proyecto.** Si algo no está aquí, no está documentado.
 >
-> El [`README.md`](README.md) tiene el resumen: qué hace el sistema, el stack y el
-> deploy local desde cero. El [`MANUAL.md`](MANUAL.md) tiene el uso y la operación:
-> los servicios, el secreto del client de servicio, los certificados, el desarrollo
-> y el tema. Este archivo tiene el detalle técnico completo.
+> El [`README.md`](README.md) tiene el resumen: qué hace el sistema, el stack y el deploy local desde cero. El [`MANUAL.md`](MANUAL.md) tiene el uso y la operación: los servicios, el secreto del client de servicio, los certificados, el desarrollo y el tema. Este archivo contiene la especificación funcional, el relevamiento formal, el modelado, los requisitos, la arquitectura y el detalle técnico completo.
+>
+> Los informes académicos formales se encuentran en [`Entrega Proyecto Final Grupo 5.md`](Entrega%20Proyecto%20Final%20Grupo%205.md) (PFC — entrega parcial final) y [`MVP Grupo 8- DACS.md`](MVP%20Grupo%208-%20DACS.md) (DACS — informe del MVP), ambos actualizados al 15/11/2026.
 
-**Proyecto:** Vincula-UP — Red Técnica con Respaldo Universitario (Universidad Popular de Concepción del Uruguay)
-**Alcance:** MVP (Minimum Viable Product)
+---
+
+### Metadatos Institucionales y Equipo del Proyecto
+
+- **Institución:** Universidad Tecnológica Nacional (UTN) — Facultad Regional Concepción del Uruguay (FRCU)
+- **Carrera:** Ingeniería en Sistemas de Información
+- **Cátedra:** Proyecto Final de Carrera (PFC)
+- **Alcance de esta entrega:** Fase 1 — MVP (Minimum Viable Product)
+- **Docentes:**
+  - Lucas Scheider
+  - Adrian Tournour
+- **Equipo de Desarrollo (Alumnos):**
+  - Davezac, Luciano Emmanuel (`LD`) — Backend
+  - Morales, Nicolas (`NM`) — Infraestructura, integración en BFF y pruebas de integración
+  - Velazquez, Julian (`JV`) — Historias de usuario
+  - Vergara, Agustin (`AV`) — Frontend
+  - Villanueva, Antonio Nicolas (`NV`) — Relevamiento, modelado de datos y testing
 
 ---
 
 ## Índice
 
-1. [Contexto y objetivos](#1-contexto-y-objetivos)
-2. [Roles del MVP](#2-roles-del-mvp)
-3. [Arquitectura](#3-arquitectura)
-4. [Stack y versiones](#4-stack-y-versiones)
-5. [Estructura del repositorio](#5-estructura-del-repositorio)
-6. [API del BFF: los 45 endpoints](#6-api-del-bff-los-45-endpoints)
-7. [Modelo de datos](#7-modelo-de-datos)
-8. [Autenticación y autorización](#8-autenticación-y-autorización)
-9. [Los tres flujos completos](#9-los-tres-flujos-completos)
-10. [Ubicaciones: geocodificación, cifrado y fotos](#10-ubicaciones-geocodificación-cifrado-y-fotos)
-    - [10.1 Geocodificación](#101-geocodificación) · [10.2 Cifrado de ubicaciones](#102-cifrado-de-ubicaciones) · [10.3 Almacenamiento de fotos](#103-almacenamiento-de-fotos) · [10.4 Quién ve la foto de quién](#104-quién-ve-la-foto-de-quién) · [10.5 Privacidad de la dirección](#105-privacidad-de-la-dirección-del-cliente)
-11. [Variables de entorno](#11-variables-de-entorno)
-12. [Datos de arranque](#12-datos-de-arranque)
-13. [Infraestructura: TLS, Nginx](#13-infraestructura-tls-nginx)
-14. [Scripts operativos](#14-scripts-operativos)
-15. [Estado real del MVP](#15-estado-real-del-mvp)
-16. [Deuda técnica conocida](#16-deuda-técnica-conocida)
+1. [Tema del proyecto, problemática y razón de ser](#1-tema-del-proyecto-problemática-y-razón-de-ser)
+   - 1.1 [Tema del proyecto y lema institucional](#11-tema-del-proyecto-y-lema-institucional)
+   - 1.2 [Problemática](#12-problemática)
+   - 1.3 [Razón de ser del proyecto](#13-razón-de-ser-del-proyecto)
+   - 1.4 [El MVP dentro del Proyecto Final de Carrera](#14-el-mvp-dentro-del-proyecto-final-de-carrera)
+2. [Objetivo y alcance del MVP](#2-objetivo-y-alcance-del-mvp)
+   - 2.1 [Objetivo](#21-objetivo)
+   - 2.2 [Alcance](#22-alcance)
+   - 2.3 [Criterios de éxito de la demo](#23-criterios-de-éxito-de-la-demo)
+3. [Organización del trabajo](#3-organización-del-trabajo)
+   - 3.1 [Equipo y metodología](#31-equipo-y-metodología)
+   - 3.2 [Épicas](#32-épicas)
+   - 3.3 [Sprints y subtareas detalladas](#33-sprints-y-subtareas-detalladas)
+   - 3.4 [Definition of Done (DoD)](#34-definition-of-done-dod)
+4. [Relevamiento](#4-relevamiento)
+   - 4.1 [Historias de usuario: Gestión de usuarios](#41-historias-de-usuario-gestión-de-usuarios)
+   - 4.2 [Historias de usuario: Gestión de solicitudes](#42-historias-de-usuario-gestión-de-solicitudes)
+   - 4.3 [Requisitos funcionales](#43-requisitos-funcionales)
+   - 4.4 [Requisitos no funcionales](#44-requisitos-no-funcionales)
+   - 4.5 [Trazabilidad de historias de usuario](#45-trazabilidad-de-historias-de-usuario)
+5. [Modelado](#5-modelado)
+   - 5.1 [Diagrama de casos de uso](#51-diagrama-de-casos-de-uso)
+   - 5.2 [Diagrama de clases](#52-diagrama-de-clases)
+   - 5.3 [Diagramas de estados y transiciones](#53-diagramas-de-estados-y-transiciones)
+6. [Arquitectura y tecnología](#6-arquitectura-y-tecnología)
+   - 6.1 [Componentes y stack](#61-componentes-y-stack)
+   - 6.2 [Responsabilidades por servicio](#62-responsabilidades-por-servicio)
+   - 6.3 [Puntos clave a revisar de la arquitectura](#63-puntos-clave-a-revisar-de-la-arquitectura)
+   - 6.4 [Roles del sistema](#64-roles-del-sistema)
+   - 6.5 [Decisiones de diseño clave](#65-decisiones-de-diseño-clave)
+7. [Estructura del repositorio](#7-estructura-del-repositorio)
+8. [API del BFF: catálogo de endpoints](#8-api-del-bff-catálogo-de-endpoints)
+   - 8.1 [Profesionales](#81-profesionales) · 8.2 [Solicitudes](#82-solicitudes) · 8.3 [Mensajes, chat en vivo y calificaciones](#83-mensajes-chat-en-vivo-y-calificaciones) · 8.4 [Usuarios](#84-usuarios) · 8.5 [Especialidades](#85-especialidades) · 8.6 [Activación y vinculación](#86-activación-y-vinculación) · 8.7 [Utilidades](#87-utilidades)
+9. [Modelo de datos detallado](#9-modelo-de-datos-detallado)
+   - 9.1 [ms-usuarios](#91-ms-usuarios--usuario) · 9.2 [ms-profesionales](#92-ms-profesionales--profesional-especialidad-y-disponibilidad) · 9.3 [ms-solicitudes](#93-ms-solicitudes--solicitud-mensaje-y-calificación) · 9.4 [Consistencia de claves de fotos](#94-consistencia-de-claves-de-fotos)
+10. [Autenticación, autorización y seguridad](#10-autenticación-autorización-y-seguridad)
+    - 10.1 [Flujo de login OIDC + PKCE](#101-flujo-de-login-oidc-authorization-code--pkce) · 10.2 [Validación del token en el BFF y Resource Servers](#102-validación-del-token-en-el-bff-y-resource-servers) · 10.3 [RBAC: 27 reglas](#103-rbac-27-reglas) · 10.4 [Alta del profesional sin auto-registro](#104-alta-del-profesional-sin-auto-registro) · 10.5 [Aceptación de términos y condiciones](#105-aceptación-de-los-términos-y-condiciones) · 10.6 [Configuración del realm](#106-configuración-del-realm)
+11. [Ubicaciones: geocodificación, cifrado y fotos](#11-ubicaciones-geocodificación-cifrado-y-fotos)
+    - 11.1 [Geocodificación con OpenStreetMap / Nominatim](#111-geocodificación-con-openstreetmap--nominatim) · 11.2 [Cifrado de ubicaciones en reposo](#112-cifrado-de-ubicaciones-en-reposo-aes-256-gcm) · 11.3 [Almacenamiento de fotos](#113-almacenamiento-de-fotos-y-volúmenes) · 11.4 [Quién ve la foto de quién](#114-quién-ve-la-foto-de-quién) · 11.5 [Privacidad de la dirección del cliente](#115-privacidad-de-la-dirección-del-cliente)
+12. [Variables de entorno y configuración](#12-variables-de-entorno-y-configuración)
+13. [Datos de arranque y migraciones](#13-datos-de-arranque-y-migraciones)
+14. [Infraestructura: TLS, Nginx](#14-infraestructura-tls-nginx)
+15. [Scripts operativos y despliegue](#15-scripts-operativos-y-despliegue)
+16. [Prototipos de pantallas](#16-prototipos-de-pantallas)
 17. [Diseño visual](#17-diseño-visual)
+18. [Estado real del MVP y deuda técnica](#18-estado-real-del-mvp-y-deuda-técnica)
 
 Anexos:
-
 - [A. Términos y datos](#anexo-a-términos-y-datos)
 - [B. Preguntas frecuentes](#anexo-b-preguntas-frecuentes)
 - [C. Tema claro y oscuro](#anexo-c-tema-claro-y-oscuro)
 
 ---
 
-## 1. Contexto y objetivos
+## 1. Tema del proyecto, problemática y razón de ser
 
-Vincula-UP conecta a la comunidad con profesionales de oficios técnicos validados
-(electricidad, plomería, gas, refrigeración, etc.), con respaldo institucional de
-la Universidad Popular. Permite resolver servicios técnicos de proximidad mediante
-un flujo transparente de solicitud, coordinación y calificación.
+### 1.1 Tema del proyecto y lema institucional
 
-El producto se organiza alrededor de un único flujo de negocio —**pedir un turno y
-que alguien lo cumpla**— con tres actores que participan de forma distinta en el
-mismo ciclo de vida de la solicitud.
+Vincula-UP es una plataforma web (PWA) de inserción laboral para los egresados de la Universidad Popular de Concepción del Uruguay (UP). Conecta a la comunidad, tanto vecinos como empresas, con técnicos y profesionales de oficios que egresaron de la institución y cuyo perfil fue validado por ella: el ciudadano busca un profesional por oficio y cercanía, solicita un turno, coordina por chat y califica el servicio.
 
-### Objetivo del MVP
+Su lema resume la propuesta institucional de confianza:
+> *“Antes de que entre a tu casa, ya lo conocemos nosotros”*.
 
-Demostrar que el circuito completo funciona de punta a punta con datos reales y
-autenticación real: el cliente pide un turno, el profesional lo acepta o rechaza
-con motivo, ambos coordinan por chat, el trabajo se completa y el cliente califica.
-Sin usuarios simulados ni autenticación falsa.
+El proyecto se desarrolla en el marco de la carrera de Ingeniería en Sistemas de Información (UTN, Facultad Regional Concepción del Uruguay) y este documento corresponde a su MVP (Fase 1).
 
----
+### 1.2 Problemática
 
-## 2. Roles del MVP
+La Universidad Popular cumple un rol fundamental en la formación técnica y de oficios de la región. Sin embargo, existe una brecha operativa entre la finalización del trayecto formativo y la inserción efectiva del egresado en el mercado laboral local. Hoy, cuando un vecino o una empresa busca a un técnico egresado, el proceso es analógico y desestructurado: se consultan registros físicos (el Libro Matriz) y se triangula la información con el cuerpo docente. Según el relevamiento realizado con la Secretaría de la Universidad, esa respuesta demora entre dos y tres días hábiles, un plazo incompatible con una necesidad de asistencia técnica inmediata, como una falla eléctrica o una pérdida de gas.
 
-| Rol | Qué hace | Pantalla principal |
+El problema no es solo de demora. Afecta de manera distinta a los tres actores involucrados:
+
+| Actor | Problema | Consecuencia |
 |---|---|---|
-| **Cliente / Vecino** | Busca oficios, define su ubicación geográfica, solicita turno, chatea para coordinar y califica el servicio finalizado | `/solicitar` → `/solicitudes` |
-| **Profesional Técnico** | Completa su activación (foto, radio de cobertura, horarios semanales), gestiona solicitudes (acepta/rechaza con motivo), coordina por chat | `/activar-perfil` → `/solicitudes` |
-| **Administrador Institucional** | Da de alta profesionales al padrón con legajo y especialidades, monitorea el estado (Cargado, Activo, Suspendido), suspende y reactiva cuentas | `/admin` |
+| **Ciudadano (cliente)** | Busca un profesional sin referencias previas y debe permitir el ingreso a su domicilio a alguien de quien no conoce la identidad ni la aptitud técnica. | Espera, incertidumbre y riesgo percibido; recurre al boca a boca o a canales informales. |
+| **Egresado (profesional)** | No cuenta con un canal institucional que haga visibles sus competencias certificadas. | Dificultad para conseguir clientes apenas termina sus estudios y para generar ingresos en el ámbito local. |
+| **Universidad (secretaría y rectoría)** | Atiende las consultas de forma manual y no registra qué oficios busca la comunidad. | Interrupciones constantes en la secretaría, pérdida de trazabilidad del egresado y planificación académica basada en la intuición y no en datos. |
 
-Los roles son **roles de negocio**, no roles de Keycloak. Viven en
-`ms-usuarios` (`Usuario.rolNegocio`) y se replican como roles de realm en
-Keycloak. La correspondencia no es 1:1 en una sola dirección, en los dos
-sentidos:
+### 1.3 Razón de ser del proyecto
 
-- **Keycloak → `ms-usuarios`:** cuando alguien entra por primera vez y no hay
-  fila en el padrón, el rol sale del token (`GET /usuarios/por-keycloak?rol=`).
-  Es seguro porque el registro abierto del realm asigna
-  `default-roles-vincula-up` → `CLIENTE`: un auto-registrado nunca nace
-  `PROFESIONAL` ni `ADMIN` por esa vía.
-- **`ms-usuarios` → Keycloak:** al dar de alta a un profesional, el BFF crea su
-  cuenta en Keycloak con rol `PROFESIONAL` y una contraseña temporal; el
-  profesional sólo activa su perfil (ver
-  [§8.4](#84-alta-del-profesional-sin-auto-registro)).
+Vincula-UP surge de la necesidad de sistematizar esa vinculación, transformando un proceso administrativo tradicional en una solución tecnológica segura, escalable y de acceso inmediato que beneficie a las tres partes:
 
-**Por qué el frontend y el backend tienen que mirar lo mismo.** El frontend
-arma el perfil con el `rolNegocio` que devuelve `ms-usuarios`, no con el claim del
-token, y es el que decide a qué sección entra cada quien (`inicioDeSesion`). Si
-esas dos fuentes se desalinean, el backend autoriza cosas que la interfaz no
-muestra: el administrador, por ejemplo, podía hacer `GET /api/usuarios` (el
-`SecurityConfig` lee el token) sin poder entrar nunca a `/admin` (el guard del
-frontend leía la base). Por eso el rol de negocio se resuelve una sola vez, al
-auto-registrar la cuenta.
+- **Para el ciudadano:** reduce la espera y la incertidumbre al buscar un técnico. Como solo se publican perfiles validados por la Universidad, la plataforma aporta una capa de seguridad y un respaldo técnico cuando se permite el ingreso de un prestador al hogar.
+- **Para el egresado:** le da un canal digital directo para visibilizar sus competencias certificadas, aumentar su empleabilidad y generar ingresos dentro de la comunidad local.
+- **Para la Universidad:** libera tiempo del personal administrativo al delegar la búsqueda y el contacto inicial en el sistema, y le entrega por primera vez datos objetivos sobre los oficios más demandados para planificar futuros cursos.
+- **Para la región:** su arquitectura modular permite replicarla en otras instituciones similares que busquen modernizar su bolsa de trabajo y crear entornos seguros de vinculación laboral.
 
-### Estados de una cuenta
+### 1.4 El MVP dentro del Proyecto Final de Carrera
 
-| Estado | Significado |
-|---|---|
-| `CARGADO` | Preregistrado por el administrador; todavía no completó la activación |
-| `ACTIVO` | Habilitado para operar |
-| `SUSPENDIDO` | Sancionado por incumplimiento de normas; no puede operar |
-| `INACTIVO` | Cliente baneado (aplica a `ms-usuarios`) |
-
-Una cuenta `SUSPENDIDO` no puede ejecutar **ninguna** operación autenticada: el
-BFF lo corta en `requireActive()` antes de llegar a cualquier endpoint de negocio
-(`ApiController.java:70-74`).
-
+Este MVP es la primera versión funcional del PFC *Vincula-UP: plataforma digital de inserción laboral para egresados*, y corresponde a su Fase 1. Todo el relevamiento, los requisitos, las decisiones de arquitectura y el modelado que se presentan acá se toman como base de la información obtenida durante el desarrollo del PFC. El MVP no reemplaza al proyecto completo: implementa el circuito de mayor valor, el que permite comprobar de punta a punta que la propuesta funciona, y deja el resto para las etapas siguientes del PFC.
 
 ---
 
-## 3. Arquitectura
+## 2. Objetivo y alcance del MVP
+
+### 2.1 Objetivo
+
+Demostrar que el circuito completo funciona de punta a punta con datos reales y autenticación real: el cliente pide un turno, el profesional lo acepta o rechaza con motivo, ambos coordinan por chat, el trabajo se completa y el cliente califica.
+
+### 2.2 Alcance
+
+**El MVP incluye:**
+- Registro, ingreso y recuperación de contraseña con Keycloak, con los roles Cliente, Profesional y Administrador.
+- Alta de profesionales por el administrador y activación del perfil por el propio profesional.
+- Directorio de profesionales con búsqueda por categoría, disponibilidad y proximidad geográfica.
+- Ciclo completo de la solicitud: crear, aceptar, rechazar con motivo, cancelar, completar y vencimiento automático.
+- Chat por solicitud, calificación del servicio y notificaciones por correo y WebPush.
+- Paneles del administrador: profesionales, categorías, clientes e indicadores.
+
+**El MVP no incluye** (queda para versiones posteriores):
+- Carga masiva de profesionales (el requisito original la mencionaba, pero no tiene historia de usuario en esta fase).
+- Pagos o presupuestos dentro de la plataforma.
+- Aplicación móvil nativa (se ofrece como Progressive Web App - PWA instalable).
+
+### 2.3 Criterios de éxito de la demo
+
+1. Un administrador da de alta a un profesional, y este activa su perfil (foto, zona de cobertura y horarios) y aparece en el padrón.
+2. Un cliente se registra con su correo y envía una solicitud completando el flujo de `/solicitar`.
+3. El profesional recibe el aviso y acepta (ve la dirección exacta) o rechaza indicando el motivo.
+4. Ambos intercambian mensajes en vivo por chat.
+5. El trabajo se marca como completado y el cliente califica una única vez; la reputación del profesional se actualiza.
+6. Una solicitud sin respuesta vence sola y ambas partes reciben aviso.
+7. Toda la operación pasa por el BFF con autenticación real basada en tokens.
+
+---
+
+## 3. Organización del trabajo
+
+### 3.1 Equipo y metodología
+
+Como metodología se utiliza **Scrum documentado en Jira**, con sprints de dos semanas de duración.
+
+| Integrante | Sigla | Foco principal |
+|---|---|---|
+| Luciano Emmanuel Davezac | `LD` | Backend |
+| Agustín Vergara | `AV` | Frontend |
+| Julián Velazquez | `JV` | Historias de usuario |
+| Nicolás Morales | `NM` | Infraestructura, integración en BFF y pruebas de integración |
+| Nicolás Villanueva | `NV` | Relevamiento, modelado de datos y testing |
+
+### 3.2 Épicas
+
+Se agruparon los sprints en dos épicas de dos sprints cada una:
+
+| Épica | Contenido | Sprints |
+|---|---|---|
+| **Gestión de usuarios** | Entorno e infraestructura, modelado y backend de administradores, profesionales y usuarios, integración en BFF | Sprint 1 y Sprint 2 |
+| **Gestión de solicitudes** | Modelado, historias de usuario, backend, frontend, testing e integración del ciclo de solicitudes | Sprint 3 y Sprint 4 |
+
+### 3.3 Sprints y subtareas detalladas
+
+#### Sprint 1 · 28/09 – 12/10
+**Objetivo:** Dejar funcionando el entorno (Docker, Keycloak, Nginx y bff-web), relevamiento, historias de usuarios y modelado terminado.
+
+| Actividad | Subtarea | Responsable | Historias |
+|---|---|---|---|
+| Relevamiento y modelado de usuarios | Relevar datos y reglas de administradores, profesionales y clientes | NV | HU-U01 a HU-U14 |
+| Relevamiento y modelado de usuarios | Modelar las entidades Usuario, Profesional, Disponibilidad y Especialidad, y los enumerados Rol, EstadoUsuario, EstadoProfesional y DiaSemana | NV | — |
+| Relevamiento y modelado de usuarios | Armar el diagrama de clases de usuarios | NV | — |
+| Relevamiento y modelado de usuarios | Armar el diagrama de estados de cuenta | NV | HU-U06, HU-U09, HU-U11 |
+| Relevamiento y modelado de usuarios | Armar el diagrama de casos de uso de usuarios | NV | — |
+| Infraestructura y seguridad base | Armar el Docker Compose con PostgreSQL, Keycloak, Nginx y bff-web | NM | — |
+| Infraestructura y seguridad base | Configurar Keycloak: realm, roles Cliente, Profesional y Administrador, y cliente del frontend | NM | HU-U01, HU-U15 |
+| Infraestructura y seguridad base | Configurar Nginx como reverse proxy con HTTPS (OpenSSL) | NM | — |
+| Infraestructura y seguridad base | Crear el esqueleto del bff-web con validación de JWT mediante JWKS | NM | — |
+| Infraestructura y seguridad base | Crear los esqueletos de ms-usuarios y ms-profesionales conectados a PostgreSQL | NM | — |
+| Historias de usuario de usuarios | Redactar las historias de uso general y de cliente (HU-U01 a HU-U04) con sus escenarios Given/When/Then | JV | HU-U01 a HU-U04 |
+| Historias de usuario de usuarios | Redactar las historias de profesional (HU-U05 a HU-U08) | JV | HU-U05 a HU-U08 |
+| Historias de usuario de usuarios | Redactar las historias de administrador (HU-U09 a HU-U14) | JV | HU-U09 a HU-U14 |
+| Historias de usuario de usuarios | Revisar las historias con el equipo y ajustar los escenarios | JV | HU-U01 a HU-U14 |
+
+#### Sprint 2 · 12/10 – 26/10
+**Objetivo:** Backend y frontend terminado. Un administrador puede dar de alta a un profesional y este activa su perfil, todo con autenticación real y a través del BFF. Pruebas manuales y de integración pasadas.
+
+| Actividad | Subtarea | Responsable | Historias |
+|---|---|---|---|
+| Backend de usuarios | ms-usuarios: registro de clientes, edición de perfil y aceptación de términos y condiciones con versión y fecha | LD | HU-U01, HU-U03, HU-U04 |
+| Backend de usuarios | Alta de profesionales por el administrador con contraseña temporal y cambio obligatorio en el primer ingreso | LD | HU-U05, HU-U09 |
+| Backend de usuarios | ms-profesionales: activación del perfil (foto, zona de cobertura) y gestión de horarios | LD | HU-U06, HU-U07 |
+| Backend de usuarios | Almacenamiento privado de fotos en el volumen | LD | HU-U04, HU-U06 |
+| Backend de usuarios | Consulta y edición del padrón, listado de clientes y desactivación o reactivación de cuentas | LD | HU-U10, HU-U11, HU-U13 |
+| Backend de usuarios | Alta, edición y baja de categorías | LD | HU-U12 |
+| Frontend de usuarios | Pantallas de registro, login y recuperación de contraseña | AV | HU-U01, HU-U02, HU-U15 |
+| Frontend de usuarios | Pantallas de términos y condiciones y de edición de perfil | AV | HU-U03, HU-U04 |
+| Frontend de usuarios | Pantallas de primer ingreso, activación del perfil y gestión de horarios del profesional | AV | HU-U05 a HU-U07 |
+| Frontend de usuarios | Paneles del administrador: alta de profesionales, padrón, categorías y clientes | AV | HU-U09 a HU-U13 |
+| Frontend de usuarios | Navegación y menús según el rol | AV | HU-U15 |
+| Testing de usuarios | Diseñar los casos de prueba a partir de los escenarios de cada historia | NV | HU-U01 a HU-U15 |
+| Testing de usuarios | Ejecutar las pruebas manuales y registrar los defectos | NV | HU-U01 a HU-U15 |
+| Testing de usuarios | Repetir las pruebas sobre las correcciones | NV | HU-U01 a HU-U15 |
+| Integración en BFF y pruebas de integración | Exponer en el bff-web los endpoints de usuarios y profesionales, propagando el token | NM | HU-U01 a HU-U14 |
+| Integración en BFF y pruebas de integración | Probar el flujo completo: alta, primer ingreso, activación del perfil y aparición en el padrón | NM | HU-U05, HU-U06, HU-U09 |
+
+#### Sprint 3 · 26/10 – 09/11
+**Objetivo:** El backend de solicitudes cubre el ciclo completo: crear, aceptar, rechazar con motivo, completar y cancelar, con las validaciones de transición y de disponibilidad.
+
+| Actividad | Subtarea | Responsable | Historias |
+|---|---|---|---|
+| Relevamiento y modelado de solicitudes | Modelar las entidades Solicitud y Calificación y el enumerado EstadoSolicitud | NV | HU-S01 a HU-S17 |
+| Relevamiento y modelado de solicitudes | Armar el diagrama de estados de la solicitud y su tabla de transiciones | NV | HU-S09 a HU-S12, HU-S15 |
+| Relevamiento y modelado de solicitudes | Actualizar el diagrama de clases y el de casos de uso con solicitudes | NV | — |
+| Historias de usuario de solicitudes | Redactar las historias de creación de la solicitud (HU-S01 a HU-S07) | JV | HU-S01 a HU-S07 |
+| Historias de usuario de solicitudes | Redactar las historias de gestión: ver, aceptar, rechazar, cancelar y completar (HU-S08 a HU-S12) | JV | HU-S08 a HU-S12 |
+| Historias de usuario de solicitudes | Redactar las historias de chat, calificación, vencimiento, notificaciones y turnos superpuestos (HU-S13 a HU-S17) | JV | HU-S13 a HU-S17 |
+| Backend de solicitudes | Crear la solicitud en estado PENDIENTE, geocodificando la dirección con Nominatim y guardando las coordenadas | LD | HU-S01, HU-S06 |
+| Backend de solicitudes | Búsqueda de profesionales por categoría, disponibilidad y cercanía | LD | HU-S02, HU-S04, HU-S05 |
+| Backend de solicitudes | Ocultar la dirección exacta y exponer solo la zona y un punto aproximado hasta la aceptación | LD | HU-S07 |
+| Backend de solicitudes | Listado de solicitudes según el rol, con filtro por estado | LD | HU-S08 |
+| Backend de solicitudes | Aceptar una solicitud con validación de transición y de turnos superpuestos | LD | HU-S09, HU-S17 |
+| Backend de solicitudes | Rechazar y cancelar con motivo obligatorio, registrando quién canceló | LD | HU-S10, HU-S11 |
+| Backend de solicitudes | Completar la solicitud por cualquiera de las partes | LD | HU-S12 |
+| Backend de solicitudes | Mensajería por solicitud y calificación única con actualización de la reputación | LD | HU-S13, HU-S14, HU-U08 |
+| Backend de solicitudes | Tarea programada que vence las solicitudes pendientes sin respuesta | LD | HU-S15 |
+
+#### Sprint 4 · 09/11 – 23/11
+**Objetivo:** El cliente pide un turno, el profesional lo gestiona y el flujo termina de punta a punta. Pruebas manuales y de integración pasadas.
+
+| Actividad | Subtarea | Responsable | Historias |
+|---|---|---|---|
+| Frontend de solicitudes | Flujo de nueva solicitud (/solicitar): ubicación, categoría, descripción, día y horario, profesional y envío | AV | HU-S01 a HU-S06 |
+| Frontend de solicitudes | Pantallas “Mis solicitudes” y “Solicitudes recibidas”, con filtro por estado | AV | HU-S08 |
+| Frontend de solicitudes | Acciones de aceptar, rechazar con motivo, cancelar y completar | AV | HU-S09 a HU-S12 |
+| Frontend de solicitudes | Pantalla de chat y pantalla de calificación | AV | HU-S13, HU-S14 |
+| Frontend de solicitudes | Bandeja de notificaciones y resumen del administrador | AV | HU-S16, HU-U14 |
+| Testing de solicitudes | Diseñar los casos de prueba de las historias HU-S01 a HU-S17 | NV | HU-S01 a HU-S17 |
+| Testing de solicitudes | Probar el circuito completo: pedir, aceptar, chatear, completar y calificar | NV | HU-S01 a HU-S14 |
+| Testing de solicitudes | Probar los casos límite: rechazo, cancelación, vencimiento y turnos superpuestos | NV | HU-S10, HU-S11, HU-S15, HU-S17 |
+| Testing de solicitudes | Repetir las pruebas de usuarios para detectar regresiones | NV | HU-U01 a HU-U15 |
+| Integración en BFF y pruebas de integración | Exponer en el bff-web los endpoints de solicitudes, chat y calificaciones | NM | HU-S01 a HU-S14 |
+| Integración en BFF y pruebas de integración | Integrar el envío de correos por SMTP y las notificaciones WebPush | NM | HU-S06, HU-S16 |
+| Integración en BFF y pruebas de integración | Probar de punta a punta con autenticación real y preparar la demo | NM | Criterios de éxito de la demo |
+
+### 3.4 Definition of Done (DoD)
+
+Una historia de usuario se considera terminada cuando:
+- Cumple todos los escenarios `Given / When / Then` de su historia.
+- El código fue revisado e integrado en la rama principal correspondiente.
+- Se probó manualmente y funcionalmente en el entorno Docker.
+- La tarea quedó formalmente cerrada en Jira.
+
+---
+
+## 4. Relevamiento
+
+### 4.1 Historias de usuario: Gestión de usuarios
+
+#### CLIENTE
+- **HU-U01 · Registrarme con mi correo**
+  *Como cliente quiero registrarme solo con mi correo para entrar sin inventar un usuario.*
+  - **Scenario: Registro exitoso**
+    - `Given` que estoy en el formulario de registro.
+    - `When` ingreso un correo nuevo y confirmo el enlace que me llega.
+    - `Then` mi cuenta se crea con rol `CLIENTE` y puedo ingresar.
+- **HU-U02 · Recuperar mi contraseña**
+  *Como cliente quiero recuperar mi contraseña para volver a entrar si la olvido.*
+  - **Scenario: Pedir el enlace de recuperación**
+    - `Given` que olvidé mi contraseña.
+    - `When` la pido con mi correo desde el login.
+    - `Then` recibo un enlace con caducidad para definir una nueva clave.
+- **HU-U03 · Aceptar los términos y condiciones**
+  *Como usuario quiero aceptar los términos en mi primer ingreso para usar la plataforma con reglas claras.*
+  - **Scenario: Términos pendientes**
+    - `Given` que no acepté la versión vigente de los términos.
+    - `When` ingreso a la aplicación.
+    - `Then` veo un modal sin botón de cerrar.
+    - `And` al aceptarlo se guardan la versión y la fecha.
+- **HU-U04 · Editar mi perfil**
+  *Como usuario quiero editar mi nombre, teléfono y foto para que la otra parte me reconozca.*
+  - **Scenario: Guardar cambios**
+    - `Given` que estoy en mi perfil.
+    - `When` cambio mis datos y guardo.
+    - `Then` mis datos se actualizan.
+    - `And` mi correo no se puede editar.
+
+#### PROFESIONAL
+- **HU-U05 · Primer ingreso con contraseña temporal**
+  *Como profesional quiero recibir una contraseña temporal para entrar sin registrarme.*
+  - **Scenario: Primer ingreso**
+    - `Given` que el administrador me dio de alta.
+    - `When` ingreso con la contraseña temporal que llegó por correo.
+    - `Then` el sistema me exige cambiarla antes de entrar.
+- **HU-U06 · Activar mi perfil**
+  *Como profesional quiero activar mi perfil para quedar visible y recibir solicitudes.*
+  - **Scenario: Activación completa**
+    - `Given` que mi perfil está en estado `CARGADO`.
+    - `When` completo foto, zona de cobertura y horarios.
+    - `Then` mi perfil pasa a `ACTIVO`.
+    - `And` aparezco en el padrón público.
+- **HU-U07 · Gestionar mis horarios**
+  *Como profesional quiero modificar mis franjas para que solo me pidan turnos cuando atiendo.*
+  - **Scenario: Cambiar franjas**
+    - `Given` que soy un profesional activo.
+    - `When` modifico mis franjas semanales.
+    - `Then` los clientes solo pueden pedirme turnos dentro de ellas.
+- **HU-U08 · Ver mi reputación**
+  *Como profesional quiero ver mis calificaciones para saber cómo me valoran.*
+  - **Scenario: Consultar reputación**
+    - `Given` que recibí calificaciones.
+    - `When` abro mi reputación.
+    - `Then` veo mi promedio de estrellas y la cantidad de calificaciones.
+
+#### ADMINISTRADOR
+- **HU-U09 · Dar de alta a un profesional**
+  *Como administrador quiero dar de alta a un profesional para incorporarlo al padrón.*
+  - **Scenario: Alta exitosa**
+    - `Given` que estoy en `/admin/profesionales/nuevo`.
+    - `When` cargo legajo, especialidades y un correo sin cuenta.
+    - `Then` se crea su cuenta con contraseña temporal y su perfil queda `CARGADO`.
+  - **Scenario: Correo ya en uso**
+    - `Given` que el correo ya tiene una cuenta.
+    - `When` intento dar de alta al profesional.
+    - `Then` el alta se rechaza con el mensaje *"Ese correo ya está en uso"*.
+- **HU-U10 · Consultar y modificar el padrón**
+  *Como administrador quiero ver y editar el padrón para saber quién está cargado, activo o suspendido.*
+  - **Scenario: Editar un profesional**
+    - `Given` que abro el detalle de un profesional.
+    - `When` modifico su legajo o sus especialidades y guardo.
+    - `Then` los cambios quedan registrados en el padrón.
+- **HU-U11 · Desactivar y reactivar cuentas**
+  *Como administrador quiero desactivar cuentas para sancionar incumplimientos sin perder el historial.*
+  - **Scenario: Desactivar una cuenta**
+    - `Given` que abro el detalle de una cuenta activa.
+    - `When` la desactivo y confirmo.
+    - `Then` queda `SUSPENDIDO` y no puede operar.
+    - `And` se conserva su historial.
+- **HU-U12 · Gestionar categorías**
+  *Como administrador quiero administrar las categorías para mantener actualizado el catálogo de oficios.*
+  - **Scenario: Crear una categoría**
+    - `Given` que estoy en `/admin/categorias/nueva`.
+    - `When` ingreso el nombre y guardo.
+    - `Then` la categoría aparece en el catálogo público.
+- **HU-U13 · Consultar clientes**
+  *Como administrador quiero ver y editar clientes para atender casos y gestionar su acceso.*
+  - **Scenario: Editar un cliente**
+    - `Given` que abro el detalle de un cliente.
+    - `When` cambio su nombre o teléfono y guardo.
+    - `Then` los datos se actualizan y su correo no se modifica.
+- **HU-U14 · Ver el resumen de la plataforma**
+  *Como administrador quiero ver indicadores para entender cómo se usa la red.*
+  - **Scenario: Abrir el resumen**
+    - `Given` que ingreso con rol `ADMIN`.
+    - `When` abro `/admin`.
+    - `Then` veo los indicadores de demanda y recorrido de las solicitudes.
+
+#### GENERAL
+- **HU-U15 · Iniciar sesión**
+  *Como usuario quiero iniciar sesión con mi correo y contraseña para acceder según mi rol.*
+  - **Scenario: Ingreso exitoso**
+    - `Given` que tengo una cuenta activa.
+    - `When` ingreso mi correo y contraseña en el login.
+    - `Then` accedo a la aplicación con las opciones de mi rol.
+  - **Scenario: Cuenta suspendida**
+    - `Given` que mi cuenta está `SUSPENDIDA`.
+    - `When` intento ingresar.
+    - `Then` no puedo operar en la plataforma (bloqueo en BFF).
+
+---
+
+### 4.2 Historias de usuario: Gestión de solicitudes
+
+#### CLIENTE: PEDIR UN TURNO
+- **HU-S01 · Indicar dónde necesito el servicio**
+  *Como cliente quiero indicar mi ubicación para que me ofrezcan profesionales cercanos.*
+  - **Scenario: Ubicación por dirección**
+    - `Given` que estoy en el primer paso de `/solicitar`.
+    - `When` escribo mi dirección o marco un punto en el mapa.
+    - `Then` se convierte en coordenadas GPS.
+    - `And` la dirección exacta no se muestra al profesional hasta que acepte.
+- **HU-S02 · Elegir la categoría**
+  *Como cliente quiero elegir un oficio para encontrar al técnico que necesito.*
+  - **Scenario: Categorías disponibles**
+    - `Given` que estoy en el paso de categoría.
+    - `When` veo el catálogo.
+    - `Then` solo aparecen categorías con al menos un profesional activo.
+- **HU-S03 · Describir el problema**
+  *Como cliente quiero describir el trabajo para que el profesional decida si puede hacerlo.*
+  - **Scenario: Descripción demasiado corta**
+    - `Given` que estoy en el paso del problema.
+    - `When` escribo menos del mínimo de caracteres exigido (20 caracteres).
+    - `Then` no puedo avanzar al paso siguiente.
+- **HU-S04 · Elegir día y horario**
+  *Como cliente quiero elegir día y horario para acordar cuándo me atienden.*
+  - **Scenario: Elegir franja**
+    - `Given` que elijo un día entre hoy y los próximos seis.
+    - `When` elijo una franja horaria.
+    - `Then` solo se me ofrecen profesionales cuya disponibilidad cubre todo ese rango.
+- **HU-S05 · Elegir profesional**
+  *Como cliente quiero comparar profesionales para elegir el que más me conviene.*
+  - **Scenario: Ordenar la lista**
+    - `Given` que hay profesionales disponibles.
+    - `When` ordeno por cercanía o por reputación.
+    - `Then` la lista se reordena y muestra estrellas y cantidad de calificaciones.
+- **HU-S06 · Enviar la solicitud**
+  *Como cliente quiero confirmar mi pedido para que el profesional lo reciba.*
+  - **Scenario: Envío exitoso**
+    - `Given` que completé los seis pasos.
+    - `When` envío la solicitud.
+    - `Then` se crea en estado `PENDIENTE`.
+    - `And` el profesional recibe un aviso por correo.
+- **HU-S07 · Proteger mi domicilio**
+  *Como cliente quiero que mi dirección exacta quede oculta hasta que acepten para cuidar mi privacidad.*
+  - **Scenario: Solicitud pendiente**
+    - `Given` que mi solicitud está `PENDIENTE`.
+    - `When` el profesional la consulta.
+    - `Then` ve solo la zona y un punto aproximado (~1.1 km de margen).
+    - `And` la dirección exacta aparece cuando la acepta.
+
+#### GESTIONAR SOLICITUDES
+- **HU-S08 · Ver mis solicitudes**
+  *Como usuario quiero ver mis solicitudes para saber qué está pendiente y qué sigue.*
+  - **Scenario: Abrir mis solicitudes**
+    - `Given` que tengo solicitudes.
+    - `When` abro `/solicitudes`.
+    - `Then` veo solo las mías, con su estado y su fecha en formato `dd/mm/aa`.
+- **HU-S09 · Aceptar una solicitud**
+  *Como profesional quiero aceptar un turno pendiente para comprometerme con el trabajo.*
+  - **Scenario: Aceptación**
+    - `Given` que tengo una solicitud `PENDIENTE` dirigida a mí.
+    - `When` la acepto.
+    - `Then` pasa a `ACEPTADA` y veo la dirección exacta.
+    - `And` el cliente recibe un aviso.
+- **HU-S10 · Rechazar con motivo**
+  *Como profesional quiero rechazar indicando el motivo para que el cliente busque otro profesional.*
+  - **Scenario: Rechazo con motivo**
+    - `Given` que tengo una solicitud `PENDIENTE`.
+    - `When` la rechazo indicando un motivo obligatorio.
+    - `Then` pasa a `RECHAZADA` y el cliente recibe el motivo.
+  - **Scenario: Rechazo sin motivo**
+    - `Given` que tengo una solicitud `PENDIENTE`.
+    - `When` intento rechazarla sin motivo.
+    - `Then` el sistema no me lo permite.
+- **HU-S11 · Cancelar un turno**
+  *Como cliente o profesional quiero cancelar con un motivo para avisar si no se puede cumplir.*
+  - **Scenario: Cancelación**
+    - `Given` que la solicitud está `PENDIENTE` o `ACEPTADA`.
+    - `When` la cancelo indicando un motivo.
+    - `Then` pasa a `CANCELADA` y se registra quién canceló.
+    - `And` la otra parte recibe un aviso.
+- **HU-S12 · Completar el trabajo**
+  *Como cliente o profesional quiero marcar el trabajo como terminado para cerrar el ciclo.*
+  - **Scenario: Trabajo terminado**
+    - `Given` que la solicitud está `ACEPTADA`.
+    - `When` cualquiera de las dos partes la marca como completada.
+    - `Then` pasa a `COMPLETADA` y se habilita la calificación.
+
+#### COORDINACIÓN Y CALIFICACIÓN
+- **HU-S13 · Chatear para coordinar**
+  *Como cliente o profesional quiero chatear para coordinar los detalles del turno.*
+  - **Scenario: Enviar un mensaje**
+    - `Given` que soy participante de la solicitud.
+    - `When` envío un mensaje.
+    - `Then` la otra parte lo recibe en vivo vía WebSocket.
+    - `And` ningún otro usuario puede leerlo.
+- **HU-S14 · Calificar el servicio**
+  *Como cliente quiero calificar con estrellas para ayudar a otros vecinos a elegir.*
+  - **Scenario: Calificar una vez**
+    - `Given` que mi solicitud está `COMPLETADA` y sin calificar.
+    - `When` califico de 1 a 5 estrellas con un comentario.
+    - `Then` la calificación se guarda.
+    - `And` no puedo calificar de nuevo esa solicitud (una calificación por solicitud).
+- **HU-S15 · Vencimiento automático**
+  *Como cliente quiero que una solicitud sin respuesta venza sola para no esperar indefinidamente.*
+  - **Scenario: Solicitud sin respuesta**
+    - `Given` que una solicitud `PENDIENTE` superó el tiempo configurado (`SOLICITUDES_TIEMPO_EXPIRACION_HOURS`).
+    - `When` corre la expiración automática del scheduler en el BFF.
+    - `Then` pasa a `VENCIDA`.
+    - `And` el cliente y el profesional reciben un aviso por correo y WebPush.
+- **HU-S16 · Recibir notificaciones**
+  *Como usuario quiero enterarme de cambios y mensajes nuevos para reaccionar a tiempo.*
+  - **Scenario: Cambio de estado**
+    - `Given` que tengo la aplicación abierta.
+    - `When` cambia el estado de una solicitud o llega un mensaje nuevo.
+    - `Then` aparece un aviso en la bandeja de notificaciones.
+- **HU-S17 · Evitar turnos superpuestos**
+  *Como profesional quiero que no se me asignen dos turnos en el mismo horario para poder cumplir lo que acepto.*
+  - **Scenario: Aceptar un turno que se superpone**
+    - `Given` que tengo una solicitud `ACEPTADA` en un día y una franja horaria.
+    - `When` intento aceptar otra solicitud `PENDIENTE` que se superpone con esa franja.
+    - `Then` el sistema no me lo permite.
+    - `And` me indica con qué turno se superpone.
+
+---
+
+### 4.3 Requisitos funcionales
+
+| ID | Requisito | Historias asociadas |
+|---|---|---|
+| **RF-01** | Registro, ingreso y recuperación de contraseña, delegados a Keycloak mediante OIDC y PKCE. | HU-U01, HU-U02, HU-U15 |
+| **RF-02** | Roles de sistema (Cliente, Profesional y Administrador) con permisos diferenciados mediante RBAC en el BFF. | Transversal |
+| **RF-03** | Aceptación obligatoria de la versión vigente de los términos y condiciones, con registro de versión y fecha. | HU-U03 |
+| **RF-04** | Edición del perfil propio (nombre, apellido, teléfono y foto de perfil). | HU-U04 |
+| **RF-05** | Alta individual de profesionales por el Administrador, con contraseña temporal y cambio obligatorio en el primer ingreso. | HU-U05, HU-U09 |
+| **RF-06** | Activación del perfil por el propio profesional (foto, zona geográfica de cobertura y horarios semanales). | HU-U06 |
+| **RF-07** | Gestión de la disponibilidad horaria por parte del profesional (franjas semanales por día). | HU-U07 |
+| **RF-08** | Consulta y edición del padrón y de los clientes; desactivación y reactivación de cuentas conservando el historial. | HU-U10, HU-U11, HU-U13 |
+| **RF-09** | Gestión de categorías de oficios técnicos por el Administrador. | HU-U12 |
+| **RF-10** | Directorio con búsqueda de profesionales por categoría, disponibilidad y proximidad geográfica. | HU-S01, HU-S02, HU-S04, HU-S05 |
+| **RF-11** | Creación de solicitudes de turno por el cliente, con protección de su dirección exacta hasta la aceptación. | HU-S01 a HU-S07 |
+| **RF-12** | Gestión del ciclo de la solicitud: consulta, aceptación, rechazo con motivo, cancelación con motivo y finalización por cualquiera de las partes, sin turnos superpuestos. | HU-S08 a HU-S12, HU-S17 |
+| **RF-13** | Mensajería de texto en vivo asociada a cada solicitud, entre cliente y profesional mediante WebSocket / STOMP. | HU-S13 |
+| **RF-14** | Calificación única de 1 a 5 estrellas con comentario por parte del cliente, y consulta de la reputación por el profesional. | HU-S14, HU-U08 |
+| **RF-15** | Vencimiento automático de las solicitudes pendientes sin respuesta al expirar el plazo configurado. | HU-S15 |
+| **RF-16** | Notificaciones por correo transaccional y dentro de la aplicación (WebPush y bandeja interna) ante cambios de estado y mensajes. | HU-S06, HU-S16 |
+| **RF-17** | Resumen con indicadores de demanda y recorrido de las solicitudes para el Administrador. | HU-U14 |
+
+---
+
+### 4.4 Requisitos no funcionales
+
+| ID | Requisito | Detalle |
+|---|---|---|
+| **RNF-01** | **Seguridad** | Autenticación basada estrictamente en tokens JWT (OIDC + PKCE); la identidad del actor se toma siempre de los claims del token en el BFF (`sub`), nunca del cuerpo de la petición. |
+| **RNF-02** | **Comunicación segura** | Todo el tráfico circula por HTTPS a través de Nginx como terminador TLS. |
+| **RNF-03** | **Privacidad de datos** | La dirección exacta del cliente se oculta al profesional hasta que acepta; las coordenadas se cifran en reposo con AES-256-GCM; las fotos se almacenan en un volumen privado y su acceso se controla por matriz de roles. |
+| **RNF-04** | **Trazabilidad y auditoría** | Al suspender una cuenta se conserva su historial completo; se registra quién cancela una solicitud y la versión y fecha de los términos aceptados. |
+| **RNF-05** | **Tiempo real y reactividad** | Los mensajes y los avisos de cambio de estado llegan a la contraparte sin recargar la aplicación (WebSocket y Signals en Angular). |
+| **RNF-06** | **Configurabilidad** | El tiempo de vencimiento de las solicitudes pendientes es un parámetro configurable (`SOLICITUDES_TIEMPO_EXPIRACION_HOURS`). |
+
+---
+
+### 4.5 Trazabilidad de historias de usuario
+
+| Historia | Título | Actor | RF | Sprint |
+|---|---|---|---|---|
+| `HU-U01` | Registrarme con mi correo | Cliente | RF-01 | 1–2 |
+| `HU-U02` | Recuperar mi contraseña | Cliente | RF-01 | 1–2 |
+| `HU-U03` | Aceptar los términos y condiciones | Todos | RF-03 | 1–2 |
+| `HU-U04` | Editar mi perfil | Todos | RF-04 | 1–2 |
+| `HU-U05` | Primer ingreso con contraseña temporal | Profesional | RF-05 | 1–2 |
+| `HU-U06` | Activar mi perfil | Profesional | RF-06 | 1–2 |
+| `HU-U07` | Gestionar mis horarios | Profesional | RF-07 | 1–2 |
+| `HU-U08` | Ver mi reputación | Profesional | RF-14 | 1–2 |
+| `HU-U09` | Dar de alta a un profesional | Administrador | RF-05 | 1–2 |
+| `HU-U10` | Consultar y modificar el padrón | Administrador | RF-08 | 1–2 |
+| `HU-U11` | Desactivar y reactivar cuentas | Administrador | RF-08 | 1–2 |
+| `HU-U12` | Gestionar categorías | Administrador | RF-09 | 1–2 |
+| `HU-U13` | Consultar clientes | Administrador | RF-08 | 1–2 |
+| `HU-U14` | Ver el resumen de la plataforma | Administrador | RF-17 | 3–4 |
+| `HU-U15` | Iniciar sesión | Todos | RF-01 | 1–2 |
+| `HU-S01` | Indicar dónde necesito el servicio | Cliente | RF-10, RF-11 | 3–4 |
+| `HU-S02` | Elegir la categoría | Cliente | RF-10, RF-11 | 3–4 |
+| `HU-S03` | Describir el problema | Cliente | RF-11 | 3–4 |
+| `HU-S04` | Elegir día y horario | Cliente | RF-10, RF-11 | 3–4 |
+| `HU-S05` | Elegir profesional | Cliente | RF-10 | 3–4 |
+| `HU-S06` | Enviar la solicitud | Cliente | RF-11, RF-16 | 3–4 |
+| `HU-S07` | Proteger mi domicilio | Cliente | RF-11 | 3–4 |
+| `HU-S08` | Ver mis solicitudes | Cliente y profesional | RF-12 | 3–4 |
+| `HU-S09` | Aceptar una solicitud | Profesional | RF-12, RF-16 | 3–4 |
+| `HU-S10` | Rechazar con motivo | Profesional | RF-12, RF-16 | 3–4 |
+| `HU-S11` | Cancelar un turno | Cliente y profesional | RF-12, RF-16 | 3–4 |
+| `HU-S12` | Completar el trabajo | Cliente y profesional | RF-12 | 3–4 |
+| `HU-S13` | Chatear para coordinar | Cliente y profesional | RF-13 | 3–4 |
+| `HU-S14` | Calificar el servicio | Cliente | RF-14 | 3–4 |
+| `HU-S15` | Vencimiento automático | Sistema | RF-15, RF-16 | 3–4 |
+| `HU-S16` | Recibir notificaciones | Todos | RF-16 | 3–4 |
+| `HU-S17` | Evitar turnos superpuestos | Profesional | RF-12 | 3–4 |
+
+---
+
+## 5. Modelado
+
+### 5.1 Diagrama de casos de uso
+
+Los actores del sistema son el **Cliente**, el **Profesional** y el **Administrador**. Los casos de uso se agrupan en las dos épicas del MVP:
+- **Gestión de usuarios:** registro, ingreso, recuperación de contraseña, perfil, aceptación de términos, alta y administración del padrón de profesionales, categorías y gestión de clientes.
+- **Gestión de solicitudes:** crear solicitud guiada en 6 pasos, aceptar/rechazar con motivo, cancelar, completar, chat en tiempo real, calificación y vencimiento automático.
+
+> Enlace al diagrama de casos de uso:
+> **https://drive.google.com/file/d/1Ju9MOgnjGWvL1gTsbLSjPvBHsg_gcU9h/view?usp=sharing**
+
+### 5.2 Diagrama de clases
+
+Las entidades del dominio son:
+- **`Usuario`:** datos personales (nombre, apellido, email, teléfono), rol de negocio (`CLIENTE`, `PROFESIONAL`, `ADMIN`), clave de foto de perfil, estado de la cuenta (`CARGADO`, `ACTIVO`, `SUSPENDIDO`, `INACTIVO`) y términos aceptados (versión y fecha).
+- **`Profesional`:** legajo institucional único, centro de zona de cobertura (latitud/longitud cifradas), radio en kilómetros, estado del perfil (`CARGADO`, `ACTIVO`, `SUSPENDIDO`) y fecha de activación.
+- **`Disponibilidad`:** franjas horarias semanales (`diaSemana`, `horaInicio`, `horaFin`) asociadas a un profesional.
+- **`Especialidad`:** catálogo de oficios técnicos validados por la Universidad Popular.
+- **`Solicitud`:** domicilio, zona aproximada, coordenadas (cifradas en reposo), descripción del problema, franja horaria propuesta, estado (`EstadoSolicitud`), canceladaPor y motivo de cancelación.
+- **`Calificación`:** puntaje (1 a 5 estrellas) y comentario asociado a una solicitud única completada.
+- **`Mensaje`:** emisor, solicitud, texto y fecha de envío para el chat en vivo.
+- Enumerados: `RolNegocio`, `EstadoUsuario`, `EstadoProfesional`, `EstadoSolicitud`, `DiaSemana`.
+
+> Enlace al diagrama de clases:
+> **https://drive.google.com/file/d/1btT906f3BM3RUKJ19vn9AyYQmFGWjRP4/view?usp=sharing**
+
+### 5.3 Diagramas de estados y transiciones
+
+#### 5.3.1 Estados de la solicitud
+Los estados posibles son `PENDIENTE`, `ACEPTADA`, `RECHAZADA`, `COMPLETADA`, `CANCELADA` y `VENCIDA`. Los estados finales son `RECHAZADA`, `COMPLETADA`, `CANCELADA` y `VENCIDA`.
+
+| Desde | Evento | Actor | Hacia | Condición o efecto |
+|---|---|---|---|---|
+| *(inicio)* | Crear solicitud | Cliente | `PENDIENTE` | El profesional ve solo la zona y un punto aproximado (~1.1 km de margen); recibe aviso por correo. |
+| `PENDIENTE` | Aceptar | Profesional | `ACEPTADA` | Se revela la dirección exacta y coordenadas reales; valida no superposición; el cliente recibe aviso. |
+| `PENDIENTE` | Rechazar | Profesional | `RECHAZADA` | El motivo es obligatorio y el cliente lo recibe; estado final. |
+| `PENDIENTE` | Cancelar | Cliente o Profesional | `CANCELADA` | Motivo obligatorio; se registra quién canceló y la otra parte recibe aviso; estado final. |
+| `ACEPTADA` | Cancelar | Cliente o Profesional | `CANCELADA` | Motivo obligatorio; se registra quién canceló y la otra parte recibe aviso; estado final. |
+| `ACEPTADA` | Completar | Cliente o Profesional | `COMPLETADA` | Marca el trabajo terminado; habilita la calificación por parte del cliente; estado final. |
+| `PENDIENTE` | Vencer | Sistema (Scheduler) | `VENCIDA` | Supera `SOLICITUDES_TIEMPO_EXPIRACION_HOURS` sin respuesta; ambas partes reciben aviso; estado final. |
+
+> Enlace al diagrama de estados de la solicitud:
+> **https://drive.google.com/file/d/1Em1No0Op45QV2_i3s2ZJCFdKz--MmYk3/view?usp=sharing**
+
+#### 5.3.2 Estados de cuenta
+Los estados son `CARGADO`, `ACTIVO`, `SUSPENDIDO` e `INACTIVO` (este último para clientes baneados).
+
+| Desde | Evento | Actor | Hacia | Condición o efecto |
+|---|---|---|---|---|
+| *(inicio)* | Registro | Cliente | `ACTIVO` | Cuenta creada con rol Cliente tras confirmar email. |
+| *(inicio)* | Alta | Administrador | `CARGADO` | Profesional con contraseña temporal creada en Keycloak; todavía no es visible en el padrón. |
+| `CARGADO` | Activar perfil | Profesional | `ACTIVO` | Completa foto, zona de cobertura y horarios semanales; aparece visible en el padrón público. |
+| `ACTIVO` | Suspender | Administrador | `SUSPENDIDO` | No puede operar ninguna acción autenticada (corte en BFF); se conserva todo su historial. |
+| `SUSPENDIDO` | Reactivar | Administrador | `ACTIVO` | Se levanta la sanción; vuelve a operar con normalidad. |
+| `ACTIVO` | Banear | Administrador | `INACTIVO` | Cliente sancionado de forma permanente. |
+
+> Enlace al diagrama de estados de cuenta:
+> **https://drive.google.com/file/d/1veufyzMZeWApTWF-NPNIUsajX1ZyAODh/view?usp=sharing**
+
+---
+
+## 6. Arquitectura y tecnología
+
+### 6.1 Componentes y stack
+
+| Componente | Tecnología | Rol en la arquitectura |
+|---|---|---|
+| **Frontend** | Angular 22 · Angular Material · PWA | Interfaz de usuario reactiva basada en Signals. |
+| **BFF (Backend for Frontend)** | Spring Boot 4 · Java 21 | Gateway único, agregación, RBAC, WebSocket, fotos y correos. |
+| **ms-usuarios** | Spring Boot 4 · Java 21 | Microservicio de identidades de negocio, perfiles y términos. |
+| **ms-profesionales** | Spring Boot 4 · Java 21 | Microservicio de padrón, especialidades y disponibilidad. |
+| **ms-solicitudes** | Spring Boot 4 · Java 21 | Microservicio de ciclo de solicitudes, chat y calificaciones. |
+| **Identidad y Seguridad** | Keycloak 26 | Proveedor de identidad OIDC, PKCE, emisión de JWT y JWKS. |
+| **Base de datos** | PostgreSQL 16 | Almacenamiento relacional en contenedor Docker. |
+| **Proxy inverso y TLS** | Nginx 1.27-alpine | Terminación TLS, SPA fallback y enrutamiento con buffers. |
+| **Almacenamiento de fotos** | Volumen Docker `fotos_data` | Persistencia privada de binarios fuera de la base de datos. |
+| **Servidor de correo** | SMTP (Gmail / Mailpit / SES) | Envío de correos transaccionales y de recuperación. |
+| **Notificaciones** | Correo transaccional + WebPush | Avisos de cambio de estado, expiración y chat. |
+| **Chat en tiempo real** | WebSocket + STOMP | Conexión bidireccional segura para mensajería en vivo. |
+| **API externa** | OpenStreetMap (Nominatim) | Geocodificación y geocodificación inversa con rate limiting. |
 
 ```
                     https://vincula-up.local          http://localhost
-                              │                            │
+                               │                            │
                     ┌─────────▼────────────────────────────▼─────────┐
                     │                   Nginx 1.27                    │
                     │  TLS · reverse proxy · SPA fallback · buffers │
@@ -127,7 +682,7 @@ BFF lo corta en `requireActive()` antes de llegar a cualquier endpoint de negoci
               │ Angular 22 SPA │ │  BFF :9001  │ │  Keycloak :8080 │
               │   estático     │ │  Spring     │ │  OIDC + PKCE    │
               └────────────────┘ └────┬────────┘ └─────────────────┘
-                                       │  JWT/JWKS
+                                       │  JWT / JWKS
         ┌──────────────────────────────┼──────────────────────────────┐
         │                              │                              │
  ┌──────▼────────┐            ┌────────▼────────┐            ┌────────▼────────┐
@@ -136,1782 +691,559 @@ BFF lo corta en `requireActive()` antes de llegar a cualquier endpoint de negoci
  └──────┬────────┘            └────────┬────────┘            └────────┬────────┘
         │                              │                              │
         └──────────────────────────────┼──────────────────────────────┘
-                              ┌────────▼────────┐
-                              │  PostgreSQL 16  │
-                              │   :5432        │
-                              └─────────────────┘
+                               ┌────────▼────────┐
+                               │  PostgreSQL 16  │
+                               │   :5432        │
+                               └─────────────────┘
 ```
 
-### El BFF y por qué existe
+### 6.2 Responsabilidades por servicio
 
-El frontend Angular **nunca** habla directo con los microservicios. Todo pasa por
-el BFF (`backend/bff-web`), que cumple cuatro funciones:
-
-1. **Agregación.** El listado de profesionales devuelve solo `usuarioId` (el
-   nombre y apellido viven en `ms-usuarios`). El BFF los pega en cada tarjeta
-   con `enriquecerConUsuarios()` (`ApiController.java:160`), en una sola pasada
-  indexada por UUID para no hacer una llamada por tarjeta. Para perfiles
-  históricos cuyo `usuarioId` todavía contiene el `keycloakId`, el BFF hace un
-  lookup de solo lectura por esa identidad y publica el `usuarioId` interno
-  resuelto, que es el que requiere el endpoint privado de fotos.
-2. **Autorización.** Valida el JWT contra el JWKS de Keycloak y aplica el RBAC.
-   Los microservicios no exponen autenticación propia y por eso no se publican
-   fuera de `127.0.0.1`.
-3. **Identidad.** La identidad del actor se toma **siempre del token**, nunca
-   del body de la petición. `actorIdentityBody()` (`ApiController.java:133-143`)
-   inyecta el `subject` de Keycloak y sobrescribe cualquier id que venga del
-   cliente. Esto evita que un usuario actúe en nombre de otro.
-4. **Tolerancia a fallos.** Si `ms-usuarios` no responde, el listado se entrega
-   igual sin datos personales en vez de tumbar la consulta. Si `ms-solicitudes`
-   no responde, se entrega sin estrellas. La reputación es un dato adicional,
-   nunca una condición para ver el padrón.
-
-### Puertos
-
-| Servicio | Puerto | Expuesto en el host |
-|---|---:|---|
-| `nginx` | 80 / 443 | Sí (todas las interfaces) |
-| `keycloak` | 8080 | Sí |
-| `postgres` | 5432 | Sí |
-| `bff-web` | 9001 | Sí |
-| `ms-usuarios` | 8081 | Sí (red interna) |
-| `ms-profesionales` | 8082 | Sí (red interna) |
-| `ms-solicitudes` | 8083 | Sí (red interna) |
-
-Los tres microservicios de dominio se publican en la red interna de Docker
-porque cada uno valida el JWT de Keycloak por su cuenta (oauth2-resource-server).
-Toda entrada del exterior pasa por nginx → BFF, pero los ms-* ya no confían
-ciegamente en el perímetro: rechazan peticiones sin token válido.
-
-### Puertos entre servicios (red interna de Docker)
-
-```
-bff-web        → ms-usuarios:8081, ms-profesionales:8082, ms-solicitudes:8083
-ms-solicitudes → ms-profesionales:8082   (valida disponibilidad al crear)
-```
+- **`bff-web` (Puerto 9001):**
+  1. **Único punto de entrada:** el frontend Angular nunca contacta a los microservicios directamente.
+  2. **Agregación y enriquecimiento:** combina la información del padrón (`ms-profesionales`) con los datos del usuario (`ms-usuarios`) y la reputación (`ms-solicitudes`).
+  3. **Autorización y RBAC:** valida el JWT contra el JWKS de Keycloak y aplica las 27 reglas de acceso. Los microservicios de dominio además actúan como OAuth2 Resource Servers para defensa en profundidad.
+  4. **Identidad estricta:** inyecta el `sub` de Keycloak en cada petición; un cliente nunca puede falsear su identidad.
+  5. **Fotos privadas:** valida tipo y tamaño, escribe en el volumen nombrado `fotos_data` y aplica la matriz de visibilidad de fotos.
+  6. **Avisos transaccionales y scheduler:** envía correos de alta, turnos y expiración con plantilla HTML/texto multipart y ejecuta el cron de expiración cada 15 segundos.
+- **`ms-usuarios` (Puerto 8081):** Cuentas y perfiles de clientes y administradores, estado de negocio (`CARGADO`, `ACTIVO`, `SUSPENDIDO`, `INACTIVO`), vinculación de `keycloakId` y registro de términos y condiciones (versión y fecha).
+- **`ms-profesionales` (Puerto 8082):** Padrón de técnicos, legajos, categorías/especialidades, disponibilidad horaria semanal y activación del perfil.
+- **`ms-solicitudes` (Puerto 8083):** Ciclo de vida completo de solicitudes, validación de turnos superpuestos, geocodificación con Nominatim, chat, calificaciones y vencimiento.
 
 ---
 
-## 4. Stack y versiones
+### 6.3 Puntos clave a revisar de la arquitectura
 
-### Backend
+#### 6.3.1 ¿Hay que especificar el conector a la API externa (OpenStreetMap / Nominatim)?
+**Sí, y está completamente especificado.**
+- **Servicio consumido:** OpenStreetMap · Nominatim.
+- **Entrada / Salida:** Dirección en texto → Coordenadas geográficas (`latitud`, `longitud`); o coordenadas → dirección normalizada (`display_name`).
+- **Servicio consumidor:** `ms-solicitudes` mediante `GeocodingClient`. El BFF expone `GET /api/gps` como proxy público hacia `GET /solicitudes/geocodificar`.
+- **Caché y Rate-Limiting:** Nominatim restringe el uso a máximo 1 req/segundo. El sistema implementa una **caché LRU en memoria de 500 entradas con TTL de 10 minutos**. Solo se cachean respuestas exitosas.
+- **Degradación controlada en 2 capas:** Si Nominatim falla o se supera el timeout, devuelve `resolved: false` con mensaje descriptivo sin lanzar excepciones. Si `ms-solicitudes` no responde, el BFF devuelve `source: servicio-no-disponible` en lugar de un error 502.
 
-| Componente | Versión |
-|---|---|
-| Java | 21 (Temurin) |
-| Spring Boot | 4.1.1 |
-| Spring Security | 4.1.1 (OAuth2 Resource Server) |
-| Jackson | 4.x — se importa como `tools.jackson.*` (paquete nuevo) |
-| JPA / Hibernate | 7.4.5.Final |
-| Base de datos | PostgreSQL 16 (producción) · H2 en memoria (dev local) |
+#### 6.3.2 ¿Hay que especificar el conector a SMTP?
+**Sí, debe quedar formalmente especificado como contrato de infraestructura.**
+- **Canal de envío:** El BFF (`NotificacionService`) y Keycloak (recuperación de contraseña, verificación) se conectan al servidor SMTP configurado por variables de entorno (`KEYCLOAK_SMTP_*`).
+- **Separación de remitentes (`From` vs `Reply-To`):**
+  - `From`: Cuenta autenticada en el servidor SMTP (ej: `lucianodavezac@gmail.com`).
+  - `Reply-To`: Casilla institucional de destino de respuestas (ej: `vinculaup@gmail.com`), configurada en `KEYCLOAK_SMTP_REPLY_TO`.
+- **Protocolo y Seguridad:** Puerto 587 con cifrado `STARTTLS` obligatorio (o 465 con SSL implícito). No se permite texto plano.
+- **Tolerancia y Best-effort:** Si el servidor SMTP no responde, la operación de negocio (ej. alta del profesional o cambio de estado de solicitud) **se confirma igual** y el fallo se registra en el log. En el alta de un profesional, el BFF devuelve `correoEnviado: false` junto con la contraseña temporal para que el administrador la suministre manualmente.
 
-Cada microservicio es un proyecto Maven independiente con su propio `mvnw`
-(wrapper). **No hay reactor raíz**: se compilan por separado.
+#### 6.3.3 ¿El volumen de fotos y el protocolo SMTP violan la arquitectura de microservicios?
+**No. Ninguno de los dos viola la arquitectura de microservicios si se respetan las siguientes directivas de diseño:**
 
-### Frontend
+1. **Almacenamiento de fotos en volumen nombrado (`fotos_data`):**
+   - **Por qué NO viola la arquitectura:** Un principio central de los microservicios es no almacenar binarios pesados (imágenes BLOB) dentro de la base de datos relacional transaccional, ya que degradaría los backups, la replicación y el pool de conexiones. Las imágenes se consideran almacenamiento de objetos.
+   - **Desacoplamiento:** El BFF gestiona la subida mediante `POST /api/fotos` y la lectura controlada mediante `GET /api/usuarios/{id}/foto` a través de la interfaz abstracta `FotoStorage`. Los microservicios de dominio (`ms-usuarios` y `ms-profesionales`) solo almacenan en su base de datos una **clave textual de 512 caracteres** (`perfiles/<uuid>.jpg`), jamás el archivo físico.
+   - **Escalabilidad horizontal futura:** En el entorno local / MVP se utiliza la implementación `FotoStorageLocal` respaldada por el volumen Docker nombrado `fotos_data`. Para escalar a múltiples hosts de producción, se sustituye dicha clase por un cliente de almacenamiento en la nube (AWS S3, MinIO o Google Cloud Storage), manteniendo intacta la API REST y el contrato de los microservicios.
 
-| Componente | Versión |
-|---|---|
-| Angular | 22.1.x |
-| Angular Material / CDK | 22.1.7 |
-| TypeScript | ~6.0.2 |
-| Zone.js | ~0.16.0 |
-| Gestor de paquetes | npm 11.19.0 |
-
-Angular 22 usa el builder `@angular/build:application` y **signals** en lugar de
-RxJS para el estado de los componentes.
-
-### Infraestructura
-
-| Componente | Versión |
-|---|---|
-| Keycloak | 26.3.3 (modo `start-dev`) |
-| PostgreSQL | 16 |
-| Nginx | 1.27-alpine |
-| pgAdmin | 8.12 |
-| Node (build del front) | 22-alpine (multi-stage en `nginx/Dockerfile`) |
+2. **Protocolo SMTP:**
+   - **Por qué NO viola la arquitectura:** SMTP es un protocolo estándar de comunicación con un servicio externo de correo saliente. El BFF actúa como orquestador de notificaciones transaccionales para los eventos del sistema. Los microservicios de dominio no tienen dependencias directas con el servidor de correos, preservando el principio de responsabilidad única.
 
 ---
 
-## 5. Estructura del repositorio
+### 6.4 Roles del sistema
+
+| Rol | Qué hace | Pantalla principal |
+|---|---|---|
+| **Cliente / Vecino** | Busca oficios, define su ubicación geográfica, solicita turno, chatea para coordinar y califica el servicio finalizado. | `/solicitar` → `/solicitudes` |
+| **Profesional Técnico** | Completa su activación (foto, radio de cobertura, horarios semanales), gestiona solicitudes (acepta/rechaza con motivo), coordina por chat. | `/activar-perfil` → `/solicitudes` |
+| **Administrador Institucional** | Da de alta profesionales al padrón con legajo y especialidades, monitorea el estado (Cargado, Activo, Suspendido), suspende y reactiva cuentas. | `/admin` |
+
+Los roles son **roles de negocio** persistidos en `ms-usuarios` (`Usuario.rolNegocio`) y replicados como roles de realm en Keycloak. En Spring Security se mapean con el prefijo estándar `ROLE_CLIENTE`, `ROLE_PROFESIONAL` y `ROLE_ADMIN`.
+
+---
+
+### 6.5 Decisiones de diseño clave
+
+- **Dirección exacta oculta hasta la aceptación:** Protege la privacidad del cliente. Mientras la solicitud está en `PENDIENTE`, el profesional solo ve la zona aproximada (barrio y localidad) y un punto con coordenadas redondeadas a 2 decimales (~1.1 km de margen). Al pasar a `ACEPTADA`, se le revela la dirección exacta.
+- **Identidad tomada siempre del token JWT:** Evita que un usuario se haga pasar por otro enviando un identificador ajeno en el cuerpo de la petición. El BFF sobreescribe cualquier ID con el claim `sub` del token.
+- **Fotos privadas en volumen con matriz de visibilidad:** Las fotos no se publican en rutas estáticas abiertas de Nginx. El endpoint `GET /api/usuarios/{id}/foto` exige autenticación y valida que el rol del solicitante tenga permitido ver la foto.
+- **Expiración automática de solicitudes pendientes:** Una tarea programada en el BFF (`SolicitudExpiracionScheduler`, cada 15 segundos) vence las solicitudes que superan el límite configurado (`SOLICITUDES_TIEMPO_EXPIRACION_HOURS`), notificando a ambas partes.
+- **BFF como único punto de entrada:** Centraliza la autorización, la agregación de datos y la exposición de WebSocket, evitando exponer los microservicios directamente a la red pública.
+- **Keycloak centralizado:** Delega el registro, el login y la recuperación de credenciales en un proveedor de identidad OIDC con PKCE S256.
+
+---
+
+## 7. Estructura del repositorio
 
 ```
 .
-├── README.md                      Resumen: qué hace, stack, deploy local
-├── MANUAL.md                      Manual de uso y operación
-├── ESPECIFICACION.md              Este documento
-├── docker-compose.yml             Orquestación de los 8 servicios
-├── .env                           Variables reales (NO versionado)
-├── .env.example                   Plantilla de variables (versionado)
+├── README.md                      Resumen del proyecto, stack y deploy rápido
+├── MANUAL.md                      Manual de uso y operación detallada
+├── ESPECIFICACION.md              Este documento único de referencia técnica
+├── docker-compose.yml             Orquestación de los contenedores Docker
+├── .env                           Variables reales de entorno (NO versionado)
+├── .env.example                   Plantilla de variables de entorno (versionado)
 │
 ├── backend/
-│   ├── bff-web/                   :9001  Gateway, RBAC, agregación
-│   ├── ms-usuarios/               :8081  Identidades y roles de negocio
+│   ├── bff-web/                   :9001  Gateway, RBAC, agregación, chat, fotos y mail
+│   ├── ms-usuarios/               :8081  Identidades de negocio, roles y términos
 │   ├── ms-profesionales/          :8082  Padrón, especialidades, disponibilidad
-│   └── ms-solicitudes/            :8083  Ciclo de vida, chat, calificaciones
+│   └── ms-solicitudes/            :8083  Ciclo de vida, chat, calificaciones, geocodificación
 │
-├── frontend/vincula-up-web/       SPA Angular
+├── frontend/vincula-up-web/       SPA Angular 22 (PWA)
 │   └── src/app/
-│       ├── core/                  Services, guards, models, utils
-│       ├── shared/                Navbar, tabbar, footer, avatar, icon, confirm
+│       ├── core/                  Services (HTTP, auth, theme, push), guards, models
+│       ├── shared/                Navbar, tabbar, footer, avatar, confirm-modal
 │       ├── home/ request/ my-requests/             Flujo del cliente
 │       ├── activation/ account/                    Flujo del profesional
-│       ├── admin/                 Shell + 4 listados y 2 altas del panel
-│       └── legal/                 Términos, FAQ y el modal de aceptación
+│       ├── admin/                 Shell + 4 paneles de administración
+│       └── legal/                 Términos, FAQ y modal de aceptación
 │
-├── keycloak/import/               Realm `vincula-up` (JSON de importación)
-├── nginx/                         Config + certificados TLS
+├── keycloak/
+│   ├── import/                    Realm `vincula-up` (JSON de importación)
+│   └── themes/vincula-up/         Tema personalizado (login, email y cuenta)
+├── nginx/                         Configuración del proxy inverso y certificados TLS
 └── scripts/
-    ├── linux-macos/               *.sh — Linux y macOS
-    │   ├── keycloak-bootstrap.sh
-    │   ├── import-ca.sh
-    │   └── generate-certs.sh
-    └── windows/                   *.ps1 — Windows
-        ├── keycloak-bootstrap.ps1
-        ├── import-ca.ps1
-        ├── generate-certs.ps1
-        └── start-local.ps1        Desarrollo sin Docker (solo Windows)
+    ├── deploy.sh                  Script de despliegue automatizado en un paso
+    ├── linux-macos/               Scripts de bootstrap, CA y certificados para Unix
+    └── windows/                   Scripts equivalentes en PowerShell para Windows
 ```
 
-> **Nota sobre el prototipo.** La maqueta original de diseño se construyó en
-> [v0](https://v0.app) (Next.js) y sigue desplegada en
-> **https://v0-vincula-up.vercel.app/**. El código fuente de ese prototipo se
-> eliminó del repositorio al consolidarse la documentación; la aplicación real
-> es la SPA Angular de `frontend/vincula-up-web`.
+---
+
+## 8. API del BFF: catálogo de endpoints
+
+Todos los endpoints cuelgan del prefijo `/api`. El BFF aplica RBAC según la regla configurada en `SecurityConfig.java`. El símbolo `—` indica acceso público.
+
+### 8.1 Profesionales
+| Método | Ruta | Rol requerido | Descripción |
+|---|---|---|---|
+| GET | `/api/profesionales` | — | Listado público del padrón. Acepta filtros `estado` y `todos`; incluye franjas de disponibilidad. |
+| GET | `/api/profesionales/{id}` | Autenticado | Ficha completa de un profesional y sus horarios semanales. |
+| GET | `/api/profesionales/mi-perfil` | `PROFESIONAL` | Perfil del profesional autenticado. |
+| POST | `/api/profesionales` | `ADMIN` | Alta tradicional de profesional en el padrón. |
+| POST | `/api/profesionales/alta` | `ADMIN` | Alta en un paso: crea cuenta en Keycloak con contraseña temporal, usuario y perfil pendiente. |
+| PUT | `/api/profesionales/{id}` | `ADMIN` | Edición de legajo y especialidades en el padrón. |
+| PATCH | `/api/profesionales/{id}/suspender` | `ADMIN` | Desactivación / baja lógica (pasa a estado `SUSPENDIDO`). |
+| PATCH | `/api/profesionales/{id}/reactivar` | `ADMIN` | Levanta la suspensión (vuelve a estado `ACTIVO`). |
+| PUT | `/api/profesionales/{id}/disponibilidad` | `PROFESIONAL` | Guarda las franjas horarias semanales de atención. |
+| GET | `/api/profesionales/{id}/disponibilidad` | Autenticado | Consulta los horarios semanales de atención. |
+| GET | `/api/mi-reputacion` | `PROFESIONAL` | Consulta el promedio de estrellas y cantidad de calificaciones propias. |
+
+### 8.2 Solicitudes
+| Método | Ruta | Rol requerido | Descripción |
+|---|---|---|---|
+| POST | `/api/solicitudes` | `CLIENTE` | Crea una solicitud en estado `PENDIENTE`. Valida día y horario contra la disponibilidad y resuelve coordenadas GPS. |
+| GET | `/api/solicitudes/mias` | Autenticado | Listado de solicitudes del actor (como cliente o profesional). |
+| GET | `/api/solicitudes/panel` | `ADMIN` | Indicadores de demanda y recorrido histórico de solicitudes. |
+| PATCH | `/api/solicitudes/{id}/aceptar` | `PROFESIONAL` | Acepta el turno (pasa a `ACEPTADA`); revela la dirección exacta. |
+| PATCH | `/api/solicitudes/{id}/rechazar` | `PROFESIONAL` | Rechaza el turno con motivo obligatorio (pasa a `RECHAZADA`). |
+| PATCH | `/api/solicitudes/{id}/completar` | `CLIENTE` o `PROFESIONAL` | Marca el trabajo terminado (pasa a `COMPLETADA`); habilita calificar. |
+| PATCH | `/api/solicitudes/{id}/cancelar` | `CLIENTE` o `PROFESIONAL` | Cancela el turno con motivo obligatorio (pasa a `CANCELADA`). |
+
+### 8.3 Mensajes, chat en vivo y calificaciones
+| Método | Ruta | Rol requerido | Descripción |
+|---|---|---|---|
+| GET | `/api/solicitudes/{id}/mensajes` | Autenticado | Historial completo de mensajes de la solicitud. |
+| POST | `/api/solicitudes/{id}/mensajes` | Autenticado | Envía y persiste un mensaje en el chat; se publica en vivo al WebSocket. |
+| GET | `/api/calificaciones` | — | Reputación pública de profesionales (promedio y total). |
+| POST | `/api/solicitudes/{id}/calificacion` | `CLIENTE` | Califica con 1 a 5 estrellas y comentario la solicitud completada. |
+| GET | `/api/solicitudes/{id}/calificacion` | Autenticado | Consulta la calificación de la solicitud. |
+| WS | `/ws` (protocolo STOMP) | Autenticado | Conexión WebSocket para mensajería en tiempo real suscrita a `/topic/solicitudes/{id}`. |
+
+### 8.4 Usuarios
+| Método | Ruta | Rol requerido | Descripción |
+|---|---|---|---|
+| GET | `/api/usuarios` | `ADMIN` | Listado general de clientes registrados. |
+| GET | `/api/usuarios/yo` | Autenticado | Perfil propio y estado de aceptación de términos. |
+| GET | `/api/usuarios/{id}` | Autenticado | Ficha del usuario contraparte para coordinación de turnos. |
+| GET | `/api/usuarios/por-keycloak` | Autenticado | Vincula o recupera la entidad de negocio a partir del `sub` del token. |
+| GET | `/api/usuarios/por-email` | `ADMIN` | Búsqueda de usuario por email (devuelve 204 si no existe). |
+| POST | `/api/usuarios` | `ADMIN` | Creación administrativa de usuario de negocio. |
+| PATCH | `/api/usuarios/{id}` | `ADMIN` | Edición de datos personales del usuario. |
+| PATCH | `/api/usuarios/yo` | Autenticado | Edición de datos del perfil propio (nombre, apellido, teléfono). |
+| PATCH | `/api/usuarios/{id}/suspender` | `ADMIN` | Desactiva una cuenta de cliente (estado `SUSPENDIDO`). |
+| PATCH | `/api/usuarios/{id}/reactivar` | `ADMIN` | Reactiva una cuenta de cliente. |
+| DELETE | `/api/usuarios/{id}` | `ADMIN` | Baja lógica de la cuenta. |
+
+### 8.5 Especialidades
+| Método | Ruta | Rol requerido | Descripción |
+|---|---|---|---|
+| GET | `/api/especialidades` | — | Catálogo público de especialidades técnicas. |
+| POST | `/api/especialidades` | `ADMIN` | Crea una nueva especialidad en el catálogo. |
+| PUT | `/api/especialidades/{id}` | `ADMIN` | Modifica el nombre de una especialidad existente. |
+| DELETE | `/api/especialidades/{id}` | `ADMIN` | Elimina una especialidad del catálogo. |
+
+### 8.6 Activación y vinculación
+| Método | Ruta | Rol requerido | Descripción |
+|---|---|---|---|
+| POST | `/api/profesionales/activar` | `PROFESIONAL` | Activa el perfil cargando foto, zona GPS y horarios (pasa a `ACTIVO`). |
+| POST | `/api/profesionales/vincular` | `PROFESIONAL` | Vincula la identidad de Keycloak con el registro del padrón. |
+
+### 8.7 Utilidades
+| Método | Ruta | Rol requerido | Descripción |
+|---|---|---|---|
+| POST | `/api/fotos` | Autenticado | Sube un archivo de imagen al volumen privado y retorna su **clave** (`perfiles/<uuid>.jpg`). |
+| GET | `/api/usuarios/{id}/foto` | Autenticado | Sirve los bytes de la foto si la matriz de visibilidad de roles lo autoriza. |
+| DELETE | `/api/fotos/{key}` | Autenticado | Elimina lógicamente una foto de perfil del volumen privado. |
+| PATCH | `/api/terminos/aceptar` | Autenticado | Registra la versión y fecha de los términos aceptados por el usuario. |
+| GET | `/api/gps` | — | Proxy público de geocodificación de direcciones con Nominatim. |
+| GET | `/actuator/health` | — | Endpoint de diagnóstico del estado del servicio. |
 
 ---
 
-## 6. API del BFF: los 45 endpoints
+## 9. Modelo de datos detallado
 
-Todos cuelgan de `/api`. El BFF expone 40 operaciones agrupadas en siete
-familias. La columna **Rol** refleja la regla real de `SecurityConfig.java`;
-`—` significa público.
+Los identificadores de todas las entidades son `UUID`. No se utilizan claves foráneas físicas entre bases de datos de diferentes microservicios para garantizar el desacoplamiento.
 
-### 6.1 Profesionales
-
-| Método | Ruta | Rol | Descripción |
-|---|---|---|---|
-| GET | `/api/profesionales` | — | Listado público del padrón. Acepta `estado` y `todos`; cada perfil incluye `disponibilidad` semanal |
-| GET | `/api/profesionales/{id}` | Autenticado | Ficha de un profesional, incluidos sus horarios semanales en `disponibilidad` |
-| GET | `/api/profesionales/mi-perfil` | PROFESIONAL | Perfil propio |
-| POST | `/api/profesionales` | ADMIN | Alta de profesional |
-| POST | `/api/profesionales/alta` | ADMIN | Alta en un paso: cuenta de Keycloak con contraseña temporal + usuario + perfil pendiente |
-| PUT | `/api/profesionales/{id}` | ADMIN | Edición del padrón |
-| PATCH | `/api/profesionales/{id}/suspender` | ADMIN | Baja lógica. En la interfaz se llama **desactivar** |
-| PATCH | `/api/profesionales/{id}/reactivar` | ADMIN | Levanta la suspensión |
-| PUT | `/api/profesionales/{id}/disponibilidad` | PROFESIONAL | Horarios semanales |
-| GET | `/api/profesionales/{id}/disponibilidad` | Autenticado | Lee horarios |
-| GET | `/api/mi-reputacion` | PROFESIONAL | Reputación del propio profesional |
-
-### 6.2 Solicitudes
-
-| Método | Ruta | Rol | Descripción |
-|---|---|---|---|
-| POST | `/api/solicitudes` | CLIENTE | Crea la solicitud (acepta `profesionalId` como id de perfil o `usuarioId`, valida día y rango horario contra la disponibilidad semanal y resuelve GPS). No reserva el turno ni impide otras solicitudes en el mismo horario o categoría |
-| GET | `/api/solicitudes/mias` | Autenticado | Solicitudes del actor (cliente o profesional) |
-| GET | `/api/solicitudes/panel` | ADMIN | Indicadores de demanda y recorrido de las solicitudes |
-| PATCH | `/api/solicitudes/{id}/aceptar` | PROFESIONAL | Acepta el turno |
-| PATCH | `/api/solicitudes/{id}/rechazar` | PROFESIONAL | Rechaza con motivo |
-| PATCH | `/api/solicitudes/{id}/completar` | CLIENTE o PROFESIONAL | Marca el trabajo como terminado |
-| PATCH | `/api/solicitudes/{id}/cancelar` | CLIENTE o PROFESIONAL | Cancela el turno |
-
-### 6.3 Mensajes y calificaciones
-
-| Método | Ruta | Rol | Descripción |
-|---|---|---|---|
-| GET | `/api/solicitudes/{id}/mensajes` | Autenticado | Historial del chat |
-| POST | `/api/solicitudes/{id}/mensajes` | Autenticado | Envía un mensaje |
-| GET | `/api/calificaciones` | — | Reputación pública (promedio y cantidad) |
-| POST | `/api/solicitudes/{id}/calificacion` | CLIENTE | Califica con estrellas |
-| GET | `/api/solicitudes/{id}/calificacion` | Autenticado | Lee la calificación |
-
-**Chat en tiempo real (BFF):** el cliente abre WebSocket en `/ws`, envía el JWT
-como header STOMP `Authorization: Bearer ...` en `CONNECT` y se suscribe a
-`/topic/solicitudes/{id}`. El BFF valida el JWT y autoriza cada suscripción
-comprobando que el usuario sea participante de esa solicitud. Los mensajes se
-siguen enviando y persistiendo por `POST /api/solicitudes/{id}/mensajes`; tras
-guardar correctamente, el BFF publica la respuesta en el tópico. No se admiten
-envíos STOMP directos. Nginx transporta el upgrade WebSocket hacia el BFF.
-El panel del chat desplaza automáticamente al último mensaje al cargar el historial,
-recibir un mensaje en vivo o completar un envío.
-
-### 6.4 Usuarios
-
-| Método | Ruta | Rol | Descripción |
-|---|---|---|---|
-| GET | `/api/usuarios` | ADMIN | Listado de clientes |
-| GET | `/api/usuarios/yo` | Autenticado | Perfil propio |
-| GET | `/api/usuarios/{id}` | Autenticado | Ficha de la contraparte para coordinar |
-| GET | `/api/usuarios/por-keycloak` | Autenticado | Vincula o recupera por `sub` del token |
-| GET | `/api/usuarios/por-email` | ADMIN | Busca por email (204 si no existe) |
-| POST | `/api/usuarios` | ADMIN | Crea usuario |
-| PATCH | `/api/usuarios/{id}` | ADMIN | Edita usuario |
-| PATCH | `/api/usuarios/yo` | Autenticado | Actualiza el perfil propio |
-| PATCH | `/api/usuarios/{id}/suspender` | ADMIN | Desactiva la cuenta (estado SUSPENDIDO) |
-| PATCH | `/api/usuarios/{id}/reactivar` | ADMIN | Reactiva la cuenta |
-| DELETE | `/api/usuarios/{id}` | ADMIN | Baja lógica |
-
-### 6.5 Especialidades
-
-| Método | Ruta | Rol | Descripción |
-|---|---|---|---|
-| GET | `/api/especialidades` | — | Catálogo público |
-| POST | `/api/especialidades` | ADMIN | Crea especialidad |
-| PUT | `/api/especialidades/{id}` | ADMIN | Renombra |
-| DELETE | `/api/especialidades/{id}` | ADMIN | Elimina |
-
-### 6.6 Activación y vinculación
-
-| Método | Ruta | Rol | Descripción |
-|---|---|---|---|
-| POST | `/api/profesionales/activar` | PROFESIONAL | Activa perfil (foto, zona GPS, horarios) |
-| POST | `/api/profesionales/vincular` | PROFESIONAL | Vincula la identidad con el perfil |
-
-### 6.7 Utilidades
-
-| Método | Ruta | Rol | Descripción |
-|---|---|---|---|
-| POST | `/api/fotos` | Autenticado | Sube una foto al volumen y devuelve su **clave** (no hay URL pública) |
-| GET | `/api/usuarios/{id}/foto` | Autenticado + rol | Devuelve la foto de un usuario si el rol la tiene permitida ([§10.4](#104-quién-ve-la-foto-de-quién)) |
-| PATCH | `/api/terminos/aceptar` | Autenticado | Registra la aceptación de los términos; **el id sale del token**, nunca del cuerpo ([§8.5](#85-aceptación-de-los-términos-y-condiciones)) |
-| GET | `/api/gps` | — | Geocodificación de una dirección |
-| GET | `/actuator/health` | — | Health check (sin prefijo `/api`) |
-
----
-
-
-## 7. Modelo de datos
-
-Cinco entidades de negocio repartidas en tres microservicios. Los identificadores
-son `UUID` en todas partes.
-
-### 7.1 `ms-usuarios` — Usuario
-
+### 9.1 `ms-usuarios` — Usuario
 | Campo | Tipo | Notas |
 |---|---|---|
-| `id` | UUID | PK |
-| `keycloakId` | UUID | `sub` del token. **Admite nulos**: las invitaciones de profesionales todavía no tienen cuenta en Keycloak |
-| `nombre` | String | `given_name` del token |
-| `apellido` | String | `family_name` del token |
-| `email` | String | Único, es la identidad de acceso |
-| `telefono` | String | Opcional |
-| `fotoUrl` | String, 512 | URL pública de la foto, servida por el almacenamiento de objetos. **El archivo no vive en la base** |
-| `rolNegocio` | Enum | `CLIENTE` · `PROFESIONAL` · `ADMIN` |
-| `estado` | Enum | `ACTIVO` · `SUSPENDIDO` |
-| `fechaAlta` | OffsetDateTime | |
+| `id` | `UUID` | Primary Key. |
+| `keycloakId` | `UUID` | Claim `sub` del token JWT. Admite nulos en prerregistros administrativos. |
+| `nombre` | `VARCHAR(100)` | Nombre de pila. |
+| `apellido` | `VARCHAR(100)` | Apellido. |
+| `email` | `VARCHAR(255)` | Único. Identidad de acceso al sistema. |
+| `telefono` | `VARCHAR(50)` | Opcional. |
+| `fotoUrl` | `VARCHAR(512)` | Almacena la **clave** del archivo en el volumen privado (ej: `perfiles/<uuid>.jpg`), no una URL pública. |
+| `rolNegocio` | `ENUM` | `CLIENTE`, `PROFESIONAL`, `ADMIN`. |
+| `estado` | `ENUM` | `CARGADO`, `ACTIVO`, `SUSPENDIDO`, `INACTIVO`. |
+| `fechaAlta` | `TIMESTAMP WITH TIME ZONE` | Momento de creación del registro. |
+| `terminos_version` | `VARCHAR(32)` | Versión de los términos aceptados (ej: `2026-11-01`). |
+| `terminos_aceptado_en`| `TIMESTAMP WITH TIME ZONE` | Fecha y hora exacta de aceptación de términos. |
 
-### 7.2 `ms-profesionales` — Profesional
+### 9.2 `ms-profesionales` — Profesional, Especialidad y Disponibilidad
 
+#### Entidad `Profesional`
 | Campo | Tipo | Notas |
 |---|---|---|
-| `id` | UUID | PK |
-| `usuarioId` | UUID | Referencia al `Usuario.id` (no hay FK: microservicio independiente) |
-| `legajo` | String | Identificador del padrón, p. ej. `P-2001`. Único |
-| `fotoUrl` | String, `text` | Data URL base64 |
-| `zonaCoberturaLat` | Texto cifrado | Centro de la zona de cobertura (AES-256-GCM) |
-| `zonaCoberturaLng` | Texto cifrado | |
-| `radioKm` | Double | Radio en kilómetros |
-| `estado` | Enum | `CARGADO` · `ACTIVO` · `SUSPENDIDO` |
-| `fechaCarga` | OffsetDateTime | Alta en el padrón |
-| `fechaActivacion` | OffsetDateTime | Completó los 3 pasos de activación |
-| `especialidades` | `Set<Especialidad>` | Relación N:N |
-| `disponibilidad` | `Array<{ id: UUID, profesionalId: UUID, diaSemana: String, horaInicio: LocalTime, horaFin: LocalTime }>` | Franjas semanales configuradas por el profesional; se incluyen tanto en el listado como en la ficha. Angular las consume como `Professional.horarios` para recomendar sólo profesionales cuya franja cubra el rango solicitado. |
+| `id` | `UUID` | Primary Key. |
+| `usuarioId` | `UUID` | Referencia lógica a `Usuario.id` de `ms-usuarios`. |
+| `legajo` | `VARCHAR(50)` | Identificador institucional único otorgado por la UP (ej: `P-2001`). |
+| `fotoUrl` | `VARCHAR(512)` | Clave del archivo de foto en el volumen (`perfiles/<uuid>.jpg`). |
+| `zonaCoberturaLat` | `TEXT` | Latitud del centro de cobertura cifrada con AES-256-GCM. |
+| `zonaCoberturaLng` | `TEXT` | Longitud del centro de cobertura cifrada con AES-256-GCM. |
+| `radioKm` | `DOUBLE PRECISION` | Radio de cobertura territorial en kilómetros. |
+| `estado` | `ENUM` | `CARGADO`, `ACTIVO`, `SUSPENDIDO`. |
+| `fechaCarga` | `TIMESTAMP WITH TIME ZONE` | Fecha de alta administrativa en el padrón. |
+| `fechaActivacion` | `TIMESTAMP WITH TIME ZONE` | Fecha en la que completó la activación del perfil. |
+| `especialidades` | `Set<Especialidad>` | Relación Many-to-Many con la tabla de especialidades. |
 
-### 7.3 `ms-profesionales` — Especialidad y Disponibilidad
+#### Entidades `Especialidad` y `Disponibilidad`
+- **`Especialidad`:** `id` (`UUID`, PK), `nombre` (`VARCHAR(100)`).
+- **`Disponibilidad`:** `id` (`UUID`, PK), `profesionalId` (`UUID`), `diaSemana` (`ENUM`: `LUNES`...`DOMINGO`), `horaInicio` (`TIME`), `horaFin` (`TIME`).
 
-**Especialidad:** `id` (UUID, PK), `nombre` (String).
+### 9.3 `ms-solicitudes` — Solicitud, Mensaje y Calificación
 
-**Disponibilidad:** `id` (UUID, PK), `profesionalId` (UUID), `diaSemana` (enum
-`LUNES`…`DOMINGO`), `horaInicio` (`LocalTime`), `horaFin` (`LocalTime`).
-
-Al crear una solicitud, `ms-solicitudes` exige que inicio y fin correspondan al
-mismo día calendario y que el rango completo quede dentro de una franja de ese
-día. Si no se configuraron horarios, o `ms-profesionales` no permite verificar
-la disponibilidad, la solicitud no se crea. Las solicitudes no bloquean ni
-reservan franjas: se permiten varias para un mismo profesional, horario y
-categoría, incluso del mismo cliente.
-
-### 7.4 `ms-solicitudes` — Solicitud
-
-> Las coordenadas se guardan **cifradas**: las columnas `latitud` y `longitud`
-> almacenan texto cifrado, no el número. Ver [§10.2](#102-cifrado-de-ubicaciones).
-
+#### Entidad `Solicitud`
 | Campo | Tipo | Notas |
 |---|---|---|
-| `id` | UUID | PK |
-| `clienteId` | UUID | Quién pide el turno |
-| `profesionalId` | UUID | Quién lo atiende |
-| `especialidadId` | UUID | Categoría elegida |
-| `direccionServicio` | String | Dirección del domicilio. **No se envía al profesional hasta que acepta** (ver §10.4) |
-| `zonaAproximada` | String | Barrio y localidad. Es lo que ve el profesional mientras la solicitud está pendiente |
-| `descripcion` | String | Mínimo 20 caracteres, obligatorio |
-| `latitud` / `longitud` | Texto cifrado | Punto del servicio. Se guarda cifrado (AES-256-GCM) |
-| `fechaHoraPropuesta` | LocalDateTime | Turno pedido |
-| `fechaHoraFinPropuesta` | LocalDateTime | Fin estimado |
-| `estado` | Enum | `PENDIENTE` · `ACEPTADA` · `RECHAZADA` · `COMPLETADA` · `CANCELADA` · `VENCIDA` |
-| `motivoCancelacion` | String | Solo en `CANCELADA` |
-| `canceladaPor` | UUID | Quién canceló |
-| `fechaCreacion` / `fechaCambioEstado` | LocalDateTime | Auditoría del ciclo |
+| `id` | `UUID` | Primary Key. |
+| `clienteId` | `UUID` | Referencia lógica al cliente que solicita el servicio. |
+| `profesionalId` | `UUID` | Referencia lógica al profesional asignado. |
+| `especialidadId` | `UUID` | Especialidad técnica requerida. |
+| `direccionServicio` | `VARCHAR(255)` | Dirección exacta; oculta al profesional mientras esté en `PENDIENTE`. |
+| `zonaAproximada` | `VARCHAR(255)` | Barrio y localidad extraídos por geocodificación inversa. |
+| `descripcion` | `TEXT` | Detalle del problema técnico (mínimo 20 caracteres). |
+| `latitud` | `TEXT` | Latitud del domicilio cifrada con AES-256-GCM. |
+| `longitud` | `TEXT` | Longitud del domicilio cifrada con AES-256-GCM. |
+| `fechaHoraPropuesta` | `TIMESTAMP` | Inicio del turno acordado. |
+| `fechaHoraFinPropuesta` | `TIMESTAMP` | Fin estimado del turno. |
+| `estado` | `ENUM` | `PENDIENTE`, `ACEPTADA`, `RECHAZADA`, `COMPLETADA`, `CANCELADA`, `VENCIDA`. |
+| `motivoCancelacion` | `VARCHAR(500)` | Obligatorio si el estado es `RECHAZADA` o `CANCELADA`. |
+| `canceladaPor` | `UUID` | Identificador del usuario que canceló la solicitud. |
+| `fechaCreacion` | `TIMESTAMP` | Fecha de creación del pedido. |
+| `fechaCambioEstado`| `TIMESTAMP` | Fecha de última transición del ciclo de vida. |
 
-**Transiciones válidas** (validadas en `SolicitudService`):
+#### Entidades `Mensaje` y `Calificación`
+- **`Mensaje`:** `id` (`UUID`, PK), `solicitudId` (`UUID`), `emisorId` (`UUID`), `texto` (`TEXT`), `fechaEnvio` (`TIMESTAMP`).
+- **`Calificación`:** `id` (`UUID`, PK), `solicitudId` (`UUID`, única por solicitud), `puntaje` (`INTEGER`, 1 a 5), `comentario` (`VARCHAR(500)`), `fechaCalificacion` (`TIMESTAMP`).
 
-```
-PENDIENTE ──aceptar──▶ ACEPTADA ──completar──▶ COMPLETADA
-    │                     │
-    ├──rechazar──▶ RECHAZADA
-    └──cancelar──▶ CANCELADA ◀──cancelar── (desde ACEPTADA)
-```
-
-### 7.5 `ms-solicitudes` — Mensaje y Calificacion
-
-**Mensaje:** `id` (UUID, PK), `solicitudId` (UUID), `emisorId` (UUID), `texto`
-(String), `fechaEnvio` (LocalDateTime).
-
-**Calificacion:** `id` (UUID, PK), `solicitudId` (UUID, **única** — una
-calificación por solicitud), `puntaje` (Integer, 1-5), `comentario` (String),
-`fechaCalificacion` (LocalDateTime).
-
-### 7.6 Nota sobre los datos duplicados
-
-`Usuario.fotoUrl` y `Profesional.fotoUrl` existen ambos, y los dos guardan la
-**clave** del archivo, no una URL: la foto se pide por
-`GET /api/usuarios/{id}/foto` ([§10.4](#104-quién-ve-la-foto-de-quién)).
-`ms-usuarios` guarda la foto general de la persona y `ms-profesionales` la que se
-muestra en el padrón. No hay FK entre microservicios: la consistencia se resuelve
-en el BFF, que al enriquecer el listado busca el usuario y lo omite si no
-responde. Los listados devuelven `tieneFoto` (un booleano) y nunca la clave, para
-que no quede una ruta con la que pedirle la foto a cualquiera.
-
-
-## 8. Autenticación y autorización
-
-### 8.1 Flujo de login (OIDC Authorization Code + PKCE)
-
-```
-1. Usuario entra a /ingresar
-2. El guard redirectToKeycloak llama a AuthService.loginWithKeycloak()
-3. Se genera state + nonce aleatorios y se guardan en sessionStorage
-4. Se genera el code_verifier PKCE y su code_challenge (S256) con Web Crypto
-5. Redirección a Keycloak con response_type=code
-6. Keycloak autentica y vuelve a /?code=...&state=...
-7. handleCodeCallback() valida state, canjea el code por tokens
-8. Se guarda el access_token y el perfil en localStorage
-9. La app llama a /api/usuarios/por-keycloak con el sub del token
-10. El BFF vincula o recupera el usuario de negocio
-11. Mientras se verifica la cuenta, la SPA muestra una pantalla de carga; el
-  acceso al contenido y la comprobación legal esperan la respuesta.
-```
-
-La URL de **registro** de Keycloak se usa por separado
-(`openRegister()`, `auth.service.ts:107`): los clientes se auto-gestionan y los
-profesionales se registran con el email que cargó el administrador.
-
-**Protecciones aplicadas:** `state` y `nonce` aleatorios de 16 bytes
-(`crypto.getRandomValues`), PKCE S256 obligatorio (el realm lo exige vía
-`pkce.code.challenge.method: S256`), y validación de `state` en el callback.
-
-### 8.2 Validación del token en el BFF
-
-`SecurityConfig` monta un **OAuth2 Resource Server** stateless
-(`SessionCreationPolicy.STATELESS`). El `JwtDecoder` (`SecurityConfig.java:157`)
-valida:
-
-1. **Firma** contra el JWKS de Keycloak (`KEYCLOAK_JWK_SET_URI`), con rotación
-   de claves automática.
-2. **Emisor**: un validador custom acepta solo tokens cuyo `iss` contenga
-   `/realms/vincula-up` (`SecurityConfig.java:160-166`). Rechaza cualquier
-   token de otro realm, aunque tenga firma válida.
-
-Los roles se leen de tres claims a la vez (`roles`, `realm_access.roles` y
-`role`) y se mapean a `ROLE_*` para Spring Security. Se cubren así las variantes
-de emisión de token entre versiones de Keycloak.
-
-### 8.3 RBAC: 27 reglas
-
-`SecurityConfig.securityFilterChain()` declara las reglas en orden de
-especificidad. Resumen:
-
-| Ámbito | Reglas |
-|---|---|
-| Público | `GET /api/profesionales`, `GET /api/calificaciones`, `GET /api/especialidades`, `GET /api/gps`, `GET /actuator/health`, `OPTIONS /**` |
-| ADMIN | Listar/crear/editar/borrar usuarios, alta y edición de profesionales, desactivar/reactivar, CRUD de especialidades, `GET /api/solicitudes/panel`, `GET /api/usuarios/por-email` |
-| PROFESIONAL | `POST /api/profesionales/activar`, `mi-perfil`, `vincular`, `PUT .../disponibilidad`, `GET /api/mi-reputacion`, aceptar y rechazar solicitudes |
-| CLIENTE | `POST /api/solicitudes`, `POST /api/solicitudes/{id}/calificacion` |
-| Cualquiera de los dos | `PATCH .../completar`, `PATCH .../cancelar` |
-| Solo autenticado | `/api/solicitudes/mias`, mensajes, leer calificación, ver disponibilidad ajena, ficha de la contraparte |
-
-**No hay borrado físico del padrón**: la baja es lógica (desactivar), para
-conservar el historial de solicitudes.
-
-Además del RBAC por ruta, el BFF corta a las cuentas `SUSPENDIDO` en
-`requireActive()` antes de ejecutar cualquier operación de negocio, y resuelve la
-identidad del actor desde el token (ver [§3](#el-bff-y-por-qué-existe)).
-
-### 8.4 Alta del profesional sin auto-registro
-
-Este es el punto más delicado del modelo de roles, y merece su propio
-apartado. La secuencia real es:
-
-1. El **admin** da de alta un profesional con `POST /api/profesionales/alta`.
-2. El BFF crea la cuenta en **Keycloak** (usuario = correo) con el rol
-   `PROFESIONAL` y una **contraseña temporal** (`temporary = true` +
-   `UPDATE_PASSWORD`): el profesional **no se registra**, ya tiene cuenta.
-3. El BFF registra el usuario en `ms-usuarios` (`rolNegocio = PROFESIONAL`, ya
-   vinculado a su `keycloakId`) y el perfil `CARGADO` en `ms-profesionales`.
-4. El BFF manda por correo el usuario y la contraseña temporal. Esa contraseña
-   **no vence**: si el profesional entra una semana, un mes o un año después, el
-   primer login le exige cambiarla (`UPDATE_PASSWORD`) y recién ahí entra.
-5. El profesional **activa su perfil** (foto, zona de cobertura y horarios).
-
-**Por qué una contraseña temporal y no un enlace con vencimiento.** El enlace de
-un correo de Keycloak (`execute-actions-email`) caduca —por defecto a las 12
-horas— y obligaría a reenviarlo. La contraseña temporal, en cambio, espera lo que
-haga falta y se invalida sola en el primer ingreso: es la opción más tolerante
-para el caso real, donde el profesional puede tardar meses en activar.
-
-**Restricción de seguridad:** la asignación de rol sólo puede ser `CLIENTE` →
-`PROFESIONAL`. **Nunca otorga `ADMIN`**: el rol administrativo no se propaga
-desde el padrón.
-
-**Qué pasa con los prerregistros antiguos.** Antes el profesional se
-auto-registraba en Keycloak y el BFF lo promovía en su primer login
-(`keycloakAdmin.promoverAProfesional()`). Ese camino se conserva como red de
-seguridad para las cuentas que hayan quedado en ese estado:
-`sincronizarRolProfesional()` (`ApiController.java`) sigue promoviendo
-`CLIENTE → PROFESIONAL` si la fila del padrón dice `PROFESIONAL` y el token
-todavía dice `CLIENTE`. Tampoco otorga `ADMIN`.
-
-**La otra mitad: qué pasa cuando la fila no existe.** Si alguien entra y no hay
-fila en el padrón, el rol sale del token ([§2](#2-roles-del-mvp)). Esto cubre el
-caso del **administrador institucional**: su cuenta la crea el administrador de
-Keycloak, no el padrón, así que si el auto-alta no respetara el token quedaría
-trancado —nada en la aplicación crea un `ADMIN`— y el panel `/admin` sería
-inalcanzable aunque el backend lo autorizara.
-
-`SEMBRAR_DEMO=true` siembra las tres cuentas de prueba (`cliente@`,
-`profesional@`, `admin@`) con su rol ya asignado, así el padrón y el panel
-funcionan desde el primer arranque ([§16-bis](#16-bis-datos-de-demostración)).
-
-### 8.5 Aceptación de los términos y condiciones
-
-El alta de cuentas la hace Keycloak, así que la aceptación se pide **después** del
-primer ingreso, no en un formulario propio.
-
-**Dónde se guarda.** Dos columnas en `usuarios`:
-
-| Columna | Qué guarda |
-|---|---|
-| `terminos_version` | La versión del documento que aceptó (máx. 32 caracteres) |
-| `terminos_aceptado_en` | Cuándo |
-
-Ambas nullable, igual que `estado`: las cuentas anteriores quedan como "no aceptó"
-y el sistema se los pide. El texto vive en el frontend (`legal/terminos/terminos.ts`),
-que es lo único que define qué versión está vigente.
-
-**El flujo:**
-
-1. La app muestra una pantalla de carga mientras consulta `GET /api/usuarios/yo`
-  y lee los tres campos.
-2. Solo después de que responda el backend, si la versión guardada no es la
-  vigente, `terminosPendientes` es `true`.
-3. Aparece un modal montado en `app.html`, **sin botón de cerrar**. Si la consulta
-  falla, el modal no aparece y la pantalla de carga ofrece reintentar.
-4. Al marcar el casillero, `PATCH /api/terminos/aceptar` guarda versión y fecha.
-
-**Por qué es un modal y no un guard.** Es una capa sobre toda la aplicación, no
-una pantalla: escribir una URL no lo esquiva, y tampoco navegar. La única forma de
-salir es aceptar. Mientras el backend no responde, la aplicación muestra una capa de
-animación de inicio de sesión y verificación de credenciales (`app-auth-loading`):
-primero se consulta la cuenta (`GET /api/usuarios/yo`) de forma disimulada y, si
-los términos no están aceptados, se despliega el modal sin parpadeos para quienes ya
-los aceptaron.
-
-**El id sale del token.** El endpoint no acepta un id en el cuerpo; si lo
-aceptara, cualquiera con su propia sesión podría registrar la aceptación en la
-cuenta de otro.
-
-**Si falla el registro, el modal no se cierra.** El estado solo cambia a aceptado
-cuando la llamada volvió bien.
-
-**Limitación conocida:** el realm tiene `verifyEmail: false`. Quien se
-auto-registra con un correo que ya tiene fila de negocio queda vinculado a esa
-fila y toma su rol. Con el alta nueva eso casi no puede pasar (la cuenta de
-Keycloak ya existe, así que no hay segunda auto-registración), pero sí con las
-cuentas antiguas ([§16](#16-deuda-técnica-conocida)).
-
-### 8.6 Configuración del realm
-
-`keycloak/import/vincula-up-realm.json`:
-
-| Propiedad | Valor |
-|---|---|
-| `realm` | `vincula-up` |
-| `registrationAllowed` | `true` (auto-registro de clientes) |
-| `registrationEmailAsUsername` | `true` — **el registro pide solo el correo**, que además queda como nombre de usuario interno |
-| `loginWithEmailAllowed` | `true` — se accede con el email, sin nombre de usuario aparte |
-| `duplicateEmailsAllowed` | `false` |
-| `resetPasswordAllowed` | `true` (requiere SMTP configurado) |
-| `verifyEmail` | `false` |
-| `sslRequired` | `none` (el TLS lo termina nginx) |
-| Roles de realm | `CLIENTE`, `PROFESIONAL`, `ADMIN` |
-
-> **Por qué `registrationEmailAsUsername`.** La aplicación se identifica por
-> correo, y el email es además la identidad con la que el backend vincula la
-> cuenta. Pedir un "nombre de usuario" aparte obligaba a inventarse un alias que
-> nadie recordaba, y terminaba siendo el correo otra vez pero escrito distinto
-> (`juan.perez` vs `juan.perez@gmail.com`), que es justamente la forma de romper
-> el vínculo. Con esta opción, Keycloak oculta el campo del formulario y usa el
-> correo como `username` interno: el identificador técnico sigue existiendo
-> (Keycloak lo necesita para todo) pero la persona nunca lo ve ni lo escribe.
->
-> No obliga a migrar nada: las cuentas de demostración del import ya tienen
-> `username` igual a `email`. Para aplicar el cambio sobre un realm que ya está
-> corriendo, `scripts/{linux-macos,windows}/keycloak-bootstrap.*` lo actualizan de
-> forma idempotente ([§14.1](#141-keycloak-bootstrap-sh--ps1)).
-
-**Recuperación de contraseña.** El login ofrece «¿Olvidaste tu contraseña?» y
-Keycloak recibe el correo y emite el enlace de recuperación con caducidad; la
-persona define la nueva clave en el formulario del tema `vincula-up`. No se
-mantiene una ruta de restablecimiento paralela en Angular ni en el BFF. El flujo
-requiere SMTP operativo en el realm: el bootstrap configura esos valores desde
-`KEYCLOAK_SMTP_*` en `.env`. En la revisión del 2026-11-01, las variables locales
-de usuario, contraseña y remitente estaban configuradas y se verificó el render
-del enlace y del formulario; no se envió un correo de prueba.
-
-**Notificaciones web de solicitudes y chat.** La navbar muestra una bandeja Angular
-para clientes y profesionales. El servicio consulta `/api/solicitudes/mias` cada
-30 segundos, compara estados con el snapshot por cuenta y crea un aviso cuando
-detecta una transición. Para solicitudes aceptadas también consulta los mensajes,
-detecta IDs nuevos y avisa por mensajes entrantes; la primera consulta inicializa
-el snapshot sin notificar mensajes históricos. Los IDs vistos se guardan por
-cuenta y solicitud en `localStorage`.
-
-El chat abierto actualiza sus mensajes por WebSocket/STOMP en tiempo real. La
-conexión solo permanece activa mientras el diálogo está abierto; al cerrarlo se
-desconecta. La identidad propia compara `usuarioId` y el `sub` de Keycloak para
-reconocer también mensajes históricos guardados con cualquiera de esas identidades.
-Los mensajes propios y ajenos se alinean y colorean de forma distinta. Las fechas
-de solicitudes (tarjetas, estado y encabezado del chat) y el resumen del turno
-nuevo se presentan como `dd/mm/aa`. El sello de la primera conversación de cada
-día incluye fecha `dd/mm/aa` y hora `HH:mm`; los mensajes siguientes muestran solo
-la hora. Las fechas de la bandeja de notificaciones también usan `dd/mm/aa`. El
-modelo conserva fecha ISO para ordenar correctamente. El sondeo de mensajes se
-conserva como mecanismo para las notificaciones cuando el chat está cerrado.
-
-Mientras la conversación correspondiente está abierta, los mensajes recibidos se
-marcan vistos sin crear notificación; al cerrar el chat se sincroniza el snapshot
-para evitar alertas tardías de mensajes ya leídos. Los mensajes propios tampoco
-generan avisos. El historial y el estado leído/no leído se guardan en `localStorage`.
-Cada aviso de chat identifica al remitente con su nombre y apellido, además de
-mostrar una vista previa del texto. En móvil el panel de notificaciones queda fijo
-al viewport, por encima de la barra inferior de navegación.
-
-La aplicación declara un manifest PWA y registra un service worker. Si la persona
-concede permiso, se usa la Notification API para mostrar el aviso del sistema.
-Los avisos de cambio de estado aparecen cuando la pestaña está en segundo plano;
-los de mensaje pueden aparecer también en primer plano si el chat de esa solicitud
-no está abierto. El clic abre `/solicitudes`.
-
-**Límite de esta fase:** no hay suscripción ni servidor Web Push. El navegador no
-puede entregar cambios hechos por otra persona cuando la aplicación está cerrada
-o el service worker está detenido; el sondeo solo funciona mientras hay una página
-abierta. El push real requiere guardar suscripciones y un emisor backend con VAPID,
-además de gestionar expiración y revocación.
-
-**Clientes:**
-
-| Client | Tipo | Uso |
-|---|---|---|
-| `vincula-up-public` | Público | App Angular. PKCE S256 obligatorio, redirect URIs para `localhost`, `:4200` y `vincula-up.local`, `directAccessGrantsEnabled` (lo usa la verificación de la API con `curl`) |
-| `vincula-up-admin` | Confidencial | Service account del BFF para promover roles. Sin `standardFlowEnabled` ni `directAccessGrantsEnabled` |
-
-> **El realm se importa solo la primera vez.** Como Keycloak persiste en
-> Postgres, los cambios posteriores al JSON no se aplican solos: hay que correr
-> `scripts/linux-macos/keycloak-bootstrap.sh` (o `.ps1` en Windows) — ver
-> [§14](#14-scripts-operativos).
-
-> **Los textos del import van cortos: 255 caracteres es el techo.** Las columnas
-> de texto de Keycloak 26.x en Postgres son `varchar(255)`. Si un campo del JSON
-> (por ejemplo el `description` de un client) lo supera, el import **falla
-> entero** con `ERROR: value too long for type character varying(255)`,
-> Keycloak aborta la transacción, no arranca y entra en un **loop de reinicios**
-> (`restartCount` creciendo, `exitCode=1` en los logs del contenedor). El síntoma
-> desde el host es que `http://localhost:8080` reinicia la conexión y el BFF se
-> queda sin issuer. La explicación larga de por qué `https://*` está en los
-> `redirectUris` vive en `keycloak/import/README.md`, no en el `description` del
-> client. Detalle en [§16.1](#161-prioridad-alta).
+### 9.4 Consistencia de claves de fotos
+Ambos modelos (`Usuario` y `Profesional`) guardan en `fotoUrl` la **clave interna** (`perfiles/<uuid>.jpg`) del archivo alojado en el volumen privado `fotos_data`. Los endpoints de consulta devuelven un booleano `tieneFoto` en lugar de la clave o ruta directa, evitando la exposición no autorizada de archivos.
 
 ---
 
-## 9. Los tres flujos completos
+## 10. Autenticación, autorización y seguridad
 
-### 9.1 Cliente: pedir un turno
+### 10.1 Flujo de login (OIDC Authorization Code + PKCE)
 
-Ruta `/solicitar`, en **6 pasos** (`request.ts`):
+1. El usuario navega a `/ingresar`.
+2. El guard `redirectToKeycloak` invoca `AuthService.loginWithKeycloak()`.
+3. Se generan `state` y `nonce` criptográficos aleatorios de 16 bytes (`crypto.getRandomValues`).
+4. Se crea el `code_verifier` PKCE y su hash `code_challenge` mediante SHA-256 (`S256`) con Web Crypto API.
+5. Redirección a Keycloak con `response_type=code` y parámetros PKCE.
+6. Keycloak autentica al usuario y redirige a la URL de callback con el código de autorización.
+7. `handleCodeCallback()` valida el `state`, canjea el código por tokens mediante petición POST al endpoint de tokens de Keycloak.
+8. Se almacenan de forma segura el `access_token` y el perfil en `localStorage`.
+9. La SPA invoca `GET /api/usuarios/por-keycloak` enviando el Bearer token con el `sub`.
+10. El BFF vincula o recupera el usuario de negocio y devuelve el perfil completo con `rolNegocio`.
 
-| Paso | Qué hace | Validación |
-|---|---|---|
-| 1. **Ubicación** | Escribe la dirección o la marca en el mapa. Se geocodifica a coordenadas | Obligatorio. La dirección exacta se difiere hasta que el profesional acepta |
-| 2. **Categoría** | Elige una especialidad con al menos un profesional activo | Obligatorio; el catálogo se filtra para no ofrecer categorías sin profesionales |
-| 3. **Problema** | Describe brevemente el trabajo solicitado | Obligatorio; mínimo 10 caracteres |
-| 4. **Día** | Elige una fecha desde hoy hasta los próximos seis días; cada opción muestra el día de semana y el día del mes | Obligatorio |
-| 5. **Horario** | Elige una franja horaria | Obligatorio |
-| 6. **Profesional** | Elige entre los profesionales de esa categoría y ordena por cercanía o reputación | Obligatorio |
+### 10.2 Validación del token en el BFF y Resource Servers
 
-Al enviar: se valida en `ms-solicitudes` que el profesional esté `ACTIVO` y que
-haya cobertura para las coordenadas del servicio. La solicitud nace `PENDIENTE`.
-El wizard indica visualmente los seis pasos y, si se intenta abandonar `/solicitar`
-antes del envío, pide confirmación para evitar perder lo completado. Las consultas
-de categorías/profesionales y el envío muestran el spinner de Angular Material.
+`SecurityConfig` en el BFF configura un **OAuth2 Resource Server stateless**:
+- **Validación de firma:** Comprueba la firma del JWT contra el conjunto de claves públicas JWKS de Keycloak (`KEYCLOAK_JWK_SET_URI`).
+- **Validación de emisor:** Rechaza cualquier token cuyo claim `iss` no contenga `/realms/vincula-up`.
+- **Mapeo de roles:** Lee los roles desde `roles`, `realm_access.roles` y `role`, mapeándolos al formato `ROLE_<ROL>` en el contexto de Spring Security.
+- **Microservicios de dominio:** `ms-usuarios`, `ms-profesionales` y `ms-solicitudes` también incorporan `spring-boot-starter-oauth2-resource-server` y validan el token independientemente en la red interna de Docker.
 
-**Chat y calificación.** En `/solicitudes` el cliente ve el estado, escribe
-mensajes dentro de cada solicitud, cancela mientras siga `PENDIENTE` y, cuando el
-trabajo está `COMPLETADA`, califica con estrellas y comentario (una sola vez).
+### 10.3 RBAC: 27 reglas
 
-### 9.2 Profesional: activar perfil y gestionar solicitudes
-
-**Activación en 3 pasos** (ruta `/activar-perfil`):
-
-1. **Foto de perfil** — se lee la imagen y se muestra la previsualización
-   (funciona también al volver desde la selección de ubicación).
-2. **Zona GPS** — marca el centro y el radio de cobertura en km.
-3. **Horarios semanales** — define franjas por día de la semana.
-
-Al completar, el perfil pasa de `CARGADO` a `ACTIVO` y queda visible en el
-padrón. Un profesional sin activar es redirigido a esta pantalla por el guard
-`requireRequestsAccess`.
-
-**Gestión de solicitudes** (misma pantalla `/solicitudes`, con el contenido
-filtrado por rol):
-
-- **Aceptar** — la dirección exacta del servicio se le revela en ese momento.
-- **Rechazar** — pide un motivo obligatorio.
-- **Completar** — marca el trabajo como terminado (lo puede hacer cualquiera de
-  las dos partes).
-- **Cancelar** — con motivo, registrando quién canceló (`RolCancelacion`).
-
-### 9.3 Administrador: padrón, categorías y clientes
-
-Shell propio (`/admin`) con 4 pantallas:
-
-| Pantalla | Qué hace |
+| Ámbito | Endpoints y Reglas |
 |---|---|
-| **Resumen** | Indicadores de demanda y recorrido de las solicitudes, sobre datos reales de `GET /api/solicitudes/panel` |
-| **Profesionales** | Padrón completo, alta de profesionales y detalle |
-| **Categorías** | CRUD de especialidades |
-| **Clientes** | Listado y detalle con edición de datos y gestión del acceso |
+| **Público** | `GET /api/profesionales`, `GET /api/calificaciones`, `GET /api/especialidades`, `GET /api/gps`, `GET /actuator/health`, `OPTIONS /**` |
+| **ADMIN** | `GET /api/usuarios`, `POST /api/usuarios`, `PATCH /api/usuarios/{id}`, `PATCH /api/usuarios/{id}/suspender`, `PATCH /api/usuarios/{id}/reactivar`, `DELETE /api/usuarios/{id}`, `POST /api/profesionales`, `POST /api/profesionales/alta`, `PUT /api/profesionales/{id}`, `PATCH /api/profesionales/{id}/suspender`, `PATCH /api/profesionales/{id}/reactivar`, CRUD `/api/especialidades/**`, `GET /api/solicitudes/panel`, `GET /api/usuarios/por-email` |
+| **PROFESIONAL** | `POST /api/profesionales/activar`, `GET /api/profesionales/mi-perfil`, `POST /api/profesionales/vincular`, `PUT /api/profesionales/{id}/disponibilidad`, `GET /api/mi-reputacion`, `PATCH /api/solicitudes/{id}/aceptar`, `PATCH /api/solicitudes/{id}/rechazar` |
+| **CLIENTE** | `POST /api/solicitudes`, `POST /api/solicitudes/{id}/calificacion` |
+| **Cualquiera de los dos** | `PATCH /api/solicitudes/{id}/completar`, `PATCH /api/solicitudes/{id}/cancelar` |
+| **Solo Autenticado** | `GET /api/solicitudes/mias`, historial de mensajes, envío de mensajes por chat, ver disponibilidad ajena, `GET /api/usuarios/{id}` |
 
-El alta de un profesional usa `POST /api/profesionales/alta`, que en un solo
-paso crea la cuenta de Keycloak con contraseña temporal, el usuario de negocio y
-su perfil pendiente (ver
-[§8.4](#84-alta-del-profesional-sin-auto-registro)).
+### 10.4 Alta del profesional sin auto-registro
 
-**El flujo de las pantallas de detalle: entrar a consultar, y adentro
-modificar.** Las dos listas (profesionales y clientes) muestran **una sola acción
-por fila: "Consultar"**. El detalle que se abre tiene, en orden:
+1. El Administrador carga los datos en `/admin/profesionales/nuevo` (`POST /api/profesionales/alta`).
+2. El BFF crea la cuenta en Keycloak con el rol `PROFESIONAL` y una **contraseña temporal** (`temporary: true`, `requiredActions: ["UPDATE_PASSWORD"]`).
+3. El BFF registra la entidad en `ms-usuarios` (`rolNegocio = PROFESIONAL`) y el perfil en `ms-profesionales` con estado `CARGADO`.
+4. El BFF envía un correo transaccional al profesional informando usuario, contraseña temporal y pasos de activación.
+5. Al primer ingreso, Keycloak fuerza el cambio obligatorio de contraseña (`UPDATE_PASSWORD`).
+6. El profesional activa su perfil completando foto, zona y horarios (`POST /api/profesionales/activar`), pasando su estado a `ACTIVO`.
 
-1. **Consultar** — los datos, solo lectura.
-2. **Modificar** — los campos editables (legajo y especialidades en el padrón;
-   nombre, apellido y teléfono en el cliente). El email no se edita: es la
-   identidad con la que la persona accede a su cuenta.
-3. **Acceso** — al pie, separado con un borde y aire, el botón de **desactivar** o
-   **reactivar**, que siempre pide confirmación.
+### 10.5 Aceptación de los términos y condiciones
 
-**Por qué las acciones sensibles están adentro.** En una lista, un botón rojo
-junto a cada nombre queda a un clic de distancia y se aprieta sin querer. Meterlo
-en el detalle obliga a abrir la ficha de esa persona concreta: el que va a
-desactivar a alguien ya sabe a quién.
+La aceptación se solicita tras el primer ingreso exitoso a la aplicación:
+- La SPA consulta `GET /api/usuarios/yo`. Si el campo `terminos_version` no coincide con la versión vigente (`VERSION_TERMINOS`), se despliega una capa modal sobre `app.html` **sin botón de cierre**.
+- Al confirmar, `PATCH /api/terminos/aceptar` registra la versión y la marca temporal. La identidad se toma siempre del token JWT.
 
-**Una sola palabra para la misma acción.** Los dos paneles usan
-desactivar/reactivar (el de clientes ya lo decía; el de profesionales decía
-"suspender"). "Suspender" suena más técnico y cuesta más entender sin contexto. El
-estado interno sigue siendo `SUSPENDIDO` y el endpoint `/suspender`: eso es la
-API, no la interfaz.
+### 10.6 Configuración del realm
 
-**No se expone "eliminar".** Existe `DELETE /api/usuarios/{id}` y borra de verdad,
-con historial de solicitudes y calificaciones colgando. Con ese historial, un
-borrado accidental no se recupera, así que la interfaz no lo ofrece.
-
-**Sobre el directorio.** El cliente no ve un padrón suelto: busca y elige
-profesional en el paso 4 de `/solicitar`, un flujo guiado que consume el mismo
-endpoint público `GET /api/profesionales`. Esa ruta sigue siendo pública, que es
-lo que garantiza que el cliente pueda buscar sin sesión.
+- `realm`: `vincula-up`
+- `registrationAllowed`: `true` (auto-registro de clientes).
+- `registrationEmailAsUsername`: `true` (el correo electrónico se utiliza como nombre de usuario interno).
+- `loginWithEmailAllowed`: `true`.
+- `duplicateEmailsAllowed`: `false`.
+- `resetPasswordAllowed`: `true` (recuperación de contraseña vía SMTP).
+- `verifyEmail`: `true` (confirmación obligatoria por correo para clientes).
+- `sslRequired`: `none` (terminación TLS delegada en Nginx).
 
 ---
 
+## 11. Ubicaciones: geocodificación, cifrado y fotos
 
+### 11.1 Geocodificación con OpenStreetMap / Nominatim
 
-## 10. Ubicaciones: geocodificación, cifrado y fotos
+- Implementada en `GeocodingClient` de `ms-solicitudes` y expuesta por el BFF en `/api/gps`.
+- Entrada de dirección en texto con extracción de coordenadas precisas; soporte para geocodificación inversa detallada (`reverseGeocode`).
+- **Caché en memoria LRU de 500 direcciones con TTL de 10 minutos** para respetar la política de uso de 1 req/s de OSM.
+- Detección precisa de hardware GPS en frontend mediante Geolocation API (`enableHighAccuracy: true`, `timeout: 15s`).
 
-### 10.1 Geocodificación
+### 11.2 Cifrado de ubicaciones en reposo (AES-256-GCM)
 
-`GET /api/gps?direccion=...` es público y consulta **Nominatim (OpenStreetMap)**.
+Las coordenadas geográficas se cifran a nivel de aplicación en:
+- `solicitudes.latitud` y `solicitudes.longitud` (`ms-solicitudes`).
+- `profesionales.zona_cobertura_lat` y `profesionales.zona_cobertura_lng` (`ms-profesionales`).
+- Cifrado simétrico AES-256-GCM con vector de inicialización (IV) de 12 bytes aleatorio (`base64(iv || ciphertext)`). Dos coordenadas idénticas producen cadenas cifradas completamente diferentes.
+- Clave de 32 bytes configurada en la variable `UBICACIONES_CLAVE`.
 
-**Hay una sola implementación**, en el `GeocodingClient` de `ms-solicitudes`.
-El BFF expone el endpoint público y proxea a `GET /solicitudes/geocodificar`
-mediante `BackendGateway.geocodificar()`. La duplicación de la lógica, con
-timeouts distintos entre el controlador y el microservicio, hacía imposible saber
-cuál de los dos rigiera el resultado: una implementación única con caché y rate
-limiting hace que el comportamiento sea predecible.
+### 11.3 Almacenamiento de fotos y volúmenes
 
-**Respuesta** (siempre 200, con campos duplicados por compatibilidad):
+- Las fotos de perfil se almacenan como archivos binarios fuera de PostgreSQL en el volumen Docker `fotos_data`.
+- Flujo: El frontend sube el binario a `POST /api/fotos` (`multipart/form-data`); el BFF valida tamaño (máximo 2 MB en `STORAGE_MAX_BYTES`) y tipo MIME (`image/jpeg`, `image/png`, `image/webp`), escribe el archivo en el volumen (`/data/fotos/perfiles/<uuid>.jpg`) y devuelve la clave al frontend.
+- Los microservicios solo almacenan la clave. El BFF es el único componente que interactúa con el sistema de archivos.
 
-| Campo | Descripción |
-|---|---|
-| `resolved` | `true` si se resolvió a coordenadas |
-| `latitude` / `longitude` | Coordenadas (null si no se resolvió) |
-| `latitud` / `longitud` | Alias del mismo valor |
-| `address` | Dirección normalizada que devuelve Nominatim |
-| `source` | `nominatim-osm` · `nominatim-empty` · `empty-query` · `nominatim-error` · `nominatim-parse` · `servicio-no-disponible` |
-| `error` | Mensaje legible, solo si no se resolvió |
+### 11.4 Quién ve la foto de quién
 
-**Caché en memoria con TTL de 10 minutos**, LRU acotada a 500 direcciones. Solo
-se cachean los aciertos: un fallo por red puede ser transitorio y no conviene
-repetirlo durante 10 minutos. El frontend geocodifica mientras la persona escribe
-y vuelve a pedir la misma dirección al elegir el punto del mapa, así que la caché
-evita consultas repetidas contra un proveedor que limita a 1 req/s.
+Las fotos son privadas y se sirven bajo autorización en `GET /api/usuarios/{id}/foto`:
 
-**Degradación en dos capas.** Si Nominatim falla, `ms-solicitudes` devuelve
-`resolved: false` con un mensaje. Si además `ms-solicitudes` no responde, el BFF
-devuelve lo mismo con `source: servicio-no-disponible` en vez de cortar con 502:
-una falla del backend de solicitudes no debe dejar sin geocodificar a toda la
-app. En ninguno de los dos casos se lanza excepción.
-
-### 10.2 Cifrado de ubicaciones
-
-Las coordenadas se cifran **en reposo** con **AES-256-GCM**, en la capa de
-aplicación (no es cifrado de disco de Postgres). Afecta a:
-
-| Servicio | Columnas |
-|---|---|
-| `ms-solicitudes` | `solicitudes.latitud`, `solicitudes.longitud` — ubicación del domicilio del cliente |
-| `ms-profesionales` | `profesionales.zona_cobertura_lat`, `profesionales.zona_cobertura_lng` |
-
-**Cómo funciona.** `CifradorUbicaciones` cifra al escribir y descifra al leer, de
-forma transparente para services y DTOs. Como las entidades no son beans de
-Spring, el cifrado se inyecta con un holder estático que el propio `CifradorUbicaciones`
-registra en un `@PostConstruct`. El resultado es `base64(iv || cifrado)`, con el
-IV aleatorio de 12 bytes al principio: dos coordenadas iguales producen textos
-distintos, así que no se puede deducir que dos vecinos están en el mismo punto.
-
-**Configuración.** Clave de 32 bytes en Base64 en `UBICACIONES_CLAVE`, **compartida
-por los dos servicios** (si difieren, cada uno descifra lo que el otro cifró):
-
-```bash
-openssl rand -base64 32    # genera una
-```
-
-Sin la variable los servicios arrancan igual y registran un aviso, guardando en
-claro: preferible eso a no dejar trabajar en desarrollo.
-
-**Qué protege y qué no.** Un dump de la base no expone ubicaciones. **No** protege
-contra un usuario con sesión que ve las coordenadas por la API, porque la API las
-devuelve descifradas: es lo que permite que el orden por cercanía se calcule en el
-navegador.
-
-**Consecuencia a tener en cuenta.** Las columnas cifradas no admiten consultas
-espaciales: no hay `WHERE latitud BETWEEN ...` ni orden por cercanía en SQL. Hoy
-eso no rompe nada porque el radio de cobertura se persiste pero no se usa para
-filtrar, y la distancia se calcula en el cliente. Si alguna vez hace falta
-filtrar por distancia en SQL, hay que agregar una columna en claro deliberada.
-
-**Compatibilidad.** Si el texto guardado no es un ciphertext válido —por ejemplo,
-un valor en claro de una base anterior— se interpreta como número en lugar de
-fallar.
-
----
-
-### 10.3 Almacenamiento de fotos
-
-Las fotos **no se guardan en PostgreSQL**: viven fuera de la base, en el volumen
-Docker `fotos_data`, y ahí solo se conserva la **clave** del archivo
-(`perfiles/<uuid>.jpg`).
-
-**Flujo completo:**
-
-```
-1. El usuario elige una imagen → previsualización local (data URL, no se envía)
-2. El frontend sube el archivo con POST /api/fotos (multipart/form-data)
-3. El BFF valida tipo y tamaño, lo escribe en el volumen y devuelve { key }
-4. El frontend manda esa clave a /api/profesionales/activar o /api/usuarios/yo
-5. El microservicio guarda la clave (512 caracteres)
-```
-
-**Por qué el BFF y no cada microservicio:** evita duplicar el cliente de
-almacenamiento en dos servicios, y el BFF ya es quien valida sesión y rol. Los
-servicios de dominio solo reciben la clave: nunca ven el archivo.
-
-**Una sola implementación (`FotoStorageLocal`).** No hay bucket ni servicio de
-objetos: el stack no usa ninguno. La interfaz `FotoStorage` queda con un método
-de escritura y uno de lectura, lo que deja el punto de extensión si alguna vez
-hacía falta otro backend.
-
-### 10.4 Quién ve la foto de quién
-
-Las fotos de perfil **no son públicas**. No existe ninguna URL de foto: el
-frontend nunca recibe una ruta, solo el `usuarioId` del dueño y un booleano
-`tieneFoto`. La imagen se pide a `GET /api/usuarios/{id}/foto`, que exige sesión
-y aplica esta matriz antes de devolver los bytes:
-
-| mi rol \ foto del otro | `CLIENTE` | `PROFESIONAL` | `ADMIN` |
+| Rol del solicitante \ Foto de: | `CLIENTE` | `PROFESIONAL` | `ADMIN` |
 |---|---|---|---|
-| **`CLIENTE`** | no | sí | no |
-| **`PROFESIONAL`** | sí | no | no |
-| **`ADMIN`** | sí | sí | no |
+| **`CLIENTE`** | No | **Sí** | No |
+| **`PROFESIONAL`** | **Sí** | No | No |
+| **`ADMIN`** | **Sí** | **Sí** | No |
 
-Más la **propia**, que siempre se ve. Traducido: un cliente ve las fotos de los
-profesionales (los elige y agenda con ellos), un profesional ve las de los
-clientes (coordinan el turno) y el administrador ve las de ambos, pero nadie ve
-las de su propio rol ni las de otro administrador.
+*Nota: La foto propia siempre es visible para el propio usuario.*
 
-**Por qué el BFF y no nginx.** nginx puede servir un volumen como estático, con
-`Cache-Control: public` y 30 días de caché: cualquiera con la URL descargaría la
-foto de cualquiera y un proxy compartido la guardaría. Por eso `nginx` **no monta**
-el volumen `fotos_data`; el BFF es el único que lo lee. Responde con
-`Cache-Control: private, no-cache` más un
-`ETag`, así el navegador revalida en vez de re-descargar y nada queda en cachés
-compartidos.
+### 11.5 Privacidad de la dirección del cliente
 
-**Por qué `403` y no `404`.** "No existe" y "no te corresponde" son respuestas
-distintas a la misma pregunta y distinguen cuentas que existen de las que no. Se
-acepta el costo: los identificadores son UUID, así que no se adivinan, y no se
-filtra ningún dato sensible — solo que ese rol no puede ver esa foto.
-
-**En el frontend.** Un `<img src>` no manda el header `Authorization`, así que la
-imagen no puede pedirse con la etiqueta. El `FotoService` la pide con
-`HttpClient`, cachea los blobs por usuario y devuelve una URL `blob:`. El
-`vu-avatar` es el único lugar que lo usa: recibe `usuarioId` + `tieneFoto` en vez
-de una URL, así que las ocho pantallas que muestran fotos no cambian al pasar de
-URL a endpoint.
-
-**Límites:** 2 MB por imagen (`STORAGE_MAX_BYTES`) y solo JPEG, PNG o WebP — SVG
-queda excluido a propósito, porque es XML ejecutable. Las claves se generan con
-`UUID` y usan el prefijo `perfiles/`: usar el nombre original permitiría
-colisiones y rutas manipulables con `../` (la lectura normaliza el path y
-rechaza el que salga del volumen). `nginx` sube `client_max_body_size` a 3 m: ya
-no necesita el margen que exigía el base64.
-
-**Eliminación de datos:** las fotos que estaban en base 64 en versiones previas se
-descartaron. Las filas que guardaban la URL pública completa
-(`/fotos/perfiles/x.jpg`) se normalizan quitando el prefijo; el BFF acepta ambas
-formas, así que una base existente no necesita migración.
-### 10.5 Privacidad de la dirección del cliente
-
-El domicilio del cliente **no se le muestra al profesional hasta que acepta el turno**.
-
-| Estado | Cliente | Profesional | Admin |
+| Estado de la solicitud | Cliente | Profesional | Administrador |
 |---|---|---|---|
-| `PENDIENTE` | Su dirección completa | **Zona** (barrio y localidad) + punto redondeado a ~1,1 km | Todo (panel) |
-| `ACEPTADA` en adelante | Su dirección completa | Dirección completa y coordenadas exactas | Todo |
-
-**Por qué la zona y no nada.** El profesional necesita poder decidir: si el trabajo le queda muy lejos o si la zona le resulta insegura, son motivos reales para rechazar. Ocultarle todo lo obligaría a aceptar a ciegas, y en la práctica terminaría preguntando por la dirección igual.
-
-**Cómo se calcula la zona.** Se reutiliza el geocodificado que ya se hace al crear la solicitud: `GeocodingClient.extraerZona()` toma el `display_name` que devuelve Nominatim (`"Urquiza 1234, Barrio Norte, Concepción del Uruguay"`), descarta el primer segmento —la vía con su altura— y se queda con los dos siguientes. Es una función pura de strings: **no agrega ninguna llamada de red**. Cuando el cliente elige el punto en el mapa y manda coordenadas en vez de escribir la dirección, no hay `display_name` del cual extraerla, así que se hace **una** consulta inversa al proveedor, que entra por la caché existente.
-
-**Las coordenadas se redondean a 2 decimales**, que equivalen a ~1,1 km de margen. Con 3 decimales el punto estaría a ~110 m, demasiado cerca para llamarlo aproximado. El mapa que ve el profesional usa esas coordenadas redondeadas, así que tampoco filtra el domicilio.
-
-**Dónde se aplica el filtro.** En el BFF, en `ocultarDireccionSiEstaPendiente()`: es el único que sabe quién está preguntando, porque `ms-solicitudes` recibe el `usuarioId` como parámetro y no valida la identidad. Al salir de `PENDIENTE` no se vuelve a ocultar, aunque el profesional termine rechazando: ya vio la dirección, volver a ocultarla no aportaría nada.
-
-**Lo que esto no cubre:**
-
-- La **descripción** que escribe el cliente es texto libre: si la persona escribe la dirección ahí, se ve. La prevención es aclarar en el formulario que describa el problema, no la ubicación.
-- `ms-solicitudes` sigue devolviendo la dirección exacta a quien le pregunte: el filtrado vive en el BFF. Los microservicios validan el JWT de Keycloak por su cuenta (oauth2-resource-server), así que requieren token válido en cada petición.
-- Las coordenadas siguen **cifradas en reposo** en la base: el cifrado no cambia, lo que cambia es que la API devuelve un punto redondeado.
+| `PENDIENTE` | Dirección completa | **Zona aproximada** (barrio y localidad) + punto redondeado a 2 decimales (~1.1 km) | Todo el detalle |
+| `ACEPTADA` en adelante | Dirección completa | **Dirección completa y coordenadas exactas** | Todo el detalle |
 
 ---
 
-
-
-## 11. Variables de entorno
-
-Se leen del archivo `.env` en la raíz (ignorado por git). Copiar
-`.env.example` → `.env` para empezar.
-
-### Base de datos
-
-| Variable | Default | Descripción |
-|---|---|---|
-| `POSTGRES_DB` | `vinculaup` | Nombre de la base |
-| `POSTGRES_USER` | `postgres` | Usuario de Postgres |
-| `POSTGRES_PASSWORD` | `postgres` | Contraseña de Postgres |
-| `DATABASE_URL` | `jdbc:postgresql://postgres:5432/vinculaup` | JDBC. Sin definir, cada servicio usa H2 en memoria |
-| `DATABASE_USERNAME` | `postgres` | Usuario de la app |
-| `DATABASE_PASSWORD` | `postgres` | Contraseña de la app |
-| `JPA_DDL_AUTO` | `update` | Esquema: `update` crea y actualiza tablas automáticamente |
-
-### Keycloak
-
-| Variable | Default | Descripción |
-|---|---|---|
-| `KEYCLOAK_ISSUER_URI` | `http://keycloak:8080/realms/vincula-up` | Emisor que valida el BFF |
-| `KEYCLOAK_JWK_SET_URI` | `.../protocol/openid-connect/certs` | JWKS para validar firmas |
-| `KEYCLOAK_HOSTNAME` | `vincula-up.local` | Host público de Keycloak |
-| `KEYCLOAK_ADMIN` | `admin` | Usuario admin de Keycloak |
-| `KEYCLOAK_ADMIN_PASSWORD` | `admin` | Contraseña del admin |
-| `KEYCLOAK_REALM` | `vincula-up` | Nombre del realm |
-| `KEYCLOAK_ADMIN_BASE_URL` | `http://keycloak:8080` | Base para el service account |
-| `KEYCLOAK_ADMIN_CLIENT_ID` | `vincula-up-admin` | Client de servicio |
-| `KEYCLOAK_ADMIN_CLIENT_SECRET` | `vincula-up-admin-secret` | Secret del client de servicio. Vacío en `.env.example`: rige el default de demo, que es público |
-
-### SMTP (recuperación de contraseña)
-
-| Variable | Default | Descripción |
-|---|---|---|
-| `KEYCLOAK_SMTP_HOST` | `smtp.gmail.com` | Servidor SMTP |
-| `KEYCLOAK_SMTP_PORT` | `587` | Puerto |
-| `KEYCLOAK_SMTP_STARTTLS` | `true` | STARTTLS |
-| `KEYCLOAK_SMTP_AUTH` | `true` | Autenticación SMTP |
-| `KEYCLOAK_SMTP_USER` | — | Usuario (con Gmail: una dirección) |
-| `KEYCLOAK_SMTP_PASSWORD` | — | **Contraseña de aplicación**, no la de la cuenta |
-| `KEYCLOAK_SMTP_FROM` | — | Remitente (`From`) |
-| `KEYCLOAK_SMTP_FROM_DISPLAY_NAME` | `Vincula-UP` | Nombre visible del remitente |
-| `KEYCLOAK_SMTP_REPLY_TO` | — (cae al `From`) | **A dónde llegan las respuestas** |
-| `KEYCLOAK_CONTACTO` | — (cae al Reply-To) | Casilla que se muestra en el pie del correo |
-| `MAIL_PLANTILLA` | `/app/correos/prerregistro.html` | Ruta de la maqueta HTML del aviso |
-
-### El From y el Reply-To van separados
-
-No es duplicación: son dos cosas distintas, y separarlas es lo que permite que
-las respuestas lleguen a la casilla institucional.
-
-| | Qué es | Por qué |
-|---|---|---|
-| `From` | Quién envía | **Tiene que ser la cuenta autenticada en el SMTP.** El servidor rechaza que se envíe en nombre de otra dirección, así que con Gmail obliga a usar la casilla propia. |
-| `Reply-To` | A dónde caen las respuestas | **Puede ser cualquier dirección** y no necesita autenticarse: es solo una etiqueta del encabezado. |
-
-Con las dos separadas, el aviso sale de `lucianodavezac@gmail.com` —la cuenta con
-contraseña de aplicación— pero **cualquier respuesta del profesional cae en
-`vinculaup@gmail.com`**, la misma casilla que se publica en los términos y las
-preguntas frecuentes. `KEYCLOAK_CONTACTO` es el texto que se imprime en el pie, y
-ambos son opcionales: vacíos, el `Reply-To` cae al `From` y el pie no muestra
-contacto.
-
-### Los correos llevan la marca de la aplicación
-
-Los dos correos del sistema (el de Keycloak y el del BFF) salen con la misma
-identidad visual que la web. No es decoración: un correo pelado que le llega a
-alguien que no conoce el proyecto es indistinguible de un phishing, y en el aviso
-de alta eso es justo lo que hay que evitar.
-
-| | |
-|---|---|
-| Ancho | 600 px, con tarjeta de fondo y cabecera coral de la marca |
-| Colores | Los tokens de `src/styles.css`: `--coral #e35f43`, `--ink #1e2926`, `--muted #67716c`, `--line #d8d8ce` |
-| Modo oscuro | Una regla de `prefers-color-scheme` con clases `.vu-*` |
-| Estructura | **Tablas y estilos en línea**, no flex ni grid: Outlook no los soporta |
-| Versiones | **Siempre HTML + texto plano.** El texto plano no es adorno: los filtros antispam lo leen antes que el HTML, y un correo solo-HTML se ve más sospechoso |
-
-> **El nombre "Vincula-UP" va escrito, no solo como imagen.** Los clientes de
-> correo bloquean las imágenes remotas por defecto: si la única marca fuera el
-> logo, sin imágenes el correo se vería vacío.
-
-### Dónde vive cada cosa
-
-**Los correos de Keycloak** (recuperación de contraseña, verificación, cambio de
-correo, bienvenida, enlace vencido) usan un tema propio:
-
-```
-keycloak/themes/vincula-up/
-├── theme.properties                      parent=keycloak
-└── email/
-    ├── theme.properties                  + contacto y URL que lee el pie
-    ├── html/template.ftl                 cabecera, ancho y pie (UNO para todos)
-    └── messages/messages_es.properties   los textos de cada correo
-```
-
-Se monta en el contenedor (`./keycloak/themes/vincula-up` →
-`/opt/keycloak/themes/vincula-up:ro`) y se activa con `emailTheme=vincula-up`, que
-aplica `keycloak-bootstrap.*` por la misma razón que el SMTP: el import del realm
-solo corre la primera vez que se crea.
-
-El diseño está separado de los textos a propósito: `template.ftl` no sabe qué
-correo se está mandando, así que cambiar una palabra no puede romper la maqueta.
-
-> **Dos restricciones del motor que cortan todo el envío si no se respetan:**
->
-> 1. **Nada de `${algo?html}`.** Keycloak 26 compila las plantillas con el
->    auto-escape de FreeMarker prendido y rechaza ese operador con un
->    `ParseException` que cancela el envío. Se escribe `${algo}`.
-> 2. **El contexto de las plantillas de correo no expone `realm`.** Con las del
->    login sí viene; con las de correo no. Por eso el contacto y la URL se leen
->    de `theme.properties` (vía `properties`) y no de atributos del realm.
-
-**Los avisos transaccionales** los escribe el BFF (`NotificacionService`), no
-Keycloak. El aviso de alta de profesional tiene su maqueta en
-`backend/bff-web/src/main/resources/correos/prerregistro.html`.
-
-> **Por qué ese archivo va en el disco y no en el jar.** El `Dockerfile` lo copia
-> aparte a `/app/correos/` y la ruta se pasa por `MAIL_PLANTILLA`. Dentro del jar
-> empaquetado de Spring Boot el recurso quedaba en `BOOT-INF/classes/` pero ni
-> `ClassPathResource` ni `@Value("classpath:...")` lo resolvían, y el correo salía
-> con el texto de repuesto. Además, así la maqueta se cambia montando un volumen
-> encima, sin recompilar.
->
-> El aviso sale en **multipart**: el `MimeMessageHelper` tiene que crearse con el
-> `true` de multipart, o `setText(texto, html)` falla con *"Not in multipart
-> mode"*. Y es best-effort: si la maqueta no se puede leer, manda texto plano en
-> lugar de romper el alta del profesional.
-
-**El logo** (`logo-cuadrado.png`, 256×256) lo genera
-`scripts/generate-logo.py` desde la misma geometría del `favicon.svg`, sin
-dependencias: solo `zlib` y `struct` de la biblioteca estándar. Si cambia la
-marca hay que correr ese script y rehacer también los tres favicons.
-
-### Estado: configurado y verificado
-
-El correo saliente está operativo sobre Gmail, con una **contraseña de
-aplicación** vigente en `KEYCLOAK_SMTP_PASSWORD`. La verificación se hizo el
-**2 de octubre de 2026** con envíos reales desde el flujo de "¿Olvidó tu
-contraseña?" y desde el alta de un profesional, **capturando el MIME generado**
-para comprobar que el tema renderiza y que el `Reply-To` sale efectivamente.
-
-| Correo | Quién lo dispara |
-|---|---|
-| Recuperación de contraseña (`resetPasswordAllowed`) | La persona desde "¿Olvidó su contraseña?" del login |
-| Aviso de alta | El alta de un profesional en el panel (`POST /api/profesionales/alta`) |
-| Nueva solicitud | Creación confirmada (`POST /api/solicitudes`), al profesional destinatario |
-| Solicitud aceptada o rechazada | Transición confirmada, al cliente que la creó |
-| Solicitud completada o cancelada | Transición confirmada, a la contraparte |
-
-Los avisos de solicitudes son **best-effort**: el BFF los envía después de que
-`ms-solicitudes` confirme la operación. Un problema de SMTP o la falta de email
-del destinatario se registra en el log, pero no revierte ni hace fallar una
-transición ya guardada. No se envían notificaciones dentro de la aplicación en
-esta fase.
-> **El valor nunca se versiona.** La contraseña vive solo en el `.env` local, que
-> está en `.gitignore` y no se sube al repositorio. Las tablas de arriba y el
-> `.env.example` documentan la variable, nunca su contenido.
->
-> **Cómo se rota.** Google puede revocar una contraseña de aplicación por cuenta
-> propia (o el dueño de la cuenta la elimina). Cuando pasa hay que generar otra
-> en *Cuenta Google → Seguridad → Verificación en 2 pasos → Contraseñas de
-> aplicación*, pegarla en `KEYCLOAK_SMTP_PASSWORD` y **volver a correr el
-> bootstrap**, que es el único camino del `.env` a Keycloak:
->
-> ```bash
-> ./scripts/linux-macos/keycloak-bootstrap.sh
-> # o, en Windows:
-> powershell -ExecutionPolicy Bypass -File .\scripts\windows\keycloak-bootstrap.ps1
-> ```
->
-> El script es idempotente y avisa si encuentra la variable vacía. Sin ella el
-> reseteo de contraseña sigue habilitado en el realm, pero Keycloak no puede
-> enviar el correo: el resultado es que nadie recibe el mensaje.
-
-### Lo que la maqueta NO arregla
-
-Enviar desde una casilla personal y con enlaces a `.local` **se sigue viendo
-como un ejercicio local**, por más cuidada que esté la maqueta. Lo que mejora es
-todo lo que depende del código —que el mensaje se vea de una institución y no
-genérico, en español, con instrucciones claras y con las respuestas cayendo en la
-casilla correcta—, pero el mayor factor de confianza de un correo sigue siendo
-**mandar desde un dominio propio con SPF, DKIM y DMARC**: un remitente que dice
-"Vincula-UP" desde una casilla `@gmail.com` personal tiene exactamente la forma de
-un phishing, y ninguna plantilla lo arregla.
-
-Hoy eso está bien porque el uso es local. Para una salida real hacen falta un
-dominio y un servicio de correo transaccional; queda anotado en la deuda técnica
-(§16). Cuando se haga, el cambio es de `.env` y no de código:
-
-```bash
-KEYCLOAK_SMTP_USER=vinculaup@midominio.com
-KEYCLOAK_SMTP_FROM=vinculaup@midominio.com
-KEYCLOAK_SMTP_PASSWORD=clave-del-servicio
-KEYCLOAK_SMTP_REPLY_TO=vinculaup@midominio.com
-KEYCLOAK_CONTACTO=vinculaup@midominio.com
-```
-
-> **Cómo llega el SMTP a Keycloak.** El realm importado usa
-> `${env.KEYCLOAK_SMTP_*:}` (sintaxis de Keycloak), que se resuelve contra el
-> **entorno del contenedor**, no contra el `.env` del host. Por eso
-> `docker-compose.yml` declara `KC_SMTP_*` mapeados desde `KEYCLOAK_SMTP_*`.
-> Si se edita el `.env` hay que recrear el contenedor:
-> `docker compose up -d --force-recreate keycloak`. El
-> `keycloak-bootstrap.sh` (o `.ps1`) también aplica el SMTP por `kcadm`, y carga
-> el `.env` automáticamente.
-
-### Almacenamiento de fotos
-
-### Almacenamiento de fotos
-
-| Variable | Default | Descripción |
-|---|---|---|
-| `STORAGE_LOCAL_DIR` | `/data/fotos` | Directorio del volumen donde escribe y lee el BFF |
-| `STORAGE_PREFIX` | `perfiles` | Prefijo de la clave dentro del volumen |
-| `STORAGE_MAX_BYTES` | `2097152` | Máximo por imagen (2 MB) |
-
-No hay más variables: el almacenamiento es un volumen en disco y las fotos se
-sirven por el BFF ([§10.4](#104-quién-ve-la-foto-de-quién)), así que no hay
-endpoint, credenciales ni bucket que configurar.
-
-> `STORAGE_LOCAL_DIR` no se define en el `.env`: la fija `docker-compose.yml`
-> en `/data/fotos`, que es donde está montado el volumen.
-credenciales de la cuenta. El código no cambia.
-
-### Cifrado de ubicaciones
-
-| Variable | Default | Descripción |
-|---|---|---|
-| `UBICACIONES_CLAVE` | (vacío) | Clave AES-256 de 32 bytes en Base64. **Debe ser la misma en `ms-solicitudes` y `ms-profesionales`.** Vacía = se guarda sin cifrar, con aviso en el log |
-
-Generar con `openssl rand -base64 32`.
-
-### pgAdmin
-
-
-## 12. Datos de arranque
-
-Ninguna base es persistente entre `docker compose down -v` y un arranque limpio:
-Postgres se crea con el esquema por `ddl-auto=update` y los inicializadores
-sembran lo indispensable.
-
-### 12.1 Keycloak (import del realm)
-
-Tres usuarios de prueba, todos con contraseña `password`:
-
-| Email | Rol de realm | Para probar |
-|---|---|---|
-| `cliente@vincula-up.local` | `CLIENTE` | Pedir turno, chatear, calificar |
-| `profesional@vincula-up.local` | `PROFESIONAL` | Activar perfil, aceptar/rechazar |
-| `admin@vincula-up.local` | `ADMIN` | Panel de administración |
-
-Más una service account `service-account-vincula-up-admin` para el client de
-servicio del BFF.
-
-### 12.2 `ms-profesionales`
-
-Siembra **6 especialidades** y **1 profesional de demo**:
-
-- Especialidades: Electricidad domiciliaria · Plomería y gas · Refrigeración y aire · Reparación de electrodomésticos · Pintura y albañilería · Cerrajería integral.
-- Profesional: legajo `P-2001`, activado, con foto de `randomuser.me` y centro en
-  Concepción del Uruguay (-32.4844, -58.2328) con radio de 20 km.
-- Disponibilidad: lunes a sábado, de 8:00 a 20:00.
-
-La siembra es **idempotente y best-effort**: si el padrón ya existe no se
-tocan los datos, y si falla, el servicio arranca igual
-(`ProfesionalDataInitializer.java:45-51`). Ese cuidado existe para evitar que un
-fallo de seed mande el contenedor a un bucle de reinicios con 502 en toda la app.
-
-### 12.3 `ms-usuarios`
-
-**No siembra usuarios.** Los gestiona exclusivamente Keycloak: en el primer
-login, `GET /api/usuarios/por-keycloak` crea el registro de negocio a partir de
-los claims del token. El alta administrativa, en cambio, sí escribe acá.
-
-**Vincular una cuenta ya creada.** Cuando el BFF da de alta a un profesional y
-la fila de invitación ya existe (un prerregistro anterior), no crea una fila
-nueva: la vincula con `PATCH /api/usuarios/{id}/keycloak`
-(`VincularKeycloakRequest`, campo `keycloakId`). Así el alta no duplica usuarios
-ni pierde el legajo ya asignado.
-
-### 12.4 Migraciones best-effort al arrancar
-
-Tres scripts `ALTER TABLE` defensivos, todos toleran el fallo:
-
-
-## 13. Infraestructura: TLS, Nginx
-
-### 13.1 TLS
-
-El repositorio incluye una CA y un certificado de servidor en `nginx/certs/`.
-Los navegadores modernos exigen **dos certificados separados**, y hay que
-importar la **CA** en el navegador, nunca el certificado de servidor.
-
-> ⚠️ Es una **CA de desarrollo auto-firmada**, válida hasta diciembre de 2028.
-> No sirve para producción: si el repositorio fuera público, cualquiera con la
-> clave podría suplantar `vincula-up.local` para todos los que la instalen.
-
-**Renovarlos** (hay scripts para ambos sistemas operativos):
-
-```bash
-# Linux
-bash scripts/linux-macos/generate-certs.sh
-
-# Windows
-powershell -ExecutionPolicy Bypass -File .\scripts\windows\generate-certs.ps1
-```
-
-Después hay que **reimportar la CA nueva** en los navegadores, eliminando antes
-la anterior (`VinculaUP-CA`) de los almacenes de confianza.
-
-**Importar la CA:**
-
-- **Script automático:** `bash scripts/linux-macos/import-ca.sh` (Linux) o
-  `powershell -ExecutionPolicy Bypass -File .\scripts\import-ca.ps1` (Windows).
-  Ambos instalan en el store del sistema **y** en la base NSS de Firefox.
-- **Firefox** (cualquier SO — tiene su propio almacén, no usa el del sistema):
-  Configuración → Privacidad y Seguridad → Ver Certificados → Autoridades →
-  Importar → `nginx/certs/ca.crt` → marcar *Confiar en esta CA*.
-- **Chrome/Chromium/Edge en Linux** (usan el store del sistema):
-  `sudo cp nginx/certs/ca.crt /usr/local/share/ca-certificates/vinculaup-ca.crt && sudo update-ca-certificates`
-- **Chrome/Chromium/Edge en Windows** (usan el store de Windows):
-  `certutil -addstore -f Root .\nginx\certs\ca.crt`
-
-Además hace falta resolver el dominio local:
-
-```bash
-# Linux
-echo "127.0.0.1 vincula-up.local" | sudo tee -a /etc/hosts
-```
-
-```powershell
-# Windows (PowerShell como Administrador)
-Add-Content -Path "$env:SystemRoot\System32\drivers\etc\hosts" -Value "127.0.0.1 vincula-up.local"
-```
-
-### 13.3 Nginx
-
-Reverse proxy único con TLS, SPA fallback y balanceo hacia Keycloak y el BFF.
-
-| `location` | Destino | Notas |
-|---|---|---|
-| `/` | SPA estática | `try_files ... /index.html` para el router de Angular |
-| `/api/` | `bff-web:9001` | Variable + `resolver` de Docker |
-| `/realms/`, `/login-actions/`, `/resources/`, `/js/` | `keycloak:8080` | Necesarios para que la UI de login de Keycloak funcione tras el proxy |
-
-Ajustes que existen por motivos concretos:
-
-- **`client_max_body_size 4m`** — sin esto nginx rechaza con `413` las fotos de
-  perfil en base64 (~2,7 MB), que superan el default de 1 MB.
-- **`proxy_buffer_size 128k`, `proxy_buffers 4 256k`, `proxy_busy_buffers_size 256k`** —
-  los headers de Keycloak (JWT y cookies) no entran en los buffers por defecto.
-- **`resolver 127.0.0.11 valid=10s`** — el DNS interno de Docker. Sin esto nginx
-  fija la IP de `bff-web` al arrancar y queda devolviendo 502 si ese contenedor
-  se recrea con otra IP.
-- **Redirección 80 → 443** y cabeceras `X-Forwarded-*` para que Keycloak sepa
-  que está detrás de un proxy TLS (`KC_PROXY: edge`).
-
-El frontend se compila en **multi-stage** dentro de `nginx/Dockerfile`: Node 22
-alpine compila Angular y solo el resultado se copia a la imagen final.
+## 12. Variables de entorno y configuración
+
+Configuradas en el archivo `.env` en la raíz del repositorio (ignorado en git; plantilla en `.env.example`):
+
+### 12.1 Base de datos PostgreSQL
+- `POSTGRES_DB`: `vinculaup`
+- `POSTGRES_USER`: `postgres`
+- `POSTGRES_PASSWORD`: contraseña del motor de base de datos
+- `DATABASE_URL`: `jdbc:postgresql://postgres:5432/vinculaup`
+- `DATABASE_USERNAME`: `postgres`
+- `DATABASE_PASSWORD`: contraseña de conexión
+- `JPA_DDL_AUTO`: `update`
+
+### 12.2 Keycloak y Service Account
+- `KEYCLOAK_ISSUER_URI`: `http://keycloak:8080/realms/vincula-up`
+- `KEYCLOAK_JWK_SET_URI`: `http://keycloak:8080/realms/vincula-up/protocol/openid-connect/certs`
+- `KEYCLOAK_HOSTNAME`: `vincula-up.local`
+- `KEYCLOAK_ADMIN`: `admin`
+- `KEYCLOAK_ADMIN_PASSWORD`: contraseña de administración de Keycloak
+- `KEYCLOAK_REALM`: `vincula-up`
+- `KEYCLOAK_ADMIN_BASE_URL`: `http://keycloak:8080`
+- `KEYCLOAK_ADMIN_CLIENT_ID`: `vincula-up-admin`
+- `KEYCLOAK_ADMIN_CLIENT_SECRET`: clave secreta de la service account
+
+### 12.3 Configuración SMTP
+- `KEYCLOAK_SMTP_HOST`: `smtp.gmail.com`
+- `KEYCLOAK_SMTP_PORT`: `587`
+- `KEYCLOAK_SMTP_STARTTLS`: `true`
+- `KEYCLOAK_SMTP_AUTH`: `true`
+- `KEYCLOAK_SMTP_USER`: correo de autenticación
+- `KEYCLOAK_SMTP_PASSWORD`: contraseña de aplicación (App Password)
+- `KEYCLOAK_SMTP_FROM`: dirección remitente del sistema
+- `KEYCLOAK_SMTP_FROM_DISPLAY_NAME`: `Vincula-UP`
+- `KEYCLOAK_SMTP_REPLY_TO`: `vinculaup@gmail.com` (casilla institucional de recepción)
+- `KEYCLOAK_CONTACTO`: `vinculaup@gmail.com`
+- `MAIL_PLANTILLA`: `/app/correos/prerregistro.html`
+- `APP_URL`: `https://vincula-up.local`
+
+### 12.4 Cifrado, fotos y expiración
+- `STORAGE_LOCAL_DIR`: `/data/fotos` (ruta interna montada en contenedor)
+- `STORAGE_PREFIX`: `perfiles`
+- `STORAGE_MAX_BYTES`: `2097152` (2 MB)
+- `UBICACIONES_CLAVE`: clave AES-256 de 32 bytes en base64 (ej: `openssl rand -base64 32`)
+- `SOLICITUDES_TIEMPO_EXPIRACION_HOURS`: horas de vigencia de solicitudes pendientes (default: `24`)
 
 ---
 
-| Servicio | Sentencia | Motivo |
+## 13. Datos de arranque y migraciones
 
-## 14. Scripts operativos
+- **Siembra idempotente y best-effort:** Si los registros ya existen, los inicializadores no realizan modificaciones.
+- **Keycloak:** Crea las cuentas demo con contraseña `password`:
+  - `cliente@vincula-up.local` (rol `CLIENTE`)
+  - `profesional@vincula-up.local` (rol `PROFESIONAL`)
+  - `admin@vincula-up.local` (rol `ADMIN`)
+- **`ms-profesionales`:** Siembra 6 especialidades oficiales y 1 profesional activo de prueba (Luciano Davezac, legajo `P-2001`, disponibilidad de lunes a sábado de 8:00 a 20:00).
+- **`ms-usuarios`:** Vincula el usuario correspondiente por email en su primer acceso.
 
-Están agrupados por sistema operativo: `scripts/linux-macos/` (`.sh`, para
-Linux y macOS) y `scripts/windows/` (`.ps1`). Cada función tiene su versión en
-ambos, salvo `start-local` que es solo Windows.
+---
+
+## 14. Infraestructura: TLS, Nginx
+
+- **Proxy inverso centralizado:** Nginx 1.27 termina conexiones TLS en los puertos 80 (redirección automática) y 443.
+- **Parámetros de proxy:**
+  - `client_max_body_size 3m;` (3 MB otorga margen de seguridad sobre el límite de 2 MB del BFF para fotos de perfil multipart).
+  - `proxy_buffer_size 128k`, `proxy_buffers 4 256k`, `proxy_busy_buffers_size 256k` (soporte para cabeceras y tokens JWT voluminosos).
+  - `resolver 127.0.0.11 valid=10s` (resolución dinámica de contenedores Docker).
+- **Certificados y CA:** CA de desarrollo en `nginx/certs/ca.crt` y certificado del servidor `server.crt` con SAN para `vincula-up.local`, `localhost` y `127.0.0.1`. Fueron creados directamente mediante **OpenSSL**:
+  ```bash
+  # 1. Autoridad Certificadora (CA):
+  openssl genrsa -out ca.key 2048
+  openssl req -x509 -new -nodes -key ca.key -sha256 -days 825 -out ca.crt -subj "/CN=VinculaUP-CA" \
+    -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign"
+
+  # 2. Clave y CSR del servidor:
+  openssl genrsa -out server.key 2048
+  openssl req -new -key server.key -out server.csr -subj "/CN=vincula-up.local/O=VinculaUP Dev/C=AR"
+
+  # 3. Certificado firmado con SAN (Subject Alternative Names):
+  openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 825 -sha256 \
+    -extfile <(printf "subjectAltName=DNS:vincula-up.local,DNS:localhost,IP:127.0.0.1\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth")
+  ```
+
+---
+
+## 15. Scripts operativos y despliegue
 
 | Función | Linux / macOS | Windows |
 |---|---|---|
-| **Bootstrap del realm** (obligatorio tras el primer arranque) | `keycloak-bootstrap.sh` | `keycloak-bootstrap.ps1` |
-| Confiar la CA en los navegadores | `import-ca.sh` | `import-ca.ps1` |
-| Regenerar la CA y el certificado | `generate-certs.sh` | `generate-certs.ps1` |
-| Desarrollo sin Docker | — | `start-local.ps1` |
+| **Despliegue automatizado completo** | `./scripts/deploy.sh` | — |
+| **Bootstrap del realm de Keycloak** | `./scripts/linux-macos/keycloak-bootstrap.sh` | `.\scripts\windows\keycloak-bootstrap.ps1` |
+| **Instalación de la CA en navegadores y sistema**| `bash scripts/linux-macos/import-ca.sh` | `.\scripts\windows\import-ca.ps1` |
 
-Todos resuelven la raíz del repo por ruta relativa, así que se pueden invocar
-desde cualquier directorio.
+> Todo el stack se ejecuta de forma homogénea y estandarizada mediante contenedores Docker (`docker compose`). No se soportan ni requieren ejecuciones locales sueltas.
 
-### 14.1 `keycloak-bootstrap` (`.sh` / `.ps1`)
-
-Aplica la configuración del realm sobre una **instalación ya existente**, de
-forma idempotente, vía `kcadm.sh` por `docker exec`. Sin borrar usuarios ni datos.
-
-Es necesario porque `start-dev --import-realm` importa el realm **solo la
-primera vez**: como Keycloak persiste en Postgres, los cambios posteriores al
-JSON (auto-registro, rol por defecto, client de servicio, SMTP) no se aplican
-solos. **Sin él, el registro de usuarios no funciona.**
-
-Además, la stack de Docker incluye un servicio `keycloak-init` que se dispara
-cada vez que arranca el entorno y vuelve a ejecutar el `kcadm update` para
-forzar `loginTheme=vincula-up` y `emailTheme=vincula-up`. Esto evita que el tema
-se pierda al recrear el contenedor o al reiniciar el entorno local.
-
+Comando de inicio con Docker Compose:
 ```bash
-./scripts/linux-macos/keycloak-bootstrap.sh                              # Linux / macOS
-powershell -ExecutionPolicy Bypass -File .\scripts\windows\keycloak-bootstrap.ps1   # Windows
+docker compose up --build -d
 ```
-
-Qué aplica: auto-registro de clientes · rol `CLIENTE` por defecto · client de
-servicio `vincula-up-admin` con sus permisos (`manage-users`, `view-users`,
-`query-users`, `view-realm`) · configuración SMTP.
-
-Carga el `.env` de la raíz automáticamente (`set -a` + `source` en bash;
-parseo línea por línea en PowerShell) y funciona sin él usando defaults.
-Requiere el servicio `keycloak` levantado.
-
-### 14.2 `import-ca` (`.sh` / `.ps1`)
-
-Instala `nginx/certs/ca.crt` en los dos almacenes de confianza que existen:
-
-- el **store del sistema** → Chromium, Chrome, Edge (y `curl`, Node, la JVM);
-- la **base NSS de Firefox** → que ignora el store del sistema.
-
+Comando de detención:
 ```bash
-bash scripts/linux-macos/import-ca.sh                                # Linux / macOS
-powershell -ExecutionPolicy Bypass -File .\scripts\windows\import-ca.ps1   # Windows
+docker compose down
 ```
-
-La versión de Windows instala en `CurrentUser\Root` (no requiere elevación) y
-acepta `-Machine` para el almacén local de la máquina. Ver [§13.2](#132-tls) para
-el detalle por navegador.
-
-### 14.3 `generate-certs` (`.sh` / `.ps1`)
-
-Regenera la CA y el certificado del servidor, que hoy vencen en diciembre de
-2028. Emite el certificado con `subjectAltName` para `vincula-up.local`,
-`localhost` y `127.0.0.1`, sin el cual los navegadores modernos lo rechazan.
-
-```bash
-bash scripts/linux-macos/generate-certs.sh                                  # Linux / macOS
-powershell -ExecutionPolicy Bypass -File .\scripts\windows\generate-certs.ps1   # Windows
-```
-
-Pide confirmación antes de sobrescribir y borra los intermedios (`server.csr`,
-`ca.srl`). Tras regenerar hay que **reimportar la CA** (§14.2).
-
-### 14.4 `start-local.ps1`
-
-Desarrollo **sin Docker** en Windows: abre una ventana de PowerShell por
-microservicio con `mvnw.cmd spring-boot:run` y un perfil JVM liviano
-(`-Xmx512m -XX:+UseSerialGC -XX:ActiveProcessorCount=2`) para no fallar por
-memoria. Los servicios usan **H2 en memoria**: los datos se pierden al reiniciar.
-El frontend se levanta aparte con `npm start` en otra terminal.
-
-### 14.5 Aviso de alta por correo
-
-No es un script: es parte del BFF, pero se documenta acá porque es el paso que
-cierra el flujo de alta de un profesional.
-
-**El flujo completo:**
-
-1. El **administrador** da de alta al profesional desde el panel
-   (`POST /api/profesionales/alta`), con sus datos, legajo y especialidad. El BFF
-   **crea la cuenta en Keycloak** (usuario = correo) con una **contraseña
-   temporal** y el rol `PROFESIONAL`, y registra el usuario de negocio y el perfil
-   pendiente.
-2. El BFF envía un correo al profesional (`NotificacionService`) con su usuario,
-   su contraseña temporal, el legajo, la especialidad y los pasos numerados para
-   activar el perfil. **El profesional no se registra**: entra con esos datos.
-3. Al primer ingreso, Keycloak le exige **cambiar la contraseña**
-   (`UPDATE_PASSWORD`); recién ahí entra a la aplicación. Esa contraseña no vence
-   en el tiempo.
-4. El profesional **activa su perfil** (foto, zona de cobertura y horarios).
-
-**El correo no habla de la implementación.** Decirle a un profesional "se registra
-en Keycloak" o "el prerregistro se vincula por email" le da información que no
-necesita. El texto va en términos del servicio, y lo importante es que explique
-los dos pasos que más se confunden: **se entra con la contraseña temporal que
-llega por correo, y esa contraseña hay que cambiarla en el primer ingreso**.
-
-**El alta solo acepta correos sin cuenta.** Si el correo ya tiene una sesión
-—alguien se registró y usó esa dirección— el alta se rechaza con `409` y el
-mensaje *"Ese correo ya está en uso. Elegí otro."* El criterio son dos: que la fila
-de `usuarios` venga con `keycloakId` lleno, y que la cuenta no exista ya en
-Keycloak. Si la fila existe pero viene vacía, es un prerregistro anterior del
-mismo administrador: se completa en lugar de duplicarse (ver [§12.3](#123-ms-usuarios)).
-
-> **El correo es best-effort, pero el panel lo dice.** Si el SMTP no está
-> configurado o el servidor rechaza el mensaje, la cuenta queda creada y el fallo
-> queda en el log: dar de alta a un profesional nunca falla porque no salió un
-> correo. Para que el administrador no asuma que el profesional se enteró,
-> `avisarAltaProfesional` devuelve si el mensaje salió y la respuesta del alta
-> trae `correoEnviado` **y** `passwordTemporal`: el panel dice *"Le enviamos por
-> correo su contraseña temporal"* o, si no salió, muestra esa contraseña para que
-> el administrador la pase por otra vía.
-
-**Configuración:** reusa el mismo SMTP que Keycloak (`KEYCLOAK_SMTP_*`), así que
-no hay credenciales duplicadas. `APP_URL` es la base del enlace del correo; si
-se despliega en otro dominio, hay que cambiarla.
-
-> **Limitación conocida:** con `verifyEmail: false` (el estado actual del realm),
-> el paso 3 no verifica que el correo sea del propio profesional. Alguien con
-> acceso a su casilla puede activarlo primero. Ver §16.2.
 
 ---
 
-## 15. Estado real del MVP
+## 16. Prototipos de pantallas
 
-### 15.1 Qué está completo
+### 16.1 Catálogo de prototipos y maqueta interactiva
 
-- Ciclo de vida completo de la solicitud, con validación de transiciones.
-- Autenticación real contra Keycloak (OIDC + PKCE), sin atajos de desarrollo.
-- RBAC de 27 reglas, aplicado en el BFF.
-- Los tres roles recorren su flujo completo contra backend real.
-- Geolocalización real (Nominatim) con degradación controlada.
-- Datos semilla para que la demo arranque sin carga manual.
-- Fotos de perfil privadas, con control de visibilidad por rol
-  ([§10.4](#104-quién-ve-la-foto-de-quién)).
-- Términos y condiciones y preguntas frecuentes
-  ([Anexo A](#anexo-a-términos-y-datos) y [Anexo B](#anexo-b-preguntas-frecuentes)).
-- Aceptación obligatoria de los términos al primer ingreso, con versión y fecha
-  registradas ([§8.5](#85-aceptación-de-los-términos-y-condiciones)).
-- Tema claro y oscuro ([Anexo C](#anexo-c-tema-claro-y-oscuro)).
-- Mapas reales (Leaflet + OpenStreetMap) en la activación del perfil
-  ([§17.7](#177-el-mapa-es-real-no-un-dibujo)).
+La maqueta interactiva original del proyecto se desarrolló en v0 (Next.js) y se encuentra desplegada públicamente en:
+> **https://v0-vincula-up.vercel.app/**
 
-### 15.2 Lo que no está
+### 16.2 Figuras de prototipos de interfaz
 
-| Brecha | Detalle |
-|---|---|
-| **Sin CI** | No hay `.github/`. Nada verifica que el código compile |
-| **Sin suite automatizada** | La verificación de la cadena completa (Postgres + Keycloak reales) queda para la validación de QA previa al despliegue |
+- **Figura 1:** Página de inicio de Vincula-UP, con accesos a *"Buscar un técnico"* para clientes y *"Soy egresado técnico"* para profesionales.
+  *(Enlace: https://drive.google.com/file/d/1Ju9MOgnjGWvL1gTsbLSjPvBHsg_gcU9h/view?usp=sharing)*
+- **Figura 2:** Pantalla *"Mis solicitudes"* del cliente, con listado de pedidos, estados y filtro por estado (`HU-S08`).
+  *(Enlace: https://drive.google.com/file/d/1btT906f3BM3RUKJ19vn9AyYQmFGWjRP4/view?usp=sharing)*
+- **Figura 3:** Pantalla *"Nueva solicitud"*, paso 1: ubicación del servicio por dirección o mapa interactivo (`HU-S01`).
+  *(Enlace: https://drive.google.com/file/d/1Em1No0Op45QV2_i3s2ZJCFdKz--MmYk3/view?usp=sharing)*
+- **Figura 4:** Pantalla *"Solicitudes recibidas"* del profesional, con ubicación aproximada y acciones de aceptar o rechazar con motivo (`HU-S07`, `HU-S08`, `HU-S09`, `HU-S10`).
+- **Figura 5:** Chat de la solicitud en tiempo real (`HU-S13`).
+  *(Enlace: https://drive.google.com/file/d/1veufyzMZeWApTWF-NPNIUsajX1ZyAODh/view?usp=sharing)*
+- **Figura 6:** Resumen del Administrador con indicadores de demanda y recorrido de solicitudes (`HU-U14`).
 
----
-
-## 16. Deuda técnica conocida
-
-Pendientes conocidos. No bloquean la demo, pero conviene tenerlos fichados.
-
-### 16.1 Prioridad alta
-
-| # | Deuda | Impacto |
-|---|---|---|
-| 1 | **Sin CI** | Nada garantiza que el código compile. Un cambio roto se descubre en la máquina de quien lo hizo |
-| 2 | **`ddl-auto=update` como esquema** | Sin migraciones versionadas no hay forma de reproducir una base ni de revertir un cambio de modelo. Correr el stack con `JPA_DDL_AUTO=validate` falla: no hay esquema que valide |
-| 3 | **Secret del client de servicio sin rotar** | `.env.example` deja `KEYCLOAK_ADMIN_CLIENT_SECRET` **vacío** a propósito, pero con el vacío **rige el default de demo** `vincula-up-admin-secret`, que es **público** (está en `docker-compose.yml` y en el JSON del realm). El stack arranca y la promoción de rol funciona, pero con un secreto que cualquiera puede leer en el repositorio: quien lo tenga puede pedir un token de servicio y promover cuentas a PROFESIONAL. Se cierra rotando (`openssl rand -hex 24`), poniendo el valor en `.env` y **re-corriendo el bootstrap**, que es lo único que lo copia a Keycloak: el import del realm **no** resuelve `${env.*}` (verificado en Keycloak 26.3.3, ver `keycloak/import/README.md`). Después hay que recrear `bff-web` |
-| 4 | **`webOrigins: ["*"]`** en el client público | Permitido en demo; en producción conviene restringirlo a los orígenes reales |
-| 5 | **`redirectUris: ["https://*"]`** en el client público | Agregado para que los túneles de Cloudflare funcionen sin reconfigurar el client cada vez que `cloudflared` genera una URL nueva: Keycloak sólo matchea comodines **al final** del patrón, así que `https://*.trycloudflare.com/*` nunca matchearía (el soporte de comodines de host sigue sin mergear). `https://*` es un prefijo y matchea **cualquier** origen https, no sólo los de Cloudflare. Cerrado en producción reemplazando ese patrón por el dominio real. Mitiga que el client sea público con PKCE S256: sin el `code_verifier` el código no se cambia por tokens |
-| 6 | **`KC_HOSTNAME` vacío (hostname dinámico)** | Con `KC_HOSTNAME_STRICT=false` y sin hostname fijo, Keycloak resuelve el host desde el request, que es lo que hace que el túnel funcione. El mismo mecanismo documenta que un atacante podría manipular el `Host` para falsificar los enlaces de recuperación de contraseña. Cerrado fijando `KEYCLOAK_HOSTNAME` en `.env` al dominio propio y con un proxy delante que no acepte `Host` arbitrarios |
-| 7 | **Textos del import sin control de longitud** | Las columnas de texto de Keycloak 26.x en Postgres son `varchar(255)`. Un `description` de 377 caracteres en `keycloak/import/vincula-up-realm.json` hizo fallar el import entero (`value too long for type character varying(255)`), con Keycloak en loop de reinicios y el BFF sin issuer. Hoy está corregido (231 caracteres), pero el JSON no tiene ninguna validación que lo impida: cualquier texto nuevo que pase de 255 rompe el arranque del stack de la misma forma. Mitigable con un check en CI que recorra el JSON y valide la longitud de cada string |
-
-### 16.2 Prioridad media
-
-| # | Deuda | Impacto |
-|---|---|---|
-| 8 | **`verifyEmail: false`** | Nadie confirma que la dirección sea suya. Con el alta nueva el profesional no se auto-registra, así que el riesgo queda sobre todo en los clientes que se registran solos. Cerrarlo requiere `verifyEmail: true` en el realm **y** `docker compose down -v`; además rompe las cuentas `@vincula-up.local` de prueba, que no son entregables |
-| 9 | **H2 por defecto en desarrollo** | Sin `DATABASE_URL`, los datos se pierden al reiniciar y el comportamiento difiere de producción |
-| 10 | **CORS con lista de orígenes fija** | `SecurityConfig.java` enumera los orígenes. Agregar un dominio es tocar código |
-| 11 | **Geocodificación puede resolver a otra ciudad** | Nominatim a veces devuelve un lugar homónimo: una dirección de Concepción del Uruguay terminó en Entre Ríos, Argentina. Es un comportamiento del servicio público, no del código; convendría validar el país del resultado |
-| 12 | **Sin reenvío de la invitación** | Si el profesional pierde la contraseña temporal antes de entrar, no hay acción para emitir una nueva (`resetearContrasenaTemporal` está prevista pero **no implementada** en `KeycloakAdminService`) y hay que hacerlo desde la consola de Keycloak o dar de alta de nuevo |
-| 13 | **La contraseña temporal siempre sale en la respuesta** | `POST /api/profesionales/alta` devuelve `passwordTemporal` aunque el correo haya salido bien, para que el panel pueda mostrarlo si el aviso falla. Cualquiera con el token de admin que lea la respuesta (o un log con el body) tiene esa clave |
-
-### 16.3 Higiene del repositorio
-
-El repositorio está limpio:
-
-- `node_modules/` no está versionado; lo cubre el `.gitignore` de la raíz.
-- Los logs de crash de la JVM (`hs_err_pid*.log`, `replay_pid*.log`) y los
-  archivos de salida del build están fuera del índice y en `.gitignore`.
-- Hay un solo `.gitignore` y un solo `.gitattributes`, ambos en la raíz: los que
-  existían por microservicio se absorbieron.
-- La documentación vive en este archivo, en el `README.md` y en el `MANUAL.md`. No
-  hay copias ni documentos contradictorios.
-- El prototipo Next.js de v0 no está en el repo. Sigue desplegado en
-  https://v0-vincula-up.vercel.app/ y es la referencia de diseño.
-
----
-
-## 16-bis. Datos de demostración
-
-Con `SEMBRAR_DEMO=true` (por defecto) cada base nueva se siembra al arrancar:
-
-| Qué | Dónde | Contenido |
-|---|---|---|
-| 3 cuentas de prueba | `ms-usuarios` | `cliente@` (CLIENTE), `profesional@` (PROFESIONAL) y `admin@` (ADMIN), con el `keycloakId` fijo del realm |
-| 6 especialidades | `ms-profesionales` | Electricidad, plomería, refrigeración, electrodomésticos, pintura, cerrajería |
-| 1 profesional | `ms-profesionales` | Luciano Benítez, legajo `P-2001`, activado, con disponibilidad de lunes a sábado |
-| 4 solicitudes | `ms-solicitudes` | 1 pendiente, 1 aceptada con 2 mensajes, 1 completada y calificada, 1 rechazada |
-
-La siembra es **idempotente** (si ya hay datos no inserta nada) y
-**best-effort** (un fallo se registra y el servicio arranca igual: un inicializador
-que tumba el contenedor dejaría toda la API en 502).
-
-**Por qué ahora sí se siembran los usuarios.** El rol de negocio que guía al
-frontend sale de `ms-usuarios` ([§2](#2-roles-del-mvp)), así que sin fila toda
-cuenta nueva nace `CLIENTE`: el `admin@` quedaba sin rol administrativo y el
-`profesional@` sin el suyo, y ambos entraban a `/solicitudes`. Las tres cuentas
-del realm se siembran con su rol ya asignado, y el `id` lo genera la base (no hay
-un UUID fijo que hardcodear), así que `ProfesionalDataInitializer` resuelve el de
-Luciano por email con una consulta SQL, con el `keycloakId` como respaldo si
-`ms-usuarios` todavía no sembró.
-
-Las solicitudes siguen necesitando que existan esas dos cuentas, y el
-inicializador lo avisa por log con el mensaje *"No se siembran solicitudes: falta
-la cuenta de…"*.
-
-> Los tres microservicios comparten la misma base, así que es ahí donde el
-> inicializador de profesionales resuelve el id de usuario por email.
-
-Para una base limpia: `SEMBRAR_DEMO=false` en el `.env`, más
-`docker compose down -v && docker compose up --build` (el volumen hay que
-recrearlo para que el cambio aplique).
+**Pantallas sin prototipo en la maqueta inicial (desarrolladas directamente en Angular):**
+- Calificación del servicio con estrellas y comentario (`HU-S14`).
+- Bandeja de notificaciones en tiempo real (`HU-S16`).
 
 ---
 
 ## 17. Diseño visual
 
-La maqueta de diseño original está en **https://v0-vincula-up.vercel.app/**.
-Esta sección conserva los tokens de diseño con los que se implementó la SPA.
+### 17.1 Paleta de tokens de color (Tema claro)
 
-### 17.1 Paleta
-
-| Token | HEX | Rol |
+| Token | HEX | Rol visual |
 |---|---|---|
-| `--paper` | `#F6F3EC` | Fondo global, tono papel pergamino |
-| `--surface-card` | `#FFFDF8` / `#FFFFFF` | Tarjetas, paneles y modales |
-| `--ink` | `#1E2926` | Títulos, texto fuerte, botón primario |
-| `--muted` | `#67716C` | Subtítulos, metadatos, placeholders |
-| `--line` | `#D8D8CE` | Bordes y divisores |
-| `--coral` | `#E35F43` | Acento, alertas, acciones destructivas |
-| `--emerald` | `#448064` | Éxito, badge "Activo", botón completar |
-| `--amber` | `#A56C19` | Pendiente, avisos de espera |
-| `--navy` | `#1E4B7A` | Burbuja de mensaje propio, botón abrir chat |
-| `--surface-highlight` | `#F3F5F1` | Tags, chips, burbuja de mensaje entrante |
+| `--paper` | `#F6F3EC` | Fondo global pergamino. |
+| `--surface-card` | `#FFFFFF` | Tarjetas y paneles elevados. |
+| `--ink` | `#1E2926` | Títulos y botón primario. |
+| `--muted` | `#67716C` | Subtítulos y metadatos. |
+| `--line` | `#D8D8CE` | Bordes y separadores. |
+| `--coral` | `#E35F43` | Acento institucional y acciones nuevas. |
+| `--emerald` | `#448064` | Éxito y estado completado. |
+| `--amber` | `#A56C19` | Estados pendientes y advertencias. |
+| `--navy` | `#1E4B7A` | Mensaje propio y acción de chat. |
 
-**Estos son los tokens del tema claro.** El tema oscuro no los redefine: los
-*pisa* en un bloque `[data-tema='oscuro']`, así que la lista de arriba sigue
-describiendo la identidad visual. El detalle del segundo tema está en el
-[Anexo C](#anexo-c-tema-claro-y-oscuro).
+### 17.2 Botones y controles
+- Radio uniforme de 8px en todos los botones y contenedores.
+- Los botones son rectangulares; la variante píldora está anulada.
+- **Hover sin `transform`:** Las transiciones afectan únicamente a `background-color`, `border-color` y `color`, garantizando estabilidad dimensional en la interfaz.
 
-### 17.2 Tipografía
+---
 
-| Nivel | Familia | Peso | Desktop | Mobile |
-|---|---|---|---|---|
-| Eyebrow / Badge | Trebuchet MS / Inter | 800 | 12px | 11px |
-| H1 Hero | Georgia | 400 | 48–64px | 34px |
-| H2 Sección | Georgia | 400 | 26–32px | 22px |
-| H3 / H4 | Trebuchet MS / Inter | 700 | 16–18px | 15px |
-| Cuerpo | Trebuchet MS / Inter | 400 | 15–16px | 14px |
-| Meta / Labels | Trebuchet MS / Inter | 500–600 | 12–13px | 12px |
+## 18. Estado real del MVP y deuda técnica
 
-### 17.3 Radios y sombras
+### 18.1 Funcionalidades completadas
+- Ciclo de vida completo de solicitudes con validación estricta de transiciones.
+- Autenticación real OIDC + PKCE en Keycloak sin atajos simulados.
+- RBAC de 27 reglas aplicado en el BFF y validación en microservicios.
+- Chat en vivo bidireccional por WebSocket/STOMP.
+- Calificaciones y reputación persistida con cálculo automático de promedios.
+- Geocodificación y mapas interactivos reales con Leaflet y OpenStreetMap.
+- Cifrado AES-256-GCM en reposo para coordenadas geográficas.
+- Fotos privadas con visibilidad por rol y volumen Docker dedicado.
+- Aceptación obligatoria de términos y condiciones en primer ingreso.
+- Temas claro y oscuro persistidos y sincronizados entre Angular y Keycloak.
 
-- Botones: radio uniforme de `8px` en todos los temas y componentes.
-- Inputs: cuadrados, según la guía visual del formulario.
-- Tarjetas y paneles: `16px`
-- Chips y badges: `999px` (píldora)
-- Sombras orgánicas: `0 2px 8px rgba(30, 41, 38, 0.04)`
-- Modales: `0 16px 40px rgba(30, 41, 38, 0.14)`
-
-### 17.4 Botones: qué hace cada variante y cómo se mueve
-
-Las cinco variantes de `.vu-btn` se distinguen por **relleno, no por tamaño**, y
-todas son accionables. La regla que hace que ninguna se pierda: **todo botón tiene
-fondo o borde**. La variante `quiet` es la única transparente, y por eso lleva
-`border-color: var(--line)`: sin ese borde, sobre el papel claro o dentro de una
-tarjeta blanca, el texto queda como una palabra suelta y no se sabe que se puede
-apretar.
-
-| Variante | Aspecto | Cuándo |
-|---|---|---|
-| `vu-btn--ink` | Relleno oscuro, texto claro | Acción principal de la pantalla |
-| `vu-btn--coral` | Relleno coral | Acción que crea algo nuevo |
-| `vu-btn--outline` | Fondo transparente con borde en claro; superficie clara y tinta oscura en oscuro | Acciones secundarias en grupo |
-| `vu-btn--quiet` | Borde tenue, sin relleno | Cancelar, cerrar, acciones terciarias |
-| `vu-btn--danger` | Relleno de alerta | Borrado y acciones irreversibles |
-
-Todos los botones HTML, enlaces-botón y toggles Material usan forma rectangular
-con radio de `8px`, incluidos los controles icon-only. En tema oscuro, `vu-btn--outline` usa fondo claro y tinta
-oscura para conservar contraste frente al primario sólido; `vu-btn--quiet`
-permanece transparente con borde más visible. Estas reglas se definen globalmente
-en `src/styles.css` y aplican en todas las páginas.
-
-**El hover solo cambia color, nunca mueve nada.** La transición es de
-`background-color`, `border-color` y `color`; no incluye `transform`. Un botón que
-se levanta con `translateY(-2px)` empuja el contenido de abajo en superficies
-chicas —la tarjeta de "solicitud enviada", los avisos de error— y el texto parece
-bailar dentro del botón. Un hover que mueve píxeles se nota en los elementos
-vecinos, y en un formulario lleno de campos eso se lee como salto. La respuesta al
-puntero tiene que ser "esto cambió de color", no "esto se movió".
-
-Los hovers de los controles que no son botones (días, categorías, sugerencias)
-mantienen su excepción: cambian el color del borde, que en una tarjeta no empuja
-nada porque la tarjeta no cambia de tamaño.
-
-### 17.5 Etiquetas de los botones
-
-Los rótulos dicen la **acción**, no la aspiración. Tres reglas:
-
-| Rótulo | Regla | Ejemplos |
-|---|---|---|
-| `Nuevo` / `Nueva` | Abre un formulario de alta | "Nueva solicitud", "Nuevo profesional", "Nueva categoría" |
-| `Guardar` | Confirma el envío de un formulario | "Guardar", "Guardando..." mientras espera |
-| Verbo de la acción | Cuando no es alta ni guardado | "Desactivar", "Eliminar", "Confirmar esta ubicación" |
-
-Una etiqueta como "Crear prerregistro" repite el nombre de la entidad que la
-pantalla ya dice en el título, y "Crear nueva solicitud" repite la palabra
-"nueva" que el botón ya tiene en el ícono `+`. Queda el verbo solo.
-
-### 17.6 Los formularios de alta no van sobre el listado
-
-El alta de un profesional (`/admin/profesionales/nuevo`) y de una categoría
-(`/admin/categorias/nueva`) son **pantallas propias**, no un panel que se abre
-encima de la grilla: con la lista cargada, el formulario quedaría arriba de veinte
-tarjetas y habría que scrollear para verlo. Además, el `+` del botón sugiere
-"agregar a la lista", no "ir a otra pantalla". La pantalla de alta tiene su
-encabezado, su "Volver" y un botón `Cancelar`, y al guardar devuelve a la lista
-con el aviso ya redactado (vía `navigate(..., { state })`).
-
-### 17.7 El mapa es real, no un dibujo
-
-La activación del perfil muestra un **Leaflet de verdad** con tiles de
-OpenStreetMap. Un dibujo con gradientes que imite un mapa se lee como un mapa y no
-tiene nada que ver con la dirección elegida.
-
-Hay dos mapas en el paso 2, con propósitos distintos:
-
-- **Vista de referencia** (`#zone-map`): solo lectura, sin arrastre ni zoom con
-  rueda. Muestra dónde quedó el punto para que el profesional se ubique.
-- **Modal "Ajustar en el mapa"** (`#activation-map`): interactivo, con búsqueda de
-  dirección, GPS y confirmación.
-
-El de referencia va en solo lectura a propósito: si se pudiera arrastrar el
-marcador ahí, competiría con el input de texto de arriba y nadie sabría cuál de
-los dos manda. El punto se ajusta en un solo lugar.
-
-**Las tiles en tema oscuro.** OpenStreetMap no publica un tema oscuro, así que el
-cuadrado blanco se invierte con un filtro sobre `.leaflet-tile-pane`
-(`invert` + `hue-rotate(180deg)`), que además devuelve los colores a su tono: sin
-el `hue-rotate`, el verde de los parques salía violeta. El marcador y los controles
-quedan fuera del filtro porque son nuestros y sí deben quedar en color de marca.
-
-### 17.8 Criterio
-
-La interfaz debe transmitir **calidez, seriedad universitaria y claridad técnica
-editorial**. No debe parecer una app corporativa genérica azul, ni una red social
-saturada. Por eso la paleta parte de un papel cálido y reserva el croma para lo
-que exige atención: estados y errores.
-
-Los valores viven en `src/styles.css` como custom properties, de modo que la
-implementación Angular y la maqueta comparten el mismo vocabulario visual.
-
-**Todo color que no sea un acento pasa por un token.** Cuando se agregan pantallas
-o estados, el color se declara en `styles.css` (o se reutiliza uno existente) y
-no en el CSS del componente. Es la condición para que el tema oscuro siga siendo
-correcto: si un color queda escrito a mano, el bloque oscuro no lo alcanza y
-aparece un parche del color anterior. La verificación es mecánica, y está en el
-[MANUAL §Tema claro y oscuro](MANUAL.md#tema-claro-y-oscuro).
+### 18.2 Deuda técnica registrada
+- **Pipeline de CI/CD:** Configuración de GitHub Actions para ejecución automatizada de pruebas y builds en cada pull request.
+- **Dominio productivo y correo institucional:** En producción se requiere registrar un dominio con políticas SPF, DKIM y DMARC y reemplazar las credenciales locales por un servicio como Amazon SES o SendGrid.
+- **Almacenamiento de fotos en S3:** Migrar de `FotoStorageLocal` a un backend compatible con Amazon S3 / MinIO para clusters multi-nodo.
 
 ---
 
 ## Anexo A. Términos y datos
-
-Ruta `/terminos`. Es a la vez los términos y la política de datos y cookies.
-
-**Por qué están en un solo documento.** La política de cookies no está aparte a
-propósito: la aplicación **no tiene cookies publicitarias, de analítica ni de
-terceros**, así que un documento propio prometería una privacidad que el usuario
-tendría que ir a buscar. Todo junto, con el pie del sitio apuntando directo a la
-sección de datos.
-
-**Las ocho secciones:**
-
-1. Qué es Vincula-UP
-2. Qué hace cada rol
-3. **Tus datos y el almacenamiento en tu navegador**
-4. Cómo entra un profesional al padrón
-5. Responsabilidad y alcance
-6. Cancelaciones y calificación
-7. Fotos de perfil
-8. Cambios en estos términos
-
-Debajo, el contacto (`vinculaup@gmail.com`) y la fecha de vigencia.
-
-La sección 3 dice, en términos llanos: que no hay cookies de seguimiento ni
-terceros y por eso no hay cartel de consentimiento; cuáles son las de sesión de
-autenticación; que el token vive en `localStorage` **con la limitación escrita**;
-qué datos se guardan; que la dirección exacta no se ve hasta que el profesional
-acepta; y la matriz de quién ve la foto de quién.
-
-**Cómo se mantiene.** El contenido vive como datos (`legal-doc.ts`) y la versión
-en `VERSION_TERMINOS`, que es la que compara el modal contra lo que hay guardado
-([§8.5](#85-aceptación-de-los-términos-y-condiciones)). Si se edita el texto, hay que **subir la
-versión** o el sistema no vuelve a pedir la aceptación.
-
-**Contacto:** `vinculaup@gmail.com`.
-
----
+Ruta `/terminos`. Documento único de términos de servicio y política de privacidad y cookies. Explica de forma accesible el almacenamiento local de tokens, las medidas de privacidad de ubicación y la protección de datos personales.
 
 ## Anexo B. Preguntas frecuentes
-
-Ruta `/preguntas-frecuentes`. Catorce preguntas agrupadas por momento de uso:
-
-| Grupo | Preguntas |
-|---|---|
-| Cuenta | Crear una cuenta · Olvidé la contraseña |
-| Tus datos | Quién ve mis datos · Quién ve mi foto · Qué ve el profesional de mi dirección |
-| Turnos | Cómo pido un servicio · Cancelar · Cómo funciona la calificación |
-| Trabajar en la red | Entrar al padrón · Qué falta para activar el perfil · Zonas y horarios |
-| Privacidad y ayuda | Cookies y rastreo · A quién escribo |
-
-Cada pregunta es una sección con `<details>` nativo: se abre y cierra sin
-JavaScript y funciona con teclado y lector de pantalla, que es justo lo que un
-`div` con click no da.
-
-Comparten el componente `legal-page` con los términos: mismo formato de índice
-lateral fijo en desktop y mismos tokens, así que el tema oscuro las revierte sin
-tocar estos archivos.
-
----
+Ruta `/preguntas-frecuentes`. Preguntas organizadas por categorías (Cuenta, Tus datos, Turnos, Trabajar en la red, Privacidad y ayuda) con controles accesibles nativos `<details>`.
 
 ## Anexo C. Tema claro y oscuro
-
-**Cómo se decide.** Tres estados en `TemaService`: `claro`, `oscuro` y `sistema`.
-La primera visita usa `sistema` (respeta `prefers-color-scheme`); desde ahí en
-adelante manda la elección, guardada en `localStorage` y en una cookie de mismo
-host bajo `vincula-up-tema`. La cookie comparte la preferencia con las pantallas
-de Keycloak aunque usen otro puerto. Si queda en `sistema`, sigue en vivo los
-cambios del ajuste del sistema con la app abierta.
-
-**Cómo se aplica.** Como atributo `data-tema` en `<html>`, que es lo que lee el
-bloque `[data-tema='oscuro']` de `styles.css`.
-
-El tema de acceso de Keycloak usa el mismo valor compartido: su layout ofrece un
-control accesible en login, registro y recuperación, y aplica la clase oscura de
-PatternFly junto con el atributo `data-tema`. Así el cambio elegido antes o
-durante la autenticación se conserva al volver a la SPA.
-
-**Por qué hay un script aparte en `index.html`.** Angular arranca después de que
-se pinte el primer fotograma, así que aplicar el tema desde el servicio dejaría
-un destello blanco en cada recarga para quien está en oscuro. El script inline
-corre **antes** y pone el atributo. Está escrito a mano y no importado de un
-archivo justamente porque un import de módulos llega tarde. **Tiene que coincidir
-con `TemaService`: misma clave, mismos valores.**
-
-**Los colores viven centralizados.** Los ~100 colores que usan los componentes
-están declarados como tokens en `styles.css`. Si un color queda escrito a mano en
-el CSS de un componente, el bloque `[data-tema='oscuro']` no lo alcanza y aparece
-un parche del color anterior en medio de la pantalla.
-
-| Familia | Tokens |
-|---|---|
-| Superficies | `--surface-input`, `-subtle`, `-tint`, `-sunken`, `-strong`, `--line-strong` |
-| Alertas | `--alert-{error,success,warning,info,neutral}-{bg,ink,border}` |
-| Sombras | `--shadow-color` y `--shadow-strength`, que multiplican a los cuatro tokens `--shadow-*` |
-| Sobre acento | `--on-accent`, `--deco-line` |
-| Sobre color sólido | `--on-solid` — tinta sobre coral, esmeralda o navy; siempre blanca, no se invierte |
-| Superficie oscura de marca | `--band-dark`, `--band-dark-hover`, `--band-ink`, `--band-ink-soft`, `--band-muted`, `--band-accent` |
-| Barra inferior | `--tabbar-h` — alto de la barra fija de móvil; el pie reserva ese espacio |
-| Velos | `--scrim` (fondo de los modales), `--bar-translucent` |
-
-**Lo que deliberadamente no se tocó:** los acentos (`coral`, `emerald`, `amber`,
-`navy`). Ya tienen contraste suficiente sobre fondo oscuro y son la identidad de
-la marca. Quedó fuera del sistema de tokens un solo color: el rojo del botón de
-peligro, que es un acento.
-
-**Las superficies que no cambian con el tema.** Los tokens `--band-*` y
-`--on-solid` se declaran una sola vez en `:root` y el bloque `[data-tema='oscuro']`
-no los toca. No es una excepción: son superficies cuyo color no depende del tema.
-
-La regla que hay que respetar es que **un token de tinta no se usa como fondo**.
-`--ink` es tinta, y por lo tanto se invierte: pasa a `#e8edea` en el tema oscuro. Si
-se lo usa de fondo, en oscuro el bloque queda claro, y si encima lleva tinta clara
-queda ilegible. Los tres casos donde se usa una superficie oscura fija son el botón
-primario `.vu-btn--ink`, la banda "Para egresados" de la portada y la burbuja
-propia del chat. El caso más llamativo era el botón primario: con `--ink` como
-fondo y `--surface-strong` en el hover, en tema oscuro el botón pasaba de blanco a
-casi negro al pasar el mouse, con la tinta oscura encima: **1.11:1** de contraste.
-Ahora es `#1e2926` con texto blanco en los dos temas (15:1).
-
-**La barra inferior de móvil.** Es `position: fixed` y ocupa el ancho de la
-pantalla, así que tapa lo que haya debajo. Su alto vive en `--tabbar-h` y lo
-comparten la barra, que lo aplica, y el pie, que reserva ese espacio a partir del
-mismo token. Si el número estuviera duplicado en los dos archivos, cualquier cambio
-en uno volvería a tapar el pie.
-
-**Las sombras son el caso que más delata.** Sobre fondo claro, una sombra verde
-al 3,5% casi no se ve. Sobre oscuro, directamente no se ve y las tarjetas quedan
-planas. Por eso el tema oscuro lleva `--shadow-strength: 2.6` y el color de sombra
-en negro puro.
-
-**Dónde está el botón:** en la navbar, antes del menú de usuario, para que también
-esté disponible sin sesión — cambiar el tema no pide iniciar sesión.
-
----
-
-*Fin de la especificación. Para el resumen ver [`README.md`](README.md), y para el
-uso y la operación, [`MANUAL.md`](MANUAL.md).*
-
+Gestión mediante `TemaService` en tres modos (`claro`, `oscuro`, `sistema`), atributo `data-tema` en `<html>`, soporte inline en `index.html` para evitar parpadeos y compatibilidad con PatternFly en las pantallas de acceso de Keycloak.

@@ -63,12 +63,12 @@ export class VuConfirm implements AfterViewInit {
 			role: 'alertdialog',
 		});
 		this.dialogRef.backdropClick().subscribe(() => this.cancelar());
-		this.dialogRef.keydownEvents().subscribe((event) => {
+		this.dialogRef.keydownEvents().subscribe((event: KeyboardEvent) => {
 			if (event.key === 'Escape') {
 				this.cancelar();
 			}
 		});
-		this.dialogRef.afterClosed().subscribe((result) => {
+		this.dialogRef.afterClosed().subscribe((result: string | undefined) => {
 			if (result !== 'confirm' && result !== 'cancel') {
 				this.cancelado.emit();
 			}

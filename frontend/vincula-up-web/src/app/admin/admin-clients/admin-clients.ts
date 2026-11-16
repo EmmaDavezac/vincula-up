@@ -119,6 +119,12 @@ export class AdminClients {
 		forkJoin({
 			clientes: this.api.getUsers('CLIENTE').pipe(
 				map((items) => (items ?? []) as AdminUser[]),
+				// Map fotoUrl y tieneFoto para el avatar
+				map(users => users.map(u => ({
+					...u,
+					fotoUrl: u.fotoUrl?.trim() || '',
+					tieneFoto: Boolean(u.tieneFoto) || Boolean(u.fotoUrl && u.fotoUrl.trim().length > 0),
+				}))),
 				catchError((error) => {
 					this.aviso.set(avisoError(this.api.describeError(error, 'No se pudo cargar la lista de clientes.')));
 					return of([] as AdminUser[]);

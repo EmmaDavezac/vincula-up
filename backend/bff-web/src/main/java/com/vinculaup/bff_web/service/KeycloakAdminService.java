@@ -105,7 +105,7 @@ public class KeycloakAdminService {
         if (!habilitado() || keycloakUserId == null) {
             return false;
         }
-        Optional<String> token = token();
+        Optional<String> token = tokenDeServicio();
         if (token.isEmpty()) {
             return false;
         }
@@ -146,7 +146,7 @@ public class KeycloakAdminService {
                 || passwordTemporal == null || passwordTemporal.isBlank()) {
             return null;
         }
-        Optional<String> token = token();
+        Optional<String> token = tokenDeServicio();
         if (token.isEmpty()) {
             return null;
         }
@@ -189,7 +189,7 @@ public class KeycloakAdminService {
         if (!habilitado() || email == null || email.isBlank()) {
             return Optional.empty();
         }
-        Optional<String> token = token();
+        Optional<String> token = tokenDeServicio();
         if (token.isEmpty()) {
             return Optional.empty();
         }
@@ -222,7 +222,7 @@ public class KeycloakAdminService {
         if (!habilitado() || keycloakUserId == null || accion == null || accion.isBlank()) {
             return null;
         }
-        Optional<String> token = token();
+        Optional<String> token = tokenDeServicio();
         if (token.isEmpty()) {
             return null;
         }
@@ -261,7 +261,7 @@ public class KeycloakAdminService {
                 || passwordTemporal == null || passwordTemporal.isBlank()) {
             return false;
         }
-        Optional<String> token = token();
+        Optional<String> token = tokenDeServicio();
         if (token.isEmpty()) {
             return false;
         }
@@ -301,7 +301,7 @@ public class KeycloakAdminService {
         if (!habilitado() || keycloakUserId == null) {
             return;
         }
-        Optional<String> token = token();
+        Optional<String> token = tokenDeServicio();
         if (token.isEmpty()) {
             return;
         }
@@ -345,7 +345,7 @@ public class KeycloakAdminService {
     }
 
     /** Token de servicio con cache: se renueva 30s antes de expirar. */
-    private Optional<String> token() {
+    public Optional<String> tokenDeServicio() {
         if (cachedToken != null && Instant.now().isBefore(cachedTokenExpiry)) {
             return Optional.of(cachedToken);
         }

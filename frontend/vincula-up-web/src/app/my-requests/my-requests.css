@@ -747,3 +747,67 @@
 	font-size: 0.8125rem;
 	margin: 0;
 }
+
+/* Mapa de la tarjeta: sin controles, sin zoom ni arrastre.
+   El iframe se agranda y el contenedor (overflow: hidden) recorta
+   el zoom (arriba izquierda) y la atribución (abajo). */
+.embedded-map--static {
+	height: calc(100% + 180px);
+	inset: -90px -60px;
+	pointer-events: none;
+	position: absolute;
+	width: calc(100% + 120px);
+}
+
+.req-card__map-expand {
+	align-items: center;
+	background: var(--surface-card);
+	border: 1px solid var(--line);
+	border-radius: 0.5rem;
+	box-shadow: var(--shadow-sm);
+	color: var(--ink);
+	cursor: pointer;
+	display: inline-flex;
+	height: 2rem;
+	justify-content: center;
+	padding: 0;
+	position: absolute;
+	right: 0.5rem;
+	top: 0.5rem;
+	width: 2rem;
+	z-index: 7;
+}
+
+.req-card__map-expand:hover {
+	background: var(--surface-highlight);
+	border-color: var(--muted);
+}
+
+.req-card__map-expand:focus-visible {
+	outline: 2px solid var(--coral);
+	outline-offset: 2px;
+}
+
+.req-card__map-hit {
+	background: transparent;
+	border: 0;
+	cursor: pointer;
+	inset: 0;
+	padding: 0;
+	position: absolute;
+	z-index: 6;
+}
+
+.req-card__map-hit:focus-visible {
+	outline: 2px solid var(--coral);
+	outline-offset: -2px;
+}
+
+/* Mapa del modal: interactivo */
+.map-modal__frame {
+	border: 1px solid var(--line);
+	border-radius: 0.5rem;
+	height: min(60vh, 28rem);
+	overflow: hidden;
+	width: 100%;
+}

@@ -172,7 +172,14 @@ public class BackendGateway {
     }
 
     public JsonNode buscarUsuarioPorEmail(String email) {
-        return ejecutar(() -> usuarios.buscarPorEmail(email));
+        try {
+            return ejecutar(() -> usuarios.buscarPorEmail(email));
+        } catch (ResponseStatusException e) {
+            if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
+                return null;
+            }
+            throw e;
+        }
     }
 
     public JsonNode buscarUsuarioPorId(UUID id) {
@@ -223,6 +230,10 @@ public class BackendGateway {
 
     public JsonNode cancelarSolicitud(UUID id, JsonNode body) {
         return ejecutar(() -> solicitudes.cancelar(id, body));
+    }
+
+    public JsonNode expirarSolicitudesPendientes() {
+        return ejecutar(() -> solicitudes.expirarPendientes());
     }
 
     /* ── Utilidades ───────────────────────────────────────────────────── */

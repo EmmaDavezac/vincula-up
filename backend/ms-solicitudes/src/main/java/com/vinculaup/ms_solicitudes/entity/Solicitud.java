@@ -1,5 +1,6 @@
 package com.vinculaup.ms_solicitudes.entity;
 
+import com.vinculaup.ms_solicitudes.config.SolicitudExpiradaException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -93,6 +94,14 @@ public class Solicitud {
 
     private String motivoCancelacion;
 
+    /** Fecha y hora en que la solicitud expirará si permanece PENDIENTE. Nula = sin vencimiento. */
+    @Column(name = "fecha_expiracion", nullable = true, columnDefinition = "TIMESTAMP")
+    private LocalDateTime fechaExpiracion;
+
+    /** Indica si la solicitud debe considerarse vencida automáticamente */
+    @Column(name = "es_vencible", nullable = false)
+    private Boolean esVencible = true;
+
     /**
      * Identificador de quien canceló (el {@code clienteId} o el {@code profesionalId}
      * de la solicitud). Antes no se guardaba y las dos partes veían el mismo texto
@@ -114,12 +123,19 @@ public class Solicitud {
             Double latitud, Double longitud, LocalDateTime fechaHoraPropuesta, String descripcion,
             LocalDateTime fechaHoraFinPropuesta) {
         this(clienteId, profesionalId, especialidadId, direccionServicio, null,
-                latitud, longitud, fechaHoraPropuesta, descripcion, fechaHoraFinPropuesta);
+                latitud, longitud, fechaHoraPropuesta, descripcion, fechaHoraFinPropuesta, 24.0);
     }
 
     public Solicitud(UUID clienteId, UUID profesionalId, UUID especialidadId, String direccionServicio,
             String zonaAproximada, Double latitud, Double longitud, LocalDateTime fechaHoraPropuesta,
             String descripcion, LocalDateTime fechaHoraFinPropuesta) {
+        this(clienteId, profesionalId, especialidadId, direccionServicio, zonaAproximada,
+                latitud, longitud, fechaHoraPropuesta, descripcion, fechaHoraFinPropuesta, 24.0);
+    }
+
+    public Solicitud(UUID clienteId, UUID profesionalId, UUID especialidadId, String direccionServicio,
+            String zonaAproximada, Double latitud, Double longitud, LocalDateTime fechaHoraPropuesta,
+            String descripcion, LocalDateTime fechaHoraFinPropuesta, double tiempoExpiracionHours) {
         this.clienteId = clienteId;
         this.profesionalId = profesionalId;
         this.especialidadId = especialidadId;
@@ -133,6 +149,11 @@ public class Solicitud {
         this.estado = EstadoSolicitud.PENDIENTE;
         this.fechaCreacion = LocalDateTime.now();
         this.fechaCambioEstado = this.fechaCreacion;
+        this.esVencible = tiempoExpiracionHours > 0;
+        long minutos = Math.round(tiempoExpiracionHours * 60.0);
+        this.fechaExpiracion = (tiempoExpiracionHours > 0 && minutos > 0)
+                ? this.fechaCreacion.plusMinutes(minutos)
+                : null;
     }
 
     public UUID getId() { return id; }
@@ -175,14 +196,37 @@ public class Solicitud {
     }
     public LocalDateTime getFechaHoraPropuesta() { return fechaHoraPropuesta; }
     public LocalDateTime getFechaHoraFinPropuesta() { return fechaHoraFinPropuesta; }
-    public EstadoSolicitud getEstado() { return estado; }
+    public EstadoSolicitud getEstado() {
+        if (isExpirada()) {
+            return EstadoSolicitud.VENCIDA;
+        }
+        return estado;
+    }
     public String getMotivoCancelacion() { return motivoCancelacion; }
     public UUID getCanceladaPor() { return canceladaPor; }
     public LocalDateTime getFechaCreacion() { return fechaCreacion; }
     public LocalDateTime getFechaCambioEstado() { return fechaCambioEstado; }
+    public LocalDateTime getFechaExpiracion() { return fechaExpiracion; }
+    public Boolean getEsVencible() { return esVencible; }
+
+    public boolean isExpirada() {
+        return this.estado == EstadoSolicitud.PENDIENTE
+                && Boolean.TRUE.equals(this.esVencible)
+                && this.fechaExpiracion != null
+                && LocalDateTime.now().isAfter(this.fechaExpiracion);
+    }
 
     public void cambiarEstado(EstadoSolicitud nuevoEstado) {
+        if (isExpirada() && nuevoEstado != EstadoSolicitud.VENCIDA) {
+            throw new SolicitudExpiradaException("Esta solicitud ha expirado y no puede tener su estado modificado");
+        }
         this.estado = nuevoEstado;
+        this.fechaCambioEstado = LocalDateTime.now();
+    }
+
+    public void expirar(String motivo) {
+        this.motivoCancelacion = motivo;
+        this.estado = EstadoSolicitud.VENCIDA;
         this.fechaCambioEstado = LocalDateTime.now();
     }
 

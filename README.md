@@ -1,29 +1,53 @@
-# Vincula-UP
+# Vincula-UP — Red Técnica con Respaldo Universitario
 
-Plataforma de vinculación entre clientes y profesionales de oficios técnicos, con
-respaldo institucional de la Universidad Popular de Concepción del Uruguay.
+> *“Antes de que entre a tu casa, ya lo conocemos nosotros”*
 
-Un cliente pide un turno, un profesional lo acepta o rechaza, coordinan por chat
-y el cliente califica.
+Plataforma web (PWA) de inserción laboral para egresados de oficios técnicos de la **Universidad Popular de Concepción del Uruguay (UP)**, desarrollada en el marco del **Proyecto Final de Carrera (PFC) de Ingeniería en Sistemas de Información** en la **Universidad Tecnológica Nacional — Facultad Regional Concepción del Uruguay (UTN - FRCU)**.
 
-## Stack
+### Equipo del Proyecto
+- **Docentes:** Lucas Scheider · Adrian Tournour
+- **Alumnos:**
+  - Davezac, Luciano Emmanuel (`LD`) — Backend
+  - Morales, Nicolas (`NM`) — Infraestructura, integración en BFF y pruebas
+  - Velazquez, Julian (`JV`) — Historias de usuario
+  - Vergara, Agustin (`AV`) — Frontend
+  - Villanueva, Antonio Nicolas (`NV`) — Relevamiento, modelado de datos y testing
 
-| Capa | Tecnología |
-|---|---|
-| Backend | Java 21 · Spring Boot 4 · 4 microservicios detrás de un BFF |
-| Frontend | Angular 22 |
-| Identidad | Keycloak (login con email y contraseña) |
-| Datos | PostgreSQL |
+---
 
-No hace falta Node ni Java: todo compila dentro de Docker.
+## Descripción del Proyecto y Problemática
 
-Todo se levanta con Docker.
+Hoy, cuando un vecino o una empresa busca un técnico egresado en la región, el proceso es analógico y desestructurado (consulta manual del Libro Matriz y triangulación con docentes), demorando entre 2 y 3 días hábiles.
+Vincula-UP sistematiza y moderniza esta vinculación:
+1. **Búsqueda y solicitud:** El cliente busca por oficio y cercanía geográfica, describe el trabajo y elige día/horario.
+2. **Privacidad:** La dirección exacta permanece oculta al profesional hasta que acepta el turno (ve solo zona y punto aproximado a ~1.1 km).
+3. **Gestión de turnos:** El profesional acepta o rechaza indicando motivo obligatorio, validando no superposición de horarios.
+4. **Coordinación:** Ambos participantes coordinan detalles mediante chat en tiempo real por WebSocket.
+5. **Cierre y reputación:** Al completarse el trabajo, el cliente califica el servicio con estrellas y comentario.
+
+## Stack Tecnológico
+
+| Capa | Tecnología | Detalle |
+|---|---|---|
+| **Backend** | Java 21 · Spring Boot 4 | 3 microservicios de dominio (`ms-usuarios`, `ms-profesionales`, `ms-solicitudes`) detrás de un BFF (`bff-web`) |
+| **Frontend** | Angular 22 | PWA con componentes standalone, signals y Angular Material |
+| **Identidad** | Keycloak 26 | Autenticación OIDC + PKCE S256, roles y validación JWKS |
+| **Persistencia** | PostgreSQL 16 | Base de datos relacional para datos de negocio |
+| **Archivos** | Volumen Docker `fotos_data` | Almacenamiento privado de fotos fuera de la base de datos relacional |
+| **Tiempo Real** | WebSocket + STOMP | Mensajería de chat en vivo y notificaciones reactivas |
+| **Geolocalización** | OpenStreetMap / Nominatim | Geocodificación y orden por cercanía con caché y rate limiting |
+| **Infraestructura** | Docker Compose + Nginx 1.27 | Proxy inverso, terminación TLS y enrutamiento con buffers |
+
+Todo el entorno se ejecuta mediante Docker: no se requiere instalar Node ni Java en la máquina host.
 
 ---
 
 ## Deploy local desde cero
 
-Son 5 pasos y la primera vez tarda unos minutos.
+La configuración del realm de Keycloak se aplica automáticamente al levantar
+Docker. Para el entorno local solo hay que preparar el host y confiar en la CA
+de desarrollo; `.env` es opcional si se usan los valores de demo. Después, un
+único comando construye y arranca todo el stack.
 
 ### 1. Requisitos
 
@@ -54,12 +78,19 @@ El repositorio trae una CA de desarrollo (`nginx/certs/ca.crt`). Instalala asi:
 
 > Importa siempre `ca.crt` (la CA), nunca `server.crt`.
 
-### 3. Preparar el `.env`
+### 3. Configuración opcional
 
-El `.env` guarda los secretos y **no se versiona**:
+Compose trae valores por defecto para desarrollo local. Si querés personalizarlos,
+creá `.env` desde la plantilla; el archivo real guarda secretos y **no se versiona**.
 
+**Linux / macOS:**
 ```bash
 cp .env.example .env
+```
+
+**Windows PowerShell:**
+```powershell
+Copy-Item .env.example .env
 ```
 
 > Si te pasaron un `.env` ya configurado, usa ese.
@@ -67,22 +98,45 @@ cp .env.example .env
 ### 4. Levantar la aplicación
 
 ```bash
-docker compose up --build
+# Despliegue rápido (importa CA, crea .env, levanta stack y bootstrap Keycloak)
+./scripts/deploy.sh  # script que importa CA, crea .env, levanta el stack y bootstrap Keycloak en un solo paso
 ```
 
-La primera vez tarda unos minutos. Para dejarlo en segundo plano, agrega `-d`.
+#### Opción 1: Despliegue totalmente automatizado
+```bash
+# Importa CA, crea .env, levanta stack y bootstrap Keycloak
+./scripts/deploy.sh  # script que importa CA, crea .env, levanta el stack y bootstrap Keycloak en un solo paso
+```
 
-### 5. Importar el realm de Keycloak
+#### Opción 2: Despliegue manual (pasos por separado)
+```bash
+# Importar la CA (Linux/macOS)
+bash scripts/linux-macos/import-ca.sh
 
-Con los contenedores ya arriba (el script aplica el auto-registro, el rol por
-defecto, el client de servicio y el SMTP):
+# Crear .env si no existe (usar la plantilla)
+cp .env.example .env   # o ajusta según necesites
+
+# Levantar el stack (rebuild)
+docker compose up --build -d
+
+# Ejecutar bootstrap de Keycloak (opcional, para realms existentes)
+bash scripts/linux-macos/keycloak-bootstrap.sh
+```
+
+La primera vez puede tardar varios minutos: Docker compila los microservicios y
+Angular, inicia PostgreSQL y Keycloak, importa el realm, ejecuta `keycloak-init`
+(registro, roles, client de servicio, permisos, SMTP y temas) y, al finalizar,
+arranca el BFF y Nginx. El init es idempotente y se ejecuta antes del BFF. En
+una instalación nueva no hay que correr el bootstrap de Keycloak manualmente.
+
+Para revisar el progreso: `docker compose ps` y `docker compose logs -f keycloak-init`.
+
+El bootstrap del host queda como herramienta de recuperación para realms existentes
+que no hayan ejecutado el init actualizado, o para sincronizar manualmente los
+redirects del cliente público:
 
 **Linux:** `./scripts/linux-macos/keycloak-bootstrap.sh`
 **Windows:** `powershell -ExecutionPolicy Bypass -File .\scripts\windows\keycloak-bootstrap.ps1`
-
-> Sin este paso, el registro de usuarios no funciona. Es idempotente: se puede
-> volver a correr sin romper nada. Tambien hay que repetirlo despues de un
-> `docker compose down -v`.
 
 ### Cómo entrar
 
@@ -101,7 +155,8 @@ docker compose down       # apaga todo (conserva los datos)
 ```
 
 > `docker compose down -v` además borra la base de datos. Después hay que
-> repetir el paso 5.
+> volver a levantar el stack; Keycloak importará el realm y `keycloak-init`
+> aplicará automáticamente su configuración.
 
 ---
 
@@ -109,3 +164,5 @@ docker compose down       # apaga todo (conserva los datos)
 
 - [`MANUAL.md`](MANUAL.md)
 - [`ESPECIFICACION.md`](ESPECIFICACION.md)
+- [`Entrega Proyecto Final Grupo 5.md`](Entrega%20Proyecto%20Final%20Grupo%205.md) — Informe de la entrega parcial final del Proyecto Final de Carrera (PFC)
+- [`MVP Grupo 8- DACS.md`](MVP%20Grupo%208-%20DACS.md) — Informe del MVP desarrollado en DACS

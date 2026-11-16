@@ -100,6 +100,16 @@ public class SolicitudExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
 
+    @ExceptionHandler(SolicitudExpiradaException.class)
+    public ResponseEntity<Map<String, Object>> handleSolicitudExpirada(SolicitudExpiradaException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", Instant.now().toString());
+        body.put("status", HttpStatus.CONFLICT.value());
+        body.put("error", "Conflict");
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleUnexpected(Exception ex) {
         Logger log = LoggerFactory.getLogger(SolicitudExceptionHandler.class);

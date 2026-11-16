@@ -77,6 +77,11 @@ export class AdminProfessionals {
 		this.confirmacion.set(null);
 	}
 
+	/** Navega a la pantalla de alta de un nuevo profesional */
+	abrirNuevoProfesional(): void {
+    this.router.navigate(['/admin/profesionales/nuevo']);
+  }
+
 	/** Cuentas de los profesionales: traen email, teléfono y la foto real. */
 	private readonly cuentas = signal<ReadonlyMap<string, AdminUser>>(new Map());
 

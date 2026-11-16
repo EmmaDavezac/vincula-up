@@ -84,7 +84,7 @@
       "credentials": [
         { "type": "password", "value": "password", "temporary": false }
       ],
-      "realmRoles": ["CLIENTE"]
+      "realmRoles": ["default-roles-vincula-up", "CLIENTE"]
     },
     {
       "id": "22222222-2222-2222-2222-222222222222",
@@ -97,7 +97,7 @@
       "credentials": [
         { "type": "password", "value": "password", "temporary": false }
       ],
-      "realmRoles": ["PROFESIONAL"]
+      "realmRoles": ["default-roles-vincula-up", "PROFESIONAL"]
     },
     {
       "id": "33333333-3333-3333-3333-333333333333",
@@ -110,7 +110,7 @@
       "credentials": [
         { "type": "password", "value": "password", "temporary": false }
       ],
-      "realmRoles": ["ADMIN"]
+      "realmRoles": ["default-roles-vincula-up", "ADMIN"]
     },
     {
       "username": "service-account-vincula-up-admin",

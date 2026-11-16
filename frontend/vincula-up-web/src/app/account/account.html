@@ -29,6 +29,7 @@
         <div class="hero-info">
           <h2 class="vu-h2">{{ fullName() }}</h2>
           <p class="hero-email">{{ user.email }}</p>
+          <p class="hint">Tu foto y nombre visibles en la plataforma.</p>
           <div class="hero-badges">
             @if (memberSince()) {
               <span class="hero-since">Miembro desde {{ memberSince() }}</span>
@@ -54,7 +55,7 @@
       <!-- Reputación (solo profesionales) -->
       @if (esProfesional()) {
         <div class="card">
-          <div class="card-head"><div><h2 class="vu-h3">Tu reputación</h2><p class="hint">Lo que dicen los vecinos que ya te/brindaron un servicio.</p></div></div>
+          <div class="card-head"><div><h2 class="vu-h3">Tu reputación</h2><p class="hint">Reseñas y calificaciones que recibiste de tus clientes.</p></div></div>
           @if (reputacionError()) {
             <p class="error" role="alert">{{ reputacionError() }}</p>
           } @else if (reputacion(); as rep) {
@@ -91,7 +92,7 @@
 
       <!-- Datos personales -->
       <div class="card">
-        <div class="card-head"><div><h2 class="vu-h3">Datos personales</h2><p class="hint">Tu nombre como aparece en la plataforma.</p></div></div>
+        <div class="card-head"><div><h2 class="vu-h3">Datos personales</h2><p class="hint">Nombre y apellido que se muestran en tu perfil.</p></div></div>
         @if (editing() !== 'personal') {
           <button type="button" class="vu-btn vu-btn--quiet vu-btn--sm link" (click)="startEdit('personal')">Editar</button>
         }
@@ -115,7 +116,7 @@
 
       <!-- Contacto -->
       <div class="card">
-        <div class="card-head"><div><h2 class="vu-h3">Contacto</h2><p class="hint">Cómo te ubican los profesionales y la universidad.</p></div></div>
+        <div class="card-head"><div><h2 class="vu-h3">Contacto</h2><p class="hint">Teléfono para coordinar servicios y correo asociado a tu cuenta.</p></div></div>
         @if (editing() !== 'contact') {
           <button type="button" class="vu-btn vu-btn--quiet vu-btn--sm link" (click)="startEdit('contact')">Editar</button>
         }
@@ -147,7 +148,7 @@
 
       <!-- Seguridad -->
       <div class="card">
-        <div class="card-head"><div><h2 class="vu-h3">Seguridad</h2></div></div>
+        <div class="card-head"><div><h2 class="vu-h3">Seguridad</h2><p class="hint">Actualizá la contraseña que usás para ingresar a Vincula-UP.</p></div></div>
         <button type="button" class="vu-btn vu-btn--ink primary" (click)="openPasswordChange()">Cambiar contraseña</button>
       </div>
 

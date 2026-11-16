@@ -3,9 +3,8 @@ node_modules/
 dist/
 .angular/
 .sass-cache/
+frontend/**/src/**/*.js
 
-# Documentacion de referencia
-/Docs
 
 # Build de Java
 **/target/

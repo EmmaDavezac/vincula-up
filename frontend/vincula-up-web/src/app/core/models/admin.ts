@@ -37,6 +37,8 @@ export interface AdminUser {
 	 */
 	tieneFoto?: boolean;
 	rolNegocio: string;
+    // URL de la foto si el backend la proporciona (data URL)
+    fotoUrl?: string;
 	estado?: string;
 	keycloakId?: string | null;
 	fechaAlta?: string;

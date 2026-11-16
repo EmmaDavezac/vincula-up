@@ -446,10 +446,10 @@ export class Activation {
         navigator.geolocation.getCurrentPosition(
           (pos) => onExito(pos.coords.latitude, pos.coords.longitude),
           (err2) => void intentarFallback(err2.code),
-          { timeout: 4000, maximumAge: 60000, enableHighAccuracy: true },
+          { timeout: 15000, maximumAge: 60000, enableHighAccuracy: false },
         );
       },
-      { timeout: 6000, maximumAge: 300000, enableHighAccuracy: false },
+      { timeout: 12000, maximumAge: 0, enableHighAccuracy: true },
     );
   }
 

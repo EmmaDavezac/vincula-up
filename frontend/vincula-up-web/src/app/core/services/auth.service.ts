@@ -624,8 +624,15 @@ export class AuthService {
           }
           return cuenta;
         }),
-        catchError(() => {
+        catchError((error: HttpErrorResponse) => {
           this.photoRequested = false;
+          // Si el usuario ya no existe en la BD (404) o el token fue rechazado (401),
+          // la sesión local es inválida. Hacemos logout automático para que el usuario
+          // pueda volver a iniciar sesión limpiamente sin borrar cookies a mano.
+          if (error.status === 401 || error.status === 404) {
+            this.logout();
+            return of(null);
+          }
           this.cuentaConsultada.set(true);
           this.errorConsultaCuenta.set(true);
           return of(null);

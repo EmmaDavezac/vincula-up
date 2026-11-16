@@ -133,6 +133,24 @@ Invoke-Kcadm update "realms/$realm" `
 # que se auto-registre entra como cliente y el BFF acepta su rol de negocio.
 Invoke-Kcadm add-roles -r $realm --rname "default-roles-$realm" --rolename CLIENTE
 
+# Los usuarios de demo vienen del import con realmRoles explícitos y, sin este
+# rol compuesto, no tienen los roles del client 'account' (manage-account). Sin
+# ellos el token no lleva 'account' en el 'aud' y la consola de cuenta
+# (/realms/<realm>/account) responde 401 al cambiar la contraseña. Es idempotente
+# y se saltea a los que no existan.
+Write-Host "==> Asignando default-roles-$realm a los usuarios de demo (consola de cuenta)"
+foreach ($demoUser in @('cliente@vincula-up.local', 'profesional@vincula-up.local', 'admin@vincula-up.local')) {
+    $demoId = (docker exec -i $Container $kcadm get users -r $realm `
+        -q "username=$demoUser" --fields id --format csv --noquotes |
+        Select-Object -Last 1)
+    if (-not $demoId -or -not $demoId.Trim()) {
+        Write-Host "    $demoUser no existe en el realm: se omite."
+        continue
+    }
+    Invoke-Kcadm add-roles -r $realm --uusername $demoUser --rolename "default-roles-$realm"
+    Write-Host "    ${demoUser}: ok"
+}
+
 # ── 2. Client de servicio ───────────────────────────────────────────────────
 Write-Host "==> Verificando el client de servicio $adminClientId"
 $clientUuid = (docker exec -i $Container $kcadm get clients -r $realm `
