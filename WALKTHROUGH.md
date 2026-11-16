@@ -572,6 +572,13 @@
 - **Verificación:** Compilación del BFF, `npm --prefix frontend/vincula-up-web run build` y reconstrucción de `bff-web`/`nginx`.
 - **Especificación:** Sin cambios en rutas ni contratos.
 
+### [2026-11-16] - fix: mostrar hover y cursor en el acceso de la landing
+- **Objetivo:** Hacer evidente que el botón «Ingresar» de la barra superior es interactivo.
+- **Cambios realizados:**
+  - Se declara el cursor de acción y el cambio de fondo al pasar sobre el botón, usando el token de hover del primario.
+  - Archivo modificado: `frontend/vincula-up-web/src/app/shared/navbar/navbar.css`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build`.
+
 ### [2026-10-31] - ux: ordenar acciones y simplificar datos de Mi cuenta
 - **Objetivo:** Alinear las acciones de todas las secciones de Mi cuenta y retirar aclaraciones obsoletas de email y contraseña.
 - **Cambios realizados:**

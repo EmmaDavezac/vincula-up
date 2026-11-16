@@ -276,9 +276,14 @@ z-index 70 compite de verdad contra el 50 de la barra.
 
 /* En mobile, "Ingresar" viene del tabbar: el botón primario se oculta. */
 .auth-action--cta {
+	cursor: pointer;
 	display: none;
 	font-size: 0.75rem;
 	padding: 0.625rem 0.75rem;
+}
+
+.auth-action--cta:hover:not(:disabled) {
+	background-color: var(--band-dark-hover);
 }
 
 @media (min-width: 1024px) {
