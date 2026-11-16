@@ -54,7 +54,7 @@
 						}
 					</div>
 
-					<div class="admin-categories__actions">
+					<div class="admin-categories__actions vu-admin-row-actions">
 						@if (renamingId() === category.id) {
 							<button type="button" class="vu-btn vu-btn--ink vu-btn--sm" (click)="saveRename(category)" [disabled]="busy()">
 								{{ busy() ? 'Guardando...' : 'Guardar' }}

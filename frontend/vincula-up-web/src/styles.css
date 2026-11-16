@@ -1566,6 +1566,22 @@ button.mat-mdc-button.vu-btn--quiet {
 	flex: 0 0 auto;
 }
 
+.vu-admin-row-actions {
+	align-items: stretch;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	min-width: 0;
+}
+
+.vu-admin-row-actions > .vu-btn {
+	justify-content: center;
+	min-height: 2.75rem;
+	text-align: center;
+	white-space: normal;
+	width: 100%;
+}
+
 .vu-admin-list-count {
 	color: var(--coral);
 	font-size: 0.8rem;

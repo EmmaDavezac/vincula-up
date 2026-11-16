@@ -137,17 +137,6 @@
 	margin: 0;
 }
 
-/* 5. Acciones: botón a todo el ancho en mobile */
-.admin-professionals__actions {
-	display: flex;
-	flex-direction: column;
-	gap: 0.5rem;
-	min-width: 0;
-}
-
-.admin-professionals__actions .vu-btn {
-	width: 100%;
-}
 .admin-professionals__row .vu-admin-field-label {
 	display: block;
 }
@@ -183,18 +172,6 @@
 		display: none;
 	}
 
-		.admin-professionals__actions {
-		align-items: stretch;
-		flex-direction: column;
-		justify-content: center;
-	}
-
-	.admin-professionals__actions .vu-btn {
-		justify-content: center;
-		text-align: center;
-		white-space: nowrap;
-		width: 100%;
-	}
 }
 .admin-professionals__search {
   margin-bottom: 1rem;

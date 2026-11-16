@@ -25,6 +25,47 @@
 
 ## Historial
 
+### [2026-11-16] - ux: unificar botones de acción en listados de administración
+- **Objetivo:** Dar una presentación consistente a las acciones de las filas de profesionales, categorías y clientes.
+- **Cambios realizados:**
+  - Se agrega el estilo compartido `.vu-admin-row-actions` para apilar los botones, igualar ancho, alineación, separación y altura mínima.
+  - Se conservan las variantes semánticas existentes para acciones primarias, secundarias y destructivas.
+  - Se eliminan reglas locales redundantes de los tres listados.
+  - Archivos modificados: `frontend/vincula-up-web/src/styles.css` y los templates/estilos de profesionales, categorías y clientes bajo `frontend/vincula-up-web/src/app/admin/`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build`.
+
+### [2026-11-16] - fix: agregar mi cuenta a la barra móvil de administración
+- **Objetivo:** Mantener accesible la cuenta del administrador en móvil tras ocultar el acceso duplicado del menú superior.
+- **Cambios realizados:**
+  - Se agrega «Mi cuenta» a la barra inferior de administración, que enlaza a `/mi-cuenta`.
+  - Archivo modificado: `frontend/vincula-up-web/src/app/shared/tabbar/tabbar.ts`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build`.
+
+### [2026-11-16] - fix: evitar duplicar mi cuenta en navegación móvil
+- **Objetivo:** Evitar que «Mi cuenta» aparezca simultáneamente en el menú superior y en la barra inferior de móvil.
+- **Cambios realizados:**
+  - El acceso «Mi cuenta» del menú de usuario se oculta en móvil, donde permanece disponible en la barra inferior según el rol.
+  - En escritorio el acceso del menú superior se mantiene, ya que la barra inferior no se muestra.
+  - Archivos modificados: `frontend/vincula-up-web/src/app/shared/navbar/navbar.html` y `frontend/vincula-up-web/src/app/shared/navbar/navbar.css`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build`.
+
+### [2026-11-16] - ux: priorizar solicitudes en la barra inferior
+- **Objetivo:** Facilitar el acceso a la tarea principal de clientes y profesionales desde la navegación móvil.
+- **Cambios realizados:**
+  - Se elimina «Inicio» de la barra inferior para clientes y profesionales.
+  - Se etiqueta `/solicitudes` como «Enviadas» para clientes y «Recibidas» para profesionales.
+  - Visitantes y administradores conservan sus secciones actuales.
+  - Archivo modificado: `frontend/vincula-up-web/src/app/shared/tabbar/tabbar.ts`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build`.
+
+### [2026-11-16] - ux: agregar descripciones a las secciones de mi cuenta
+- **Objetivo:** Explicar brevemente qué información contiene cada sección de «Mi cuenta».
+- **Cambios realizados:**
+  - Se agregan o afinan descripciones para el perfil, la reputación, los datos personales, el contacto y la seguridad.
+  - Se reutiliza el estilo de ayuda existente sin introducir colores ni estilos nuevos.
+  - Archivo modificado: `frontend/vincula-up-web/src/app/account/account.html`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build`.
+
 ### [2026-11-16] - fix: dar estilo de botón secundario a crear cuenta
 - **Objetivo:** Hacer que «Crear cuenta» se reconozca como una acción y acompañe visualmente al acceso primario.
 - **Cambios realizados:**

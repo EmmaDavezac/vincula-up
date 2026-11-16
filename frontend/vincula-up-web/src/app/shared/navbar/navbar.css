@@ -479,3 +479,9 @@ z-index 70 compite de verdad contra el 50 de la barra.
 .user-menu__item--danger:hover {
 	background: var(--alert-error-bg);
 }
+
+@media (max-width: 1023px) {
+	.user-menu__item--account {
+		display: none;
+	}
+}
