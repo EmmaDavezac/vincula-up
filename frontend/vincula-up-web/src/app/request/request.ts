@@ -92,7 +92,7 @@ readonly filteredSpecialties = computed(() => {
    * caracter suelto.
    */
   readonly problemSummary = signal('');
-  readonly MIN_SUMMARY_LENGTH = 10;
+  readonly MIN_SUMMARY_LENGTH = 20;
 
   /** El resumen ya tiene contenido suficiente para avanzar. */
   readonly resumenValido = computed(() => this.problemSummary().trim().length >= this.MIN_SUMMARY_LENGTH);
@@ -209,7 +209,7 @@ readonly filteredSpecialties = computed(() => {
 private readonly destroyRef = inject(DestroyRef);
 private readonly ahora = signal(new Date());
 private readonly MIN_ANTICIPACION_MIN = 60;
-readonly DIAS_VISIBLES = 14;
+readonly DIAS_VISIBLES = 7;
 
 private aMinutos(hhmm: string): number {
   const [h, m] = (hhmm ?? '').split(':').map(Number);
@@ -273,7 +273,7 @@ private franjaDisponible(dayId: string, slot: { start: string; end: string }): b
   return profs.some((p) => this.trabajaEn(p, dayId, slot));
 }
 
-/** Dos semanas; los días sin ninguna franja disponible quedan deshabilitados. */
+/** Una semana; los días sin ninguna franja disponible quedan deshabilitados. */
 readonly dayOptions = computed(() => {
   this.ahora(); this.allProfessionals(); this.selectedSpecialty(); // dependencias
   const today = new Date();

@@ -3,15 +3,32 @@ import { Component, ElementRef, computed, inject, signal, viewChild } from '@ang
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-import { catchError, of } from 'rxjs';
-import { ApiService, MyReputation, UserAccount, UserAccountUpdate } from '../core/services/api.service';
+import { catchError, of, switchMap, throwError } from 'rxjs';
+import { ApiService, AvailabilitySlot, MyReputation, UserAccount, UserAccountUpdate } from '../core/services/api.service';
 import { AuthService } from '../core/services/auth.service';
 import { FotoService } from '../core/services/foto.service';
 import { environment } from '../../environments/environment';
 import { VuAvatar } from '../shared/avatar/avatar';
 import { VuConfirm } from '../shared/confirm/confirm';
 
-type CardKey = 'personal' | 'contact' | 'photo';
+type CardKey = 'personal' | 'contact' | 'photo' | 'availability';
+
+type PendingSave =
+  | {
+      kind: 'account';
+      titulo: string;
+      mensaje: string;
+      detalle: string;
+      peligro?: boolean;
+      request: UserAccountUpdate;
+    }
+  | {
+      kind: 'availability';
+      titulo: string;
+      mensaje: string;
+      detalle: string;
+      slots: AvailabilitySlot[];
+    };
 
 /**
  * Sección "Mi cuenta": el usuario ve su información y la actualiza por
@@ -44,12 +61,26 @@ export class Account {
   readonly saving = signal(false);
 
   /** Guardado pendiente de confirmación (se arma con lo que se va a enviar). */
-  readonly confirmacion = signal<{ titulo: string; mensaje: string; detalle: string; peligro?: boolean; request: UserAccountUpdate } | null>(null);
+  readonly confirmacion = signal<PendingSave | null>(null);
 
   readonly personalDraft = signal({ nombre: '', apellido: '' });
   readonly contactDraft = signal({ telefono: '' });
   readonly cardError = signal('');
   readonly cardNotice = signal('');
+  readonly professionalId = signal<string | null>(null);
+  readonly availability = signal<AvailabilitySlot[]>([]);
+  readonly availabilityDraft = signal<AvailabilitySlot[]>([]);
+  readonly availabilityLoading = signal(false);
+  readonly availabilityError = signal('');
+  readonly weekDays: ReadonlyArray<{ id: string; name: string }> = [
+    { id: 'LUNES', name: 'Lunes' },
+    { id: 'MARTES', name: 'Martes' },
+    { id: 'MIERCOLES', name: 'Miércoles' },
+    { id: 'JUEVES', name: 'Jueves' },
+    { id: 'VIERNES', name: 'Viernes' },
+    { id: 'SABADO', name: 'Sábado' },
+    { id: 'DOMINGO', name: 'Domingo' },
+  ];
 
   // Foto de perfil: vista previa local hasta guardar.
   readonly photoPreview = signal('');
@@ -132,6 +163,10 @@ export class Account {
     return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
   }
 
+  esConfirmacionPeligrosa(pendiente: PendingSave): boolean {
+    return pendiente.kind === 'account' && pendiente.peligro === true;
+  }
+
   readonly roleLabel = computed(() => {
     const role = this.account()?.rolNegocio;
     if (role === 'PROFESIONAL') return 'Profesional';
@@ -162,9 +197,33 @@ export class Account {
         // La reputación sólo existe para el rol profesional.
         if (user.rolNegocio === 'PROFESIONAL') {
           this.cargarReputacion();
+          this.cargarDisponibilidad(user);
         }
       }
       this.loading.set(false);
+    });
+  }
+
+  cargarDisponibilidad(user: UserAccount): void {
+    this.availabilityLoading.set(true);
+    this.availabilityError.set('');
+    this.api.getMyProfessionalProfile(user.id, user.keycloakId).pipe(
+      switchMap((profile) => {
+        if (!profile?.id) {
+          return throwError(() => new Error('No se encontró el perfil profesional asociado a esta cuenta.'));
+        }
+        this.professionalId.set(profile.id);
+        return this.api.getAvailability(profile.id);
+      }),
+      catchError((error) => {
+        this.availabilityError.set(this.api.describeError(error, 'No se pudo cargar tu disponibilidad.'));
+        return of(null);
+      }),
+    ).subscribe((slots) => {
+      this.availabilityLoading.set(false);
+      if (slots) {
+        this.availability.set(this.normalizarDisponibilidad(slots));
+      }
     });
   }
 
@@ -178,6 +237,8 @@ export class Account {
       this.personalDraft.set({ nombre: user.nombre ?? '', apellido: user.apellido ?? '' });
     } else if (card === 'contact') {
       this.contactDraft.set({ telefono: user.telefono ?? '' });
+    } else if (card === 'availability') {
+      this.availabilityDraft.set(this.normalizarDisponibilidad(this.availability()));
     }
     // La tarjeta de foto no precarga nada: la foto guardada la resuelve el avatar
     // por su id, y la vista previa local arranca vacía hasta elegir un archivo.
@@ -288,6 +349,64 @@ export class Account {
     });
   }
 
+  nombreDia(dia: string): string {
+    return this.weekDays.find((item) => item.id === dia.toUpperCase())?.name ?? dia;
+  }
+
+  agregarFranja(): void {
+    this.availabilityDraft.update((slots) => [
+      ...slots,
+      { diaSemana: 'LUNES', horaInicio: '09:00', horaFin: '18:00' },
+    ]);
+  }
+
+  actualizarFranja(index: number, field: keyof AvailabilitySlot, value: string): void {
+    this.availabilityDraft.update((slots) =>
+      slots.map((slot, currentIndex) =>
+        currentIndex === index ? { ...slot, [field]: value } : slot,
+      ),
+    );
+  }
+
+  quitarFranja(index: number): void {
+    this.availabilityDraft.update((slots) => slots.filter((_, currentIndex) => currentIndex !== index));
+  }
+
+  saveAvailability(): void {
+    const slots = this.normalizarDisponibilidad(this.availabilityDraft());
+    if (!this.professionalId()) {
+      this.cardError.set('No se encontró el perfil profesional para guardar los horarios.');
+      return;
+    }
+    const invalidRange = slots.find(
+      (slot) => !/^\d{2}:\d{2}$/.test(slot.horaInicio)
+        || !/^\d{2}:\d{2}$/.test(slot.horaFin)
+        || slot.horaInicio >= slot.horaFin,
+    );
+    if (invalidRange) {
+      this.cardError.set('En cada franja, la hora de fin debe ser posterior a la de inicio.');
+      return;
+    }
+    if (JSON.stringify(slots) === JSON.stringify(this.normalizarDisponibilidad(this.availability()))) {
+      this.cardError.set('No hay cambios para guardar en tu disponibilidad.');
+      return;
+    }
+
+    this.cardError.set('');
+    const dias = new Set(slots.map((slot) => slot.diaSemana)).size;
+    this.confirmacion.set({
+      kind: 'availability',
+      titulo: 'Actualizar disponibilidad',
+      mensaje: slots.length
+        ? `¿Guardás ${slots.length} ${slots.length === 1 ? 'franja' : 'franjas'} de disponibilidad?`
+        : '¿Querés quitar todas tus franjas de disponibilidad?',
+      detalle: slots.length
+        ? `La nueva disponibilidad cubrirá ${dias} ${dias === 1 ? 'día' : 'días'} de la semana y se usará en nuevas solicitudes.`
+        : 'Tu perfil seguirá activo, pero no aparecerás como disponible para nuevas solicitudes hasta agregar otra franja.',
+      slots,
+    });
+  }
+
   /**
    * Ningún cambio se guarda sin que la persona lo confirme: se muestra qué se
    * va a enviar y recién ahí se llama a la API.
@@ -299,13 +418,17 @@ export class Account {
     peligro: boolean,
     request: UserAccountUpdate,
   ): void {
-    this.confirmacion.set({ titulo, mensaje, detalle, peligro, request });
+    this.confirmacion.set({ kind: 'account', titulo, mensaje, detalle, peligro, request });
   }
 
   confirmarGuardado(): void {
     const pendiente = this.confirmacion();
     if (!pendiente) return;
     this.confirmacion.set(null);
+    if (pendiente.kind === 'availability') {
+      this.persistAvailability(pendiente.slots);
+      return;
+    }
     this.persist(pendiente.request);
   }
 
@@ -340,6 +463,51 @@ export class Account {
       this.editing.set(null);
       this.cardNotice.set('Tu información se actualizó correctamente.');
     });
+  }
+
+  private persistAvailability(slots: AvailabilitySlot[]): void {
+    const professionalId = this.professionalId();
+    if (!professionalId) {
+      this.cardError.set('No se encontró el perfil profesional para guardar los horarios.');
+      return;
+    }
+    this.saving.set(true);
+    this.cardError.set('');
+    this.cardNotice.set('');
+    const payload = slots.map((slot) => ({
+      ...slot,
+      horaInicio: `${slot.horaInicio}:00`,
+      horaFin: `${slot.horaFin}:00`,
+    }));
+    this.api.setAvailability(professionalId, payload).pipe(
+      catchError((error) => {
+        this.cardError.set(this.api.describeError(error, 'No se pudo guardar tu disponibilidad.'));
+        this.saving.set(false);
+        return of(null);
+      }),
+    ).subscribe((saved) => {
+      this.saving.set(false);
+      if (!saved) return;
+      this.availability.set(this.normalizarDisponibilidad(slots));
+      this.editing.set(null);
+      this.cardNotice.set('Tu disponibilidad se actualizó correctamente.');
+    });
+  }
+
+  private normalizarDisponibilidad(slots: AvailabilitySlot[]): AvailabilitySlot[] {
+    const ordenDias = new Map(this.weekDays.map((day, index) => [day.id, index]));
+    return slots
+      .map((slot) => ({
+        diaSemana: slot.diaSemana.toUpperCase(),
+        horaInicio: slot.horaInicio.slice(0, 5),
+        horaFin: slot.horaFin.slice(0, 5),
+      }))
+      .sort((a, b) =>
+        (ordenDias.get(a.diaSemana) ?? Number.MAX_SAFE_INTEGER)
+          - (ordenDias.get(b.diaSemana) ?? Number.MAX_SAFE_INTEGER)
+          || a.horaInicio.localeCompare(b.horaInicio)
+          || a.horaFin.localeCompare(b.horaFin),
+      );
   }
 
   onPhotoSelected(event: Event): void {

@@ -8,10 +8,10 @@ import java.util.List;
  *
  * @param promedio stars de 1 a 5, redondeado a un decimal
  * @param cantidad reseñas recibidas
- * @param reseñas detalle, de la más reciente a la más antigua
+ * @param resenas detalle, de la más reciente a la más antigua
  */
 public record ReputacionProfesionalResponse(
         double promedio,
         long cantidad,
-        List<ResenaResponse> reseñas) {
+        List<ResenaResponse> resenas) {
 }

@@ -14,6 +14,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.Customizer;
@@ -24,6 +25,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
@@ -137,31 +139,38 @@ public class SecurityConfig {
             @Override
             public Collection<GrantedAuthority> convert(Jwt jwt) {
                 List<GrantedAuthority> authorities = new ArrayList<>();
-                addClaimRoles(authorities, jwt.getClaimAsStringList("roles"));
-                addClaimRoles(authorities, jwt.getClaimAsStringList("realm_access.roles"));
-                addClaimRoles(authorities, jwt.getClaimAsStringList("role"));
+                List<String> roles = new ArrayList<>();
+                addClaimRoles(roles, jwt.getClaimAsStringList("roles"));
+                addClaimRoles(roles, jwt.getClaimAsStringList("realm_access.roles"));
+                addClaimRoles(roles, jwt.getClaimAsStringList("role"));
 
                 Map<String, Object> realmAccess = jwt.getClaim("realm_access");
-                if (realmAccess instanceof Map<?, ?> map && map.get("roles") instanceof Collection<?> roles) {
-                    for (Object role : roles) {
+                if (realmAccess instanceof Map<?, ?> map && map.get("roles") instanceof Collection<?> realmRoles) {
+                    for (Object role : realmRoles) {
                         if (role instanceof String value) {
-                            authorities.add(new SimpleGrantedAuthority("ROLE_" + value));
+                            if (!value.isBlank()) {
+                                roles.add(value);
+                            }
                         }
                     }
                 }
+                List.of("ADMIN", "PROFESIONAL", "CLIENTE").stream()
+                        .filter(roles::contains)
+                        .findFirst()
+                        .ifPresent(role -> authorities.add(new SimpleGrantedAuthority("ROLE_" + role)));
                 return authorities;
             }
         });
         return converter;
     }
 
-    private void addClaimRoles(List<GrantedAuthority> authorities, Collection<String> roles) {
-        if (roles == null) {
+    private void addClaimRoles(Collection<String> target, Collection<String> claimRoles) {
+        if (claimRoles == null) {
             return;
         }
-        for (String role : roles) {
+        for (String role : claimRoles) {
             if (role != null && !role.isBlank()) {
-                authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
+                target.add(role);
             }
         }
     }
@@ -170,15 +179,19 @@ public class SecurityConfig {
     public JwtDecoder jwtDecoder(
             @Value("${KEYCLOAK_JWK_SET_URI:http://localhost:8080/realms/vincula-up/protocol/openid-connect/certs}") String jwkSetUri) {
         NimbusJwtDecoder jwtDecoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
-        OAuth2TokenValidator<Jwt> validator = token -> {
+        jwtDecoder.setJwtValidator(tokenValidator());
+        return jwtDecoder;
+    }
+
+    OAuth2TokenValidator<Jwt> tokenValidator() {
+        OAuth2TokenValidator<Jwt> issuerValidator = token -> {
             String iss = token.getClaimAsString("iss");
             if (iss != null && iss.contains("/realms/vincula-up")) {
                 return OAuth2TokenValidatorResult.success();
             }
             return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_issuer", "Issuer " + iss + " is not vincula-up", null));
         };
-        jwtDecoder.setJwtValidator(validator);
-        return jwtDecoder;
+        return new DelegatingOAuth2TokenValidator<>(new JwtTimestampValidator(), issuerValidator);
     }
 
 }

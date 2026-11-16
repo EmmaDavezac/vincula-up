@@ -56,7 +56,7 @@ export class MyRequests {
   private readonly router = inject(Router);
   @ViewChild('chatDialog') private chatDialog!: TemplateRef<unknown>;
   @ViewChild('statusDialog') private statusDialog!: TemplateRef<unknown>;
-  @ViewChild('cancelDialog') private cancelDialog!: TemplateRef<unknown>;
+  @ViewChild('reasonDialog') private reasonDialog!: TemplateRef<unknown>;
   @ViewChild('mapDialog') private mapDialog!: TemplateRef<unknown>;
   private mapDialogRef?: MatDialogRef<unknown>;
 
@@ -67,7 +67,7 @@ export class MyRequests {
   });
   private chatDialogRef?: MatDialogRef<unknown>;
   private statusDialogRef?: MatDialogRef<unknown>;
-  private cancelDialogRef?: MatDialogRef<unknown>;
+  private reasonDialogRef?: MatDialogRef<unknown>;
   readonly auth = inject(AuthService);
   private readonly requestService = inject(RequestService);
   private readonly notifications = inject(NotificationService);
@@ -204,11 +204,11 @@ export class MyRequests {
   // Estado de la solicitud / rechazo modal/dialog state
   /** Solicitud abierta en el modal de "Actualizar estado" (cliente y profesional). */
   readonly updatingRequestId = signal<string | null>(null);
-  /** Mensaje de cancelación: obligatorio para el cliente y para el profesional. */
+  /** Motivo obligatorio para cancelar o rechazar una solicitud. */
   readonly motivoEstado = signal('');
-  /** Error del mensaje obligatorio, para dejarlo debajo del campo. */
+  /** Error del motivo obligatorio, para dejarlo debajo del campo. */
   readonly motivoError = signal('');
-  /** Transición que espera confirmación escribiendo su motivo (solo cancelar). */
+  /** Transición que espera un motivo obligatorio. */
   readonly estadoAConfirmar = signal<RequestStatus | null>(null);
 
   // Rating state
@@ -588,9 +588,9 @@ googleMapsUrl(request: ServiceRequest): string | null {
 
   cerrarActualizarEstado(): void {
     this.statusDialogRef?.close();
-    this.cancelDialogRef?.close();
+    this.reasonDialogRef?.close();
     this.statusDialogRef = undefined;
-    this.cancelDialogRef = undefined;
+    this.reasonDialogRef = undefined;
     this.resetEstadoDialog();
   }
 
@@ -602,24 +602,23 @@ googleMapsUrl(request: ServiceRequest): string | null {
   }
 
   /**
-   * Cualquier cambio de estado pide confirmación. La cancelación tiene su propio
-   * paso (el motivo es obligatorio), y el resto —aceptar, rechazar o completar—
-   * muestra la consecuencia antes de aplicarse.
+   * Los cambios que requieren explicación recogen el motivo antes de enviarse;
+   * las demás transiciones muestran una confirmación antes de aplicarse.
    */
   elegirEstado(request: ServiceRequest, nuevo: RequestStatus): void {
-    if (nuevo === 'CANCELADA') {
+    if (nuevo === 'CANCELADA' || nuevo === 'RECHAZADA') {
       this.estadoAConfirmar.set(nuevo);
       this.motivoEstado.set('');
       this.motivoError.set('');
-      this.cancelDialogRef = this.dialog.open(this.cancelDialog, {
-        ariaLabel: 'Motivo de la cancelación',
+      this.reasonDialogRef = this.dialog.open(this.reasonDialog, {
+        ariaLabel: nuevo === 'RECHAZADA' ? 'Motivo del rechazo' : 'Motivo de la cancelación',
         ariaModal: true,
         maxWidth: 'min(32rem, calc(100vw - 2rem))',
         panelClass: 'vu-details-dialog',
         width: 'min(29rem, calc(100vw - 2rem))',
       });
-      this.cancelDialogRef.afterClosed().subscribe(() => {
-        this.cancelDialogRef = undefined;
+      this.reasonDialogRef.afterClosed().subscribe(() => {
+        this.reasonDialogRef = undefined;
         if (this.estadoAConfirmar()) {
           this.volverAEstadoOpciones();
         }
@@ -687,36 +686,41 @@ googleMapsUrl(request: ServiceRequest): string | null {
 
   /** Vuelve a la lista de opciones sin cerrar el modal. */
   volverAEstadoOpciones(): void {
-    this.cancelDialogRef?.close();
-    this.cancelDialogRef = undefined;
+    this.reasonDialogRef?.close();
+    this.reasonDialogRef = undefined;
     this.estadoAConfirmar.set(null);
     this.motivoEstado.set('');
     this.motivoError.set('');
   }
 
-  /** Confirma la cancelación: sin motivo no sale, la contraparte tiene que saber por qué. */
-  confirmarCancelacion(): void {
+  /** Confirma el rechazo o la cancelación: ambos requieren un motivo para la contraparte. */
+  confirmarEstadoConMotivo(): void {
     const solicitud = this.solicitudDelModal();
-    if (!solicitud) return;
+    const nuevo = this.estadoAConfirmar();
+    if (!solicitud || (nuevo !== 'CANCELADA' && nuevo !== 'RECHAZADA')) return;
     if (!this.motivoEstado().trim()) {
-      this.motivoError.set('Contale a la contraparte por qué cancelás.');
+      this.motivoError.set(
+        nuevo === 'RECHAZADA'
+          ? 'Contale a la contraparte por qué rechazás el pedido.'
+          : 'Contale a la contraparte por qué cancelás.',
+      );
       return;
     }
-    this.aplicarEstado(solicitud, 'CANCELADA');
+    const motivo = this.motivoEstado().trim();
+    this.cerrarActualizarEstado();
+    this.aplicarEstado(solicitud, nuevo, motivo);
   }
 
-  aplicarEstado(request: ServiceRequest, nuevo: RequestStatus): void {
+  aplicarEstado(request: ServiceRequest, nuevo: RequestStatus, motivo = ''): void {
     const actorId = this.auth.currentUser()?.id;
     if (!actorId) return;
     const id = String(request.id);
     this.errorMessage.set('');
-    // El motivo solo viaja en la cancelación (obligatorio para las dos partes).
-    const motivo = this.motivoEstado().trim();
 
     const llamada =
       nuevo === 'COMPLETADA' ? this.api.completeRequest(id, actorId)
       : nuevo === 'CANCELADA' ? this.api.cancelRequest(id, actorId, motivo)
-      : nuevo === 'RECHAZADA' ? this.api.rejectRequest(id, actorId, '')
+      : nuevo === 'RECHAZADA' ? this.api.rejectRequest(id, actorId, motivo)
       : this.api.acceptRequest(id, actorId, '');
 
     llamada.pipe(
@@ -732,7 +736,7 @@ googleMapsUrl(request: ServiceRequest): string | null {
       this.successMessage.set(
         nuevo === 'COMPLETADA' ? 'La solicitud fue marcada como completada. ¡Ahora podés calificar el servicio!'
         : nuevo === 'CANCELADA' ? 'Cancelaste la solicitud. La contraparte ve el motivo que escribiste.'
-        : nuevo === 'RECHAZADA' ? 'Solicitud rechazada.'
+        : nuevo === 'RECHAZADA' ? 'Solicitud rechazada. La contraparte ve el motivo que escribiste.'
         : 'Solicitud aceptada. Podés comunicarte por el chat.',
       );
       this.reloadRequests();
@@ -1049,4 +1053,3 @@ cerrarMapa(): void {
   }
   
 }
-

@@ -4,7 +4,7 @@
 >
 > El [`README.md`](README.md) tiene el resumen: qué hace el sistema, el stack y el deploy local desde cero. El [`MANUAL.md`](MANUAL.md) tiene el uso y la operación: los servicios, el secreto del client de servicio, los certificados, el desarrollo y el tema. Este archivo contiene la especificación funcional, el relevamiento formal, el modelado, los requisitos, la arquitectura y el detalle técnico completo.
 >
-> Los informes académicos formales se encuentran en [`Entrega Proyecto Final Grupo 5.md`](Entrega%20Proyecto%20Final%20Grupo%205.md) (PFC — entrega parcial final) y [`MVP Grupo 8- DACS.md`](MVP%20Grupo%208-%20DACS.md) (DACS — informe del MVP), ambos actualizados al 15/11/2026.
+> Los informes académicos formales se encuentran en [`Entrega Proyecto Final Grupo 5.md`](Entrega%20Proyecto%20Final%20Grupo%205.md) (PFC — entrega parcial final) y [`MVP Grupo 8- DACS.md`](MVP%20Grupo%208-%20DACS.md) (DACS — informe del MVP). La matriz de aceptación del DACS se actualizó al 16/11/2026.
 
 ---
 
@@ -230,12 +230,12 @@ Se agruparon los sprints en dos épicas de dos sprints cada una:
 | Relevamiento y modelado de solicitudes | Actualizar el diagrama de clases y el de casos de uso con solicitudes | NV | — |
 | Historias de usuario de solicitudes | Redactar las historias de creación de la solicitud (HU-S01 a HU-S07) | JV | HU-S01 a HU-S07 |
 | Historias de usuario de solicitudes | Redactar las historias de gestión: ver, aceptar, rechazar, cancelar y completar (HU-S08 a HU-S12) | JV | HU-S08 a HU-S12 |
-| Historias de usuario de solicitudes | Redactar las historias de chat, calificación, vencimiento, notificaciones y turnos superpuestos (HU-S13 a HU-S17) | JV | HU-S13 a HU-S17 |
+| Historias de usuario de solicitudes | Redactar las historias de chat, calificación, vencimiento, notificaciones y solicitudes múltiples en una franja disponible (HU-S13 a HU-S17) | JV | HU-S13 a HU-S17 |
 | Backend de solicitudes | Crear la solicitud en estado PENDIENTE, geocodificando la dirección con Nominatim y guardando las coordenadas | LD | HU-S01, HU-S06 |
 | Backend de solicitudes | Búsqueda de profesionales por categoría, disponibilidad y cercanía | LD | HU-S02, HU-S04, HU-S05 |
 | Backend de solicitudes | Ocultar la dirección exacta y exponer solo la zona y un punto aproximado hasta la aceptación | LD | HU-S07 |
 | Backend de solicitudes | Listado de solicitudes según el rol, con filtro por estado | LD | HU-S08 |
-| Backend de solicitudes | Aceptar una solicitud con validación de transición y de turnos superpuestos | LD | HU-S09, HU-S17 |
+| Backend de solicitudes | Aceptar solicitudes con validación de transición y disponibilidad, permitiendo varias en una misma franja | LD | HU-S09, HU-S17 |
 | Backend de solicitudes | Rechazar y cancelar con motivo obligatorio, registrando quién canceló | LD | HU-S10, HU-S11 |
 | Backend de solicitudes | Completar la solicitud por cualquiera de las partes | LD | HU-S12 |
 | Backend de solicitudes | Mensajería por solicitud y calificación única con actualización de la reputación | LD | HU-S13, HU-S14, HU-U08 |
@@ -253,7 +253,7 @@ Se agruparon los sprints en dos épicas de dos sprints cada una:
 | Frontend de solicitudes | Bandeja de notificaciones y resumen del administrador | AV | HU-S16, HU-U14 |
 | Testing de solicitudes | Diseñar los casos de prueba de las historias HU-S01 a HU-S17 | NV | HU-S01 a HU-S17 |
 | Testing de solicitudes | Probar el circuito completo: pedir, aceptar, chatear, completar y calificar | NV | HU-S01 a HU-S14 |
-| Testing de solicitudes | Probar los casos límite: rechazo, cancelación, vencimiento y turnos superpuestos | NV | HU-S10, HU-S11, HU-S15, HU-S17 |
+| Testing de solicitudes | Probar los casos límite: rechazo, cancelación, vencimiento y varias solicitudes en una franja disponible | NV | HU-S10, HU-S11, HU-S15, HU-S17 |
 | Testing de solicitudes | Repetir las pruebas de usuarios para detectar regresiones | NV | HU-U01 a HU-U15 |
 | Integración en BFF y pruebas de integración | Exponer en el bff-web los endpoints de solicitudes, chat y calificaciones | NM | HU-S01 a HU-S14 |
 | Integración en BFF y pruebas de integración | Integrar el envío de correos por SMTP y las notificaciones WebPush | NM | HU-S06, HU-S16 |
@@ -322,8 +322,9 @@ Una historia de usuario se considera terminada cuando:
   *Como profesional quiero modificar mis franjas para que solo me pidan turnos cuando atiendo.*
   - **Scenario: Cambiar franjas**
     - `Given` que soy un profesional activo.
-    - `When` modifico mis franjas semanales.
-    - `Then` los clientes solo pueden pedirme turnos dentro de ellas.
+    - `When` agrego, edito o quito días y rangos horarios desde "Mi cuenta".
+    - `Then` la disponibilidad semanal queda guardada y se muestra al volver a consultar.
+    - `And` los clientes solo pueden crear nuevas solicitudes dentro de las franjas actualizadas.
 - **HU-U08 · Ver mi reputación**
   *Como profesional quiero ver mis calificaciones para saber cómo me valoran.*
   - **Scenario: Consultar reputación**
@@ -503,13 +504,13 @@ Una historia de usuario se considera terminada cuando:
     - `Given` que tengo la aplicación abierta.
     - `When` cambia el estado de una solicitud o llega un mensaje nuevo.
     - `Then` aparece un aviso en la bandeja de notificaciones.
-- **HU-S17 · Evitar turnos superpuestos**
-  *Como profesional quiero que no se me asignen dos turnos en el mismo horario para poder cumplir lo que acepto.*
-  - **Scenario: Aceptar un turno que se superpone**
-    - `Given` que tengo una solicitud `ACEPTADA` en un día y una franja horaria.
-    - `When` intento aceptar otra solicitud `PENDIENTE` que se superpone con esa franja.
-    - `Then` el sistema no me lo permite.
-    - `And` me indica con qué turno se superpone.
+- **HU-S17 · Aceptar varias solicitudes en una franja disponible**
+  *Como profesional quiero poder atender varias solicitudes dentro de una misma franja de disponibilidad.*
+  - **Scenario: Aceptar solicitudes en la misma franja**
+    - `Given` que tengo dos solicitudes `PENDIENTE` para el mismo día y rango horario, ambos dentro de mi disponibilidad.
+    - `When` acepto las dos solicitudes.
+    - `Then` ambas pasan a `ACEPTADA` de forma independiente.
+    - `And` una solicitud aceptada no bloquea otras solicitudes que correspondan a esa franja disponible.
 
 ---
 
@@ -528,7 +529,7 @@ Una historia de usuario se considera terminada cuando:
 | **RF-09** | Gestión de categorías de oficios técnicos por el Administrador. | HU-U12 |
 | **RF-10** | Directorio con búsqueda de profesionales por categoría, disponibilidad y proximidad geográfica. | HU-S01, HU-S02, HU-S04, HU-S05 |
 | **RF-11** | Creación de solicitudes de turno por el cliente, con protección de su dirección exacta hasta la aceptación. | HU-S01 a HU-S07 |
-| **RF-12** | Gestión del ciclo de la solicitud: consulta, aceptación, rechazo con motivo, cancelación con motivo y finalización por cualquiera de las partes, sin turnos superpuestos. | HU-S08 a HU-S12, HU-S17 |
+| **RF-12** | Gestión del ciclo de la solicitud: consulta, aceptación, rechazo con motivo, cancelación con motivo y finalización por cualquiera de las partes; se permiten varias solicitudes en una misma franja de disponibilidad. | HU-S08 a HU-S12, HU-S17 |
 | **RF-13** | Mensajería de texto en vivo asociada a cada solicitud, entre cliente y profesional mediante WebSocket / STOMP. | HU-S13 |
 | **RF-14** | Calificación única de 1 a 5 estrellas con comentario por parte del cliente, y consulta de la reputación por el profesional. | HU-S14, HU-U08 |
 | **RF-15** | Vencimiento automático de las solicitudes pendientes sin respuesta al expirar el plazo configurado. | HU-S15 |
@@ -585,7 +586,7 @@ Una historia de usuario se considera terminada cuando:
 | `HU-S14` | Calificar el servicio | Cliente | RF-14 | 3–4 |
 | `HU-S15` | Vencimiento automático | Sistema | RF-15, RF-16 | 3–4 |
 | `HU-S16` | Recibir notificaciones | Todos | RF-16 | 3–4 |
-| `HU-S17` | Evitar turnos superpuestos | Profesional | RF-12 | 3–4 |
+| `HU-S17` | Aceptar varias solicitudes en una franja disponible | Profesional | RF-12 | 3–4 |
 
 ---
 
@@ -623,7 +624,7 @@ Los estados posibles son `PENDIENTE`, `ACEPTADA`, `RECHAZADA`, `COMPLETADA`, `CA
 | Desde | Evento | Actor | Hacia | Condición o efecto |
 |---|---|---|---|---|
 | *(inicio)* | Crear solicitud | Cliente | `PENDIENTE` | El profesional ve solo la zona y un punto aproximado (~1.1 km de margen); recibe aviso por correo. |
-| `PENDIENTE` | Aceptar | Profesional | `ACEPTADA` | Se revela la dirección exacta y coordenadas reales; valida no superposición; el cliente recibe aviso. |
+| `PENDIENTE` | Aceptar | Profesional | `ACEPTADA` | Se revela la dirección exacta y coordenadas reales; una solicitud aceptada no bloquea otras de la misma franja de disponibilidad; el cliente recibe aviso. |
 | `PENDIENTE` | Rechazar | Profesional | `RECHAZADA` | El motivo es obligatorio y el cliente lo recibe; estado final. |
 | `PENDIENTE` | Cancelar | Cliente o Profesional | `CANCELADA` | Motivo obligatorio; se registra quién canceló y la otra parte recibe aviso; estado final. |
 | `ACEPTADA` | Cancelar | Cliente o Profesional | `CANCELADA` | Motivo obligatorio; se registra quién canceló y la otra parte recibe aviso; estado final. |
@@ -711,7 +712,7 @@ Los estados son `CARGADO`, `ACTIVO`, `SUSPENDIDO` e `INACTIVO` (este último par
   6. **Avisos transaccionales y scheduler:** envía correos de alta, turnos y expiración con plantilla HTML/texto multipart y ejecuta el cron de expiración cada 15 segundos.
 - **`ms-usuarios` (Puerto 8081):** Cuentas y perfiles de clientes y administradores, estado de negocio (`CARGADO`, `ACTIVO`, `SUSPENDIDO`, `INACTIVO`), vinculación de `keycloakId` y registro de términos y condiciones (versión y fecha).
 - **`ms-profesionales` (Puerto 8082):** Padrón de técnicos, legajos, categorías/especialidades, disponibilidad horaria semanal y activación del perfil.
-- **`ms-solicitudes` (Puerto 8083):** Ciclo de vida completo de solicitudes, validación de turnos superpuestos, geocodificación con Nominatim, chat, calificaciones y vencimiento.
+- **`ms-solicitudes` (Puerto 8083):** Ciclo de vida completo de solicitudes, validación de disponibilidad y transiciones, solicitudes múltiples por franja, geocodificación con Nominatim, chat, calificaciones y vencimiento.
 
 ---
 
@@ -823,9 +824,9 @@ Todos los endpoints cuelgan del prefijo `/api`. El BFF aplica RBAC según la reg
 | PUT | `/api/profesionales/{id}` | `ADMIN` | Edición de legajo y especialidades en el padrón. |
 | PATCH | `/api/profesionales/{id}/suspender` | `ADMIN` | Desactivación / baja lógica (pasa a estado `SUSPENDIDO`). |
 | PATCH | `/api/profesionales/{id}/reactivar` | `ADMIN` | Levanta la suspensión (vuelve a estado `ACTIVO`). |
-| PUT | `/api/profesionales/{id}/disponibilidad` | `PROFESIONAL` | Guarda las franjas horarias semanales de atención. |
+| PUT | `/api/profesionales/{id}/disponibilidad` | `PROFESIONAL` | Reemplaza las franjas horarias semanales; el BFF valida que el perfil pertenezca al profesional autenticado. Se usa desde "Mi cuenta" y admite varios rangos por día. |
 | GET | `/api/profesionales/{id}/disponibilidad` | Autenticado | Consulta los horarios semanales de atención. |
-| GET | `/api/mi-reputacion` | `PROFESIONAL` | Consulta el promedio de estrellas y cantidad de calificaciones propias. |
+| GET | `/api/mi-reputacion` | `PROFESIONAL` | Consulta la reputación propia como `{ promedio, cantidad, resenas }`; cada reseña incluye puntaje, comentario, fecha y nombre del cliente. Si falla el servicio de calificaciones, se informa el error en lugar de mostrar una reputación vacía. |
 
 ### 8.2 Solicitudes
 | Método | Ruta | Rol requerido | Descripción |
@@ -1236,7 +1237,7 @@ La maqueta interactiva original del proyecto se desarrolló en v0 (Next.js) y se
 - Temas claro y oscuro persistidos y sincronizados entre Angular y Keycloak.
 
 ### 18.2 Deuda técnica registrada
-- **Aceptación manual completa y notificaciones externas:** GitHub Actions ejecuta pruebas unitarias de los cuatro servicios, pruebas Angular, auditoría npm, build productivo, smoke E2E de navegador y E2E autenticado contra un stack Docker demo (solicitud, privacidad, chat, completar y calificar). Falta ejecutar y registrar en Jira la matriz manual completa de aceptación; el E2E no valida entregabilidad real de correos/WebPush con proveedores externos ni todos los dispositivos/casos operativos.
+- **Cierre de aceptación del MVP:** GitHub Actions ejecuta pruebas unitarias de los cuatro servicios, pruebas Angular, auditoría de dependencias, build productivo, smoke E2E de navegador y E2E autenticado contra un stack Docker demo. La implementación del alcance actual está completa; resta terminar la aceptación manual de T-U04 y T-U15, validar HTTPS en un navegador que confíe en la CA de desarrollo y comprobar la entrega WebPush con VAPID de prueba. El detalle y los pasos de cierre están en la sección **Pendientes para el cierre** de [MVP Grupo 8- DACS.md](./MVP%20Grupo%208-%20DACS.md). Después de registrar los resultados, corresponde consolidar la documentación y publicar los cambios finales de la rama.
 - **Dominio productivo y correo institucional:** En producción se requiere registrar un dominio con políticas SPF, DKIM y DMARC y reemplazar las credenciales locales por un servicio como Amazon SES o SendGrid.
 - **Almacenamiento de fotos en S3:** Migrar de `FotoStorageLocal` a un backend compatible con Amazon S3 / MinIO para clusters multi-nodo.
 

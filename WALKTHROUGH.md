@@ -25,6 +25,51 @@
 
 ## Historial
 
+### [2026-11-16] - docs: aclarar los pendientes para cerrar el MVP
+- **Objetivo:** Alinear la documentación con el estado de aceptación y delimitar las tareas restantes para el cierre de la entrega.
+- **Cambios realizados:**
+  - `MVP Grupo 8- DACS.md`: se especificaron las validaciones manuales pendientes de perfil, recorrido por roles, HTTPS en navegador y recepción de WebPush; se separaron de las mejoras de producción/escala.
+  - `ESPECIFICACION.md`: se aclaró que no hay nuevas funcionalidades del MVP identificadas como requisito de cierre y se enlazó la lista de aceptación pendiente.
+- **Pendiente:** Completar esas pruebas manuales, registrar sus resultados/evidencias, consolidar la documentación y publicar los cambios finales revisados en la rama.
+- **Verificación:** Revisión cruzada de los estados y referencias entre la matriz de aceptación y la especificación. No se ejecutaron pruebas de software porque este cambio es documental.
+
+### [2026-11-16] - test: completar revalidación de aceptación del MVP
+- **Objetivo:** Continuar los casos pendientes con evidencia integrada y visual, corregir los fallos encontrados y actualizar el estado real de la matriz.
+- **Cambios realizados:**
+  - `frontend/vincula-up-web/src/app/request/request.ts`: se limitó el calendario de solicitudes a hoy y los próximos seis días, conforme a HU-S04; antes exponía 14 días.
+  - `frontend/vincula-up-web/src/app/request/request.spec.ts`: regresión que verifica las siete fechas ofrecidas.
+  - `scripts/e2e_authenticated.py`: valida el alta/baja de una suscripción con el formato real del navegador, rechaza endpoints HTTP, comprueba pertenencia de las listas y vuelve a leer `canceladaPorRol` para ambos participantes.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/config/SecurityConfig.java`: el validador JWT conserva la comprobación de emisor e incorpora validación de `exp`/`nbf`.
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/controller/ApiController.java`: se aplanan las claves de la suscripción del navegador para el DTO de `ms-usuarios`.
+  - `MVP Grupo 8- DACS.md` y `ESPECIFICACION.md`: se registraron resultados, correcciones y bloqueos locales de TLS/WebPush.
+- **Verificación:**
+  - Maven enfocado: BFF 11/11 pruebas; `ms-solicitudes` 10/10.
+  - Angular: 9/9 pruebas y build de producción aprobado.
+  - `scripts/e2e_authenticated.py`: aprobado para RBAC, propiedad de solicitudes, privacidad, push local, cancelaciones con actor persistido, chat, finalización y calificaciones.
+  - Playwright: términos persistidos tras reingreso; reputación visual coincidente con API (3,1, 17 calificaciones y 17 reseñas); ordenamiento por proximidad/reputación; categorías/ubicación y horarios de cobertura completa; lista de solicitudes con estado y fecha `dd/mm/aa`.
+  - JWT: tokens ausente/malformado/firma alterada y token firmado tras `exp + 65 s` recibieron 401; token vigente recibió 200.
+  - HTTPS: HTTP redirigió a HTTPS y la CA local validó el certificado con curl. El navegador integrado no confía en la CA sin instalación; VAPID no está configurado, por lo que la entrega WebPush sigue sin probarse.
+- **Estado:** T-U03, T-U08, T-S01, T-S02, T-S04, T-S05, T-S08, T-NF01 y T-NF04 aprobados. T-NF02, T-S15 y T-S16 continúan parciales por configuración del entorno; la matriz global no se declara cerrada.
+
+### [2026-11-16] - test: completar aceptación y corregir el contrato de reputación
+- **Objetivo:** Continuar la aceptación del MVP, actualizar la evidencia y corregir defectos encontrados en la activación profesional y en la consulta de reputación.
+- **Cambios realizados:**
+  - `backend/bff-web/src/main/java/com/vinculaup/bff_web/controller/ApiController.java`: la activación usa la operación por identidad de usuario; `/mi-reputacion` ahora deja que se propaguen errores del servicio y no devuelve una reputación vacía como si fuera válida.
+  - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/dto/ReputacionProfesionalResponse.java`: el campo se serializa como `resenas`, consistente con el BFF y el frontend.
+  - `backend/ms-solicitudes/src/test/java/com/vinculaup/ms_solicitudes/dto/ReputacionProfesionalResponseTest.java`: prueba el nombre JSON y la inclusión del detalle.
+  - `frontend/vincula-up-web/src/app/request/request.spec.ts`: agrega una prueba del orden por proximidad y por promedio de reputación.
+  - `scripts/e2e_authenticated.py` y `.github/docker-compose.e2e.yml`: se conservan las comprobaciones de roles/activación y SMTP de prueba con Mailpit.
+  - `MVP Grupo 8- DACS.md` y `ESPECIFICACION.md`: se actualizaron resultados de aceptación y el contrato documentado de `/api/mi-reputacion`.
+- **Verificación:**
+  - `./backend/ms-solicitudes/mvnw -f backend/ms-solicitudes/pom.xml test`: 19 pruebas aprobadas.
+  - `./backend/bff-web/mvnw -f backend/bff-web/pom.xml test`: 7 pruebas aprobadas.
+  - `npm --prefix frontend/vincula-up-web test -- --watch=false`: 8 pruebas aprobadas.
+  - `npm --prefix frontend/vincula-up-web run build`: build de producción aprobado.
+  - La respuesta integrada de reputación devolvió 3,2, 11 calificaciones y 11 reseñas; el directorio presentó dos perfiles activos con reputaciones/ubicaciones distintas.
+  - `python3 scripts/e2e_authenticated.py`: aprobado tras reconstruir el BFF.
+  - La verificación visual autenticada de reputación y ordenamiento quedó pendiente porque el reinicio de Keycloak invalidó la sesión del navegador de aceptación.
+- **Estado:** U01, U02, U05, U06 y S06 aprobados. U08 y S05 parciales a la espera de la reejecución visual; S15 sigue parcial por WebPush.
+
 ### [2026-11-15] - task: identificar pendientes planificación Jira
 
 - **Objetivo:** Identificar qué tareas faltan implementar para completar la planificación de Jira basada en la documentación del proyecto.
@@ -1143,3 +1188,74 @@
   - Una prueba detectó que `Usuario.update` sí permitía cambiar el correo, a diferencia del contrato documentado; se corrigió para mantenerlo inmutable.
   - Actualizados el plan del MVP y el estado de deuda técnica, distinguiendo lo cubierto automáticamente de la aceptación manual restante y los proveedores externos de notificación.
 - **Verificación:** `./mvnw --batch-mode --no-transfer-progress test` en los cuatro servicios (28 pruebas); `npm ci`, `npm audit` (0 vulnerabilidades), `npm test -- --watch=false` (4 pruebas), `npm run build`, `npm run test:e2e` (1 navegador) y `python3 scripts/e2e_authenticated.py` con el stack Docker limpio y saludable (flujo autenticado completo aprobado).
+
+### [2026-11-15] - test: ejecutar aceptación manual parcial con Playwright
+
+- **Objetivo:** Validar desde Chromium los flujos principales de navegador y comprobar privacidad de una solicitud pendiente hasta su aceptación.
+- **Entorno:** Frontend local en viewport móvil de 390 × 844 y stack Docker aislado `vinculaup-manual`, con cuentas y datos demo descartables; commit base `f8ae42c`.
+- **Resultado:** Aprobados navegación pública/FAQ/términos, persistencia del tema oscuro en viewport móvil, bloqueo inicial por términos, creación de solicitud desde ubicación en mapa, elección de categoría/fecha/franja/profesional, ocultamiento de dirección pendiente, revelado tras aceptar y envío de un mensaje por chat.
+- **Fallo encontrado y corregido:** T-S03 espera que 19 caracteres no permitan continuar y que se exijan 20. La interfaz inicialmente indicó un mínimo de 10 y habilitó continuar con 19 (`1234567890123456789`). Se actualizó el límite a 20 y se agregó una prueba unitaria de 19, 20 y espacios exteriores.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/request/request.ts`, `frontend/vincula-up-web/src/app/request/request.spec.ts`, `MVP Grupo 8- DACS.md` y este walkthrough.
+- **Reejecución:** En Chromium, 19 caracteres dejaron deshabilitado “Continuar” y mostraron el mínimo 20; exactamente 20 habilitaron el avance. Con 19 caracteres útiles rodeados de espacios también quedó bloqueado. Pasaron los 7 tests unitarios del frontend, el smoke E2E Playwright (1 prueba) y el build de producción.
+- **Alcance pendiente:** No se ejecutó toda la matriz de 32 historias ni la entrega real de correo/WebPush; registro, recuperación, suspensión, HTTPS y otros escenarios también requieren pruebas. Rechazo y cancelación se validaron en la pasada posterior.
+- **Limpieza:** Se apagó el stack Docker aislado y se eliminaron sus volúmenes; el contenedor preexistente `indiar-db` permaneció activo.
+
+### [2026-11-16] - test: ampliar aceptación manual y ejecutar regresión
+
+- **Objetivo:** Completar la siguiente tanda de aceptación del MVP y registrar resultados reproducibles, incluidos fallos.
+- **Entorno:** Chromium y stack Docker aislado con cuentas demo y base descartable; no se usaron datos productivos.
+- **Aprobado:** Se confirmó que el rechazo y la cancelación quedan reflejados en la vista del cliente, que el rechazo conserva y muestra el motivo, que la cancelación conserva actor y motivo, que el dashboard ADMIN está restringido frente a CLIENTE, y que el perfil guarda el teléfono de prueba. Tras compartir el diálogo para ambas transiciones con motivo, se reejecutó la cancelación: sin motivo permaneció pendiente y con motivo pasó a `CANCELADA`, visible para el cliente. Se verificó la expiración automática adelantando únicamente la fecha de expiración de una solicitud demo: el scheduler la cambió a `VENCIDA` y la SPA mostró el estado. El centro mostró notificaciones locales.
+- **Resultado aclarado para T-S17:** Se aceptaron dos solicitudes del mismo profesional para el mismo día y rango. La franja es disponibilidad, no un turno exclusivo; el profesional puede atender varias solicitudes en ella, por lo que este comportamiento es correcto y T-S17 se registra aprobado con el criterio actualizado.
+- **Corrección de T-S10:** El rechazo aceptaba motivo vacío y no informaba al cliente; se corrigió en backend y frontend. Playwright confirmó que sin motivo se muestra un error y el estado sigue `PENDIENTE`; con motivo se rechaza y el cliente ve el texto. La API responde HTTP 400 si falta y la prueba de servicio verifica que guarda el motivo recortado.
+- **Limitaciones:** No se validaron entregas reales de correo ni WebPush; el navegador reportó avisos bloqueados. Esta pasada no cubre toda la matriz de 32 historias ni HTTPS.
+- **Verificación automatizada:** 29 pruebas Maven entre los cuatro servicios (18 en `ms-solicitudes`), 7 pruebas unitarias frontend, 1 smoke E2E Playwright y build de producción aprobados; también pasó `scripts/e2e_authenticated.py` en la ejecución previa.
+- **Archivos modificados:** `ESPECIFICACION.md`, `MVP Grupo 8- DACS.md`, `WALKTHROUGH.md`, servicio y prueba de solicitudes, interfaz de “Mis solicitudes” y la regresión previa del mínimo de descripción.
+- **Estado:** T-S10 y T-S17 quedan aprobados con sus criterios actualizados; la aceptación del MVP sigue abierta por los casos pendientes, HTTPS y las integraciones reales de correo/WebPush.
+
+### [2026-11-16] - fix: exigir motivo al rechazar una solicitud
+
+- **Objetivo:** Impedir rechazos sin explicación y permitir que el cliente vea el motivo, sin bloquear solicitudes que comparten franja disponible.
+- **Cambios:** El backend valida que el motivo no sea nulo o solo espacios y lo guarda recortado. El frontend muestra el motivo obligatorio para rechazo, no envía la transición hasta completarlo y envía el texto al endpoint. Se agregó una prueba de servicio para validar rechazo vacío y exitoso.
+- **Regla de negocio aclarada:** Una franja representa disponibilidad; varias solicitudes pueden aceptarse dentro de la misma franja. Se actualizaron HU-S17, RF-12, la matriz T-S17 y las referencias de planificación relacionadas.
+- **Archivos modificados:** `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/service/SolicitudService.java`, `backend/ms-solicitudes/src/test/java/com/vinculaup/ms_solicitudes/service/SolicitudServiceTest.java`, `frontend/vincula-up-web/src/app/my-requests/my-requests.ts`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `ESPECIFICACION.md`, `MVP Grupo 8- DACS.md` y este walkthrough.
+- **Verificación:** `./mvnw --batch-mode --no-transfer-progress test` en `backend/ms-solicitudes` (18 pruebas); `npm run build` y `npm test -- --watch=false` (7 pruebas); Playwright con rechazo y cancelación sin motivo bloqueados, transiciones válidas y motivos visibles para la contraparte.
+
+### [2026-11-16] - feat: editar datos de clientes desde administración
+
+- **Objetivo:** Completar T-U13, cuya matriz pedía editar nombre/teléfono desde el panel, pero la vista de clientes solo permitía consultar y suspender/reactivar.
+- **Cambios:** El detalle administrativo ahora permite editar nombre, apellido y teléfono, valida nombre y apellido, muestra errores de guardado y actualiza la lista/modal tras una respuesta exitosa. El email no se presenta como campo editable y no se envía en el PATCH. Se actualizaron el texto de la vista y los estilos según la guía visual.
+- **Pruebas de aceptación:** Playwright guardó nombre y teléfono y confirmó su persistencia tras recargar; el email permaneció intacto. Un intento de PATCH del email como ADMIN no cambió el email; el PATCH de datos personales como CLIENTE fue denegado con 403. La suspensión bloqueó `GET /api/usuarios/yo` y la creación de una solicitud con 403; tras reactivar, el perfil devolvió 200 y el historial de 6 solicitudes siguió visible.
+- **Acceso por rol:** `/api/solicitudes/panel` devolvió 200 para ADMIN, 403 para CLIENTE y PROFESIONAL, y 401 sin token o con token malformado.
+- **Regresión:** Pasó `scripts/e2e_authenticated.py`, incluyendo identidad/RBAC, privacidad, rechazo y cancelación con motivo, solicitudes múltiples por franja, chat API, finalización, calificaciones de 1 y 5 estrellas y rechazo de duplicados.
+- **Documentación:** Se registraron resultados en `MVP Grupo 8- DACS.md`. Los seis indicadores del dashboard coincidieron con el conjunto consultado en el API (19 solicitudes, 4 completadas, 1 profesional activo, 1 cliente y 4 valoraciones con promedio 4,0/5), por lo que T-U14 queda aprobado. T-U15 sigue parcial por no cubrir todas las operaciones de cada rol; T-NF01 sigue parcial porque no se probaron tokens vencidos/alterados. T-S14 queda aprobado tras probar ambos límites y el duplicado.
+- **Archivos:** `frontend/vincula-up-web/src/app/admin/admin-clients/admin-clients.ts`, `admin-clients.html`, `admin-clients.css`, `scripts/e2e_authenticated.py`, `MVP Grupo 8- DACS.md` y este walkthrough.
+- **Verificación:** `npm test -- --watch=false` (7 pruebas), `npm run build` y `git diff --check`.
+- **Estado:** T-U11 y T-U13 aprobados en el stack demo. La aceptación del MVP sigue abierta: registro/recuperación e invitación por correo, fotos por rol, disponibilidad/reputación con múltiples profesionales, WebSocket en vivo, integración real de correo/WebPush y parte de la matriz NF aún no tienen evidencia completa.
+
+### [2026-11-15] - feat: editar disponibilidad profesional desde mi cuenta
+
+- **Objetivo:** Completar HU-U07 para que los profesionales activos puedan gestionar sus franjas después de la activación inicial.
+- **Cambios:** “Mi cuenta” carga el perfil profesional y sus horarios; permite agregar, editar y quitar franjas individuales por día, incluidas varias franjas en un mismo día. Valida rangos horarios, pide confirmación antes de reemplazar la disponibilidad y muestra errores de carga/guardado. La actualización reutiliza el endpoint existente, que verifica la pertenencia del perfil en el BFF. Los errores al cargar el perfil ahora se muestran en vez de convertirse silenciosamente en “sin perfil”.
+- **Prueba manual:** Playwright editó el lunes a 09:00–17:00 y 17:00–20:00; el rango inválido 20:00–08:00 no se pudo guardar. Las dos franjas sobrevivieron una recarga. Con esa disponibilidad, crear solicitud 07:00–08:00 devolvió HTTP 400 y crearla 09:00–10:00 devolvió HTTP 201.
+- **Documentación:** Se actualizó HU-U07, la descripción del endpoint en `ESPECIFICACION.md` y el registro de T-U07 en `MVP Grupo 8- DACS.md`.
+- **Archivos:** `frontend/vincula-up-web/src/app/account/account.ts`, `account.html`, `account.css`, `frontend/vincula-up-web/src/app/core/services/api.service.ts`, `ESPECIFICACION.md`, `MVP Grupo 8- DACS.md` y este walkthrough.
+- **Verificación:** `npm run build`, `npm test -- --watch=false` (7 pruebas), persistencia y validación de disponibilidad mediante Playwright/API; `git diff --check`.
+- **Estado:** T-U07 aprobado en el stack demo aislado. Los datos se descartaron al desmontar el stack de aceptación.
+
+### [2026-11-15] - fix: evitar permisos simultáneos de cliente y profesional
+
+- **Objetivo:** Corregir el permiso indebido de creación de solicitudes que el test de aceptación encontró en cuentas PROFESIONAL.
+- **Hallazgo:** Keycloak agrega `CLIENTE` como rol predeterminado y lo conserva al asignar `PROFESIONAL` o `ADMIN`. El BFF convertía todos los roles JWT en autoridades Spring; una cuenta profesional obtuvo HTTP 201 al intentar crear una solicitud como cliente.
+- **Corrección:** El conversor JWT concede una única autoridad de negocio, con prioridad `ADMIN`, `PROFESIONAL`, `CLIENTE`, alineada con la resolución de rol que ya usa el BFF. Se añadieron pruebas unitarias para las tres cuentas con roles superpuestos y aserciones E2E que requieren 403 para PROFESIONAL/ADMIN al crear solicitudes.
+- **Verificación:** 3 pruebas Maven de `SecurityConfigTest`; `scripts/e2e_authenticated.py`; matriz de endpoints principales para panel, usuarios, solicitud, transiciones, calificación y reputación; WebSocket cliente/profesional en vivo y rechazo de ADMIN durante CONNECT. El BFF se reconstruyó y reejecutó en el stack aislado.
+- **Documentación:** Se actualizaron T-U15/T-NF01, T-NF03/T-NF05 y T-NF06 en `MVP Grupo 8- DACS.md`. T-U15 y T-NF01 quedan parciales por cobertura restante; T-NF03, T-NF05 y T-NF06 pasan a aprobados.
+- **Archivos:** `backend/bff-web/src/main/java/com/vinculaup/bff_web/config/SecurityConfig.java`, `backend/bff-web/src/test/java/com/vinculaup/bff_web/config/SecurityConfigTest.java`, `scripts/e2e_authenticated.py`, `MVP Grupo 8- DACS.md` y este walkthrough.
+
+### [2026-11-15] - test: ampliar aceptación con SMTP local y RBAC
+
+- **Objetivo:** Desbloquear verificaciones de correo sin usar proveedores reales y completar más casos de aceptación P0.
+- **Infraestructura E2E:** `.github/docker-compose.e2e.yml` ahora agrega Mailpit (SMTP local `1025`, bandeja HTTP `8025`) y configura Keycloak/BFF para enviar allí, sin cambiar el stack de producción.
+- **Pruebas ejecutadas:** Invitación de profesional `CARGADO` con credencial temporal y enlace; duplicado respondió 409 sin un segundo correo; la contraseña temporal no obtuvo token con `UPDATE_PASSWORD` pendiente; una solicitud produjo aviso al profesional; la expiración envió avisos a cliente y profesional, venció solo la solicitud pendiente y respetó el umbral configurable y el valor predeterminado de 24 horas.
+- **Resultado en matriz:** T-U09 y T-S06 aprobados. T-U05 y T-S15 parciales porque falta completar cambio de contraseña en UI y WebPush. T-U01/U02 siguen pendientes aunque Mailpit ya permite ejecutarlos.
+- **Verificación del entorno:** Chat STOMP en vivo entre los participantes, rechazo de ADMIN en CONNECT, privacidad de fotos/domicilio y matriz de roles principales. Pruebas Maven BFF: 7/7; regresión `scripts/e2e_authenticated.py` aprobada.
+- **Archivos:** `.github/docker-compose.e2e.yml`, `MVP Grupo 8- DACS.md`, `backend/bff-web/src/main/java/com/vinculaup/bff_web/config/SecurityConfig.java`, su prueba unitaria, `scripts/e2e_authenticated.py` y este walkthrough.

@@ -1,7 +1,28 @@
 services:
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - "1025:1025"
+      - "8025:8025"
   keycloak-init:
     environment:
+      KEYCLOAK_SMTP_HOST: mailpit
+      KEYCLOAK_SMTP_PORT: "1025"
+      KEYCLOAK_SMTP_STARTTLS: "false"
+      KEYCLOAK_SMTP_AUTH: "false"
+      KEYCLOAK_SMTP_FROM: e2e@vincula-up.local
+  keycloak:
+    environment:
+      KEYCLOAK_SMTP_HOST: mailpit
+      KEYCLOAK_SMTP_PORT: "1025"
+      KEYCLOAK_SMTP_STARTTLS: "false"
+      KEYCLOAK_SMTP_AUTH: "false"
       KEYCLOAK_SMTP_FROM: e2e@vincula-up.local
   bff-web:
     environment:
+      KEYCLOAK_SMTP_HOST: mailpit
+      KEYCLOAK_SMTP_PORT: "1025"
+      KEYCLOAK_SMTP_STARTTLS: "false"
+      KEYCLOAK_SMTP_AUTH: "false"
+      KEYCLOAK_SMTP_FROM: e2e@vincula-up.local
       MANAGEMENT_HEALTH_MAIL_ENABLED: "false"

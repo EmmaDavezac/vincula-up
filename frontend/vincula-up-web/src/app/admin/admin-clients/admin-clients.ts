@@ -27,9 +27,9 @@ import { VuIcon } from '../../shared/icon/icon';
 import { VuSkeletonList } from '../../shared/skeleton-list/skeleton-list';
 
 /**
- * Clientes registrados: actividad (solicitudes realizadas), estado de la cuenta y
- * suspensión/reactivación. Los clientes se registran solos desde "Crear cuenta", así
- * que el panel sólo gestiona el acceso.
+ * Clientes registrados: actividad (solicitudes realizadas), estado de la cuenta,
+ * edición de datos personales y suspensión/reactivación. El correo se mantiene
+ * como identidad de acceso.
  */
 @Component({
 	selector: 'app-admin-clients',
@@ -149,18 +149,15 @@ export class AdminClients {
 		return conteo;
 	}
 
-	/**
-	 * Detalle del cliente. Es de solo lectura: muestra los datos de la cuenta y
-	 * permite activar o desactivar el acceso. Los datos de contacto no se editan
-	 * desde acá, los edita la persona desde "Mi cuenta".
-	 *
-	 * <p>La suspensión y la reactivación salen de acá y no de la fila: en una
-	 * lista, un botón rojo junto a cada nombre invita a apretarlo sin querer.
-	 */
+	/** La edición y la gestión de acceso se mantienen dentro del detalle. */
 	readonly modal = signal<AdminUser | null>(null);
+	readonly editando = signal(false);
+	readonly guardandoEdicion = signal(false);
+	readonly editForm = { nombre: '', apellido: '', telefono: '' };
 
 	abrirDetalle(client: AdminUser): void {
 		this.aviso.set({ texto: '', tipo: 'info' });
+		this.editando.set(false);
 		this.modal.set(client);
 		this.detailDialogRef = this.dialog.open(this.clientDetailDialog, {
 			ariaLabel: 'Detalle del cliente',
@@ -174,6 +171,60 @@ export class AdminClients {
 	cerrarDetalle(): void {
 		this.detailDialogRef?.close();
 		this.modal.set(null);
+		this.editando.set(false);
+	}
+
+	iniciarEdicion(client: AdminUser): void {
+		this.editForm.nombre = client.nombre ?? '';
+		this.editForm.apellido = client.apellido ?? '';
+		this.editForm.telefono = client.telefono ?? '';
+		this.editando.set(true);
+	}
+
+	cancelarEdicion(): void {
+		this.editando.set(false);
+	}
+
+	guardarEdicion(): void {
+		const client = this.modal();
+		if (!client || this.guardandoEdicion()) {
+			return;
+		}
+
+		const nombre = this.editForm.nombre.trim();
+		const apellido = this.editForm.apellido.trim();
+		if (!nombre || !apellido) {
+			this.aviso.set(avisoError('El nombre y el apellido son obligatorios.'));
+			return;
+		}
+
+		this.guardandoEdicion.set(true);
+		this.api.updateUser(client.id, {
+			nombre,
+			apellido,
+			telefono: this.editForm.telefono.trim() || undefined,
+		}).pipe(
+			catchError((error) => {
+				this.guardandoEdicion.set(false);
+				this.aviso.set(avisoError(this.api.describeError(error, 'No se pudieron guardar los datos del cliente.')));
+				return of(null);
+			}),
+		).subscribe((updated) => {
+			this.guardandoEdicion.set(false);
+			if (!updated) {
+				return;
+			}
+			const clientActualizado: AdminUser = {
+				...client,
+				...updated,
+				fotoUrl: updated.fotoUrl?.trim() || '',
+				tieneFoto: Boolean(updated.tieneFoto) || Boolean(updated.fotoUrl?.trim()),
+			};
+			this.clients.update((items) => items.map((item) => item.id === client.id ? clientActualizado : item));
+			this.modal.set(clientActualizado);
+			this.editando.set(false);
+			this.aviso.set(avisoExito(`Los datos de ${nombreCompleto(clientActualizado)} quedaron actualizados.`));
+		});
 	}
 
 	// ── Acceso ─────────────────────────────────────────────────────────

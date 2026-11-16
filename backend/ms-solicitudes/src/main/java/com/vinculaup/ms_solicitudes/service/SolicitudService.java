@@ -205,7 +205,12 @@ public class SolicitudService {
         verificarExpiracion(solicitud);
         ensureProfessionalActor(solicitud, request);
         ensureState(solicitud, EstadoSolicitud.PENDIENTE);
-        solicitud.rechazar(request.motivo());
+        String motivo = request.motivo() == null ? "" : request.motivo().trim();
+        if (motivo.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Indicá el motivo del rechazo");
+        }
+        solicitud.rechazar(motivo);
         return toResponse(solicitud);
     }
 

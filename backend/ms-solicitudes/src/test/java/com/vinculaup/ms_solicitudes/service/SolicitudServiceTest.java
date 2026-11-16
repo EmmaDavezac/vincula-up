@@ -66,6 +66,24 @@ class SolicitudServiceTest {
     }
 
     @Test
+    void rechazarExigeMotivoYGuardaElMotivoNormalizado() {
+        when(profesionalesClient.obtenerIdentidades(anyCollection()))
+                .thenReturn(List.of(new ProfesionalIdentidad(profesionalId, profesionalUsuarioId, "ACTIVO")));
+
+        ResponseStatusException sinMotivo = assertThrows(ResponseStatusException.class,
+                () -> service.rechazar(solicitudId, new CambiarEstadoRequest(profesionalUsuarioId, "  ")));
+        assertEquals(HttpStatus.BAD_REQUEST, sinMotivo.getStatusCode());
+        assertEquals(EstadoSolicitud.PENDIENTE, solicitud.getEstado());
+
+        var response = service.rechazar(solicitudId,
+                new CambiarEstadoRequest(profesionalUsuarioId, "  No puedo atender ese día.  "));
+
+        assertEquals(EstadoSolicitud.RECHAZADA, response.estado());
+        assertEquals(EstadoSolicitud.RECHAZADA, solicitud.getEstado());
+        assertEquals("No puedo atender ese día.", response.motivoCancelacion());
+    }
+
+    @Test
     void otroProfesionalNoPuedeAceptarLaSolicitud() {
         when(profesionalesClient.obtenerIdentidades(anyCollection()))
                 .thenReturn(List.of(new ProfesionalIdentidad(UUID.randomUUID(), profesionalUsuarioId, "ACTIVO")));

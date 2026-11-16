@@ -3,7 +3,7 @@
 <div class="vu-admin-list-head admin-clients__head">
 	<div>
 		<h1 class="vu-admin-title">Clientes</h1>
-		<p class="vu-admin-lead admin-clients__lead">Consultá y administrá el acceso de cada cliente.</p>
+		<p class="vu-admin-lead admin-clients__lead">Consultá y editá los datos de cada cliente; administrá también su acceso.</p>
 	</div>
 	<p class="vu-admin-list-count admin-clients__count">
 		@if (hayBusqueda()) {
@@ -116,16 +116,30 @@ esto; la única acción que altera la cuenta queda adentro, con su confirmación
 				<dl class="admin-clients__modal-grid">
 					<div>
 						<dt>Nombre</dt>
-						<dd>{{ abierto.nombre || 'Sin dato' }}</dd>
+						<dd>
+							@if (editando()) {
+								<input class="vu-input" type="text" name="clientNombre" [(ngModel)]="editForm.nombre" aria-label="Nombre" required />
+							} @else {
+								{{ abierto.nombre || 'Sin dato' }}
+							}
+						</dd>
 					</div>
 					<div>
 						<dt>Apellido</dt>
-						<dd>{{ abierto.apellido || 'Sin dato' }}</dd>
+						<dd>
+							@if (editando()) {
+								<input class="vu-input" type="text" name="clientApellido" [(ngModel)]="editForm.apellido" aria-label="Apellido" required />
+							} @else {
+								{{ abierto.apellido || 'Sin dato' }}
+							}
+						</dd>
 					</div>
 					<div>
 						<dt>Teléfono</dt>
 						<dd>
-							@if (abierto.telefono) {
+							@if (editando()) {
+								<input class="vu-input" type="tel" name="clientTelefono" [(ngModel)]="editForm.telefono" aria-label="Teléfono" />
+							} @else if (abierto.telefono) {
 								<a class="admin-clients__modal-link" [href]="'tel:' + abierto.telefono">{{ abierto.telefono }}</a>
 							} @else {
 								Sin teléfono
@@ -137,6 +151,40 @@ esto; la única acción que altera la cuenta queda adentro, con su confirmación
 						<dd>{{ abierto.fechaAlta ? (abierto.fechaAlta | date: 'd/M/yyyy') : 'Sin dato' }}</dd>
 					</div>
 				</dl>
+
+				@if (editando()) {
+					<div class="admin-clients__edit-actions">
+						<button
+							type="button"
+							mat-stroked-button
+							class="vu-btn vu-btn--outline"
+							(click)="cancelarEdicion()"
+							[disabled]="guardandoEdicion()"
+						>
+							Cancelar
+						</button>
+						<button
+							type="button"
+							mat-flat-button
+							class="vu-btn vu-btn--ink"
+							(click)="guardarEdicion()"
+							[disabled]="guardandoEdicion()"
+						>
+							{{ guardandoEdicion() ? 'Guardando...' : 'Guardar cambios' }}
+						</button>
+					</div>
+				} @else {
+					<div class="admin-clients__edit-actions">
+						<button
+							type="button"
+							mat-stroked-button
+							class="vu-btn vu-btn--outline"
+							(click)="iniciarEdicion(abierto)"
+						>
+							Editar datos
+						</button>
+					</div>
+				}
 
 				<div class="admin-clients__modal-danger">
 					<p class="admin-clients__modal-label">Acceso a la cuenta</p>

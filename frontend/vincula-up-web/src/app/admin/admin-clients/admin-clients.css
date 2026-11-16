@@ -256,3 +256,14 @@
 	line-height: 1.5;
 	margin: 0;
 }
+
+.admin-clients__edit-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.admin-clients__modal-grid .vu-input {
+	margin-top: 0.25rem;
+	width: 100%;
+}

@@ -89,6 +89,107 @@
         </div>
       }
 
+      @if (esProfesional()) {
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2 class="vu-h3">Disponibilidad semanal</h2>
+              <p class="hint">Definí los días y rangos horarios en los que podés recibir nuevas solicitudes.</p>
+            </div>
+          </div>
+
+          @if (availabilityLoading()) {
+            <p class="hint" role="status">Cargando tu disponibilidad...</p>
+          } @else if (availabilityError()) {
+            <p class="error" role="alert">{{ availabilityError() }}</p>
+            <button type="button" class="vu-btn vu-btn--outline secondary" (click)="cargarDisponibilidad(user)">
+              Reintentar
+            </button>
+          } @else if (editing() === 'availability') {
+            <div class="availability-editor">
+              @for (slot of availabilityDraft(); track $index) {
+                <div class="availability-editor__row">
+                  <label class="vu-label">
+                    Día
+                    <select
+                      class="vu-select"
+                      [attr.aria-label]="'Día de la franja ' + ($index + 1)"
+                      [ngModel]="slot.diaSemana"
+                      (ngModelChange)="actualizarFranja($index, 'diaSemana', $event)"
+                    >
+                      @for (day of weekDays; track day.id) {
+                        <option [value]="day.id">{{ day.name }}</option>
+                      }
+                    </select>
+                  </label>
+                  <label class="vu-label">
+                    Desde
+                    <input
+                      class="vu-input"
+                      type="time"
+                      [attr.aria-label]="'Desde franja ' + ($index + 1)"
+                      [ngModel]="slot.horaInicio"
+                      (ngModelChange)="actualizarFranja($index, 'horaInicio', $event)"
+                    />
+                  </label>
+                  <label class="vu-label">
+                    Hasta
+                    <input
+                      class="vu-input"
+                      type="time"
+                      [attr.aria-label]="'Hasta franja ' + ($index + 1)"
+                      [ngModel]="slot.horaFin"
+                      (ngModelChange)="actualizarFranja($index, 'horaFin', $event)"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    class="vu-btn vu-btn--quiet vu-btn--sm availability-editor__remove"
+                    [attr.aria-label]="'Quitar franja ' + ($index + 1)"
+                    (click)="quitarFranja($index)"
+                  >
+                    Quitar
+                  </button>
+                </div>
+              } @empty {
+                <p class="hint">No hay franjas cargadas. Podés agregar los días y horarios en los que atendés.</p>
+              }
+
+              <button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="agregarFranja()">
+                Agregar franja
+              </button>
+            </div>
+            @if (cardError()) {
+              <p class="error" role="alert">{{ cardError() }}</p>
+            }
+            <div class="card-actions">
+              <button type="button" class="vu-btn vu-btn--ink primary" [disabled]="saving()" (click)="saveAvailability()">
+                {{ saving() ? 'Guardando…' : 'Guardar disponibilidad' }}
+              </button>
+              <button type="button" class="vu-btn vu-btn--outline secondary" [disabled]="saving()" (click)="cancelEdit()">
+                Cancelar
+              </button>
+            </div>
+          } @else {
+            @if (availability().length) {
+              <ul class="availability-list">
+                @for (slot of availability(); track $index) {
+                  <li>
+                    <strong>{{ nombreDia(slot.diaSemana) }}</strong>
+                    <span>{{ slot.horaInicio }} a {{ slot.horaFin }}</span>
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p class="hint">Todavía no configuraste días y horarios de atención.</p>
+            }
+            <button type="button" class="vu-btn vu-btn--outline secondary" (click)="startEdit('availability')">
+              Editar disponibilidad
+            </button>
+          }
+        </div>
+      }
+
       <!-- Datos personales -->
       <div class="card">
         <div class="card-head"><div><h2 class="vu-h3">Datos personales</h2><p class="hint">Tu nombre como aparece en la plataforma.</p></div></div>
@@ -157,5 +258,5 @@
 
 <!-- Confirmación de los guardados -->
 @if (confirmacion(); as pendiente) {
-  <vu-confirm [titulo]="pendiente.titulo" [mensaje]="pendiente.mensaje" [detalle]="pendiente.detalle" textoConfirmar="Guardar" [peligro]="pendiente.peligro ?? false" icono="pencil" (confirmado)="confirmarGuardado()" (cancelado)="cancelarGuardado()" />
+  <vu-confirm [titulo]="pendiente.titulo" [mensaje]="pendiente.mensaje" [detalle]="pendiente.detalle" textoConfirmar="Guardar" [peligro]="esConfirmacionPeligrosa(pendiente)" icono="pencil" (confirmado)="confirmarGuardado()" (cancelado)="cancelarGuardado()" />
 }

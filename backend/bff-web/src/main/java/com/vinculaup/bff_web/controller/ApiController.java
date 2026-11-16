@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
@@ -137,7 +138,11 @@ public class ApiController {
             throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "La suscripción push está incompleta");
         }
-        webPush.guardar(userId(user), subscription);
+        var solicitud = tools.jackson.databind.json.JsonMapper.builder().build().createObjectNode();
+        solicitud.put("endpoint", subscription.path("endpoint").asText());
+        solicitud.put("p256dh", keys.path("p256dh").asText());
+        solicitud.put("auth", keys.path("auth").asText());
+        webPush.guardar(userId(user), solicitud);
     }
 
     @DeleteMapping("/notifications/push-subscription")
@@ -365,7 +370,7 @@ public class ApiController {
     public JsonNode activarProfesional(@RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
         professionalProfile(user, false);
-        JsonNode resultado = gateway.activarProfesional(UUID.fromString(user.path("id").asText()), identityBody(body, user, "usuarioId"));
+        JsonNode resultado = gateway.activarProfesionalPorUsuario(identityBody(body, user, "usuarioId"));
         guardarFotoEnUsuario(body, user);
         return resultado;
     }
@@ -419,15 +424,9 @@ public class ApiController {
             // Todavía no completó el alta en el padrón: no tiene reputación.
             return vacio;
         }
-        JsonNode reputacion;
-        try {
-            reputacion = gateway.reputacionDe(UUID.fromString(profile.get("id").asText()));
-        } catch (RuntimeException exception) {
-            // ms-solicitudes no responde: se devuelve vacío y la tarjeta avisa.
-            return vacio;
-        }
+        JsonNode reputacion = gateway.reputacionDe(UUID.fromString(profile.get("id").asText()));
         if (reputacion == null || !reputacion.isObject()) {
-            return vacio;
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "No se pudo consultar la reputación.");
         }
 
         Map<UUID, String> nombres = new HashMap<>();

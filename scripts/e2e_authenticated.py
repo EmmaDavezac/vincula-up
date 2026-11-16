@@ -7,6 +7,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
 
 KEYCLOAK_URL = os.getenv("E2E_KEYCLOAK_URL", "http://127.0.0.1:8080")
@@ -100,6 +101,35 @@ def main():
     assert admin["rolNegocio"] == "ADMIN"
     api("GET", f"/solicitudes/mias?usuarioId={admin['id']}", admin_token, expected_status=403)
 
+    push_endpoint = f"https://push.invalid/e2e/{uuid4()}"
+    api(
+        "PUT",
+        "/notifications/push-subscription",
+        professional_token,
+        {
+            "endpoint": push_endpoint,
+            "keys": {"p256dh": "test-public-key", "auth": "test-auth-secret"},
+        },
+        expected_status=204,
+    )
+    api(
+        "DELETE",
+        f"/notifications/push-subscription?endpoint={urllib.parse.quote(push_endpoint, safe='')}",
+        professional_token,
+        expected_status=204,
+    )
+    api(
+        "PUT",
+        "/notifications/push-subscription",
+        professional_token,
+        {
+            "endpoint": f"http://push.invalid/e2e/{uuid4()}",
+            "keys": {"p256dh": "test-public-key", "auth": "test-auth-secret"},
+        },
+        expected_status=400,
+    )
+    print("PASS: browser-shaped Web Push subscription is stored/removed; insecure endpoints are rejected")
+
     profiles = api("GET", "/profesionales?estado=ACTIVO", client_token)
     profile = next(
         item
@@ -107,6 +137,19 @@ def main():
         if item["usuarioId"] == professional["id"]
         and any(speciality["id"] == SPECIALITY_ID for speciality in item["especialidades"])
     )
+    activated_profile = api(
+        "PATCH",
+        "/profesionales/activar",
+        professional_token,
+        {
+            "zonaCoberturaLat": -32.4833,
+            "zonaCoberturaLng": -58.2318,
+            "radioKm": 15,
+            "especialidadIds": [SPECIALITY_ID],
+        },
+    )
+    assert activated_profile["id"] == profile["id"]
+    assert activated_profile["estado"] == "ACTIVO"
     start, end = next_available_slot(profile["disponibilidad"])
     request_body = {
         "clienteId": "ffffffff-ffff-ffff-ffff-ffffffffffff",
@@ -119,21 +162,32 @@ def main():
         "fechaHoraFinPropuesta": end,
         "descripcion": "E2E automatizado del circuito de solicitud.",
     }
+    api("POST", "/solicitudes", professional_token, request_body, expected_status=403)
+    api("POST", "/solicitudes", admin_token, request_body, expected_status=403)
     created = api("POST", "/solicitudes", client_token, request_body, expected_status=201)
     request_id = created["id"]
     assert created["estado"] == "PENDIENTE"
     assert created["clienteId"] == client["id"], "The BFF must take the client identity from the token"
+
+    client_requests = api(
+        "GET",
+        f"/solicitudes/mias?usuarioId={professional['id']}",
+        client_token,
+    )
+    assert any(item["id"] == request_id for item in client_requests)
+    assert all(item["clienteId"] == client["id"] for item in client_requests)
 
     received = api(
         "GET",
         f"/solicitudes/mias?usuarioId={professional['id']}",
         professional_token,
     )
+    assert all(item["profesionalId"] == profile["id"] for item in received)
     pending = next(item for item in received if item["id"] == request_id)
     assert pending["direccionServicio"] == pending["zonaAproximada"]
     assert pending["latitud"] == round(pending["latitud"], 2)
     assert pending["longitud"] == round(pending["longitud"], 2)
-    print("PASS: auth, RBAC, identity derived from token, pending location privacy")
+    print("PASS: auth, RBAC, request-list ownership, identity derived from token, pending location privacy")
 
     accepted = api(
         "PATCH",
@@ -151,6 +205,103 @@ def main():
     assert accepted_request["direccionServicio"] == request_body["direccionServicio"]
     assert accepted_request["latitud"] == request_body["latitud"]
     print("PASS: professional acceptance reveals exact location to the participant")
+
+    def create_request(description):
+        body = {**request_body, "descripcion": description}
+        response = api("POST", "/solicitudes", client_token, body, expected_status=201)
+        assert response["estado"] == "PENDIENTE"
+        assert response["clienteId"] == client["id"]
+        return response
+
+    rejection = create_request("Solicitud E2E para probar rechazo con motivo.")
+    api(
+        "PATCH",
+        f"/solicitudes/{rejection['id']}/rechazar",
+        professional_token,
+        {"motivo": "   "},
+        expected_status=400,
+    )
+    still_pending = api(
+        "GET",
+        f"/solicitudes/mias?usuarioId={professional['id']}",
+        professional_token,
+    )
+    assert next(item for item in still_pending if item["id"] == rejection["id"])["estado"] == "PENDIENTE"
+    rejected = api(
+        "PATCH",
+        f"/solicitudes/{rejection['id']}/rechazar",
+        professional_token,
+        {"motivo": "  No puedo atender ese día.  "},
+    )
+    assert rejected["estado"] == "RECHAZADA"
+    assert rejected["motivoCancelacion"] == "No puedo atender ese día."
+    print("PASS: rejection requires a reason, preserves PENDIENTE when empty, and exposes the trimmed reason")
+
+    first_same_slot = create_request("Solicitud E2E de franja compartida A.")
+    second_same_slot = create_request("Solicitud E2E de franja compartida B.")
+    for candidate in (first_same_slot, second_same_slot):
+        result = api(
+            "PATCH",
+            f"/solicitudes/{candidate['id']}/aceptar",
+            professional_token,
+            {},
+        )
+        assert result["estado"] == "ACEPTADA"
+    print("PASS: multiple requests in one available time range can be accepted independently")
+
+    pending_cancellation = create_request("Solicitud E2E para probar cancelación pendiente.")
+    api(
+        "PATCH",
+        f"/solicitudes/{pending_cancellation['id']}/cancelar",
+        client_token,
+        {"motivo": " "},
+        expected_status=400,
+    )
+    cancelled_pending = api(
+        "PATCH",
+        f"/solicitudes/{pending_cancellation['id']}/cancelar",
+        client_token,
+        {"motivo": "  Cambio de planes.  "},
+    )
+    assert cancelled_pending["estado"] == "CANCELADA"
+    assert cancelled_pending["motivoCancelacion"] == "Cambio de planes."
+    assert cancelled_pending["canceladaPorRol"] == "CLIENTE"
+    client_cancellations = api(
+        "GET",
+        f"/solicitudes/mias?usuarioId={client['id']}",
+        client_token,
+    )
+    saved_client_cancellation = next(
+        item for item in client_cancellations if item["id"] == pending_cancellation["id"]
+    )
+    assert saved_client_cancellation["canceladaPorRol"] == "CLIENTE"
+
+    accepted_cancellation = create_request("Solicitud E2E para probar cancelación aceptada.")
+    api(
+        "PATCH",
+        f"/solicitudes/{accepted_cancellation['id']}/aceptar",
+        professional_token,
+        {},
+    )
+    cancelled_accepted = api(
+        "PATCH",
+        f"/solicitudes/{accepted_cancellation['id']}/cancelar",
+        professional_token,
+        {"motivo": "  No podré asistir.  "},
+    )
+    assert cancelled_accepted["estado"] == "CANCELADA"
+    assert cancelled_accepted["motivoCancelacion"] == "No podré asistir."
+    assert cancelled_accepted["canceladaPorRol"] == "PROFESIONAL"
+    professional_cancellations = api(
+        "GET",
+        f"/solicitudes/mias?usuarioId={professional['id']}",
+        professional_token,
+    )
+    saved_professional_cancellation = next(
+        item for item in professional_cancellations if item["id"] == accepted_cancellation["id"]
+    )
+    assert saved_professional_cancellation["canceladaPorRol"] == "PROFESIONAL"
+    print("PASS: pending and accepted requests require cancellation reasons and retain the actor's explanation")
 
     message = api(
         "POST",
@@ -190,7 +341,34 @@ def main():
         rating_body,
         expected_status=409,
     )
-    print("PASS: chat, completion, one rating per request, and duplicate rejection")
+
+    one_star_request = create_request("Solicitud E2E para probar la calificación mínima.")
+    api(
+        "PATCH",
+        f"/solicitudes/{one_star_request['id']}/aceptar",
+        professional_token,
+        {},
+    )
+    api(
+        "PATCH",
+        f"/solicitudes/{one_star_request['id']}/completar",
+        client_token,
+        {},
+    )
+    one_star = api(
+        "POST",
+        f"/solicitudes/{one_star_request['id']}/calificacion",
+        client_token,
+        {
+            "clienteId": "00000000-0000-0000-0000-000000000000",
+            "puntaje": 1,
+            "comentario": "Calificación mínima E2E",
+        },
+        expected_status=201,
+    )
+    assert one_star["solicitudId"] == one_star_request["id"]
+    assert one_star["puntaje"] == 1
+    print("PASS: chat, completion, 1- and 5-star ratings, and duplicate rejection")
 
 
 if __name__ == "__main__":

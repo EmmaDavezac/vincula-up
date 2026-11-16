@@ -73,7 +73,7 @@ interface ProfessionalActivationResponse {
   estado?: string;
 }
 
-interface AvailabilitySlot {
+export interface AvailabilitySlot {
   diaSemana: string;
   horaInicio: string;
   horaFin: string;
@@ -296,13 +296,13 @@ export class ApiService {
     return this.http.get<ProfessionalActivationResponse>(`${this.baseUrl}/profesionales/mi-perfil`, {
       params,
       headers: this.authHeaders(),
-    }).pipe(
-      catchError(() => of(null)),
-    );
+    });
   }
 
-  setAvailability(professionalId: string, slots: AvailabilitySlot[]): Observable<unknown> {
-    return this.http.put(`${this.baseUrl}/profesionales/${professionalId}/disponibilidad`, slots, { headers: this.authHeaders() });
+  setAvailability(professionalId: string, slots: AvailabilitySlot[]): Observable<AvailabilitySlot[]> {
+    return this.http.put<AvailabilitySlot[]>(`${this.baseUrl}/profesionales/${professionalId}/disponibilidad`, slots, {
+      headers: this.authHeaders(),
+    });
   }
 
   suspendProfessional(id: string): Observable<unknown> {
