@@ -266,12 +266,10 @@ z-index 70 compite de verdad contra el 50 de la barra.
 	}
 }
 
-/* Enlace secundario: "Crear cuenta". */
-.auth-action--link {
-	color: var(--ink);
-	font-size: 0.875rem;
-	font-weight: 700;
-	text-decoration: none;
+/* Acción secundaria junto al botón primario de ingreso. */
+.auth-action--register {
+	font-size: 0.75rem;
+	padding: 0.625rem 0.65rem;
 }
 
 /* En mobile, "Ingresar" viene del tabbar: el botón primario se oculta. */
@@ -282,6 +280,11 @@ z-index 70 compite de verdad contra el 50 de la barra.
 }
 
 @media (min-width: 1024px) {
+	.auth-action--register {
+		font-size: 0.875rem;
+		padding: 0.625rem 1rem;
+	}
+
 	.auth-action--cta {
 		display: inline-flex;
 		font-size: 0.875rem;

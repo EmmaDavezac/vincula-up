@@ -25,6 +25,14 @@
 
 ## Historial
 
+### [2026-11-16] - fix: dar estilo de botón secundario a crear cuenta
+- **Objetivo:** Hacer que «Crear cuenta» se reconozca como una acción y acompañe visualmente al acceso primario.
+- **Cambios realizados:**
+  - Se reemplaza el enlace sin destino por un botón de acción con estilo outline.
+  - Se ajusta el tamaño para móvil y escritorio usando los estilos y tokens globales.
+  - Archivos modificados: `frontend/vincula-up-web/src/app/shared/navbar/navbar.html` y `frontend/vincula-up-web/src/app/shared/navbar/navbar.css`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build`.
+
 ### [2026-11-12] - fix: notificaciones de vencimiento con autenticación de servicio y aviso al profesional
 - **Objetivo:**
   1. Corregir el error `401 UNAUTHORIZED` que impedía que el `SolicitudExpiracionScheduler` enviara mails al vencer solicitudes: el hilo de fondo no tenía contexto HTTP ni sesión WebSocket, por lo que `JdkHttpClientRequestFactory` no adjuntaba el header `Authorization` al llamar a `ms-usuarios` y `ms-profesionales`.

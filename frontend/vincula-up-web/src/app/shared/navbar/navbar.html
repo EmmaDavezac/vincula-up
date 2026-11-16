@@ -174,7 +174,13 @@
 					}
 				</div>
 			} @else {
-				<a class="auth-action auth-action--link" (click)="auth.registerWithKeycloak()">Crear cuenta</a>
+				<button
+					type="button"
+					class="vu-btn vu-btn--outline auth-action auth-action--register"
+					(click)="auth.registerWithKeycloak()"
+				>
+					Crear cuenta
+				</button>
 				<button
 					type="button"
 					class="vu-btn vu-btn--ink auth-action auth-action--cta vu-btn--square"
