@@ -176,7 +176,7 @@ public class UsuarioService {
         }
         Usuario usuario = repository.findById(id).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
-        usuario.update(request.nombre(), request.apellido(), request.email(), request.telefono(), request.fotoUrl());
+        usuario.update(request.nombre(), request.apellido(), request.telefono(), request.fotoUrl());
         return toResponse(usuario);
     }
 

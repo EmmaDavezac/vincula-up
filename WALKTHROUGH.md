@@ -25,7 +25,16 @@
 
 ## Historial
 
-### [2026-11-12] - fix: notificaciones de vencimiento con autenticación de servicio y aviso al profesional
+### [2026-11-15] - task: identificar pendientes planificación Jira
+
+- **Objetivo:** Identificar qué tareas faltan implementar para completar la planificación de Jira basada en la documentación del proyecto.
+- **Cambios realizados:**
+  - Analizó ESPECIFICACION.md y MVP DACS.md para mapear historias, sprints y responsables
+  - Identificadas 32 historias de usuario que necesitan issues en Jira
+  - Definida asignación de historias a sprints 1-4 con fechas correspondientes
+  - Establecido responsables por historia según equipo de desarrollo
+  - Mapeado RF (Requisitos Funcionales) a cada historia
+- **Verificación:** Documentación consultada y cruzada con estado actual del repositorio
 - **Objetivo:**
   1. Corregir el error `401 UNAUTHORIZED` que impedía que el `SolicitudExpiracionScheduler` enviara mails al vencer solicitudes: el hilo de fondo no tenía contexto HTTP ni sesión WebSocket, por lo que `JdkHttpClientRequestFactory` no adjuntaba el header `Authorization` al llamar a `ms-usuarios` y `ms-profesionales`.
   2. Notificar al **profesional** además del cliente cuando una solicitud vence por falta de respuesta.
@@ -1111,3 +1120,26 @@
   - **`ESPECIFICACION.md`:** Agregada mención de los informes académicos formales en el bloque introductorio.
   - **`WALKTHROUGH.md`:** Esta entrada.
 - **Verificación:** `git diff --stat` confirma que solo se modifican archivos `.md`. No hay cambios de código, por lo que no aplica compilación backend/frontend.
+
+### [2026-11-15] - docs: completar planificación de pruebas del MVP
+
+- **Objetivo:** Documentar un plan de pruebas ejecutable y trazable a las 32 historias de usuario del MVP.
+- **Cambios realizados:**
+  - `MVP Grupo 8- DACS.md`: ampliados los 32 casos funcionales con precondiciones, pasos y resultados esperados; agregados seis casos no funcionales para RNF-01 a RNF-06, preparación del entorno/datos, formato de evidencia y criterios de aceptación P0/P1.
+  - `ESPECIFICACION.md`: añadido enlace a la matriz y actualizado el Definition of Done para exigir pruebas y registro de resultados.
+  - Se conservaron los cambios locales preexistentes de este archivo.
+- **Verificación:** `git diff --check`; revisión de cobertura HU-U01–HU-U15, HU-S01–HU-S17 y RNF-01–RNF-06. La matriz define pruebas, pero no afirma que hayan sido ejecutadas.
+
+### [2026-11-15] - test: automatizar reglas críticas, privacidad y CI del MVP
+
+- **Objetivo:** Convertir parte de los criterios críticos del plan en pruebas ejecutables, agregar una validación de navegador y automatizar la regresión en GitHub Actions.
+- **Cambios realizados:**
+  - Agregadas pruebas para identidad/correo inmutable, términos y suspensión en `ms-usuarios`; horarios en `ms-profesionales`; ciclo de solicitudes, permisos, cancelación, vencimiento y calificación en `ms-solicitudes`; y privacidad del domicilio en `bff-web`.
+  - Extraído el filtrado de domicilio pendiente a `SolicitudPrivacyFilter` para probar que antes de aceptar se muestra solo la zona y las coordenadas se reducen a dos decimales; después de aceptar se conserva la dirección exacta.
+  - Agregado Playwright para comprobar en Chromium la landing pública, el FAQ de privacidad y el enlace a términos.
+  - Creado `.github/workflows/ci.yml` para ejecutar Maven en los cuatro servicios, pruebas unitarias Angular, build productivo y smoke E2E en `push` y `pull_request`.
+  - Agregado `.github/docker-compose.e2e.yml` y `scripts/e2e_authenticated.py`: arranca el stack demo con Keycloak y ejercita autenticación real, RBAC, solicitud, privacidad de domicilio antes/después de aceptar, chat, completado y calificación única.
+  - Actualizadas dependencias Angular 22 y Playwright; `npm audit` quedó sin vulnerabilidades reportadas.
+  - Una prueba detectó que `Usuario.update` sí permitía cambiar el correo, a diferencia del contrato documentado; se corrigió para mantenerlo inmutable.
+  - Actualizados el plan del MVP y el estado de deuda técnica, distinguiendo lo cubierto automáticamente de la aceptación manual restante y los proveedores externos de notificación.
+- **Verificación:** `./mvnw --batch-mode --no-transfer-progress test` en los cuatro servicios (28 pruebas); `npm ci`, `npm audit` (0 vulnerabilidades), `npm test -- --watch=false` (4 pruebas), `npm run build`, `npm run test:e2e` (1 navegador) y `python3 scripts/e2e_authenticated.py` con el stack Docker limpio y saludable (flujo autenticado completo aprobado).

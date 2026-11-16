@@ -1,0 +1,7 @@
+services:
+  keycloak-init:
+    environment:
+      KEYCLOAK_SMTP_FROM: e2e@vincula-up.local
+  bff-web:
+    environment:
+      MANAGEMENT_HEALTH_MAIL_ENABLED: "false"

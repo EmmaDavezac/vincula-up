@@ -66,6 +66,8 @@ Ingeniería en Sistemas de Información
 
 [Sprint 4 · 09/11 – 23/11	9](#sprint-4-·-09/11-–-23/11)
 
+[Plan de pruebas	9](#plan-de-pruebas)
+
 [Definition of Done	9](#definition-of-done)
 
 [**Relevamiento	9**](#relevamiento)
@@ -335,13 +337,128 @@ Objetivo: El cliente pide un turno, el profesional lo gestiona y el flujo termin
 | Integración en BFF y pruebas de integración | Integrar el envío de correos por SMTP y las notificaciones WebPush | NM | HU-S06, HU-S16 |
 | Integración en BFF y pruebas de integración | Probar de punta a punta con autenticación real y preparar la demo | NM | Criterios de éxito de la demo |
 
+### Plan de pruebas {#plan-de-pruebas}
+
+El plan cubre las 32 historias de usuario y los criterios de éxito de la demo. Cada caso debe ejecutarse con cuentas y datos de prueba, sin utilizar información personal ni credenciales de producción.
+
+#### Niveles y responsables
+
+| Nivel | Alcance | Responsable |
+|---|---|---|
+| Unitario y de componentes | Reglas de negocio, validaciones, transiciones de estado, cálculos y componentes o servicios de interfaz afectados | LD (backend) y AV (frontend) |
+| Integración | Persistencia y comunicación BFF-servicios; autenticación JWT y permisos por rol; chat y notificaciones. Aislar Nominatim y los proveedores de correo/WebPush en pruebas automatizadas | NM |
+| Aceptación manual | Ejecutar los escenarios de esta matriz en Docker con perfiles Cliente, Profesional y Administrador; comprobar también los flujos de la demo | NV |
+
+#### Automatización disponible
+
+El repositorio incluye una primera suite automatizada ejecutada localmente:
+
+| Componente | Cobertura automatizada | Resultado actual |
+|---|---|---|
+| `ms-usuarios` | Perfil, correo identitario inmutable, aceptación de términos y suspensión/reactivación | 4 pruebas unitarias |
+| `ms-profesionales` | Reemplazo de horarios y rechazo de rangos inválidos sin borrar los existentes | 3 pruebas unitarias |
+| `ms-solicitudes` | Autorización de participantes, ciclo aceptar-completar-calificar, cancelación, disponibilidad, expiración y cifrado de coordenadas | 17 pruebas unitarias |
+| `bff-web` | Ocultamiento del domicilio pendiente y redondeo de coordenadas hasta la aceptación | 4 pruebas unitarias |
+| Frontend | Generación de iniciales de avatar | 4 pruebas unitarias |
+| Frontend en Chromium | Navegación pública, preguntas frecuentes y contenido de privacidad | 1 smoke test E2E de navegador |
+| Stack Docker + Keycloak + BFF | Autenticación/RBAC, identidad tomada del token, solicitud, privacidad antes/después de aceptar, chat, completar, calificación y rechazo de duplicados | 1 E2E API autenticado |
+
+GitHub Actions ejecuta las pruebas Maven de los cuatro servicios, auditoría de dependencias, pruebas unitarias Angular, compilación de producción, smoke E2E de navegador y E2E API autenticado sobre un stack Docker con datos demo en cada `push` y `pull_request`. Comandos locales:
+
+```bash
+# En cada backend/ms-usuarios, backend/ms-profesionales,
+# backend/ms-solicitudes y backend/bff-web:
+./mvnw --batch-mode --no-transfer-progress test
+
+cd frontend/vincula-up-web
+npm test -- --watch=false
+npm run build
+npm run test:e2e
+
+# Con el stack Docker de demo arriba y Keycloak importado:
+cd ../..
+python3 scripts/e2e_authenticated.py
+```
+
+El E2E autenticado ya se ejecutó en un stack Docker local aislado y pasó con las cuentas demo. No cubre el envío/recepción real de correo y WebPush (el stack de prueba no usa proveedores externos) ni sustituye toda la matriz de aceptación manual de 32 historias, navegadores/dispositivos y casos operativos; esos resultados deben registrarse en Jira antes de declarar aprobado el MVP.
+
+#### Preparación común
+
+Ejecutar en un entorno Docker de prueba equivalente al despliegue del MVP, con correos y WebPush de prueba y sin datos personales reales. Preparar:
+
+* Una cuenta activa por rol (Cliente, Profesional y Administrador), un profesional `CARGADO`, un profesional `ACTIVO` y una cuenta suspendida.
+* Dos clientes y dos profesionales para comprobar separación de datos; al menos dos categorías, franjas disponibles y un profesional con calificaciones conocidas.
+* Solicitudes de prueba en los estados necesarios (`PENDIENTE`, `ACEPTADA`, `COMPLETADA`), incluida una solicitud con domicilio y otra con datos de cancelación.
+* Acceso a los registros de la aplicación y a la base de datos de prueba para contrastar estados, auditoría y datos persistidos. Para casos con terceros, usar correo/WebPush de prueba inspeccionables.
+
+Al comenzar cada caso, anotar los identificadores de los datos utilizados. Restablecer o crear datos nuevos al terminar para que las ejecuciones no dependan del orden.
+
+#### Matriz funcional trazable
+
+Prioridad **P0**: flujo principal de la demo, seguridad, privacidad y reglas críticas; debe aprobarse para cerrar el MVP. **P1**: cobertura funcional restante y regresión. En cada fila, preparar las precondiciones indicadas, ejecutar los pasos y comparar el resultado observable con el esperado.
+
+| ID / HU | Precondiciones y datos | Pasos | Resultado esperado | Prioridad |
+|---|---|---|---|---|
+| T-U01 · HU-U01 | Correo de prueba no registrado; acceso al buzón de prueba. | 1. Completar registro. 2. Confirmar el enlace recibido. 3. Iniciar sesión. | La cuenta se crea una sola vez con rol `CLIENTE` y puede ingresar. | P0 |
+| T-U02 · HU-U02 | Cuenta de prueba existente; buzón de prueba. | 1. Solicitar recuperación. 2. Usar el enlace vigente y guardar clave nueva. 3. Repetir con enlace vencido o ya usado. | El enlace vigente permite cambiar la clave; el vencido/usado no permite cambiarla. La clave nueva permite ingresar. | P1 |
+| T-U03 · HU-U03 | Cuenta sin aceptación de la versión vigente de términos. | 1. Ingresar e intentar cerrar el modal o navegar fuera. 2. Aceptar. 3. Recargar y volver a ingresar. | No se puede omitir la aceptación; se persisten versión y fecha, y el modal ya no bloquea esa versión aceptada. | P1 |
+| T-U04 · HU-U04 | Usuario autenticado con perfil conocido. | 1. Cambiar nombre, teléfono y foto. 2. Guardar y recargar. 3. Intentar modificar el correo. | Los campos editables persisten; el correo no cambia ni puede modificarse desde la interfaz/API. | P1 |
+| T-U05 · HU-U05 | Profesional recién creado con contraseña temporal y buzón de prueba. | 1. Iniciar sesión con la clave temporal. 2. Intentar navegar a otra función sin cambiarla. 3. Cambiarla e ingresar de nuevo. | Se exige el cambio antes de operar; la clave nueva funciona y la temporal deja de permitir el acceso. | P0 |
+| T-U06 · HU-U06 | Profesional en estado `CARGADO`, con datos de activación disponibles. | 1. Completar foto, zona de cobertura y horarios. 2. Guardar. 3. Buscarlo en el padrón/directorio. | El perfil pasa a `ACTIVO` y aparece en las consultas públicas que correspondan. | P0 |
+| T-U07 · HU-U07 | Profesional activo con franja semanal registrada; solicitud de búsqueda en fecha y horario conocidos. | 1. Cambiar una franja. 2. Guardar. 3. Buscar turnos dentro y fuera de la franja actualizada. | La búsqueda refleja la nueva disponibilidad y no ofrece horarios fuera de ella. | P1 |
+| T-U08 · HU-U08 | Profesional con dos calificaciones de prueba conocidas (por ejemplo, 3 y 5 estrellas). | 1. Ingresar como profesional. 2. Abrir reputación. 3. Comparar promedio y cantidad con los datos preparados. | Se muestran promedio 4 y dos calificaciones; el resultado coincide con las calificaciones persistidas. | P1 |
+| T-U09 · HU-U09 | Administrador autenticado; un correo libre y otro ya asociado a una cuenta. | 1. Dar de alta profesional con correo libre. 2. Verificar perfil y aviso. 3. Repetir con correo existente. | El alta válida crea el perfil `CARGADO` y genera la contraseña temporal; el duplicado se rechaza con el mensaje definido y no crea otra cuenta. | P0 |
+| T-U10 · HU-U10 | Administrador y profesional existente con legajo/especialidades conocidos. | 1. Abrir detalle. 2. Cambiar legajo o especialidades. 3. Guardar y volver a consultar. | El padrón muestra los nuevos valores persistidos y no altera otros profesionales. | P1 |
+| T-U11 · HU-U11 | Cuenta activa con historial de prueba; administrador autenticado. | 1. Suspender cuenta. 2. Intentar una operación protegida con esa cuenta. 3. Consultar historial. 4. Reactivar e intentar operar. | La cuenta suspendida no puede operar, el historial se conserva y al reactivarla recupera el acceso permitido. | P1 |
+| T-U12 · HU-U12 | Administrador autenticado y nombre de categoría de prueba no existente. | 1. Crear la categoría. 2. Consultar el catálogo como cliente. | La categoría queda persistida y visible en el catálogo público. | P1 |
+| T-U13 · HU-U13 | Administrador y cliente existente con correo conocido. | 1. Editar nombre o teléfono. 2. Guardar y volver a consultar el cliente. 3. Intentar modificar su correo. | Los cambios permitidos persisten; el correo permanece inalterado. | P1 |
+| T-U14 · HU-U14 | Datos de prueba que permitan generar indicadores; cuentas Admin, Cliente y Profesional. | 1. Abrir `/admin` como Admin. 2. Comparar indicadores con datos preparados. 3. Intentar abrirlo con los otros roles. | El Admin ve indicadores consistentes con los datos; Cliente y Profesional no acceden al panel ni a sus datos. | P1 |
+| T-U15 · HU-U15 | Cuentas activas de los tres roles y una cuenta suspendida. | 1. Iniciar sesión con cada rol. 2. Comprobar navegación y operaciones autorizadas. 3. Intentar operar con cuenta suspendida. | Cada rol accede a sus opciones autorizadas; la cuenta suspendida no puede operar aunque tenga sesión iniciada. | P0 |
+| T-S01 · HU-S01 | Cliente autenticado; servicio de geocodificación de prueba disponible. | 1. Ingresar una dirección y consultar coordenadas. 2. Repetir seleccionando un punto en el mapa. | Ambas entradas producen una ubicación utilizable para la búsqueda; se conservan coordenadas válidas. La exposición de la dirección se verifica también en T-S07 y T-NF03. | P0 |
+| T-S02 · HU-S02 | Catálogo con una categoría con profesionales activos y otra sin profesionales activos. | 1. Abrir el paso de categorías como Cliente. 2. Comparar las opciones con los datos preparados. | Solo se ofrecen categorías que tienen al menos un profesional activo. | P1 |
+| T-S03 · HU-S03 | Cliente en el formulario de solicitud. | 1. Ingresar 19 caracteres e intentar avanzar. 2. Ingresar exactamente 20 y avanzar. | Con menos de 20 no se avanza; con 20 se admite continuar, siempre que los demás campos requeridos sean válidos. | P0 |
+| T-S04 · HU-S04 | Profesionales de prueba con disponibilidad completa, parcial y nula para franjas conocidas. | 1. Consultar fechas desde hoy hasta los próximos seis días. 2. Elegir franjas para las que se prepararon esos perfiles. | Solo aparecen profesionales cuya disponibilidad cubre la franja completa; no se ofrecen fechas fuera del rango. | P0 |
+| T-S05 · HU-S05 | Dos o más profesionales con distancias y reputaciones diferentes y conocidas. | 1. Ordenar por cercanía. 2. Ordenar por reputación. 3. Revisar datos mostrados. | Cada orden respeta el criterio elegido y se muestran estrellas y cantidad de calificaciones correctas. | P1 |
+| T-S06 · HU-S06 | Cliente autenticado, datos válidos para los seis pasos, profesional elegible y buzón de prueba. | 1. Completar los seis pasos. 2. Confirmar envío una sola vez. 3. Consultar solicitud y buzón del profesional. | Se crea una solicitud `PENDIENTE` asociada al cliente/profesional correctos y el profesional recibe el aviso definido. | P0 |
+| T-S07 · HU-S07 | Solicitud `PENDIENTE` con domicilio exacto conocido; cliente, profesional destinatario y tercero. | 1. Consultar la solicitud como profesional destinatario. 2. Repetir como tercero. 3. Aceptar y volver a consultar como destinatario. | Antes de aceptar solo se muestra zona/punto aproximado; el tercero no accede; tras aceptar, solo los participantes autorizados ven el domicilio exacto. | P0 |
+| T-S08 · HU-S08 | Solicitudes de dos clientes y solicitudes dirigidas a dos profesionales, con estados/fechas conocidos. | 1. Abrir `/solicitudes` como cada usuario. 2. Revisar pertenencia, estado y fecha. 3. Intentar acceder a detalle ajeno. | Cada usuario ve solo solicitudes propias o dirigidas a él; estados y fechas `dd/mm/aa` son correctos; el detalle ajeno es denegado. | P1 |
+| T-S09 · HU-S09 | Solicitud `PENDIENTE` asignada a un profesional; buzón de prueba del cliente. | 1. Aceptarla como profesional asignado. 2. Consultar estado y dirección. 3. Revisar aviso del cliente. | Pasa a `ACEPTADA`, se revela el domicilio al participante autorizado y el cliente recibe el aviso. | P0 |
+| T-S10 · HU-S10 | Solicitud `PENDIENTE` dirigida al profesional; buzón del cliente. | 1. Rechazar con motivo. 2. Verificar estado/aviso. 3. Repetir en otra solicitud sin motivo. | El rechazo válido pasa a `RECHAZADA` y comunica el motivo; sin motivo no cambia el estado ni se registra el rechazo. | P0 |
+| T-S11 · HU-S11 | Solicitudes `PENDIENTE` y `ACEPTADA`, cada una con cliente/profesional participantes y buzones de prueba. | 1. Cancelar cada solicitud como uno de sus participantes con motivo. 2. Intentar una cancelación sin motivo. 3. Verificar estado, autor e aviso. | Las cancelaciones válidas pasan a `CANCELADA`, conservan motivo y actor y notifican a la otra parte; sin motivo no se completa la operación. | P0 |
+| T-S12 · HU-S12 | Solicitud `ACEPTADA` sin completar. | 1. Marcar completada como Cliente. 2. Repetir con una segunda solicitud como Profesional. 3. Consultar estado y opción de calificar. | En ambos casos pasa a `COMPLETADA` y queda habilitada la calificación una sola vez por solicitud. | P0 |
+| T-S13 · HU-S13 | Cliente y profesional participantes conectados; tercer usuario ajeno y sesión independiente. | 1. Enviar mensaje en cada sentido. 2. Verificar recepción sin recargar. 3. Intentar leer/publicar como tercero. | Participantes intercambian mensajes en vivo; el tercero no puede leer ni publicar en ese chat. | P0 |
+| T-S14 · HU-S14 | Solicitudes completadas sin calificar y una solicitud ya calificada. | 1. Calificar una con 1 estrella y otra con 5, ambas con comentario. 2. Consultar persistencia/reputación. 3. Intentar duplicar una calificación. | Se aceptan límites 1 y 5 con comentario; se persiste una calificación por solicitud y el duplicado se rechaza. | P0 |
+| T-S15 · HU-S15 | Tiempo de expiración de prueba reducido; solicitudes `PENDIENTE` y `ACEPTADA`; buzones y WebPush de prueba de ambas partes. | 1. Crear o preparar ambas solicitudes. 2. Esperar/ejecutar el ciclo del scheduler tras superar el plazo. 3. Revisar estados y avisos. | Solo la pendiente vencida pasa a `VENCIDA`; ambas partes reciben correo y WebPush; la aceptada no cambia. | P0 |
+| T-S16 · HU-S16 | Usuario con WebPush habilitado y una solicitud/mensaje de prueba. | 1. Provocar un cambio de estado. 2. Enviar un mensaje nuevo. 3. Revisar bandeja y notificaciones. | Se registra y muestra el aviso correspondiente a cada evento sin atribuirlo a usuarios ajenos. | P1 |
+| T-S17 · HU-S17 | Un turno `ACEPTADA` y dos solicitudes candidatas del mismo profesional, una superpuesta y otra no. | 1. Intentar aceptar la solicitud superpuesta. 2. Revisar mensaje/conflicto y estado. 3. Aceptar la no superpuesta. | La superpuesta se rechaza y señala el turno conflictivo sin cambiar indebidamente el estado; la no superpuesta puede aceptarse. | P0 |
+
+#### Matriz de requisitos no funcionales
+
+| ID / requisito | Precondiciones y datos | Pasos | Resultado esperado | Prioridad |
+|---|---|---|---|---|
+| T-NF01 · RNF-01 Seguridad y autenticación | Cliente HTTP de prueba; token válido, ausente, vencido, alterado y tokens con roles diferentes. | 1. Llamar a un endpoint protegido sin token y con tokens inválidos. 2. Llamar con tokens válidos de cada rol. 3. En solicitudes, intentar enviar un identificador de actor distinto del sujeto autenticado. | Sin token válido se deniega el acceso; los roles solo ejecutan operaciones autorizadas; la identidad/actor se toma del token, nunca de un ID manipulable del cuerpo. | P0 |
+| T-NF02 · RNF-02 HTTPS | Despliegue de prueba con Nginx y certificado configurado. | 1. Abrir la aplicación por HTTPS. 2. Revisar certificado y solicitudes de red. 3. Probar acceso HTTP. | El certificado es válido para el entorno y las rutas de la aplicación/API operan por HTTPS; HTTP no expone credenciales, tokens ni datos de usuario. | P0 |
+| T-NF03 · RNF-03 Privacidad | Fotos privadas y solicitudes con domicilio exacto; cuentas Admin, Cliente, Profesional participante y tercero. | 1. Solicitar las fotos como roles autorizados/no autorizados. 2. Consultar una solicitud pendiente y luego aceptada con las cuentas indicadas. | Las fotos y domicilios solo son accesibles según las reglas de rol/participación; domicilio exacto oculto antes de aceptar; URL/identificador directo no elude permisos. | P0 |
+| T-NF04 · RNF-04 Trazabilidad | Cuenta con historial, términos pendientes y solicitudes cancelables en estado válido. | 1. Suspender y consultar historial. 2. Aceptar términos y revisar versión/fecha. 3. Cancelar como cada rol en solicitudes distintas y consultar auditoría. | No se pierde historial al suspender; aceptación conserva versión y fecha; cada cancelación conserva motivo y actor correctos. | P1 |
+| T-NF05 · RNF-05 Tiempo real | Dos sesiones de participantes y una de tercero; conexión WebSocket/STOMP disponible. | 1. Enviar mensaje y cambiar estado desde una sesión. 2. Observar la sesión de la otra parte sin recargar. 3. Observar la del tercero. | Eventos llegan a participantes sin refrescar y no se entregan ni exponen a usuarios ajenos. | P0 |
+| T-NF06 · RNF-06 Configurabilidad | Entorno de prueba con valor de expiración conocido y solicitudes pendientes con marcas de tiempo antes/después del umbral. | 1. Configurar plazo de prueba. 2. Crear solicitudes a ambos lados del umbral. 3. Ejecutar ciclo de expiración. 4. Reiniciar con valor por defecto documentado y comprobar su lectura efectiva. | El plazo configurado controla el vencimiento; solo solicitudes que superan el umbral expiran. El valor efectivo, incluido el predeterminado, coincide con la configuración documentada y no requiere cambio de código. | P0 |
+
+#### Ejecución, evidencia y cierre
+
+1. Ejecutar en este orden: pruebas unitarias/componentes, integración, matriz funcional, matriz no funcional y recorrido completo de demo. Los servicios externos (geocodificación, SMTP y WebPush) deben ser controlables en pruebas automatizadas; para aceptación se usan sus integraciones de prueba.
+2. Ejecutar cada caso con las precondiciones de su fila y los datos comunes indicados. Repetir en limpio los casos dependientes de estado; no usar información personal, claves reales ni datos de producción.
+3. Para cada ejecución registrar: ID del caso, versión/commit, entorno, fecha, ejecutor, identificadores de datos de prueba, resultado esperado, resultado obtenido, estado (aprobado/fallido/bloqueado), evidencia y, si aplica, issue de defecto vinculado. Guardar evidencia sin exponer tokens, contraseñas, direcciones reales ni otros datos sensibles.
+4. Ante un fallo, registrar defecto reproducible con caso, pasos, resultado esperado/obtenido y evidencia; corregir, volver a ejecutar el caso y la regresión relacionada, conservando el resultado de cada ejecución.
+5. El MVP queda aceptado cuando todos los P0 funcionales y no funcionales pasan, no hay defectos bloqueantes abiertos y los P1 están aprobados o explícitamente aceptados como pendientes con responsable y justificación. Marcar como **pendiente de ejecución** cualquier caso planificado que todavía no tenga evidencia de resultado; la existencia de este plan no implica que los tests ya se hayan ejecutado.
+
 ### Definition of Done {#definition-of-done}
 
 Una historia de usuario se considera terminada cuando:
 
 * Cumple todos los escenarios Given/When/Then de su historia.  
 * El código fue revisado e integrado en la rama principal.  
-* Se probó manualmente en el entorno Docker.  
+* Pasan las pruebas unitarias y de integración aplicables a los cambios.
+* Se ejecutaron y registraron en Jira los casos de aceptación aplicables de la matriz de pruebas, en el entorno Docker.
 * La tarea quedó cerrada en Jira.
 
 ## Relevamiento {#relevamiento}

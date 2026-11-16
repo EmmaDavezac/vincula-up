@@ -858,63 +858,10 @@ public class ApiController {
         } else if (!"CLIENTE".equals(role)) {
             throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "Rol no autorizado");
         }
-        return ocultarDireccionSiEstaPendiente(
+        return SolicitudPrivacyFilter.aplicar(
                 gateway.listarSolicitudes(userId(user), List.of(authenticatedSubject()),
                         "PROFESIONAL".equals(role) ? "RECIBIDAS" : "ENVIADAS", role),
                 role);
-    }
-
-    /**
-     * Le oculta al profesional la dirección exacta del cliente mientras la
-     * solicitud sigue pendiente.
-     * <p>
-     * El domicilio se revela recién cuando el profesional acepta: así puede decidir
-     * si le conviene sin conocer beforehand la calle exacta, y el vecino no expone
-     * su casa a un tercero que todavia se ocupo del turno.
-     * <p>
-     * En lugar de la dirección se devuelve la <b>zona</b> (barrio y localidad) y las
-     * coordenadas redondeadas a 2 decimales, que equivalen a una precisión de
-     * ~1,1 km: alcanzan para saber si la zona es conocida o si queda lejos, pero
-     * no para localizar una casa. Con 3 decimales el margen sería de ~110 m, que
-     * ya es demasiado cerca.
-     * <p>
-     * El cliente no pasa por acá: él siempre ve su propia dirección. Y a partir de
-     * ACEPTADA el profesional ve todo, porque ya se comprometió a ir.
-     */
-    private JsonNode ocultarDireccionSiEstaPendiente(JsonNode solicitudes, String role) {
-        if (!"PROFESIONAL".equals(role) || solicitudes == null || !solicitudes.isArray()) {
-            return solicitudes;
-        }
-        var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
-        var resultado = mapper.createArrayNode();
-        for (JsonNode solicitud : solicitudes) {
-            var copia = mapper.createObjectNode();
-            copia.setAll((tools.jackson.databind.node.ObjectNode) solicitud);
-
-            boolean pendiente = "PENDIENTE".equalsIgnoreCase(copia.path("estado").asText(""));
-            if (pendiente) {
-                String zona = copia.path("zonaAproximada").asText(null);
-                if (zona != null && !zona.isBlank()) {
-                    copia.put("direccionServicio", zona);
-                } else {
-                    // Sin zona calculada no se inventa nada: el frontend muestra que
-                    // la dirección exacta se ve al aceptar.
-                    copia.remove("direccionServicio");
-                }
-                redondearCoordenada(copia, "latitud");
-                redondearCoordenada(copia, "longitud");
-            }
-            resultado.add(copia);
-        }
-        return resultado;
-    }
-
-    /** Redondea a 2 decimales (~1,1 km) la coordenada indicada, si viene presente. */
-    private void redondearCoordenada(tools.jackson.databind.node.ObjectNode nodo, String campo) {
-        var valor = nodo.get(campo);
-        if (valor != null && valor.isNumber()) {
-            nodo.put(campo, Math.round(valor.asDouble() * 100.0) / 100.0);
-        }
     }
 
     /**

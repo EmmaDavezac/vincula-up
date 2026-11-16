@@ -4,6 +4,8 @@ dist/
 .angular/
 .sass-cache/
 frontend/**/src/**/*.js
+frontend/**/playwright-report/
+frontend/**/test-results/
 
 
 # Build de Java

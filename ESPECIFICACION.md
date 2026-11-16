@@ -259,12 +259,15 @@ Se agruparon los sprints en dos épicas de dos sprints cada una:
 | Integración en BFF y pruebas de integración | Integrar el envío de correos por SMTP y las notificaciones WebPush | NM | HU-S06, HU-S16 |
 | Integración en BFF y pruebas de integración | Probar de punta a punta con autenticación real y preparar la demo | NM | Criterios de éxito de la demo |
 
+La estrategia por niveles, responsables y matriz trazable de casos de prueba para las 32 historias está en la sección **Plan de pruebas** del [MVP Grupo 8- DACS.md](./MVP%20Grupo%208-%20DACS.md#plan-de-pruebas).
+
 ### 3.4 Definition of Done (DoD)
 
 Una historia de usuario se considera terminada cuando:
 - Cumple todos los escenarios `Given / When / Then` de su historia.
 - El código fue revisado e integrado en la rama principal correspondiente.
-- Se probó manualmente y funcionalmente en el entorno Docker.
+- Pasan las pruebas unitarias y de integración aplicables a los cambios.
+- Se ejecutaron y registraron en Jira los casos de aceptación aplicables de la matriz de pruebas, en el entorno Docker.
 - La tarea quedó formalmente cerrada en Jira.
 
 ---
@@ -1233,7 +1236,7 @@ La maqueta interactiva original del proyecto se desarrolló en v0 (Next.js) y se
 - Temas claro y oscuro persistidos y sincronizados entre Angular y Keycloak.
 
 ### 18.2 Deuda técnica registrada
-- **Pipeline de CI/CD:** Configuración de GitHub Actions para ejecución automatizada de pruebas y builds en cada pull request.
+- **Aceptación manual completa y notificaciones externas:** GitHub Actions ejecuta pruebas unitarias de los cuatro servicios, pruebas Angular, auditoría npm, build productivo, smoke E2E de navegador y E2E autenticado contra un stack Docker demo (solicitud, privacidad, chat, completar y calificar). Falta ejecutar y registrar en Jira la matriz manual completa de aceptación; el E2E no valida entregabilidad real de correos/WebPush con proveedores externos ni todos los dispositivos/casos operativos.
 - **Dominio productivo y correo institucional:** En producción se requiere registrar un dominio con políticas SPF, DKIM y DMARC y reemplazar las credenciales locales por un servicio como Amazon SES o SendGrid.
 - **Almacenamiento de fotos en S3:** Migrar de `FotoStorageLocal` a un backend compatible con Amazon S3 / MinIO para clusters multi-nodo.
 

@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend · ${{ matrix.module }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - bff-web
+          - ms-usuarios
+          - ms-profesionales
+          - ms-solicitudes
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/${{ matrix.module }}/pom.xml
+      - name: Run Maven tests
+        working-directory: backend/${{ matrix.module }}
+        run: ./mvnw --batch-mode --no-transfer-progress test
+
+  frontend:
+    name: Frontend · unit tests and production build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend/vincula-up-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/vincula-up-web/package-lock.json
+      - run: npm ci
+      - name: Audit npm dependencies
+        run: npm audit
+      - name: Run unit tests
+        run: npm test -- --watch=false
+      - name: Build production SPA
+        run: npm run build
+
+  e2e:
+    name: Frontend · browser smoke E2E
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend/vincula-up-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/vincula-up-web/package-lock.json
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run browser smoke tests
+        run: npm run test:e2e
+
+  authenticated-e2e:
+    name: Backend · authenticated request lifecycle E2E
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start isolated demo stack
+        env:
+          KEYCLOAK_SMTP_HOST: ""
+          KEYCLOAK_SMTP_USER: ""
+          KEYCLOAK_SMTP_PASSWORD: ""
+          KEYCLOAK_SMTP_FROM: e2e@vincula-up.local
+          KEYCLOAK_SMTP_AUTH: "false"
+        run: |
+          docker compose \
+            --project-name vinculaup-ci \
+            --env-file .env.example \
+            -f docker-compose.yml \
+            -f .github/docker-compose.e2e.yml \
+            up --build -d --wait --wait-timeout 600 \
+            postgres keycloak keycloak-init ms-usuarios ms-profesionales ms-solicitudes bff-web
+      - name: Run authenticated lifecycle and privacy E2E
+        run: python3 scripts/e2e_authenticated.py
+      - name: Stop isolated demo stack
+        if: always()
+        run: |
+          docker compose \
+            --project-name vinculaup-ci \
+            --env-file .env.example \
+            -f docker-compose.yml \
+            -f .github/docker-compose.e2e.yml \
+            down --volumes

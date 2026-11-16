@@ -147,15 +147,12 @@ public class Usuario {
      * El email es la identidad que vincula Keycloak con el padrón y nunca se
      * cambia por acá.
      */
-    public void update(String nombre, String apellido, String email, String telefono, String fotoUrl) {
+    public void update(String nombre, String apellido, String telefono, String fotoUrl) {
         if (nombre != null && !nombre.isBlank()) {
             this.nombre = nombre.trim();
         }
         if (apellido != null && !apellido.isBlank()) {
             this.apellido = apellido.trim();
-        }
-        if (email != null && !email.isBlank()) {
-            this.email = email;
         }
         if (telefono != null && !telefono.isBlank()) {
             this.telefono = telefono.trim();
