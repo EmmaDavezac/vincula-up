@@ -1,17 +1,8 @@
-<a class="vu-admin-back" routerLink="/admin">← Resumen</a>
-
 <div class="vu-admin-list-head admin-clients__head">
 	<div>
 		<h1 class="vu-admin-title">Clientes</h1>
 		<p class="vu-admin-lead admin-clients__lead">Consultá y administrá el acceso de cada cliente.</p>
 	</div>
-	<p class="vu-admin-list-count admin-clients__count">
-		@if (hayBusqueda()) {
-			{{ clientesOrdenados().length }} de {{ clients().length }} clientes
-		} @else {
-			{{ clients().length }} clientes
-		}
-	</p>
 </div>
 
 @if (aviso().texto) {
@@ -19,7 +10,7 @@
 }
 
 @if (loading()) {
-	<div class="vu-admin-list-skeleton"><vu-skeleton-list variant="row" [count]="5" /></div>
+	<vu-skeleton-list variant="admin-client" [count]="5" />
 } @else if (clients().length) {
 	<div class="vu-admin-search admin-clients__search">
 		<label class="vu-sr-only" for="admin-search-clients">Buscar clientes</label>
@@ -34,10 +25,31 @@
 				placeholder="Buscar por nombre, email o teléfono"
 				autocomplete="off"
 			/>
+			@if (busqueda()) {
+				<button type="button" class="vu-admin-search__clear" aria-label="Borrar búsqueda" title="Borrar búsqueda" (click)="limpiarBusqueda()">
+					<vu-icon name="x" [size]="18" />
+				</button>
+			}
 		</div>
-		@if (hayBusqueda()) {
-			<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="limpiarBusqueda()">Limpiar</button>
-		}
+		<div class="admin-clients__tool-groups">
+			<div class="admin-clients__tool-group admin-clients__tool-group--filters">
+				<label class="admin-clients__tool-label" for="admin-client-status">Filtrar por estado:</label>
+				<select id="admin-client-status" class="vu-select vu-select--sm admin-clients__filter" [ngModel]="filtroEstado()" (ngModelChange)="filtroEstado.set($event)">
+					<option value="TODOS">Todos los estados</option>
+					@for (estado of estadosDisponibles(); track estado) {
+						<option [value]="estado">{{ estadoLabel(estado) }}</option>
+					}
+				</select>
+			</div>
+			<div class="admin-clients__tool-group">
+				<label class="admin-clients__tool-label" for="admin-client-order">Ordenar por:</label>
+				<select id="admin-client-order" class="vu-select vu-select--sm admin-clients__filter" [ngModel]="ordenNombre()" (ngModelChange)="ordenNombre.set($event)">
+					<option value="actividad">Más solicitudes</option>
+					<option value="asc">Nombre: A–Z</option>
+					<option value="desc">Nombre: Z–A</option>
+				</select>
+			</div>
+		</div>
 	</div>
 
 		@if (clientesOrdenados().length) {
@@ -80,12 +92,9 @@
 			}
 		</ul>
 	} @else {
-		<div class="vu-admin-empty">
-			<p class="vu-admin-panel__hint">Ningún cliente coincide con «{{ consulta() }}».</p>
-			<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="limpiarBusqueda()">
-				Limpiar búsqueda
-			</button>
-		</div>
+	<div class="vu-admin-empty">
+		<p class="vu-admin-panel__hint">No hay clientes que coincidan con los filtros seleccionados.</p>
+	</div>
 	}
 } @else {
 	<div class="vu-admin-empty">

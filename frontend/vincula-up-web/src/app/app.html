@@ -1,17 +1,9 @@
-<!--
-Una sola navegación para todo el sitio: la barra superior va siempre (también
-dentro del panel de administración) y en móvil se suma la barra inferior
-para pasar entre secciones. El footer del sitio no se muestra en el panel.
--->
+<!-- Una sola navegación y el mismo pie informativo en todas las secciones. -->
 <app-navbar />
 <main>
 	<router-outlet />
 </main>
-@if (enPanelAdmin()) {
-	<app-admin-footer />
-} @else {
-	<app-footer />
-}
+<app-footer />
 <vu-tabbar />
 
 <!--

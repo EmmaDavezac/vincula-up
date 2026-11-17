@@ -96,6 +96,37 @@ El alta de un profesional y la de una categoría son **pantallas propias**
 abierto encima del listado. Con la grilla cargada, el formulario quedaba arriba de
 veinte tarjetas.
 
+Los listados permiten buscar por texto. En **Profesionales** también se puede
+filtrar por estado y especialidad, y ordenar por nombre de A–Z o Z–A. En
+**Clientes** se filtra por estado y se puede ordenar por actividad o nombre. En
+**Categorías** se ordena el catálogo alfabéticamente en ambos sentidos. Cada filtro
+indica su criterio («Filtrar por estado», «Filtrar por especialidad») y queda
+alineado a la izquierda también en móvil. Los filtros y el ordenamiento se
+presentan en filas separadas, alineadas a la izquierda. La búsqueda se borra con
+una «×» dentro del campo sin cambiar los filtros seleccionados. Se quitaron las
+acciones de «Limpiar búsqueda/filtros», los contadores de profesionales y clientes
+de los encabezados, y los botones para crear registros quedan alineados a la
+izquierda.
+Al cerrar o abandonar la edición del nombre de una categoría se confirma la salida.
+El resumen muestra skeletons con la forma de sus indicadores y paneles mientras
+carga la información.
+En «Mi cuenta», el bloque de perfil ocupa todo el ancho disponible en móvil y la
+acción de cambio de contraseña mantiene separación respecto de su descripción.
+En escritorio, la navbar del administrador mantiene disponibles Resumen,
+Profesionales, Categorías y Clientes incluso al entrar a «Mi cuenta».
+El pie informativo del sitio también se muestra en todas las secciones de
+administración, igual que en el resto de la aplicación.
+El enlace «Ingresar» del pie solo aparece cuando no hay una sesión iniciada.
+Las etiquetas de filtros y ordenamiento quedan alineadas a la izquierda, con el
+control correspondiente.
+
+En **Mis solicitudes** y **Solicitudes recibidas**, se puede filtrar por categoría
+y estado, buscar por contraparte o dirección y ordenar por fecha del turno
+(más reciente o más antigua primero). Los controles quedan alineados a la
+izquierda, con el ordenamiento en su propia fila. Al actualizar la lista, los
+skeletons reproducen las secciones presentes en las tarjetas disponibles, como
+dirección, mapa, acciones y calificación.
+
 ### pgAdmin — ver la base de datos
 
 1. Abrí **http://localhost:5050** e ingresá con `admin@vincula-up.com` / `admin`.
@@ -507,6 +538,10 @@ y muestra el modal si difieren.
 **Si se edita el texto, hay que subir la versión.** Está en `VERSION_TERMINOS`
 (`frontend/vincula-up-web/src/app/legal/terminos/terminos.ts`). Si el texto
 cambia y la versión no, el sistema no vuelve a pedir la aceptación.
+
+Los diálogos de la aplicación comparten tamaño adaptable, superficie y paleta.
+Cuando ofrecen dos acciones, el botón secundario queda a la izquierda y el de
+confirmación a la derecha; en móvil ambos ocupan el mismo ancho.
 
 > Los términos son un documento de proyecto educativo. Antes de una salida real
 > conviene que los revise alguien del proyecto. Contacto:

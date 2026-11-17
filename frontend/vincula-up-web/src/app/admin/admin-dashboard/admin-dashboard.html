@@ -9,7 +9,48 @@
 }
 
 @if (loading()) {
-	<p class="vu-admin-panel__hint">Calculando indicadores...</p>
+	<div class="admin-dashboard__skeleton" aria-busy="true" role="status">
+		<span class="vu-sr-only">Cargando resumen...</span>
+		<section class="vu-admin-metrics" aria-hidden="true">
+			@for (item of [1, 2, 3, 4, 5, 6]; track item) {
+				<article class="vu-admin-metric admin-dashboard__skeleton-metric">
+					<span class="vu-skeleton admin-dashboard__skeleton-icon"></span>
+					<span class="vu-skeleton admin-dashboard__skeleton-label"></span>
+					<div class="vu-admin-metric__row">
+						<span class="vu-skeleton admin-dashboard__skeleton-value"></span>
+						<span class="vu-skeleton admin-dashboard__skeleton-note"></span>
+					</div>
+				</article>
+			}
+		</section>
+
+		<section class="vu-admin-split" aria-hidden="true">
+			<article class="vu-admin-panel admin-dashboard__skeleton-panel">
+				<span class="vu-skeleton admin-dashboard__skeleton-title"></span>
+				<span class="vu-skeleton admin-dashboard__skeleton-description"></span>
+				<div class="admin-dashboard__skeleton-bars">
+					@for (item of [1, 2, 3, 4, 5]; track item) {
+						<div class="admin-dashboard__skeleton-bar-row">
+							<span class="vu-skeleton admin-dashboard__skeleton-bar-label"></span>
+							<span class="vu-skeleton admin-dashboard__skeleton-bar-meta"></span>
+							<span class="vu-skeleton admin-dashboard__skeleton-bar"></span>
+						</div>
+					}
+				</div>
+			</article>
+			<article class="vu-admin-panel admin-dashboard__skeleton-panel">
+				<span class="vu-skeleton admin-dashboard__skeleton-title"></span>
+				<div class="admin-dashboard__skeleton-funnel">
+					@for (item of [1, 2, 3, 4]; track item) {
+						<div class="admin-dashboard__skeleton-funnel-row">
+							<span class="vu-skeleton admin-dashboard__skeleton-funnel-label"></span>
+							<span class="vu-skeleton admin-dashboard__skeleton-funnel-value"></span>
+						</div>
+					}
+				</div>
+			</article>
+		</section>
+	</div>
 } @else {
 	<section class="vu-admin-metrics" aria-label="Indicadores de éxito">
 		@for (metrica of metricas(); track metrica.label) {
@@ -17,7 +58,7 @@
 				<vu-icon name="bar-chart" [size]="19" class="vu-admin-metric__icon" />
 				<p class="vu-admin-metric__label">{{ metrica.label }}</p>
 				<div class="vu-admin-metric__row">
-					<strong class="vu-admin-metric__value">{{ metrica.value }}</strong>
+					<strong class="vu-admin-metric__value" [class.vu-admin-metric__value--rating]="metrica.label === 'Satisfacción promedio'">{{ metrica.value }}</strong>
 					<span class="vu-admin-metric__note">{{ metrica.nota }}</span>
 				</div>
 			</article>

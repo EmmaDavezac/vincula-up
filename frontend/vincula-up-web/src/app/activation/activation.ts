@@ -9,6 +9,7 @@ import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { VuIcon } from '../shared/icon/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { VU_DIALOG_SIZE } from '../shared/dialog-size';
 
 interface ValidatedLocation {
   lat: number;
@@ -464,7 +465,7 @@ export class Activation {
     this.mapDialogRef = this.dialog.open(this.mapPickerDialog, {
       ariaLabel: 'Elegir ubicación en el mapa',
       ariaModal: true,
-      maxWidth: 'min(60rem, calc(100vw - 2rem))',
+      ...VU_DIALOG_SIZE,
       panelClass: 'vu-details-dialog',
     });
     this.mapDialogRef.afterClosed().subscribe(() => {

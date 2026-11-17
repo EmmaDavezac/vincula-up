@@ -14,7 +14,9 @@
 				<nav class="footer-links" aria-label="Ayuda y contacto">
 					<a class="footer-link" href="mailto:vinculaup@gmail.com">Contacto</a>
 					<a class="footer-link" routerLink="/preguntas-frecuentes">Preguntas frecuentes</a>
-					<a class="footer-link" routerLink="/ingresar">Ingresar</a>
+					@if (!auth.isAuthenticated()) {
+						<a class="footer-link" routerLink="/ingresar">Ingresar</a>
+					}
 				</nav>
 			</div>
 

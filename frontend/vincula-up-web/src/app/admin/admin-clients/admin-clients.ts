@@ -1,7 +1,6 @@
 import { Component, computed, inject, signal, TemplateRef, ViewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { catchError, forkJoin, map, of } from 'rxjs';
 import {
 	AdminAviso,
@@ -23,6 +22,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatListModule } from '@angular/material/list';
 import { VuAvatar } from '../../shared/avatar/avatar';
 import { VuConfirm } from '../../shared/confirm/confirm';
+import { VU_DIALOG_SIZE } from '../../shared/dialog-size';
 import { VuIcon } from '../../shared/icon/icon';
 import { VuSkeletonList } from '../../shared/skeleton-list/skeleton-list';
 
@@ -33,7 +33,7 @@ import { VuSkeletonList } from '../../shared/skeleton-list/skeleton-list';
  */
 @Component({
 	selector: 'app-admin-clients',
-	imports: [DatePipe, FormsModule, RouterLink, MatButtonModule, MatListModule, VuAvatar, VuConfirm, VuIcon, VuSkeletonList],
+	imports: [DatePipe, FormsModule, MatButtonModule, MatListModule, VuAvatar, VuConfirm, VuIcon, VuSkeletonList],
 	templateUrl: './admin-clients.html',
 	styleUrl: './admin-clients.css',
 })
@@ -76,9 +76,15 @@ export class AdminClients {
 	// ── Buscador ────────────────────────────────────────────────────────
 
 	readonly busqueda = signal('');
+	readonly filtroEstado = signal('TODOS');
+	readonly ordenNombre = signal<'actividad' | 'asc' | 'desc'>('actividad');
 
 	/** Texto de la búsqueda ya recortado. */
 	readonly consulta = computed(() => this.busqueda().trim());
+	readonly estadosDisponibles = computed(() =>
+		[...new Set(this.clients().map((client) => this.claveEstado(client.estado)))]
+			.sort((a, b) => a.localeCompare(b, 'es')),
+	);
 
 	/** Nombre, email y teléfono: los textos por los que se puede buscar. */
 	private textoBuscable(client: AdminUser): Array<string | undefined> {
@@ -94,15 +100,18 @@ export class AdminClients {
 	readonly clientesOrdenados = computed(() => {
 		const conteo = this.solicitudesPorCliente();
 		const q = this.consulta();
-		return [...this.clients()]
+		const estado = this.filtroEstado();
+		const orden = this.ordenNombre();
+		return this.clients()
 			.map((client) => ({ client, solicitudes: conteo.get(client.id) ?? 0 }))
 			.filter((item) => coincideBusqueda(q, ...this.textoBuscable(item.client)))
-			.sort((a, b) => b.solicitudes - a.solicitudes);
+			.filter((item) => estado === 'TODOS' || this.claveEstado(item.client.estado) === estado)
+			.sort((a, b) => {
+				if (orden === 'actividad') return b.solicitudes - a.solicitudes;
+				const direccion = orden === 'asc' ? 1 : -1;
+				return direccion * nombreCompleto(a.client).localeCompare(nombreCompleto(b.client), 'es', { sensitivity: 'base' });
+			});
 	});
-
-	hayBusqueda(): boolean {
-		return this.consulta().length > 0;
-	}
 
 	limpiarBusqueda(): void {
 		this.busqueda.set('');
@@ -165,7 +174,7 @@ export class AdminClients {
 		this.detailDialogRef = this.dialog.open(this.clientDetailDialog, {
 			ariaLabel: 'Detalle del cliente',
 			ariaModal: true,
-			maxWidth: 'min(38rem, calc(100vw - 2rem))',
+			...VU_DIALOG_SIZE,
 			panelClass: 'vu-details-dialog',
 		});
 		this.detailDialogRef.afterClosed().subscribe(() => this.modal.set(null));
@@ -247,5 +256,9 @@ export class AdminClients {
 
 	estaActivo(client: AdminUser): boolean {
 		return (client.estado ?? 'ACTIVO').toUpperCase() === 'ACTIVO';
+	}
+
+	private claveEstado(estado: string | null | undefined): string {
+		return estado?.trim().toUpperCase() || 'ACTIVO';
 	}
 }

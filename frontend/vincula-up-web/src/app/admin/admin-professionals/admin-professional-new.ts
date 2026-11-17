@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 import { AdminSpecialty } from '../../core/models/admin';
 import { ApiService } from '../../core/services/api.service';
+import { VuConfirm } from '../../shared/confirm/confirm';
 
 /**
  * Alta de un profesional, en su propia pantalla.
@@ -16,7 +17,7 @@ import { ApiService } from '../../core/services/api.service';
  */
 @Component({
 	selector: 'app-admin-professional-new',
-	imports: [FormsModule, RouterLink],
+	imports: [FormsModule, RouterLink, VuConfirm],
 	templateUrl: './admin-professional-new.html',
 	styleUrl: './admin-professional-new.css',
 })
@@ -28,6 +29,9 @@ export class AdminProfessionalNew {
 	readonly loadingSpecialties = signal(true);
 	readonly submitting = signal(false);
 	readonly error = signal('');
+	readonly confirmandoSalida = signal(false);
+	private resolverSalida?: (salir: boolean) => void;
+	private guardado = false;
 
 	/**
 	 * Datos del alta. El `especialidadIds` va aparte porque las casillas se
@@ -64,6 +68,36 @@ export class AdminProfessionalNew {
 		this.form.especialidadIds = this.form.especialidadIds.includes(id)
 			? this.form.especialidadIds.filter((item) => item !== id)
 			: [...this.form.especialidadIds, id];
+	}
+
+	confirmarSalidaPendiente(): boolean | Promise<boolean> {
+		if (this.guardado || !this.hayCambiosPendientes()) return true;
+		if (this.submitting()) {
+			this.error.set('Esperá a que termine el registro antes de cambiar de sección.');
+			return false;
+		}
+		return new Promise((resolve) => {
+			this.resolverSalida = resolve;
+			this.confirmandoSalida.set(true);
+		});
+	}
+
+	resolverConfirmacionSalida(salir: boolean): void {
+		const resolver = this.resolverSalida;
+		this.resolverSalida = undefined;
+		this.confirmandoSalida.set(false);
+		resolver?.(salir);
+	}
+
+	private hayCambiosPendientes(): boolean {
+		return Boolean(
+			this.form.nombre.trim() ||
+			this.form.apellido.trim() ||
+			this.form.email.trim() ||
+			this.form.telefono.trim() ||
+			this.form.legajo.trim() ||
+			this.form.especialidadIds.length,
+		);
 	}
 
 	/**
@@ -112,6 +146,7 @@ export class AdminProfessionalNew {
 		).subscribe((resultado) => {
 			this.submitting.set(false);
 			if (!resultado) return;
+			this.guardado = true;
 			// El mensaje lo redacta `mensajeDeAlta`: hay que distinguir "quedó
 			// guardado" de "quedó guardado y avisado", porque si el correo no sale el
 			// administrador tiene que enterarse por otro medio.

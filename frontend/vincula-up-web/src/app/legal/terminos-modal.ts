@@ -5,6 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { catchError, of } from 'rxjs';
 import { AuthService } from '../core/services/auth.service';
 import { ApiService } from '../core/services/api.service';
+import { VU_DIALOG_SIZE } from '../shared/dialog-size';
 
 /**
  * Aceptación de los términos y condiciones, al primer ingreso.
@@ -61,7 +62,7 @@ import { ApiService } from '../core/services/api.service';
 						}
 					</div>
 
-					<footer class="terminos-modal__foot">
+					<footer class="terminos-modal__foot vu-dialog-actions">
 						<button
 							type="button"
 							mat-flat-button
@@ -82,9 +83,8 @@ import { ApiService } from '../core/services/api.service';
 				box-sizing: border-box;
 				display: flex;
 				flex-direction: column;
-				max-height: min(85vh, 40rem);
-				padding: 1.5rem;
-				width: min(32rem, 100%);
+				max-height: 100%;
+				width: 100%;
 			}
 
 			.terminos-modal__head {
@@ -152,28 +152,8 @@ import { ApiService } from '../core/services/api.service';
 
 			.terminos-modal__foot {
 				flex: 0 0 auto;
-				padding-top: 1.25rem;
 			}
 
-			/* Botón habilitado: relleno sólido con el color de acento de la marca */
-			.terminos-modal .vu-btn.mat-mdc-unelevated-button:not(:disabled) {
-				background: var(--coral, #e2603f);
-				color: #fff;
-			}
-
-			/* Botón deshabilitado: relleno visible pero atenuado */
-			.terminos-modal .vu-btn.mat-mdc-unelevated-button:disabled {
-				background: var(--surface-highlight);
-				border: 1px solid var(--line);
-				color: var(--muted);
-				opacity: 1;
-			}
-
-			@media (max-width: 479px) {
-				.terminos-modal {
-					padding: 1.25rem;
-				}
-			}
 		`,
 	],
 })
@@ -206,7 +186,7 @@ export class TerminosModal {
 					ariaLabel: 'Aceptación de términos y condiciones',
 					ariaModal: true,
 					disableClose: true,
-					maxWidth: 'min(34rem, calc(100vw - 2rem))',
+					...VU_DIALOG_SIZE,
 					panelClass: 'vu-details-dialog',
 				});
 				this.dialogRef.set(ref);

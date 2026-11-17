@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { confirmarSalidaDeFormularioAdmin } from './admin-unsaved-changes.guard';
 
 /**
  * Pantallas del panel de administración, en el mismo orden que la navegación del
@@ -12,6 +13,7 @@ export const adminRoutes: Routes = [
 	},
 	{
 		path: 'profesionales',
+		canDeactivate: [confirmarSalidaDeFormularioAdmin],
 		loadComponent: () => import('./admin-professionals/admin-professionals').then((module) => module.AdminProfessionals),
 		title: 'Vincula-UP | Profesionales',
 	},
@@ -22,17 +24,20 @@ export const adminRoutes: Routes = [
 		 * `profesionales` para que no la capture ese path, que no tiene comodín.
 		 */
 		path: 'profesionales/nuevo',
+		canDeactivate: [confirmarSalidaDeFormularioAdmin],
 		loadComponent: () =>
 			import('./admin-professionals/admin-professional-new').then((module) => module.AdminProfessionalNew),
 		title: 'Vincula-UP | Nuevo profesional',
 	},
 	{
 		path: 'categorias',
+		canDeactivate: [confirmarSalidaDeFormularioAdmin],
 		loadComponent: () => import('./admin-categories/admin-categories').then((module) => module.AdminCategories),
 		title: 'Vincula-UP | Categorias',
 	},
 	{
 		path: 'categorias/nueva',
+		canDeactivate: [confirmarSalidaDeFormularioAdmin],
 		loadComponent: () => import('./admin-categories/admin-category-new').then((module) => module.AdminCategoryNew),
 		title: 'Vincula-UP | Nueva categoría',
 	},

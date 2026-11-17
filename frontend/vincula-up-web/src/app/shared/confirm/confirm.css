@@ -2,8 +2,7 @@
 	display: flex;
 	flex-direction: column;
 	gap: 1rem;
-	min-width: min(28rem, calc(100vw - 3rem));
-	padding: 1.5rem;
+	padding: 0;
 }
 
 .vu-confirm__head {
@@ -64,13 +63,44 @@
 }
 
 .vu-confirm__actions {
+	align-items: stretch;
 	display: flex;
-	flex-wrap: wrap;
 	gap: 0.5rem;
 	justify-content: flex-end;
-	margin: 0;
 	min-height: 0;
-	padding: 0;
+}
+
+.vu-confirm__actions > .vu-btn {
+	border: 1px solid;
+	flex: 1 1 0;
+	min-height: 2.75rem;
+	min-width: 0;
+	padding: 0.75rem 1rem;
+}
+
+.vu-confirm__actions > .vu-confirm__cancel.vu-btn--outline,
+.vu-confirm__actions > .vu-confirm__accept.vu-btn--outline {
+	background: var(--button-secondary-bg);
+	border-color: var(--button-secondary-border);
+	color: var(--button-secondary-ink);
+}
+
+.vu-confirm__actions > .vu-confirm__cancel.vu-btn--outline:hover:not(:disabled),
+.vu-confirm__actions > .vu-confirm__accept.vu-btn--outline:hover:not(:disabled) {
+	background: var(--button-secondary-bg-hover);
+	border-color: var(--button-secondary-bg-hover);
+}
+
+.vu-confirm__actions > .vu-confirm__cancel.vu-btn--ink,
+.vu-confirm__actions > .vu-confirm__accept.vu-btn--ink {
+	background: var(--band-dark);
+	border-color: transparent;
+	color: var(--band-ink);
+}
+
+.vu-confirm__actions > .vu-confirm__cancel.vu-btn--ink:hover:not(:disabled),
+.vu-confirm__actions > .vu-confirm__accept.vu-btn--ink:hover:not(:disabled) {
+	background: var(--band-dark-hover);
 }
 
 .vu-confirm__dialog--danger .vu-confirm__accept {
@@ -80,16 +110,16 @@
 }
 
 .vu-confirm__dialog--danger .vu-confirm__accept:hover:not(:disabled) {
-	background: #a5382b;
+	background: var(--alert-error-strong);
 }
 
-.vu-confirm__dialog--cancel-primary .vu-confirm__accept {
+.vu-confirm__dialog--danger.vu-confirm__dialog--cancel-primary .vu-confirm__accept.vu-btn--outline {
 	background: transparent;
 	border-color: var(--alert-error-border);
 	color: var(--alert-error-ink);
 }
 
-.vu-confirm__dialog--cancel-primary .vu-confirm__accept:hover:not(:disabled) {
+.vu-confirm__dialog--danger.vu-confirm__dialog--cancel-primary .vu-confirm__accept.vu-btn--outline:hover:not(:disabled) {
 	background: var(--alert-error-bg);
 	border-color: var(--alert-error-ink);
 }

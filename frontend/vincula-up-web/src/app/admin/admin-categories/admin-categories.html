@@ -1,5 +1,3 @@
-<a class="vu-admin-back" routerLink="/admin">← Resumen</a>
-
 <div class="vu-admin-list-head admin-categories__head">
 	<div>
 		<h1 class="vu-admin-title">Categorías</h1>
@@ -27,14 +25,23 @@
 			placeholder="Buscar por nombre de categoría"
 			autocomplete="off"
 		/>
+		@if (busqueda()) {
+			<button type="button" class="vu-admin-search__clear" aria-label="Borrar búsqueda" title="Borrar búsqueda" (click)="limpiarBusqueda()">
+				<vu-icon name="x" [size]="18" />
+			</button>
+		}
 	</div>
-	@if (hayBusqueda()) {
-		<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm admin-categories__action" (click)="limpiarBusqueda()">Limpiar</button>
-	}
+	<div class="admin-categories__order-group">
+		<label class="admin-categories__tool-label" for="admin-category-order">Ordenar por:</label>
+		<select id="admin-category-order" class="vu-select vu-select--sm admin-categories__order" [ngModel]="ordenNombre()" (ngModelChange)="ordenNombre.set($event)">
+			<option value="asc">Nombre: A–Z</option>
+			<option value="desc">Nombre: Z–A</option>
+		</select>
+	</div>
 </div>
 
 @if (loading()) {
-	<div class="vu-admin-list-skeleton"><vu-skeleton-list variant="row" [count]="6" /></div>
+	<vu-skeleton-list variant="admin-category" [count]="6" />
 } @else if (categories().length) {
 	@if (categoriasFiltradas().length) {
 		<ul class="admin-categories__list" aria-label="Lista de categorías">
@@ -59,7 +66,7 @@
 							<button type="button" class="vu-btn vu-btn--ink vu-btn--sm" (click)="saveRename(category)" [disabled]="busy()">
 								{{ busy() ? 'Guardando...' : 'Guardar' }}
 							</button>
-							<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="cancelRename()">Cancelar</button>
+							<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="cancelRename()" [disabled]="busy()">Cancelar</button>
 						} @else {
 							<button type="button" mat-flat-button class="vu-btn vu-btn--ink vu-btn--sm" (click)="startRename(category)" [disabled]="busy()">
 	Renombrar
@@ -73,10 +80,9 @@
 			}
 		</ul>
 	} @else {
-		<div class="vu-admin-empty">
-			<p class="vu-admin-panel__hint">Ninguna categoría coincide con «{{ consulta() }}».</p>
-			<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="limpiarBusqueda()">Limpiar búsqueda</button>
-		</div>
+	<div class="vu-admin-empty">
+		<p class="vu-admin-panel__hint">Ninguna categoría coincide con «{{ consulta() }}».</p>
+	</div>
 	}
 } @else {
 	<div class="vu-admin-empty">
@@ -91,7 +97,9 @@
 		[mensaje]="pendiente.mensaje"
 		[detalle]="pendiente.detalle ?? ''"
 		[textoConfirmar]="pendiente.confirmar ?? 'Confirmar'"
+		[textoCancelar]="pendiente.textoCancelar ?? 'Cancelar'"
 		[peligro]="pendiente.peligro ?? false"
+		[cancelarPrimario]="pendiente.cancelarPrimario ?? false"
 		[icono]="pendiente.icono ?? 'pencil'"
 		(confirmado)="confirmarAccion()"
 		(cancelado)="cancelarAccion()"

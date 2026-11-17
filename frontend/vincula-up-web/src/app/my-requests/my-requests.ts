@@ -16,8 +16,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { fotoUtil } from '../core/utils/photo';
 import { VuAvatar } from '../shared/avatar/avatar';
 import { VuConfirm } from '../shared/confirm/confirm';
+import { VU_DIALOG_SIZE } from '../shared/dialog-size';
 import { VuIcon } from '../shared/icon/icon';
 import { VuSkeletonList } from '../shared/skeleton-list/skeleton-list';
+import type { RequestSkeletonShape } from '../shared/skeleton-list/skeleton-list';
 import { VuSpinner } from '../shared/spinner/spinner';
 import { ChatAutoScrollDirective } from './chat-auto-scroll.directive';
 
@@ -112,6 +114,7 @@ export class MyRequests {
   readonly statusFilter = signal<'TODAS' | RequestStatus>('TODAS');
   readonly specialtyFilter = signal<string>('TODAS');
   readonly requestSearch = signal('');
+  readonly requestOrder = signal<'oldest' | 'newest'>('newest');
   readonly filtersRefreshing = signal(false);
   private filterRefreshTimeout?: ReturnType<typeof setTimeout>;
 
@@ -141,6 +144,7 @@ export class MyRequests {
     const status = this.statusFilter();
     const specialty = this.specialtyFilter();
     const query = this.normalizarTexto(this.requestSearch());
+    const direction = this.requestOrder() === 'oldest' ? 1 : -1;
 
     return this.requests().filter((request) => {
       if (status !== 'TODAS' && request.status !== status) return false;
@@ -157,11 +161,47 @@ export class MyRequests {
       if (!coincideNombre && !coincideDireccion) return false;
 		}
       return true;
+    }).sort((a, b) => {
+		const dateA = this.requestDateTime(a);
+		const dateB = this.requestDateTime(b);
+		const invalidDate = Number.MAX_SAFE_INTEGER;
+		if (dateA === invalidDate || dateB === invalidDate) {
+			if (dateA === dateB) return 0;
+			return dateA === invalidDate ? 1 : -1;
+		}
+		if (dateA === dateB) return 0;
+		return (dateA < dateB ? -1 : 1) * direction;
     });
   });
 
-  readonly hasActiveFilters = computed(
-    () => this.statusFilter() !== 'TODAS' || this.specialtyFilter() !== 'TODAS' || !!this.requestSearch().trim(),
+  readonly requestSkeletonShapes = computed<readonly RequestSkeletonShape[]>(() =>
+    this.filteredRequests().map((request) => {
+		const isProfessional = this.isProfessional();
+		const rating = this.ratings()[String(request.id)];
+		const canChangeStatus = this.estadosDisponibles(request).length > 0;
+		const hasAlternateAction = !isProfessional && (request.status === 'RECHAZADA' || request.status === 'VENCIDA');
+		const ratingState: RequestSkeletonShape['rating'] = request.status !== 'COMPLETADA'
+		  ? 'none'
+		  : rating
+		    ? 'submitted'
+		    : isProfessional
+		      ? 'waiting'
+		      : 'form';
+
+		return {
+		  hasDescription: Boolean(request.description),
+		  hasAddress: Boolean(request.address) || (isProfessional && this.isPending(request)),
+		  hasMap: isProfessional && Boolean(request.address),
+		  hasClosureReason: Boolean(this.cierreLabel(request)),
+		  actionCount: canChangeStatus && request.status === 'ACEPTADA'
+		    ? 2
+		    : canChangeStatus || hasAlternateAction
+		      ? 1
+		      : 0,
+		  rating: ratingState,
+		  hasRatingComment: Boolean(rating?.comentario),
+		};
+    }),
   );
 
   clearFilters(): void {
@@ -182,6 +222,14 @@ export class MyRequests {
 
   cambiarBusqueda(value: string): void {
 		this.actualizarFiltros(() => this.requestSearch.set(value));
+  }
+
+  limpiarBusqueda(): void {
+    this.actualizarFiltros(() => this.requestSearch.set(''));
+  }
+
+  cambiarOrden(value: 'oldest' | 'newest'): void {
+    this.actualizarFiltros(() => this.requestOrder.set(value));
   }
 
   private actualizarFiltros(update: () => void): void {
@@ -551,8 +599,7 @@ googleMapsUrl(request: ServiceRequest): string | null {
     this.statusDialogRef = this.dialog.open(this.statusDialog, {
   ariaLabel: 'Actualizar estado de la solicitud',
   ariaModal: true,
-  width: 'min(29rem, calc(100vw - 2rem))',
-  maxWidth: 'calc(100vw - 2rem)',
+  ...VU_DIALOG_SIZE,
   panelClass: 'vu-details-dialog',
 });
     this.statusDialogRef.afterClosed().subscribe(() => {
@@ -614,9 +661,8 @@ googleMapsUrl(request: ServiceRequest): string | null {
       this.cancelDialogRef = this.dialog.open(this.cancelDialog, {
         ariaLabel: 'Motivo de la cancelación',
         ariaModal: true,
-        maxWidth: 'min(32rem, calc(100vw - 2rem))',
+        ...VU_DIALOG_SIZE,
         panelClass: 'vu-details-dialog',
-        width: 'min(29rem, calc(100vw - 2rem))',
       });
       this.cancelDialogRef.afterClosed().subscribe(() => {
         this.cancelDialogRef = undefined;
@@ -756,8 +802,7 @@ googleMapsUrl(request: ServiceRequest): string | null {
       const dialogRef = this.dialog.open(this.chatDialog, {
   ariaLabel: 'Chat de la solicitud',
   ariaModal: true,
-  width: 'min(36rem, calc(100vw - 2rem))',
-  maxWidth: 'calc(100vw - 2rem)',
+  ...VU_DIALOG_SIZE,
   panelClass: 'vu-details-dialog',
 });
       this.chatDialogRef = dialogRef;
@@ -1014,8 +1059,7 @@ googleMapsUrl(request: ServiceRequest): string | null {
   this.mapDialogRef = this.dialog.open(this.mapDialog, {
     ariaLabel: 'Mapa de la ubicación',
     ariaModal: true,
-    width: 'min(44rem, calc(100vw - 2rem))',
-    maxWidth: 'calc(100vw - 2rem)',
+    ...VU_DIALOG_SIZE,
     panelClass: 'vu-details-dialog',
   });
   this.mapDialogRef.afterClosed().subscribe(() => {
@@ -1049,4 +1093,3 @@ cerrarMapa(): void {
   }
   
 }
-

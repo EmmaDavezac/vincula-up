@@ -31,53 +31,72 @@
 		}
 
 		@if (loading()) {
-			<!-- Skeleton de la grilla de tarjetas: no adivina el contenido, sólo la forma. -->
-			<vu-skeleton-list variant="card" [count]="4" />
+			<div class="requests__loading">
+				<vu-skeleton-list [variant]="isProfessional() ? 'request-professional' : 'request-client'" [count]="4" />
+			</div>
 		} @else if (requests().length) {
 			<div class="requests__bar">
 				<div class="requests__filters">
 					<label class="requests__field requests__field--search">
 						<span>{{ isProfessional() ? 'Buscar cliente o dirección' : 'Buscar profesional o dirección' }}</span>
-						<input
-							class="vu-input vu-input--sm"
-							type="search"
-							[ngModel]="requestSearch()"
-							(ngModelChange)="cambiarBusqueda($event)"
-							placeholder="Nombre o dirección"
-							[attr.aria-label]="isProfessional() ? 'Buscar por nombre de cliente o dirección' : 'Buscar por nombre de profesional o dirección'"
-						/>
+						<div class="vu-field-with-icon requests__search-wrap">
+							<vu-icon name="search" [size]="17" class="vu-field-icon" />
+							<input
+								class="vu-input vu-input--sm vu-input--search"
+								type="search"
+								[ngModel]="requestSearch()"
+								(ngModelChange)="cambiarBusqueda($event)"
+								placeholder="Nombre o dirección"
+								[attr.aria-label]="isProfessional() ? 'Buscar por nombre de cliente o dirección' : 'Buscar por nombre de profesional o dirección'"
+							/>
+							@if (requestSearch()) {
+								<button type="button" class="vu-admin-search__clear" aria-label="Borrar búsqueda" title="Borrar búsqueda" (click)="limpiarBusqueda()">
+									<vu-icon name="x" [size]="18" />
+								</button>
+							}
+						</div>
 					</label>
 
-					<div class="requests__filter-options">
-						<label class="requests__field requests__field--category">
-							<span>Filtrar por categoría</span>
+					<div class="requests__controls">
+						<div class="requests__filter-options">
+							<label class="requests__field">
+								<span>Filtrar por categoría:</span>
 							<select class="vu-select vu-select--sm" [ngModel]="specialtyFilter()" (ngModelChange)="cambiarCategoriaFiltro($event)">
 								<option value="TODAS">Todas</option>
 								@for (option of specialtyOptions(); track option.value) {
 									<option [value]="option.value">{{ option.label }}</option>
 								}
 							</select>
-						</label>
+							</label>
 
-						<label class="requests__field requests__field--status">
-							<span>Filtrar por estado</span>
+							<label class="requests__field">
+								<span>Filtrar por estado:</span>
 							<select class="vu-select vu-select--sm" [ngModel]="statusFilter()" (ngModelChange)="cambiarEstadoFiltro($event)">
 								@for (option of statusOptions; track option.value) {
 									<option [value]="option.value">{{ option.label }}</option>
 								}
 							</select>
-						</label>
+							</label>
 
-						@if (hasActiveFilters()) {
-							<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="clearFilters()">Limpiar</button>
-						}
+						</div>
+
+						<label class="requests__field requests__field--order">
+							<span>Ordenar por fecha del turno:</span>
+							<select class="vu-select vu-select--sm" [ngModel]="requestOrder()" (ngModelChange)="cambiarOrden($event)">
+								<option value="newest">Más reciente primero</option>
+								<option value="oldest">Más antigua primero</option>
+							</select>
+						</label>
 					</div>
 				</div>
 			</div>
 
 			@if (refreshing() || filtersRefreshing()) {
 				<div class="requests__refreshing" aria-live="polite">
-					<vu-skeleton-list variant="card" [count]="3" />
+					<vu-skeleton-list
+						[variant]="isProfessional() ? 'request-professional' : 'request-client'"
+						[requestShapes]="requestSkeletonShapes().slice(0, 3)"
+					/>
 				</div>
 			} @else if (filteredRequests().length) {
 				<div class="requests__grid">
@@ -270,7 +289,6 @@
 			} @else {
 				<div class="requests__empty-results" role="status">
 					<p>No encontramos solicitudes con esos filtros.</p>
-					<button type="button" class="vu-btn vu-btn--outline vu-btn--sm" (click)="clearFilters()">Limpiar filtros</button>
 				</div>
 			}
 		}
@@ -338,9 +356,10 @@
 					@for (opcion of estadosDisponibles(solicitud); track opcion) {
 						<button
 							type="button"
-							class="status-option"
-							[class.is-cancel]="opcion === 'CANCELADA'"
-							[class.is-reject]="opcion === 'RECHAZADA'"
+							class="vu-btn status-option"
+							[class.vu-btn--outline]="opcion !== 'ACEPTADA' && opcion !== 'COMPLETADA' && opcion !== 'CANCELADA' && opcion !== 'RECHAZADA'"
+							[class.vu-btn--ink]="opcion === 'ACEPTADA' || opcion === 'COMPLETADA'"
+							[class.vu-btn--danger]="opcion === 'CANCELADA' || opcion === 'RECHAZADA'"
 							(click)="elegirEstado(solicitud, opcion)"
 						>
 							{{ etiquetaEstado(opcion) }}
@@ -386,6 +405,7 @@
 				</div>
 
 				<div mat-dialog-actions class="status-modal__actions">
+					<button type="button" mat-button class="vu-btn vu-btn--outline" (click)="volverAEstadoOpciones()">Volver</button>
 					<button type="button" mat-flat-button class="vu-btn vu-btn--danger" (click)="confirmarCancelacion()">
 						Confirmar cancelación
 					</button>
@@ -414,8 +434,8 @@
 			}
 
 			@if (googleMapsUrl(solicitud); as gmaps) {
-				<div class="status-modal__actions">
-					<a class="vu-btn vu-btn--coral" [href]="gmaps" target="_blank" rel="noopener noreferrer">
+				<div class="status-modal__actions vu-dialog-actions">
+					<a class="vu-btn vu-btn--ink" [href]="gmaps" target="_blank" rel="noopener noreferrer">
 						Abrir en Google Maps
 					</a>
 				</div>

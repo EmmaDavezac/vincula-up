@@ -138,10 +138,14 @@ export interface AdminConfirmacion {
   detalle?: string;
   /** Texto del botón que confirma, con la acción nombrada. */
   confirmar?: string;
+  textoCancelar?: string;
   /** Acción destructiva: botón en rojo y foco inicial en "Cancelar". */
   peligro?: boolean;
+  /** Mantiene el foco inicial en la opción segura al confirmar un descarte. */
+  cancelarPrimario?: boolean;
   icono?: VuIconName;
   ejecutar: () => void;
+  cancelar?: () => void;
 }
 
 export function avisoExito(texto: string): AdminAviso {

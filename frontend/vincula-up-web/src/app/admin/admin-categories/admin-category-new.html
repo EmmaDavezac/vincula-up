@@ -36,3 +36,17 @@
 		</button>
 	</div>
 </form>
+
+@if (confirmandoSalida()) {
+	<vu-confirm
+		titulo="¿Salir sin guardar?"
+		mensaje="La categoría tiene cambios sin guardar."
+		detalle="Si salís ahora, vas a perder el nombre ingresado."
+		textoCancelar="Seguir editando"
+		textoConfirmar="Salir sin guardar"
+		[peligro]="true"
+		[cancelarPrimario]="true"
+		(confirmado)="resolverConfirmacionSalida(true)"
+		(cancelado)="resolverConfirmacionSalida(false)"
+	/>
+}

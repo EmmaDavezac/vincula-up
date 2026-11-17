@@ -119,6 +119,7 @@
 .hero-since {
 	color: var(--muted);
 	font-size: 0.75rem;
+	line-height: 1.4;
 }
 
 .hero-photo-edit {
@@ -245,6 +246,22 @@ cámara abre el selector) y, al competir por el ancho con el nombre y el email e
 
 .security-row p {
 	max-width: 26rem;
+}
+
+@media (max-width: 639px) {
+	.profile-hero {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+
+	.hero-info {
+		flex: 0 0 auto;
+		width: 100%;
+	}
+
+	.security-card > .vu-btn {
+		margin-top: 1rem;
+	}
 }
 
 /* ── Carga ─────────────────────────────────────────────────────────────── */
