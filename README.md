@@ -34,11 +34,20 @@ Vincula-UP sistematiza y moderniza esta vinculación:
 | **Identidad** | Keycloak 26 | Autenticación OIDC + PKCE S256, roles y validación JWKS |
 | **Persistencia** | PostgreSQL 16 | Base de datos relacional para datos de negocio |
 | **Archivos** | Volumen Docker `fotos_data` | Almacenamiento privado de fotos fuera de la base de datos relacional |
+| **Correo** | SMTP externo | Keycloak y el BFF lo consumen directamente para flujos de identidad y avisos de aplicación |
 | **Tiempo Real** | WebSocket + STOMP | Mensajería de chat en vivo y notificaciones reactivas |
 | **Geolocalización** | OpenStreetMap / Nominatim | Geocodificación y orden por cercanía con caché y rate limiting |
 | **Infraestructura** | Docker Compose + Nginx 1.27 | Proxy inverso, terminación TLS y enrutamiento con buffers |
 
 Todo el entorno se ejecuta mediante Docker: no se requiere instalar Node ni Java en la máquina host.
+
+SMTP y el volumen de fotos son dependencias de infraestructura, no microservicios.
+El BFF valida y sirve las fotos privadas desde `fotos_data` y envía avisos por
+SMTP; los microservicios de dominio solo persisten la clave de la foto y no
+dependen del correo. Esta configuración es adecuada para el MVP de una instancia:
+para correo con entrega garantizada se requiere procesamiento asíncrono y para
+escalar fotos entre varias instancias se necesita almacenamiento compartido (por
+ejemplo, S3 o MinIO).
 
 ---
 

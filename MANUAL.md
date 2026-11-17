@@ -191,9 +191,11 @@ dirección, mapa, acciones y calificación.
 
 ### El correo (SMTP)
 
-**Está configurado y verificado.** Con la configuración actual Keycloak envía
-los correos del sitio: el de **recuperación de contraseña** y el de **aviso de
-alta** al profesional que el administrador da de alta en el panel.
+**Está configurado.** Keycloak envía los correos de sus flujos de identidad
+(por ejemplo, recuperación de contraseña y verificación). El BFF utiliza esas
+mismas variables de entorno SMTP para sus avisos de alta de profesionales y de
+cambios de solicitudes. SMTP es un proveedor externo: no es un microservicio del
+sistema ni lo consumen los microservicios de dominio.
 
 > Verificado el **2 de octubre de 2026** con un envío real: se disparó el flujo
 > de "¿Olvidó su contraseña?" desde la pantalla de ingreso y el correo llegó a la
@@ -253,8 +255,9 @@ KEYCLOAK_CONTACTO=vinculaup@gmail.com        # casilla que se muestra en el pie
 
 #### Cómo son los correos
 
-Los dos usan la misma marca: cabecera coral con el logo, ancho de 600 px, tablas
-en vez de flex, estilos en línea y una regla de modo oscuro. El nombre
+Los correos de identidad y de aplicación usan la misma marca: cabecera coral con
+el logo, ancho de 600 px, tablas en vez de flex, estilos en línea y una regla de
+modo oscuro. El nombre
 "Vincula-UP" va **escrito y no solo como imagen**, porque los clientes de correo
 bloquean las imágenes remotas por defecto y un correo cuya única marca es un logo
 bloqueado se ve vacío.
@@ -267,20 +270,22 @@ HTML se ve más sospechoso, no menos.
 |---|---|---|
 | **Correos de Keycloak** (recuperar contraseña, verificar correo) | Tema `vincula-up`: la cabecera y el pie son uno solo para todos. Los textos están aparte, así que cambiar una palabra no rompe el diseño. | Textos: `keycloak/themes/vincula-up/email/messages/messages_es.properties`. Maqueta: `keycloak/themes/vincula-up/email/html/template.ftl` |
 | **Aviso de alta** (lo manda el BFF) | Misma marca, textos propios. | `backend/bff-web/src/main/resources/correos/prerregistro.html` |
+| **Avisos de solicitudes** (los manda el BFF) | Plantillas HTML y texto plano construidas por `NotificacionService`. | `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/NotificacionService.java` |
 
 El contacto y la URL que se imprimen en el pie salen de
 `keycloak/themes/vincula-up/email/theme.properties` (`vinculaUpContacto` y
 `vinculaUpAppUrl`).
 
-> **El aviso de alta es el único que escribe el BFF**, y su maqueta se
-> copia a `/app/correos/` dentro del contenedor en vez de ir en el jar: dentro del
+> **Las notificaciones de alta y de solicitudes las envía el BFF** después de
+> confirmar la operación correspondiente. El envío es best-effort: si SMTP falla,
+> el registro de negocio no se revierte, el error queda en logs y no hay reintento
+> automático ni cola durable. La maqueta de alta se copia a `/app/correos/`
+> dentro del contenedor en vez de ir en el jar: dentro del
 > empaquetado de Spring Boot el recurso no se dejaba resolver. Por eso la ruta
-> está en `MAIL_PLANTILLA`. Si se renombra el archivo hay que actualizar los tres
-> lugares donde aparece la ruta; para eso está el script:
->
-> ```bash
-> python3 scripts/arreglar-ruta-plantilla.py
-> ```
+> está en `MAIL_PLANTILLA`. Si se renombra el archivo, actualizá el valor de
+> `MAIL_PLANTILLA`, el valor por defecto de `mail.plantilla` en
+> `backend/bff-web/src/main/java/com/vinculaup/bff_web/service/NotificacionService.java`
+> y el origen del `COPY` en `backend/bff-web/Dockerfile`.
 
 > **Una trampa de Keycloak:** en las plantillas de correo no se puede usar
 > `${algo?html}`. Keycloak 26 compila FreeMarker con el auto-escape prendido y lo
@@ -522,6 +527,12 @@ Con la misma actualización, las fotos dejaron de servirse como archivos públic
 en `/fotos/` y ahora pasan por `GET /api/usuarios/{id}/foto`, que exige sesión. Si
 venís de una versión anterior, cerrá sesión o recargá la página: si no, el perfil
 guardado en el navegador sigue esperando la foto por la URL vieja.
+
+El BFF es el único componente que escribe y lee los binarios del volumen
+`fotos_data`; `ms-usuarios` y `ms-profesionales` almacenan solo la clave del
+archivo. El volumen local está pensado para una instancia y no comparte datos
+entre hosts. Para ejecutar varias réplicas hay que cambiar el adaptador de
+almacenamiento por uno compartido (por ejemplo S3/MinIO) y definir respaldos.
 
 También se agregaron las columnas `terminos_version` y `terminos_aceptado_en`. Se
 crean solas por el `ddl-auto`, y las cuentas que ya existían quedan con la

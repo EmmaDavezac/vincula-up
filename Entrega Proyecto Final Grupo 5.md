@@ -348,7 +348,19 @@ Todas son de código abierto y de amplia adopción, lo que reduce la curva de ap
 
 ![][image1]
 
-El BFF cumple cuatro funciones: agrega datos de varios servicios, autoriza con el JWT, resuelve la identidad del actor desde el token y tolera fallas de los servicios secundarios.
+El BFF agrega datos de varios servicios, autoriza con el JWT, resuelve la identidad del actor desde el token y tolera fallas de los servicios secundarios. En la implementación del MVP también integra el acceso a fotos y el envío de notificaciones, como se aclara a continuación.
+
+**Aclaración de la implementación del MVP:** `bff-web` es el componente de borde
+(Backend for Frontend), separado de los tres microservicios de dominio; no se
+considera un servicio de negocio adicional. SMTP y el volumen Docker de fotos
+son dependencias de infraestructura, no microservicios: Keycloak y el BFF
+conectan directamente al proveedor SMTP para sus respectivos correos, mientras
+que el BFF es el único que accede a los binarios privados. `ms-usuarios` y
+`ms-profesionales` solo guardan la clave de la foto. En el MVP, el envío desde
+el BFF es best-effort y el volumen local está pensado para una instancia. Si se
+requieren entrega confiable de correo o despliegue multi-nodo, deben agregarse
+procesamiento asíncrono con persistencia de eventos y almacenamiento de objetos
+compartido, respectivamente.
 
 #### Integración con sistemas existentes {#integración-con-sistemas-existentes}
 
@@ -398,7 +410,7 @@ La implementación de un nuevo sistema conlleva una curva de adopción natural. 
 
 El alcance del MVP deja las siguientes limitaciones, que se asumen de forma consciente y se cierran en la Fase 2\. Ninguna impide la ejecución del proyecto y todas tienen un plan de cierre en la sección “Planificación y análisis de riesgos”.
 
-| Limitación | Impacto | Cierre | Estado al 15/11/2026 |
+| Limitación | Impacto | Cierre | Estado al 17/11/2026 |
 | :---- | :---- | :---- | :---- |
 | Sin integración continua | Un cambio roto se descubre en la máquina de quien lo hizo. | Fase 2 | Registrado como deuda técnica para Fase 2. |
 | Esquema creado automáticamente, sin migraciones versionadas | No se puede reproducir ni revertir un cambio de modelo. | Fase 2 | Registrado para incorporación con Flyway en Fase 2. |
@@ -408,7 +420,7 @@ El alcance del MVP deja las siguientes limitaciones, que se asumen de forma cons
 | Verificación de correo desactivada | Un profesional podría activar su perfil con el correo de otra persona. | Fase 2, antes del piloto | Integrado con servidor SMTP (`KEYCLOAK_SMTP_*`) y `verifyEmail` activable. |
 | Geocodificación que puede resolver a otra ciudad | Una dirección puede caer fuera de Concepción del Uruguay. | Validar ciudad y país del resultado | Filtrado acotado por bounding box y caché LRU de 10 minutos implementada. |
 
-> **Nota de actualización (15 de noviembre de 2026):** Al cierre de la Fase 1 (MVP), el sistema se encuentra completamente operativo de punta a punta. Se han resuelto anticipadamente el vencimiento automático de solicitudes (24h con notificación dual a cliente y profesional), el chat bidireccional en tiempo real vía WebSocket STOMP, la generación de certificados TLS mediante OpenSSL y el empaquetado de despliegue Docker Compose estandarizado.
+> **Nota de actualización (17 de noviembre de 2026):** El Sprint 4 continúa en ejecución hasta el 23/11/2026. El código ya implementa el ciclo de solicitudes, la expiración configurable con avisos a ambas partes, el chat WebSocket/STOMP, las calificaciones y el despliegue Docker Compose. La verificación final de aceptación de punta a punta y el cierre formal del sprint siguen pendientes; por ello, no se declara cerrado el MVP antes de completar y registrar esas pruebas.
 
 #### Conclusión de la factibilidad técnica {#conclusión-de-la-factibilidad-técnica}
 
@@ -815,7 +827,7 @@ El aseguramiento de la calidad (QA) combina pruebas unitarias sobre las reglas d
 
 ### Dificultades previstas y estrategias de mitigación {#dificultades-previstas-y-estrategias-de-mitigación}
 
-* **Dependencia y latencia de servicios externos (Nominatim y SMTP)**: Posibles demoras o caídas temporales de servicios externos podrían afectar la geocodificación o el envío de correos (mediante el protocolo SMTP — *el estándar tecnológico universal que permite a los sistemas enviar correos electrónicos automáticos de forma segura, como cuando te llega un aviso de bienvenida o de una solicitud aceptada*) . Se mitiga mediante políticas de degradación controlada (si la geocodificación no responde, el flujo no se interrumpe), caché en memoria de 10 minutos para ubicaciones recurrentes, y timeouts estrictos para evitar bloqueos del hilo de ejecución.  
+* **Dependencia y latencia de servicios externos (Nominatim y SMTP)**: Demoras o caídas temporales pueden afectar la geocodificación o el envío de correos. La geocodificación cuenta con caché y degradación controlada. En la implementación actual, el envío SMTP del BFF es síncrono y best-effort: un fallo no revierte la operación de negocio, pero no hay cola durable ni reintentos automáticos. Antes de exigir entrega garantizada o exponer el sistema a mayor volumen se deben configurar límites de tiempo y agregar procesamiento asíncrono durable.
 * **Inconsistencia de datos en la arquitectura distribuida:** Al coexistir múltiples servicios desacoplados, existe riesgo de desincronización. Se mitiga prohibiendo consultas cruzadas directas a tablas de otros dominios; toda interacción inter-servicio se efectúa estrictamente vía red HTTP síncrona mediante DTOs, resolviendo la agregación en el BFF con tolerancia a fallos parciales (el padrón se entrega aun ante caídas transitorias de servicios secundarios).  
 * **Brecha de alfabetización digital de los usuarios:** El público objetivo presenta perfiles tecnológicos heterogéneos (18 a 55 años). Se mitiga aplicando interfaces limpias, botones táctiles de área generosa (mínimo 44×44 px), lenguaje desprovisto de tecnicismos y estructuración de trámites extensos en asistentes guiados por pasos cortos (wizards).
 

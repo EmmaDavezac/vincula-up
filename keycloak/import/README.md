@@ -59,6 +59,9 @@ Keycloak esté listo y reconcilia automáticamente el auto-registro, el rol
 `CLIENTE` por defecto, el rol `default-roles-<realm>` en los usuarios de demo
 (sin él la consola de cuenta da 401 al cambiar la contraseña), el client de servicio y permisos, el SMTP y los temas.
 Lee las variables del `.env` y se completa antes de que arranque el BFF.
+Esta configuración de SMTP corresponde a los correos de Keycloak. El BFF también
+lee las variables SMTP y se conecta directamente al mismo proveedor para enviar
+sus propias notificaciones; `keycloak-init` no es un relay para el BFF.
 
 Los scripts del host siguen disponibles como reconciliación manual: vuelven a
 aplicar la configuración y sincronizan la lista de `redirectUris` y `webOrigins`

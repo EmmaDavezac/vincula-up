@@ -25,6 +25,14 @@
 
 ## Historial
 
+### [2026-11-17] - docs: actualizar arquitectura y resultados de planificación del MVP
+- **Objetivo:** Alinear la documentación sobre SMTP, almacenamiento de fotos y responsabilidades del BFF; registrar los resultados por tarea planificada y los errores encontrados durante la ejecución.
+- **Cambios realizados:**
+  - `ESPECIFICACION.md`: distingue el BFF de los microservicios de dominio, aclara el consumo directo del proveedor SMTP y del volumen local, y documenta las limitaciones de entrega best-effort, escalado y respaldo.
+  - `MVP Grupo 8- DACS.md`: actualiza el estado real de los sprints, agrega el resultado de cada subtarea de planificación y registra incidentes técnicos documentados con causa y resolución.
+  - `README.md`, `MANUAL.md`, `keycloak/import/README.md` y `Entrega Proyecto Final Grupo 5.md`: sincronizan la explicación de los límites arquitectónicos y las decisiones implementadas; el manual deja de referenciar un script de mantenimiento eliminado.
+- **Verificación:** Revisión de consistencia documental y `git diff --check`. No se ejecutan pruebas de código porque esta tarea solo modifica documentación.
+
 ### [2026-11-16] - ux: unificar navegación admin y skeletons fieles a los listados
 - **Objetivo:** Evitar una navegación administrativa duplicada y hacer que los placeholders reflejen los ítems reales durante la carga.
 - **Cambios realizados:**
@@ -1119,7 +1127,7 @@
     - Diagramas de estados y tablas de transiciones formales para el ciclo de vida de la Solicitud (`PENDIENTE`, `ACEPTADA`, `RECHAZADA`, `COMPLETADA`, `CANCELADA`, `VENCIDA`) y para los estados de Cuenta (`CARGADO`, `ACTIVO`, `SUSPENDIDO`, `INACTIVO`).
   - **Análisis de arquitectura y resolución de puntos clave:**
     - *Conector a API externa:* Especificación técnica de OpenStreetMap / Nominatim con caché LRU de 500 entradas (TTL 10 min), rate-limiting y degradación en 2 capas.
-    - *Conector SMTP:* Contrato de infraestructura con variables `KEYCLOAK_SMTP_*`, STARTTLS, separación de `From` y `Reply-To`, retry policy y tolerancia a fallos.
+    - *Conector SMTP:* Contrato de infraestructura con variables `KEYCLOAK_SMTP_*`, STARTTLS, separación de `From` y `Reply-To`, envío best-effort y registro de fallos; el MVP no implementa reintentos automáticos.
     - *Persistencia de fotos y SMTP en microservicios:* Fundamentación arquitectónica de por qué NO violan los principios de microservicios (desacoplamiento de binarios fuera de Postgres mediante volumen nombrado `fotos_data`, interfaz extensible a S3/MinIO, y notificaciones desacopladas en BFF).
   - **Corrección de inconsistencias del modelo:** Unificada la definición de `fotoUrl` en `Usuario` y `Profesional` (ambas guardan la clave textual `perfiles/<uuid>.jpg` en el volumen privado, nunca una URL pública directa).
   - **Prototipos y diseño visual:** Enlace al prototipo interactivo en Vercel, enlaces a las figuras en Drive y formalización de tokens de diseño y reglas de botones.

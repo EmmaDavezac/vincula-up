@@ -654,7 +654,7 @@ Los estados son `CARGADO`, `ACTIVO`, `SUSPENDIDO` e `INACTIVO` (este último par
 | Componente | Tecnología | Rol en la arquitectura |
 |---|---|---|
 | **Frontend** | Angular 22 · Angular Material · PWA | Interfaz de usuario reactiva basada en Signals. |
-| **BFF (Backend for Frontend)** | Spring Boot 4 · Java 21 | Gateway único, agregación, RBAC, WebSocket, fotos y correos. |
+| **BFF (Backend for Frontend)** | Spring Boot 4 · Java 21 | Aplicación de borde para el frontend: gateway, agregación, RBAC, WebSocket, fotos y avisos. No es un microservicio de dominio. |
 | **ms-usuarios** | Spring Boot 4 · Java 21 | Microservicio de identidades de negocio, perfiles y términos. |
 | **ms-profesionales** | Spring Boot 4 · Java 21 | Microservicio de padrón, especialidades y disponibilidad. |
 | **ms-solicitudes** | Spring Boot 4 · Java 21 | Microservicio de ciclo de solicitudes, chat y calificaciones. |
@@ -697,6 +697,13 @@ Los estados son `CARGADO`, `ACTIVO`, `SUSPENDIDO` e `INACTIVO` (este último par
                                └─────────────────┘
 ```
 
+Las integraciones de infraestructura que no aparecen como microservicios de dominio en el diagrama son:
+
+- `bff-web` → proveedor SMTP: correos de alta y notificaciones de solicitudes.
+- `keycloak` → proveedor SMTP: recuperación y verificación de identidad.
+- `bff-web` → volumen local `fotos_data`: subida y lectura autorizada; no existe un API de almacenamiento separado.
+- `ms-usuarios` / `ms-profesionales` → persistencia de la clave de foto, no del binario.
+
 ### 6.2 Responsabilidades por servicio
 
 - **`bff-web` (Puerto 9001):**
@@ -704,8 +711,9 @@ Los estados son `CARGADO`, `ACTIVO`, `SUSPENDIDO` e `INACTIVO` (este último par
   2. **Agregación y enriquecimiento:** combina la información del padrón (`ms-profesionales`) con los datos del usuario (`ms-usuarios`) y la reputación (`ms-solicitudes`).
   3. **Autorización y RBAC:** valida el JWT contra el JWKS de Keycloak y aplica las 27 reglas de acceso. Los microservicios de dominio además actúan como OAuth2 Resource Servers para defensa en profundidad.
   4. **Identidad estricta:** inyecta el `sub` de Keycloak en cada petición; un cliente nunca puede falsear su identidad.
-  5. **Fotos privadas:** valida tipo y tamaño, escribe en el volumen nombrado `fotos_data` y aplica la matriz de visibilidad de fotos.
-  6. **Avisos transaccionales y scheduler:** envía correos de alta, turnos y expiración con plantilla HTML/texto multipart y ejecuta el cron de expiración cada 15 segundos.
+  5. **Fotos privadas:** valida tipo y tamaño, accede al almacenamiento local respaldado por `fotos_data` y aplica la matriz de visibilidad de fotos.
+  6. **Avisos y scheduler:** conecta directamente con el proveedor SMTP para enviar correos de alta y de solicitudes; ejecuta el cron de expiración cada 15 segundos. Keycloak también conecta directamente con SMTP para sus correos de identidad.
+  7. **Límite arquitectónico:** es el componente de borde/orquestación específico de la aplicación, no uno de los microservicios de dominio. En el MVP también concentra correo y acceso a fotos por su integración con las operaciones HTTP y la autorización. Si estos procesos requieren escalado, entrega garantizada o ciclo de vida independiente, deben extraerse detrás de contratos/eventos, no convertirlos en dependencias de los servicios de dominio por defecto.
 - **`ms-usuarios` (Puerto 8081):** Cuentas y perfiles de clientes y administradores, estado de negocio (`CARGADO`, `ACTIVO`, `SUSPENDIDO`, `INACTIVO`), vinculación de `keycloakId` y registro de términos y condiciones (versión y fecha).
 - **`ms-profesionales` (Puerto 8082):** Padrón de técnicos, legajos, categorías/especialidades, disponibilidad horaria semanal y activación del perfil.
 - **`ms-solicitudes` (Puerto 8083):** Ciclo de vida completo de solicitudes, validación de turnos superpuestos, geocodificación con Nominatim, chat, calificaciones y vencimiento.
@@ -725,22 +733,24 @@ Los estados son `CARGADO`, `ACTIVO`, `SUSPENDIDO` e `INACTIVO` (este último par
 #### 6.3.2 ¿Hay que especificar el conector a SMTP?
 **Sí, debe quedar formalmente especificado como contrato de infraestructura.**
 - **Canal de envío:** El BFF (`NotificacionService`) y Keycloak (recuperación de contraseña, verificación) se conectan al servidor SMTP configurado por variables de entorno (`KEYCLOAK_SMTP_*`).
+- **Rol arquitectónico:** SMTP es un servicio externo de infraestructura, no un microservicio del sistema. El BFF lo consume directamente para las notificaciones de alta y de solicitudes; Keycloak lo consume para sus flujos de identidad. Los microservicios de dominio no envían correo ni dependen de SMTP.
 - **Separación de remitentes (`From` vs `Reply-To`):**
   - `From`: Cuenta autenticada en el servidor SMTP (ej: `lucianodavezac@gmail.com`).
   - `Reply-To`: Casilla institucional de destino de respuestas (ej: `vinculaup@gmail.com`), configurada en `KEYCLOAK_SMTP_REPLY_TO`.
 - **Protocolo y Seguridad:** Puerto 587 con cifrado `STARTTLS` obligatorio (o 465 con SSL implícito). No se permite texto plano.
-- **Tolerancia y Best-effort:** Si el servidor SMTP no responde, la operación de negocio (ej. alta del profesional o cambio de estado de solicitud) **se confirma igual** y el fallo se registra en el log. En el alta de un profesional, el BFF devuelve `correoEnviado: false` junto con la contraseña temporal para que el administrador la suministre manualmente.
+- **Tolerancia y Best-effort:** Las notificaciones del BFF se envían después de que la operación de negocio fue confirmada. Si el servidor SMTP no responde, la operación (ej. alta del profesional o cambio de estado de solicitud) **se conserva igual** y el fallo se registra. En el alta, el BFF informa `correoEnviado: false` junto con la contraseña temporal para que el administrador la entregue por otra vía. No hay cola durable ni reintento automático: un correo fallido puede perderse.
 
 #### 6.3.3 ¿El volumen de fotos y el protocolo SMTP violan la arquitectura de microservicios?
-**No. Ninguno de los dos viola la arquitectura de microservicios si se respetan las siguientes directivas de diseño:**
+**No por el hecho de que los consuma el BFF.** Ni SMTP ni un volumen de archivos tienen que ser microservicios. En el MVP son dependencias de infraestructura externas al dominio, con límites y compromisos explícitos:
 
 1. **Almacenamiento de fotos en volumen nombrado (`fotos_data`):**
-   - **Por qué NO viola la arquitectura:** Un principio central de los microservicios es no almacenar binarios pesados (imágenes BLOB) dentro de la base de datos relacional transaccional, ya que degradaría los backups, la replicación y el pool de conexiones. Las imágenes se consideran almacenamiento de objetos.
-   - **Desacoplamiento:** El BFF gestiona la subida mediante `POST /api/fotos` y la lectura controlada mediante `GET /api/usuarios/{id}/foto` a través de la interfaz abstracta `FotoStorage`. Los microservicios de dominio (`ms-usuarios` y `ms-profesionales`) solo almacenan en su base de datos una **clave textual de 512 caracteres** (`perfiles/<uuid>.jpg`), jamás el archivo físico.
-   - **Escalabilidad horizontal futura:** En el entorno local / MVP se utiliza la implementación `FotoStorageLocal` respaldada por el volumen Docker nombrado `fotos_data`. Para escalar a múltiples hosts de producción, se sustituye dicha clase por un cliente de almacenamiento en la nube (AWS S3, MinIO o Google Cloud Storage), manteniendo intacta la API REST y el contrato de los microservicios.
+   - **Diseño actual:** El BFF valida, escribe y lee los binarios mediante la abstracción `FotoStorage`; los microservicios de dominio (`ms-usuarios` y `ms-profesionales`) guardan únicamente la clave (`perfiles/<uuid>.<extensión>`), no el archivo. Esto mantiene los binarios fuera de PostgreSQL y preserva la autorización centralizada de las fotos privadas.
+   - **Límite del despliegue actual:** `FotoStorageLocal` utiliza el volumen Docker `fotos_data`, montado solamente en el BFF. Es adecuado para el MVP de una instancia, pero no ofrece almacenamiento compartido entre varias instancias/hosts ni sustituye una estrategia de backup y recuperación.
+   - **Evolución:** Si se requiere despliegue multi-nodo, disponibilidad independiente o mayor volumen, reemplazar el adaptador local por almacenamiento de objetos (por ejemplo S3/MinIO). No es necesario agregar un microservicio intermediario solo para acceder al mismo volumen.
 
 2. **Protocolo SMTP:**
-   - **Por qué NO viola la arquitectura:** SMTP es un protocolo estándar de comunicación con un servicio externo de correo saliente. El BFF actúa como orquestador de notificaciones transaccionales para los eventos del sistema. Los microservicios de dominio no tienen dependencias directas con el servidor de correos, preservando el principio de responsabilidad única.
+   - **Diseño actual:** SMTP es el proveedor de correo externo, no un servicio implementado por Vincula-UP. El BFF invoca directamente SMTP para avisos posteriores a operaciones ya confirmadas; Keycloak lo invoca para recuperación/verificación. Los microservicios de dominio no conocen ni dependen de SMTP.
+   - **Trade-off:** Enviar desde el BFF es razonable mientras estas notificaciones formen parte de la experiencia web y sean best-effort. Si se exige reintento, auditoría durable, aislamiento de fallas o alto volumen, usar eventos/outbox y un consumidor de notificaciones separado. No crear un microservicio de correo por anticipado si no existe esa necesidad operativa.
 
 ---
 
@@ -1041,7 +1051,8 @@ Las coordenadas geográficas se cifran a nivel de aplicación en:
 
 - Las fotos de perfil se almacenan como archivos binarios fuera de PostgreSQL en el volumen Docker `fotos_data`.
 - Flujo: El frontend sube el binario a `POST /api/fotos` (`multipart/form-data`); el BFF valida tamaño (máximo 2 MB en `STORAGE_MAX_BYTES`) y tipo MIME (`image/jpeg`, `image/png`, `image/webp`), escribe el archivo en el volumen (`/data/fotos/perfiles/<uuid>.jpg`) y devuelve la clave al frontend.
-- Los microservicios solo almacenan la clave. El BFF es el único componente que interactúa con el sistema de archivos.
+- Los microservicios solo almacenan la clave. El BFF es el único componente que interactúa con el sistema de archivos; además, sirve las fotos desde `GET /api/usuarios/{id}/foto` tras comprobar sesión y rol.
+- Es una decisión de despliegue del MVP, no un microservicio de almacenamiento: el volumen solo está montado en el BFF y sirve para una instancia. Para múltiples réplicas/hosts se requiere almacenamiento de objetos compartido y copias de seguridad verificables.
 
 ### 11.4 Quién ve la foto de quién
 
@@ -1235,7 +1246,8 @@ La maqueta interactiva original del proyecto se desarrolló en v0 (Next.js) y se
 ### 18.2 Deuda técnica registrada
 - **Pipeline de CI/CD:** Configuración de GitHub Actions para ejecución automatizada de pruebas y builds en cada pull request.
 - **Dominio productivo y correo institucional:** En producción se requiere registrar un dominio con políticas SPF, DKIM y DMARC y reemplazar las credenciales locales por un servicio como Amazon SES o SendGrid.
-- **Almacenamiento de fotos en S3:** Migrar de `FotoStorageLocal` a un backend compatible con Amazon S3 / MinIO para clusters multi-nodo.
+- **Entrega confiable de correo:** El envío SMTP del BFF es sincrónico y best-effort, sin cola durable ni reintentos; incorporar outbox/eventos y un consumidor separado si la notificación requiere garantía de entrega.
+- **Almacenamiento de fotos multi-nodo:** Migrar de `FotoStorageLocal` a un backend compatible con Amazon S3 / MinIO para varias réplicas/hosts, junto con política de backup y recuperación.
 
 ---
 
