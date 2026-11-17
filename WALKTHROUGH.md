@@ -1320,3 +1320,29 @@
   - Se documentó el comportamiento en el [MANUAL.md](./MANUAL.md).
 - **Archivos modificados:** `frontend/vincula-up-web/src/app/home/home.css`, `MANUAL.md` y `WALKTHROUGH.md`.
 - **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente; `git diff --check` también pasó.
+
+### [2026-11-16] - feat: dar más vida visual a la landing
+- **Objetivo:** Equilibrar el contenido textual de la landing con elementos visuales vinculados al flujo real.
+- **Cambios realizados:**
+  - Se reemplazó el panel de texto repetitivo del hero por una ilustración responsive de búsqueda por oficio, con iconografía y categorías de ejemplo.
+  - Se añadieron iconos a los pasos del recorrido y a las garantías de la plataforma, además de un acceso directo de activación en la sección para egresados.
+  - Se mantuvieron colores del sistema y la guía de interacción: el movimiento decorativo es estático y las transiciones de hover cambian color.
+  - Se actualizó el [MANUAL.md](./MANUAL.md).
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/home/home.html`, `home.css`, `home.ts`, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente; `git diff --check` también pasó.
+
+### [2026-11-16] - feat: animar ilustraciones con carrusel en landing
+- **Objetivo:** Hacer más dinámica la portada con escenas ilustradas y animaciones al recorrer el contenido.
+- **Cambios realizados:**
+  - El hero muestra tres escenas visualmente diferenciadas: una búsqueda de oficio, una ficha de profesional y una conversación de coordinación.
+  - El carrusel avanza automáticamente, permite navegación manual y se detiene mientras recibe foco o puntero.
+  - Se quitó el botón de pausa; permanecen las flechas y los indicadores de navegación.
+  - Se redujo el texto de cada escena y se reemplazaron los detalles repetitivos por elementos gráficos.
+  - Las tres ilustraciones se enmarcaron con un diseño común de teléfono móvil.
+  - Se ajustó la ficha de profesional para que su contenido no se desborde del bisel.
+  - Se animan suavemente las ilustraciones y la transición de cada escena; `prefers-reduced-motion` desactiva animaciones y avance automático.
+  - Las secciones y elementos del recorrido aparecen al entrar en pantalla, con entradas escalonadas para los pasos y tarjetas.
+  - Se respeta `prefers-reduced-motion` también en las animaciones de entrada al desplazarse.
+  - Se actualizaron las instrucciones del [MANUAL.md](./MANUAL.md).
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/home/home.html`, `home.css`, `home.ts`, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente; `git diff --check` también pasó.

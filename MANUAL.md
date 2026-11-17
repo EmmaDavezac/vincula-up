@@ -125,6 +125,17 @@ solicitud y seguimiento del turno, coordinación por chat y calificación. En
 móvil, sus dos accesos principales comparten la fila con el mismo ancho.
 Los accesos principales y las tarjetas finales tienen transiciones de hover
 por color, respetando la preferencia del sistema para reducir movimiento.
+También presenta una ilustración de búsqueda, pasos con iconografía y señales
+visuales para explicar respaldo, seguridad de la dirección y coordinación.
+El hero incluye un carrusel automático de tres escenas visualmente distintas:
+búsqueda de oficio, perfil profesional y conversación de coordinación. Tiene
+controles manuales para avanzar o retroceder, se detiene mientras se interactúa
+y respeta la preferencia del sistema para reducir movimiento. Las ilustraciones
+usan texto mínimo para mantener el foco en el recorrido visual.
+La escena del chat está presentada dentro de un marco de teléfono para sugerir
+el uso de la app; el mismo marco se aplica a la búsqueda y al perfil profesional.
+Al recorrer la página, las secciones y sus pasos aparecen suavemente en pantalla,
+con movimientos escalonados; también respetan la preferencia de movimiento reducido.
 Las etiquetas de filtros y ordenamiento quedan alineadas a la izquierda, con el
 control correspondiente.
 
