@@ -6,7 +6,7 @@ Ingeniería en Sistemas de Información
 **Cátedra:** Diseño y Administración del Ciclo de Software (DACS)  
 **Proyecto:** Vincula-UP — Informe del MVP (Fase 1)  
 **Grupo:** Grupo 8  
-**Fecha de actualización:** 15 de noviembre de 2026  
+**Fecha de actualización:** 17 de noviembre de 2026
 **Repositorio oficial:** [https://github.com/EmmaDavezac/vincula-up](https://github.com/EmmaDavezac/vincula-up)
 
 **Docentes:**
@@ -65,6 +65,10 @@ Ingeniería en Sistemas de Información
 [Sprint 3 · 26/10 – 09/11	8](#sprint-3-·-26/10-–-09/11)
 
 [Sprint 4 · 09/11 – 23/11	9](#sprint-4-·-09/11-–-23/11)
+
+[Resultados de ejecución de las subtareas	9](#resultados-de-ejecucion)
+
+[Errores surgidos durante la ejecución	9](#errores-ejecucion)
 
 [Definition of Done	9](#definition-of-done)
 
@@ -213,7 +217,7 @@ Se agruparon los sprints en dos épicas de dos sprints cada una.
 
 #### Sprint 1 · 28/09 – 12/10 {#sprint-1-·-28/09-–-12/10}
 
-**Estado al 15/11/2026:** Completado.
+**Estado al 17/11/2026:** Completado.
 Objetivo: Dejar funcionando el entorno (Docker, Keycloak, Nginx y bff-web), relevamiento, historias de usuarios y modelado terminado.
 
 | Actividad | Épica | Responsable |
@@ -224,8 +228,8 @@ Objetivo: Dejar funcionando el entorno (Docker, Keycloak, Nginx y bff-web), rele
 
 #### Sprint 2 · 12/10 – 26/10 {#sprint-2-·-12/10-–-26/10}
 
-**Estado al 15/11/2026:** Completado.
-Objetivo: Backend y frontend terminado. Un administrador puede dar de alta a un profesional y este activa su perfil, todo con autenticación real y a través del BFF. Pruebas manuales y de integración de pasadas.
+**Estado al 17/11/2026:** Completado.
+Objetivo: Backend y frontend terminados. Un administrador puede dar de alta a un profesional y este activa su perfil, todo con autenticación real y a través del BFF. El cierre del sprint reporta pruebas manuales y de integración; el detalle individual de los casos no está incluido en este informe.
 
 | Actividad | Épica | Responsable |
 | ----- | ----- | ----- |
@@ -236,7 +240,7 @@ Objetivo: Backend y frontend terminado. Un administrador puede dar de alta a un 
 
 #### Sprint 3 · 26/10 – 09/11: {#sprint-3-·-26/10-–-09/11:}
 
-**Estado al 15/11/2026:** Completado.
+**Estado al 17/11/2026:** Completado.
 Objetivo: El backend de solicitudes cubre el ciclo completo: crear, aceptar, rechazar con motivo, completar y cancelar, con las validaciones de transición y de disponibilidad.
 
 | Actividad | Épica | Responsable |
@@ -247,8 +251,8 @@ Objetivo: El backend de solicitudes cubre el ciclo completo: crear, aceptar, rec
 
 #### Sprint 4 · 09/11 – 23/11: {#sprint-4-·-09/11-–-23/11:}
 
-**Estado al 15/11/2026:** Completado / Cierre y validación final de MVP.
-Objetivo: El cliente pide un turno, el profesional lo gestiona y el flujo termina de punta a punta. Pruebas manuales y de integración pasadas. Incluye expiración automática en 24h con notificación dual (correo y WebPush), chat STOMP en tiempo real, mapa interactivo y calificaciones.
+**Estado al 17/11/2026:** En ejecución; cierre previsto para el 23/11/2026.
+Objetivo: Completar el circuito de solicitud de punta a punta. En el repositorio ya están implementados el flujo de solicitud, la expiración configurable, las notificaciones por correo y WebPush, el chat STOMP, los mapas y las calificaciones. Quedan pendientes el cierre de pruebas manuales/de integración, la verificación integral de los criterios de demo y el cierre formal del sprint. No se consideran aprobadas pruebas que no tengan evidencia registrada.
 
 | Actividad | Épica | Responsable |
 | ----- | ----- | ----- |
@@ -334,6 +338,99 @@ Objetivo: El cliente pide un turno, el profesional lo gestiona y el flujo termin
 | Integración en BFF y pruebas de integración | Exponer en el bff-web los endpoints de solicitudes, chat y calificaciones | NM | HU-S01 a HU-S14 |
 | Integración en BFF y pruebas de integración | Integrar el envío de correos por SMTP y las notificaciones WebPush | NM | HU-S06, HU-S16 |
 | Integración en BFF y pruebas de integración | Probar de punta a punta con autenticación real y preparar la demo | NM | Criterios de éxito de la demo |
+
+### Resultados de ejecución de las subtareas planificadas {#resultados-de-ejecucion}
+
+Los resultados reflejan el estado del código y los documentos al 17/11/2026. En testing se distingue entre la ejecución consignada en el cierre previo y la evidencia detallada disponible: este informe no incluye una matriz de casos con resultados por escenario.
+
+#### Sprint 1 · 28/09 – 12/10
+
+| Subtarea planificada | Resultado de ejecución |
+| ----- | ----- |
+| Relevar reglas y datos de administradores, profesionales y clientes | Requisitos y reglas de negocio documentados para los perfiles de usuario. |
+| Modelar Usuario, Profesional, Disponibilidad, Especialidad y enumerados | Modelo de dominio reflejado en la especificación y en los servicios de usuarios/profesionales. |
+| Armar el diagrama de clases de usuarios | Diagrama de clases de usuarios incorporado al material de modelado. |
+| Armar el diagrama de estados de cuenta | Estados y transiciones documentados: CARGADO, ACTIVO, SUSPENDIDO e INACTIVO. |
+| Armar el diagrama de casos de uso de usuarios | Casos de uso de gestión de usuarios documentados. |
+| Armar Docker Compose con PostgreSQL, Keycloak, Nginx y bff-web | Stack de desarrollo orquestado en `docker-compose.yml`. |
+| Configurar realm, roles y cliente del frontend en Keycloak | Realm, roles de negocio y cliente OIDC configurados; BFF y servicios validan JWT. |
+| Configurar Nginx como reverse proxy con HTTPS | Proxy y TLS de desarrollo configurados con certificados locales. |
+| Crear el esqueleto de bff-web con validación JWT/JWKS | BFF operativo como entrada de la API y validador del token. |
+| Crear ms-usuarios y ms-profesionales conectados a PostgreSQL | Servicios de dominio implementados con persistencia relacional. |
+| Redactar historias generales y de cliente HU-U01–HU-U04 | Historias y escenarios documentados en el informe. |
+| Redactar historias de profesional HU-U05–HU-U08 | Historias de profesional documentadas. |
+| Redactar historias de administrador HU-U09–HU-U14 | Historias de administración documentadas. |
+| Revisar historias y ajustar escenarios HU-U01–HU-U14 | Historias consolidadas en el relevamiento funcional. |
+
+#### Sprint 2 · 12/10 – 26/10
+
+| Subtarea planificada | Resultado de ejecución |
+| ----- | ----- |
+| ms-usuarios: registro, edición de perfil y aceptación de términos | Flujos implementados; se registra versión y fecha de aceptación. |
+| Alta de profesionales con contraseña temporal y cambio obligatorio | Alta administrativa integrada con Keycloak y cambio de contraseña en primer ingreso. |
+| ms-profesionales: activación y horarios | Perfil, zona/foto y disponibilidad semanal implementados. |
+| Almacenamiento privado de fotos | BFF implementa `FotoStorageLocal` sobre `fotos_data`; los servicios guardan solo la clave. |
+| Consulta/edición de padrón, clientes y estados de cuenta | Operaciones de administración disponibles para profesionales y clientes. |
+| Alta, edición y baja de categorías | Gestión de categorías implementada en padrón y panel. |
+| Frontend de registro, login y recuperación | Pantallas integradas con el flujo OIDC de Keycloak. |
+| Frontend de términos y edición de perfil | Aceptación y edición de perfil disponibles en la aplicación. |
+| Frontend de primer ingreso, activación y horarios | Flujos del profesional implementados. |
+| Paneles administrativos de profesionales, padrón, categorías y clientes | Paneles administrativos implementados. |
+| Navegación y menús por rol | Rutas y navegación se adaptan al rol de la sesión. |
+| Diseñar casos de prueba de HU-U01–HU-U15 | Escenarios de aceptación derivados de las historias; el informe no adjunta una matriz separada de pruebas. |
+| Ejecutar pruebas manuales y registrar defectos de usuarios | El cierre previo del sprint reporta pruebas manuales; no hay registro individual de defectos/casos en este informe. |
+| Repetir pruebas sobre correcciones | Reportado dentro del cierre del sprint; evidencia por caso pendiente de consolidación documental. |
+| Exponer endpoints de usuarios/profesionales en el BFF y propagar token | API del BFF integra ambos servicios con autenticación y autorización. |
+| Probar alta, primer ingreso, activación y aparición en padrón | El flujo funcional está implementado; la evidencia detallada de ejecución no está anexada. |
+
+#### Sprint 3 · 26/10 – 09/11
+
+| Subtarea planificada | Resultado de ejecución |
+| ----- | ----- |
+| Modelar Solicitud, Calificación y EstadoSolicitud | Entidades y estados implementados/documentados en el dominio de solicitudes. |
+| Armar diagrama de estados y tabla de transiciones | Transiciones, condiciones y estados terminales documentados. |
+| Actualizar diagramas de clases y casos de uso | Modelado actualizado para incluir solicitudes y calificaciones. |
+| Redactar HU-S01–HU-S07 de creación de solicitud | Historias y escenarios de creación documentados. |
+| Redactar HU-S08–HU-S12 de gestión de solicitud | Historias de consulta, aceptación, rechazo, cancelación y finalización documentadas. |
+| Redactar HU-S13–HU-S17 de chat, calificación, vencimiento y turnos | Historias restantes documentadas. |
+| Crear solicitudes pendientes geocodificando dirección | Creación y geocodificación integradas con Nominatim y persistencia de coordenadas. |
+| Buscar profesionales por categoría, disponibilidad y cercanía | Búsqueda y orden por criterios del flujo implementados. |
+| Ocultar dirección exacta antes de aceptar | Se muestra zona aproximada hasta la aceptación y se protege la dirección exacta. |
+| Listar solicitudes según rol y filtrar por estado | Consultas por participante/rol y filtros disponibles. |
+| Aceptar con validación de transición y superposición | Reglas de transición y detección de turnos superpuestos implementadas. |
+| Rechazar/cancelar con motivo y registrar quién canceló | Reglas y registro del motivo/actor incorporados al ciclo de vida. |
+| Completar solicitud por cualquiera de las partes | Transición a COMPLETADA disponible para cliente y profesional. |
+| Mensajería y calificación única con actualización de reputación | Chat por solicitud, calificación limitada y reputación implementados. |
+| Vencer solicitudes pendientes con tarea programada | Expiración configurable implementada mediante ms-solicitudes y scheduler del BFF. |
+
+#### Sprint 4 · 09/11 – 23/11 · en curso
+
+| Subtarea planificada | Resultado de ejecución |
+| ----- | ----- |
+| Frontend de nueva solicitud: ubicación, categoría, datos, turno y envío | Flujo `/solicitar` implementado; sujeto a validación final de aceptación. |
+| Pantallas de solicitudes propias/recibidas y filtros | Listados y filtros por estado/categoría disponibles. |
+| Acciones aceptar, rechazar, cancelar y completar | Acciones integradas con la API y sus reglas de negocio. |
+| Pantallas de chat y calificación | Chat y evaluación del servicio implementados. |
+| Bandeja de notificaciones y resumen administrativo | Bandeja de notificaciones y panel de indicadores implementados. |
+| Diseñar pruebas de HU-S01–HU-S17 | Escenarios derivados de las historias; falta consolidar matriz y resultados por caso. |
+| Probar circuito completo pedir–aceptar–chatear–completar–calificar | Prueba de aceptación integral pendiente de evidencia/cierre del sprint. |
+| Probar rechazo, cancelación, vencimiento y superposición | Casos límite implementados; ejecución final conjunta pendiente de documentar. |
+| Repetir pruebas de usuarios para detectar regresiones | Regresión final del MVP pendiente de documentar. |
+| Exponer endpoints de solicitudes, chat y calificaciones en el BFF | Endpoints integrados y expuestos a través del BFF. |
+| Integrar correo SMTP y notificaciones WebPush | Integración implementada; correo best-effort y WebPush con persistencia de suscripciones. |
+| Prueba E2E con autenticación real y preparación de demo | Preparación/cierre final pendiente; ejecutar y registrar antes de declarar completado el sprint. |
+
+### Errores surgidos durante la ejecución de la planificación {#errores-ejecucion}
+
+Los siguientes incidentes están registrados en el historial técnico del proyecto; se incluyen la causa identificada y la resolución aplicada. No representan errores que sigan pendientes:
+
+| Fecha | Incidente y causa | Resolución |
+| ----- | ----- | ----- |
+| 12/11/2026 | El scheduler de expiración recibió `401` al invocar servicios de dominio desde un hilo sin contexto HTTP; no había token de usuario que reenviar. | El BFF obtuvo un token de cuenta de servicio (`client_credentials`) y lo adjuntó a las llamadas internas; se verificaron logs sin nuevos `401`. |
+| 12/11/2026 | `ms-solicitudes` no iniciaba correctamente: ambigüedad de constructores de Spring y expiración configurada solo en horas enteras. | Se consolidó la inyección en un constructor, se soportaron horas decimales y se verificó el estado saludable de los contenedores. |
+| 12/11/2026 | Fallos de compilación al incorporar expiración: campo de motivo omitido, import incorrecto, miembros duplicados y configuración incompleta. | Se restauró el campo, corrigieron imports/duplicados y se completó el manejo HTTP de solicitud expirada; `mvnw clean compile` pasó. |
+| 10–12/11/2026 | Usuarios de demo recibían `401` al cambiar contraseña en la consola de cuenta de Keycloak por faltar el rol compuesto de cuenta en el token. | Se asignó `default-roles-vincula-up` en el realm y en los scripts de reconciliación; la prueba en vivo quedó pendiente de repetirse con el stack levantado. |
+| 11/2026 | Keycloak podía quedar `unhealthy` antes de completar el arranque en frío; el healthcheck TCP podía bloquearse esperando EOF. | Se amplió el período de gracia y los reintentos, y se cambió la comprobación para abrir/cerrar TCP sin lectura bloqueante. |
 
 ### Definition of Done {#definition-of-done}
 
@@ -501,12 +598,12 @@ Enlace al diagrama:
 | Componente | Tecnología |
 | ----- | ----- |
 | Frontend | PWA con Angular y Angular Material |
-| Backend | Java y Spring Boot, dividido en microservicios (bff-web, ms-usuarios, ms-profesionales, ms-solicitudes) |
+| Backend | Java y Spring Boot: BFF de borde (`bff-web`) y tres microservicios de dominio (`ms-usuarios`, `ms-profesionales`, `ms-solicitudes`) |
 | Seguridad | Keycloak (autenticación y roles); los servicios validan el JWT con JWKS |
 | Base de datos | PostgreSQL |
 | Infraestructura | Docker, Nginx como reverse proxy y HTTPS con OpenSSL |
-| Almacenamiento de archivos | Volumen para las fotos privadas |
-| Correo | Servidor SMTP |
+| Almacenamiento de archivos | Volumen Docker local `fotos_data`, accedido solo por el BFF |
+| Correo | Proveedor SMTP externo consumido directamente por Keycloak y el BFF |
 | Notificaciones | Correo y WebPush |
 | Chat en vivo | WebSocket |
 | API externa | OpenStreetMap (Nominatim) |
@@ -515,7 +612,7 @@ Enlace al diagrama:
 
 | Servicio | Responsabilidad |
 | ----- | ----- |
-| bff-web | Único punto de entrada del frontend; coordina las llamadas a los microservicios, envía correos y gestiona las fotos |
+| bff-web | Componente de borde para el frontend (no microservicio de dominio): coordina llamadas, aplica autorización, envía avisos por SMTP y gestiona subida/lectura autorizada de fotos |
 | ms-usuarios | Cuentas y perfiles de clientes y administradores, estado de la cuenta y términos aceptados |
 | ms-profesionales | Padrón de profesionales, categorías, disponibilidad horaria y activación del perfil |
 | ms-solicitudes | Ciclo de vida de las solicitudes, geocodificación con  Nominatim, calificaciones y vencimiento automático |
@@ -529,8 +626,9 @@ Puntos a revisar de la arquitectura:
 > **Nota de actualización (15/11/2026):** Las tres preguntas originales fueron resueltas formalmente y documentadas en la [ESPECIFICACION.md](ESPECIFICACION.md), secciones 6.3.1, 6.3.2 y 6.3.3. Se resumen a continuación:
 
 * **Conector a la API externa (Nominatim):** Especificado completamente. `ms-solicitudes` consume Nominatim mediante `GeocodingClient` con caché LRU de 500 entradas y TTL de 10 minutos. El BFF expone `GET /api/gps` como proxy público. Degradación en 2 capas si Nominatim falla.
-* **Conector a SMTP:** Especificado como contrato de infraestructura. El BFF (`NotificacionService`) y Keycloak se conectan al servidor SMTP por variables de entorno (`KEYCLOAK_SMTP_*`). Puerto 587 con STARTTLS obligatorio. Tolerancia best-effort: si SMTP falla, la operación de negocio se confirma igual.
-* **Volumen de fotos y SMTP vs. arquitectura de microservicios:** No la violan. Las fotos se almacenan en un volumen Docker nombrado (`fotos_data`) gestionado exclusivamente por el BFF mediante la interfaz abstracta `FotoStorage`; los microservicios solo guardan una clave textual. SMTP es un protocolo estándar de comunicación con un servicio externo, orquestado desde el BFF.
+* **Conector a SMTP:** Es un proveedor externo, no un microservicio propio. El BFF (`NotificacionService`) y Keycloak se conectan directamente al SMTP con variables `KEYCLOAK_SMTP_*`; los servicios de dominio no lo consumen. En el BFF el envío es best-effort: si falla, la operación ya confirmada se conserva, el fallo se registra y no hay cola durable ni reintentos automáticos.
+* **Fotos y arquitectura de microservicios:** El volumen `fotos_data` no es un servicio ni una API independiente. El BFF valida, almacena y entrega las fotos con control de sesión/rol mediante `FotoStorage`; `ms-usuarios` y `ms-profesionales` solo guardan la clave del archivo. Es una solución válida para una instancia del MVP, pero no comparte automáticamente datos entre varias instancias/hosts. Para escalar se requiere almacenamiento de objetos compartido (S3/MinIO) y respaldos.
+* **Límite del BFF:** Que el BFF consuma SMTP y el almacenamiento no viola por sí mismo la arquitectura. Sí concentra responsabilidades de borde y aplicación; si correo requiere entrega garantizada/alto volumen o fotos tienen ciclo de vida independiente, conviene extraer esos procesos con contratos y eventos, no agregar servicios intermediarios sin una necesidad operativa.
 
 
 ### Roles {#roles}
