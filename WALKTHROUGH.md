@@ -1292,3 +1292,31 @@
   - Se actualizó el [MANUAL.md](./MANUAL.md).
 - **Archivos modificados:** `shared/footer/footer.ts`, `shared/footer/footer.html`, `MANUAL.md` y `WALKTHROUGH.md`.
 - **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó sin errores ni advertencias; `git diff --check` también pasó.
+
+### [2026-11-16] - fix: igualar altura de acciones de navbar
+- **Objetivo:** Dar el mismo tamaño vertical al control de tema, botones de acceso y menú de usuario.
+- **Cambios realizados:**
+  - El control de tema, «Ingresar», «Crear cuenta», notificaciones y el desplegable del usuario comparten una altura de `2.75rem`.
+  - Se actualizó el [MANUAL.md](./MANUAL.md).
+- **Archivos modificados:** `shared/navbar/navbar.css`, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente; `git diff --check` también pasó.
+
+### [2026-11-16] - feat: actualizar contenido de la landing
+- **Objetivo:** Presentar de forma más clara el flujo actual de Vincula-UP y mejorar el acceso inicial desde móviles.
+- **Cambios realizados:**
+  - Se renovaron los mensajes principales para explicar la búsqueda por oficio y disponibilidad, los perfiles incorporados por la Universidad y la gestión de solicitudes, chat y calificaciones.
+  - Se agregó un resumen de beneficios en el hero y se precisaron los pasos de solicitud y activación del perfil.
+  - Los dos CTA principales tienen el mismo ancho y quedan en una fila con espacio entre ellos, también en móvil.
+  - Se actualizaron las notas de uso del [MANUAL.md](./MANUAL.md).
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/home/home.html`, `home.css`, `home.ts`, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente; `git diff --check` también pasó.
+
+### [2026-11-16] - feat: añadir hover a botones y tarjetas de landing
+- **Objetivo:** Hacer más perceptibles las interacciones de botones y tarjetas en la landing.
+- **Cambios realizados:**
+  - Los CTA principales y las tarjetas finales ahora transicionan suavemente sus colores al pasar el puntero o recibir foco.
+  - La tarjeta coral mantiene el contraste de texto y usa el tono de hover de la paleta.
+  - Se desactivan las transiciones si el sistema solicita reducir movimiento.
+  - Se documentó el comportamiento en el [MANUAL.md](./MANUAL.md).
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/home/home.css`, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente; `git diff --check` también pasó.

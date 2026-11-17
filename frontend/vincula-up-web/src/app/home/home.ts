@@ -12,19 +12,19 @@ import { RouterLink } from '@angular/router';
 	templateUrl: './home.html',
 })
 export class Home {
-	/** Copys del prototipo: el recorrido del vecino dentro de la app. */
+	/** Recorrido del vecino al solicitar y completar un servicio. */
 	readonly neighborSteps: ReadonlyArray<string> = [
-		'Buscá por oficio y zona.',
-		'Elegí un horario disponible.',
-		'Esperá la confirmación del profesional.',
-		'Coordiná por el chat interno.',
-		'Calificá el servicio al finalizar.',
+		'Buscá por oficio, día y horario.',
+		'Conocé qué profesionales están disponibles para ese momento.',
+		'Enviá tu solicitud y seguí su estado.',
+		'Cuando la acepten, coordiná por el chat de la solicitud.',
+		'Al finalizar el trabajo, calificá el servicio.',
 	];
 
-	/** Las garantías que explican por qué se puede abrir la casa a un técnico. */
+	/** Garantías que explican cómo funciona la confianza en la plataforma. */
 	readonly guardrails: ReadonlyArray<string> = [
-		'Nadie se autopublica: cada profesional proviene del padrón de egresados.',
+		'Los perfiles profesionales son incorporados por la Universidad; no son publicaciones abiertas.',
 		'Tu dirección exacta solo se comparte cuando el profesional confirma el turno.',
-		'Todo el ida y vuelta queda registrado dentro de la app.',
+		'La coordinación se realiza en el chat asociado a cada solicitud.',
 	];
 }

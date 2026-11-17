@@ -117,6 +117,14 @@ Profesionales, Categorías y Clientes incluso al entrar a «Mi cuenta».
 El pie informativo del sitio también se muestra en todas las secciones de
 administración, igual que en el resto de la aplicación.
 El enlace «Ingresar» del pie solo aparece cuando no hay una sesión iniciada.
+En la navbar, el control de tema, los botones «Ingresar» y «Crear cuenta», las
+notificaciones y el menú de usuario comparten la misma altura.
+
+La landing explica el recorrido completo: búsqueda por oficio y disponibilidad,
+solicitud y seguimiento del turno, coordinación por chat y calificación. En
+móvil, sus dos accesos principales comparten la fila con el mismo ancho.
+Los accesos principales y las tarjetas finales tienen transiciones de hover
+por color, respetando la preferencia del sistema para reducir movimiento.
 Las etiquetas de filtros y ordenamiento quedan alineadas a la izquierda, con el
 control correspondiente.
 
