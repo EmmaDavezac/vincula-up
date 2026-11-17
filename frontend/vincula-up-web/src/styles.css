@@ -928,6 +928,33 @@ button.mat-mdc-button.vu-btn--quiet {
 	transform: translateY(-50%);
 }
 
+.vu-admin-search .vu-input--search {
+	padding-right: 2.75rem;
+}
+
+.vu-admin-search .vu-input--search::-webkit-search-cancel-button {
+	appearance: none;
+}
+
+.vu-field-with-icon > .vu-admin-search__clear {
+	align-items: center;
+	background: transparent;
+	border: 0;
+	color: var(--muted);
+	cursor: pointer;
+	display: flex;
+	justify-content: center;
+	padding: 0.25rem;
+	position: absolute;
+	right: 0.625rem;
+	top: 50%;
+	transform: translateY(-50%);
+}
+
+.vu-field-with-icon > .vu-admin-search__clear:hover {
+	color: var(--ink);
+}
+
 .vu-select {
 	appearance: none;
 	background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
@@ -1481,6 +1508,11 @@ button.mat-mdc-button.vu-btn--quiet {
 	font-weight: 700;
 }
 
+.vu-admin-metric__value--rating {
+	font-size: clamp(1.125rem, 5vw, 1.5rem);
+	white-space: nowrap;
+}
+
 .vu-admin-metric__note {
 	color: var(--muted);
 	font-size: 0.75rem;
@@ -1663,15 +1695,6 @@ button.mat-mdc-button.vu-btn--quiet {
 	font-weight: 700;
 }
 
-.vu-admin-list-skeleton {
-	background: var(--surface-card);
-	border: 1px solid var(--line);
-	border-radius: 0.75rem;
-	margin-top: 1rem;
-	overflow: hidden;
-	padding: 0 1.25rem;
-}
-
 html:has([aria-modal='true']) {
 	overflow: auto;
 }
@@ -1691,18 +1714,18 @@ html:has([aria-modal='true']) {
 	background: var(--surface-card);
 	border: 1px solid var(--line);
 	border-radius: 1rem;
-	box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+	box-shadow: var(--shadow-lg);
 	box-sizing: border-box;
 	color: var(--ink);
 	display: flex;
 	flex-direction: column;
 	height: auto;
 	max-height: calc(100vh - 1.5rem);
-	max-width: calc(100vw - 1rem);
+	max-width: 40rem;
 	min-width: 0;
 	overflow: hidden;
 	padding: 1rem;
-	width: min(100%, 40rem);
+	width: 100%;
 }
 
 @media (max-width: 767px) {
@@ -1713,9 +1736,9 @@ html:has([aria-modal='true']) {
 	.vu-confirm-dialog .mat-mdc-dialog-surface,
 	.vu-details-dialog .mat-mdc-dialog-surface {
 		max-height: calc(100dvh - 1rem);
-		max-width: calc(100vw - 0.75rem);
+		max-width: calc(100vw - 2rem);
 		padding: 0.875rem;
-		width: min(100%, 100vw);
+		width: 100%;
 	}
 }
 
@@ -1736,13 +1759,35 @@ html:has([aria-modal='true']) {
 	padding-top: 0.5rem;
 }
 
+.mat-mdc-dialog-actions,
+.vu-dialog-actions {
+	align-items: stretch;
+	display: flex;
+	direction: ltr;
+	gap: 0.5rem;
+	justify-content: flex-end;
+	flex-wrap: nowrap;
+}
+
 .mat-mdc-dialog-actions {
 	border-top: 1px solid var(--line);
-	display: flex;
-	gap: 0.75rem;
-	justify-content: flex-end;
 	margin-top: 1rem;
 	padding-top: 0.9rem;
+}
+
+.vu-dialog-actions {
+	border-top: 1px solid var(--line);
+	margin-top: 1rem;
+	padding-top: 0.9rem;
+}
+
+.mat-mdc-dialog-actions > .vu-btn,
+.vu-dialog-actions > .vu-btn {
+	flex: 1 1 0;
+	justify-content: center;
+	margin: 0;
+	min-width: 0;
+	text-align: center;
 }
 
 .vu-admin-empty {

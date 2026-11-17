@@ -88,6 +88,19 @@ El hover **solo cambia color** (`background-color`, `border-color`, `color`). Nu
 | Chips, badges, estados | `999px` (píldora) | Excepción documentada: son etiquetas, no botones |
 | Avatar | `999px` | Círculo |
 
+### Diálogos
+
+- Todos los diálogos de Angular Material usan la configuración compartida
+  `VU_DIALOG_SIZE`: ancho máximo de `40rem` y margen adaptable en móvil.
+- La superficie usa siempre `--surface-card`, borde `--line`, texto `--ink` y
+  radio de `1rem`, con la misma sombra en tema claro y oscuro.
+- En pies de acciones, el botón secundario va primero y el botón principal o de
+  confirmación queda siempre a la derecha. Si hay dos acciones, ocupan el mismo
+  ancho con un espacio entre ellas, también en móvil.
+- El primario usa `.vu-btn--ink` (o `.vu-btn--danger` para confirmar una acción
+  destructiva); el secundario usa `.vu-btn--outline`. Los diálogos informativos
+  que requieren una única acción pueden mostrar solo el botón primario.
+
 ---
 
 ## 4. Barra inferior de móvil

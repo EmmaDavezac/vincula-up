@@ -16,6 +16,7 @@ import { MatListModule } from '@angular/material/list';
 import { VuConfirm } from '../../shared/confirm/confirm';
 import { VuIcon } from '../../shared/icon/icon';
 import { VuSkeletonList } from '../../shared/skeleton-list/skeleton-list';
+import { AdminUnsavedChanges } from '../admin-unsaved-changes.guard';
 
 /**
  * Catálogo de categorías (especialidades): alta, renombre y baja. La baja falla con
@@ -27,7 +28,7 @@ import { VuSkeletonList } from '../../shared/skeleton-list/skeleton-list';
 	templateUrl: './admin-categories.html',
 	styleUrl: './admin-categories.css',
 })
-export class AdminCategories {
+export class AdminCategories implements AdminUnsavedChanges {
 	private readonly api = inject(ApiService);
 	private readonly router = inject(Router);
 
@@ -35,15 +36,15 @@ export class AdminCategories {
 	readonly loading = signal(true);
 	readonly busy = signal(false);
 	readonly busqueda = signal('');
+	readonly ordenNombre = signal<'asc' | 'desc'>('asc');
 	readonly consulta = computed(() => this.busqueda().trim());
 	readonly categoriasFiltradas = computed(() => {
 		const query = this.consulta();
-		return this.categories().filter((category) => coincideBusqueda(query, category.nombre));
+		const direccion = this.ordenNombre() === 'asc' ? 1 : -1;
+		return this.categories()
+			.filter((category) => coincideBusqueda(query, category.nombre))
+			.sort((a, b) => direccion * a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
 	});
-
-	hayBusqueda(): boolean {
-		return this.consulta().length > 0;
-	}
 
 	limpiarBusqueda(): void {
 		this.busqueda.set('');
@@ -69,7 +70,9 @@ export class AdminCategories {
 	}
 
 	cancelarAccion(): void {
+		const pendiente = this.confirmacion();
 		this.confirmacion.set(null);
+		pendiente?.cancelar?.();
 	}
 
 	constructor() {
@@ -115,7 +118,63 @@ export class AdminCategories {
 	}
 
 	cancelRename(): void {
+		const category = this.categories().find((item) => item.id === this.renamingId());
+		if (category) {
+			this.confirmacion.set({
+				titulo: this.hayCambiosEnRenombre(category) ? 'Descartar el renombre' : 'Salir de la edición',
+				mensaje: this.hayCambiosEnRenombre(category)
+					? `¿Descartar los cambios de "${category.nombre}"?`
+					: `¿Cerrar la edición de "${category.nombre}"?`,
+				detalle: this.hayCambiosEnRenombre(category)
+					? 'El nombre original se conservará en el catálogo.'
+					: 'La categoría no tiene cambios pendientes.',
+				confirmar: this.hayCambiosEnRenombre(category) ? 'Descartar cambios' : 'Cerrar edición',
+				textoCancelar: 'Seguir editando',
+				peligro: this.hayCambiosEnRenombre(category),
+				cancelarPrimario: true,
+				icono: 'pencil',
+				ejecutar: () => this.renamingId.set(null),
+			});
+			return;
+		}
 		this.renamingId.set(null);
+	}
+
+	confirmarSalidaPendiente(): boolean | Promise<boolean> {
+		if (this.busy()) {
+			this.aviso.set(avisoError('Esperá a que termine la operación antes de cambiar de sección.'));
+			return false;
+		}
+		const id = this.renamingId();
+		const category = this.categories().find((item) => item.id === id);
+		if (!category) return true;
+		if (this.confirmacion()) {
+			this.aviso.set(avisoError('Terminá o cancelá la acción pendiente antes de cambiar de sección.'));
+			return false;
+		}
+		const hayCambios = this.hayCambiosEnRenombre(category);
+		return new Promise((resolve) => {
+			this.confirmacion.set({
+				titulo: hayCambios ? '¿Salir sin guardar?' : '¿Salir de la edición?',
+				mensaje: hayCambios
+					? `El renombre de "${category.nombre}" tiene cambios sin guardar.`
+					: `Estás editando "${category.nombre}".`,
+				detalle: hayCambios
+					? 'Si salís ahora, vas a perder el nuevo nombre ingresado.'
+					: 'Podés volver a modificarla más adelante.',
+				confirmar: hayCambios ? 'Salir sin guardar' : 'Salir de la edición',
+				textoCancelar: 'Seguir editando',
+				peligro: hayCambios,
+				cancelarPrimario: true,
+				icono: 'pencil',
+				ejecutar: () => resolve(true),
+				cancelar: () => resolve(false),
+			});
+		});
+	}
+
+	private hayCambiosEnRenombre(category: AdminSpecialty): boolean {
+		return this.renameValue.trim() !== category.nombre;
 	}
 
 	/** Renombrar: primero valida, después pide confirmación con el nombre nuevo. */

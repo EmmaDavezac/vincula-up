@@ -6,6 +6,124 @@
 	margin-top: 1.5rem;
 }
 
+.admin-dashboard__skeleton-metric {
+	min-width: 0;
+}
+
+.admin-dashboard__skeleton-icon,
+.admin-dashboard__skeleton-label,
+.admin-dashboard__skeleton-value,
+.admin-dashboard__skeleton-note,
+.admin-dashboard__skeleton-title,
+.admin-dashboard__skeleton-description,
+.admin-dashboard__skeleton-bar-label,
+.admin-dashboard__skeleton-bar-meta,
+.admin-dashboard__skeleton-bar,
+.admin-dashboard__skeleton-funnel-label,
+.admin-dashboard__skeleton-funnel-value {
+	border-radius: 0.25rem;
+	display: block;
+}
+
+.admin-dashboard__skeleton-icon {
+	height: 1.25rem;
+	margin-bottom: 1.25rem;
+	width: 1.25rem;
+}
+
+.admin-dashboard__skeleton-label {
+	height: 0.625rem;
+	max-width: 8rem;
+	width: 75%;
+}
+
+.admin-dashboard__skeleton-metric .vu-admin-metric__row {
+	align-items: center;
+}
+
+.admin-dashboard__skeleton-value {
+	height: 1.75rem;
+	width: 4.5rem;
+}
+
+.admin-dashboard__skeleton-note {
+	height: 0.625rem;
+	width: 3.75rem;
+}
+
+.admin-dashboard__skeleton-panel {
+	min-width: 0;
+}
+
+.admin-dashboard__skeleton-title {
+	height: 1.25rem;
+	max-width: 16rem;
+	width: 72%;
+}
+
+.admin-dashboard__skeleton-description {
+	height: 0.75rem;
+	margin-top: 0.75rem;
+	max-width: 25rem;
+	width: 92%;
+}
+
+.admin-dashboard__skeleton-bars,
+.admin-dashboard__skeleton-funnel {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+	margin-top: 1.5rem;
+}
+
+.admin-dashboard__skeleton-bar-row {
+	display: grid;
+	gap: 0.5rem;
+	grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.admin-dashboard__skeleton-bar-label {
+	height: 0.75rem;
+	max-width: 10rem;
+	width: 68%;
+}
+
+.admin-dashboard__skeleton-bar-meta {
+	height: 0.75rem;
+	width: 6rem;
+}
+
+.admin-dashboard__skeleton-bar {
+	grid-column: 1 / -1;
+	height: 0.5rem;
+	width: 100%;
+}
+
+.admin-dashboard__skeleton-funnel-row {
+	align-items: center;
+	border-bottom: 1px solid var(--line);
+	display: flex;
+	gap: 0.75rem;
+	justify-content: space-between;
+	padding-bottom: 0.75rem;
+}
+
+.admin-dashboard__skeleton-funnel-row:last-child {
+	border-bottom: 0;
+	padding-bottom: 0;
+}
+
+.admin-dashboard__skeleton-funnel-label {
+	height: 0.75rem;
+	max-width: 14rem;
+	width: 70%;
+}
+
+.admin-dashboard__skeleton-funnel-value {
+	height: 1.25rem;
+	width: 2rem;
+}
+
 .admin-dashboard__panel-head {
 	display: flex;
 	flex-direction: column;

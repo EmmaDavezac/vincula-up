@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 import { AdminSpecialty, avisoError, avisoExito } from '../../core/models/admin';
 import { ApiService } from '../../core/services/api.service';
+import { VuConfirm } from '../../shared/confirm/confirm';
 
 /**
  * Alta de una categoría (especialidad), en su propia pantalla.
@@ -15,7 +16,7 @@ import { ApiService } from '../../core/services/api.service';
  */
 @Component({
 	selector: 'app-admin-category-new',
-	imports: [FormsModule, RouterLink],
+	imports: [FormsModule, RouterLink, VuConfirm],
 	templateUrl: './admin-category-new.html',
 	styleUrl: './admin-category-new.css',
 })
@@ -27,6 +28,9 @@ export class AdminCategoryNew {
 	readonly loading = signal(true);
 	readonly busy = signal(false);
 	readonly error = signal('');
+	readonly confirmandoSalida = signal(false);
+	private resolverSalida?: (salir: boolean) => void;
+	private guardado = false;
 
 	nombre = '';
 
@@ -76,9 +80,29 @@ export class AdminCategoryNew {
 		).subscribe((resultado) => {
 			this.busy.set(false);
 			if (!resultado) return;
+			this.guardado = true;
 			this.router.navigate(['/admin/categorias'], {
 				state: { mensaje: avisoExito(`"${nombre}" se agregó al catálogo.`).texto, exito: true },
 			});
 		});
+	}
+
+	confirmarSalidaPendiente(): boolean | Promise<boolean> {
+		if (this.guardado || !this.nombre.trim()) return true;
+		if (this.busy()) {
+			this.error.set('Esperá a que termine el guardado antes de cambiar de sección.');
+			return false;
+		}
+		return new Promise((resolve) => {
+			this.resolverSalida = resolve;
+			this.confirmandoSalida.set(true);
+		});
+	}
+
+	resolverConfirmacionSalida(salir: boolean): void {
+		const resolver = this.resolverSalida;
+		this.resolverSalida = undefined;
+		this.confirmandoSalida.set(false);
+		resolver?.(salir);
 	}
 }

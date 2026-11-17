@@ -1,40 +1,159 @@
 <div class="vu-page home">
 	<section class="hero vu-container">
-		<div>
+		<div class="hero__content" data-reveal="from-left">
 			<p class="vu-eyebrow">Universidad Popular de Concepción del Uruguay</p>
-			<h1 class="hero__title">Antes de que entre a tu casa, ya lo conocemos nosotros.</h1>
+			<h1 class="hero__title">Encontrá un técnico egresado con respaldo de la Universidad Popular.</h1>
 			<p class="vu-lead">
-				Vincula-UP conecta a los egresados técnicos de la Universidad Popular con vecinos que necesitan un
-				electricista, gasista o plomero — sin depender del boca a boca.
+				Buscá por oficio y disponibilidad, solicitá un turno y coordiná desde la app. Vincula-UP conecta a la
+				comunidad con profesionales formados en la Universidad Popular.
 			</p>
-			<div class="hero__actions">
+			<div class="hero__actions" aria-label="Accesos principales">
 				<a class="vu-btn vu-btn--ink" routerLink="/solicitudes">Buscar un técnico</a>
 				<a class="vu-btn vu-btn--outline" routerLink="/activar-perfil">Soy egresado técnico</a>
+			</div>
+		</div>
+		<div
+			class="hero-carousel"
+			data-reveal="from-right"
+			role="region"
+			aria-label="Así funciona Vincula-UP"
+			aria-roledescription="carrusel"
+			(mouseenter)="setShowcaseInteraction(true)"
+			(mouseleave)="setShowcaseInteraction(false)"
+			(focusin)="setShowcaseInteraction(true)"
+			(focusout)="showcaseFocusLeft($event)"
+		>
+				<div
+					class="hero-carousel__scene"
+					[class.hero-carousel__scene--search]="activeShowcaseIndex() === 0"
+					[class.hero-carousel__scene--profile]="activeShowcaseIndex() === 1"
+					[class.hero-carousel__scene--chat]="activeShowcaseIndex() === 2"
+					aria-live="off"
+				>
+				<div class="hero-carousel__orbit hero-carousel__orbit--outer"></div>
+				<div class="hero-carousel__orbit hero-carousel__orbit--inner"></div>
+				<div class="hero-carousel__floating-icon hero-carousel__floating-icon--top">
+					<vu-icon name="wrench" [size]="30" />
+				</div>
+				<div class="hero-carousel__floating-icon hero-carousel__floating-icon--bottom">
+					<vu-icon name="map-pin" [size]="19" />
+				</div>
+				@for (slide of showcaseSlides; track slide.title; let index = $index) {
+					@if (activeShowcaseIndex() === index) {
+						<article
+							[class]="'hero-carousel__card hero-carousel__card--' + slide.visual"
+							[attr.aria-label]="'Diapositiva ' + (index + 1) + ' de ' + showcaseSlides.length"
+							aria-roledescription="diapositiva"
+						>
+							<div
+								class="showcase-visual"
+								[class]="'showcase-visual showcase-visual--' + slide.visual"
+								aria-hidden="true"
+							>
+								@if (slide.visual === 'search') {
+									<div class="showcase-visual__searchbar">
+										<vu-icon name="search" [size]="17" />
+										<span class="showcase-visual__line showcase-visual__line--long"></span>
+									</div>
+									<div class="showcase-visual__categories">
+										<span><vu-icon name="wrench" [size]="16" /></span>
+										<span><vu-icon name="map-pin" [size]="16" /></span>
+										<span><vu-icon name="clock" [size]="16" /></span>
+									</div>
+									<div class="showcase-visual__result">
+										<span class="showcase-visual__result-icon"><vu-icon name="wrench" [size]="19" /></span>
+										<span class="showcase-visual__result-lines">
+											<span class="showcase-visual__line showcase-visual__line--medium"></span>
+											<span class="showcase-visual__line showcase-visual__line--short"></span>
+										</span>
+										<vu-icon name="arrow-right" [size]="16" />
+									</div>
+								} @else if (slide.visual === 'profile') {
+									<div class="showcase-visual__profile">
+										<span class="showcase-visual__avatar"><vu-icon name="user-round" [size]="28" /></span>
+										<span class="showcase-visual__profile-lines">
+											<span class="showcase-visual__line showcase-visual__line--medium"></span>
+											<span class="showcase-visual__line showcase-visual__line--short"></span>
+										</span>
+										<span class="showcase-visual__verified"><vu-icon name="check" [size]="15" /></span>
+									</div>
+									<div class="showcase-visual__profile-badges">
+										<span><vu-icon name="star" [size]="14" [filled]="true" /></span>
+										<span><vu-icon name="map-pin" [size]="14" /></span>
+										<span><vu-icon name="clock" [size]="14" /></span>
+									</div>
+								} @else {
+									<div class="showcase-visual__chat-heading">
+										<span class="showcase-visual__chat-avatar"><vu-icon name="user-round" [size]="17" /></span>
+										<span class="showcase-visual__line showcase-visual__line--medium"></span>
+									</div>
+									<div class="showcase-visual__bubble showcase-visual__bubble--incoming">Jueves, 16 h</div>
+									<div class="showcase-visual__bubble showcase-visual__bubble--outgoing">¡Dale!</div>
+									<div class="showcase-visual__chat-compose">
+										<span class="showcase-visual__send"><vu-icon name="send" [size]="14" /></span>
+									</div>
+								}
+							</div>
+							<h2 class="hero-carousel__title">{{ slide.title }}</h2>
+						</article>
+					}
+				}
+				<button
+					class="hero-carousel__arrow hero-carousel__arrow--previous"
+					type="button"
+					aria-label="Diapositiva anterior"
+					(click)="showPreviousShowcase()"
+				>
+					<vu-icon name="chevron-left" [size]="19" />
+				</button>
+				<button
+					class="hero-carousel__arrow hero-carousel__arrow--next"
+					type="button"
+					aria-label="Siguiente diapositiva"
+					(click)="showNextShowcase()"
+				>
+					<vu-icon name="chevron-right" [size]="19" />
+				</button>
+			</div>
+			<div class="hero-carousel__controls">
+				<div class="hero-carousel__indicators" aria-label="Elegir diapositiva">
+					@for (slide of showcaseSlides; track slide.title; let index = $index) {
+						<button
+							class="hero-carousel__indicator"
+							[class.is-active]="activeShowcaseIndex() === index"
+							type="button"
+							[attr.aria-label]="'Mostrar diapositiva ' + (index + 1)"
+							[attr.aria-current]="activeShowcaseIndex() === index ? 'true' : null"
+							(click)="activeShowcaseIndex.set(index)"
+						></button>
+					}
+				</div>
 			</div>
 		</div>
 	</section>
 
 	<section class="problem" aria-label="El problema">
-		<div class="vu-container">
-			<p class="vu-eyebrow">El problema</p>
-			<h2 class="problem__title">Contratar un técnico hoy es un acto de fe</h2>
+		<div class="vu-container" data-reveal>
+			<p class="vu-eyebrow">Una alternativa al boca a boca</p>
+			<h2 class="problem__title">Encontrar un técnico confiable no debería ser cuestión de suerte</h2>
 			<p class="problem__lead">
-				Preguntás en el grupo de WhatsApp del barrio. Alguien te pasa un número sin apellido. Mientras tanto, dejás
-				entrar a tu casa a alguien de quien no sabés nada.
+				Conocé quiénes son, qué oficios ofrecen y cuándo tienen disponibilidad. La Universidad respalda la
+				formación de los profesionales que forman parte de la plataforma.
 			</p>
 		</div>
 	</section>
 
 	<section class="steps vu-container" id="como-funciona">
-		<div class="steps__intro">
+		<div class="steps__intro" data-reveal>
 			<p class="vu-eyebrow">Para vecinos</p>
 			<h2 class="steps__title">De la búsqueda al servicio, sin salir de la app</h2>
 		</div>
 		<ol class="steps__list">
-			@for (step of neighborSteps; track step; let index = $index) {
-				<li class="steps__item">
+			@for (step of neighborSteps; track step.icon; let index = $index) {
+				<li class="steps__item" data-reveal>
 					<span class="steps__number">0{{ index + 1 }}</span>
-					<span class="steps__text">{{ step }}</span>
+					<span class="steps__icon"><vu-icon [name]="step.icon" [size]="19" /></span>
+					<span class="steps__text">{{ step.text }}</span>
 				</li>
 			}
 		</ol>
@@ -42,32 +161,37 @@
 
 	<section class="graduates">
 		<div class="graduates__inner vu-container">
-			<div>
-				<p class="graduates__eyebrow">Para egresados</p>
-				<h2 class="graduates__title">Tu perfil no lo armás de cero: lo respalda la universidad</h2>
+			<div data-reveal>
+				<p class="graduates__eyebrow"><vu-icon name="wrench" [size]="16" /> Para egresados</p>
+				<h2 class="graduates__title">Hacé visible tu oficio y conectá con tu comunidad</h2>
 			</div>
-			<p class="graduates__lead">
-				Sos egresado técnico de la Universidad Popular. La propia universidad te suma a la plataforma — vos solo
-				activás tu cuenta, definís en qué zona trabajás y cuándo atendés, y empezás a aparecer ante gente que busca
-				justo lo que sabés hacer.
+			<p class="graduates__lead" data-reveal>
+				La Universidad te incorpora a la plataforma. Activá tu cuenta, configurá tu zona de trabajo y tus horarios,
+				y gestioná las solicitudes y los turnos desde un solo lugar.
 			</p>
+			<a class="graduates__link" data-reveal routerLink="/activar-perfil">
+				Activar mi perfil <vu-icon name="arrow-right" [size]="17" />
+			</a>
 		</div>
 	</section>
 
 	<section class="trust vu-container">
-		<div>
+		<div data-reveal>
 			<p class="vu-eyebrow">Por qué confiar</p>
 			<h2 class="trust__title">No es un marketplace abierto a cualquiera</h2>
 		</div>
 		<div class="trust__list">
-			@for (point of guardrails; track point) {
-				<p class="trust__item">{{ point }}</p>
+			@for (point of guardrails; track point.icon) {
+				<p class="trust__item" data-reveal>
+					<span class="trust__icon"><vu-icon [name]="point.icon" [size]="19" /></span>
+					<span>{{ point.text }}</span>
+				</p>
 			}
 		</div>
 	</section>
 
 	<section class="closing vu-container">
-		<article class="closing__panel">
+		<article class="closing__panel" data-reveal>
 			<p class="vu-eyebrow">Respaldo institucional</p>
 			<h2 class="closing__title">Un desarrollo junto a la Universidad Popular</h2>
 			<p class="closing__lead">
@@ -76,13 +200,13 @@
 			</p>
 		</article>
 		<div class="closing__cards">
-			<a class="closing__card closing__card--coral" routerLink="/solicitudes">
+			<a class="closing__card closing__card--coral" data-reveal routerLink="/solicitudes">
 				<span class="closing__card-title">¿Necesitás un técnico?</span>
-				<span class="closing__card-link">Buscar ahora</span>
+				<span class="closing__card-link">Buscar ahora <vu-icon name="arrow-right" [size]="17" /></span>
 			</a>
-			<a class="closing__card" routerLink="/activar-perfil">
+			<a class="closing__card" data-reveal routerLink="/activar-perfil">
 				<span class="closing__card-title">¿Sos egresado técnico?</span>
-				<span class="closing__card-link">Quiero sumarme</span>
+				<span class="closing__card-link">Quiero sumarme <vu-icon name="arrow-right" [size]="17" /></span>
 			</a>
 		</div>
 	</section>

@@ -23,7 +23,6 @@
 		<footer mat-dialog-actions class="vu-confirm__actions">
 			<button
 				type="button"
-				mat-button
 				class="vu-btn vu-confirm__cancel"
 				[class.vu-btn--outline]="!cancelarPrimario()"
 				[class.vu-btn--ink]="cancelarPrimario()"
@@ -34,11 +33,10 @@
 			</button>
 			<button
 				type="button"
-				mat-flat-button
 				class="vu-btn vu-confirm__accept"
 				[class.vu-btn--danger]="peligro() && !cancelarPrimario()"
-				[class.vu-btn--outline]="peligro() && cancelarPrimario()"
-				[class.vu-btn--ink]="!peligro()"
+				[class.vu-btn--outline]="cancelarPrimario()"
+				[class.vu-btn--ink]="!peligro() && !cancelarPrimario()"
 				(click)="confirmar()"
 				[disabled]="cargando()"
 			>

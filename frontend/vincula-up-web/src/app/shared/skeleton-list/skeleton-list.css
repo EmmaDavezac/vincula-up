@@ -9,30 +9,261 @@
 	gap: 1rem;
 }
 
-/* ── Tarjetas (mis solicitudes, padrón) ─────────────────────────────────── */
+:host {
+	display: block;
+}
 
-.vu-skeleton-list[data-variant='card'] .vu-skeleton-list__card {
-	background: var(--surface-card);
+/* ── Tarjetas de solicitud ─────────────────────────────────────────────── */
+
+.vu-skeleton-list[data-variant^='request-'] {
+	display: grid;
+	gap: 1rem;
+	grid-template-columns: minmax(0, 1fr);
+}
+
+.vu-skeleton-list__request {
+	background: var(--surface-input);
 	border: 1px solid var(--line);
-	border-radius: 1rem;
+	border-radius: 1.25rem;
 	display: flex;
 	flex-direction: column;
-	gap: 0.75rem;
+	gap: 0;
 	padding: 1.25rem;
 }
 
-/* ── Filas (tablas del panel) ───────────────────────────────────────────── */
-
-.vu-skeleton-list[data-variant='row'] {
-	gap: 0;
+@media (min-width: 1024px) {
+	.vu-skeleton-list[data-variant^='request-'] {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
 }
 
-.vu-skeleton-list__row {
-	align-items: center;
-	border-bottom: 1px solid var(--line);
+.vu-skeleton-list__request-head {
+	align-items: flex-start;
 	display: flex;
-	gap: 0.875rem;
-	padding: 0.875rem 0;
+	gap: 0.75rem;
+	min-width: 0;
+}
+
+.vu-skeleton-list__request-head .vu-skeleton-list__row-text {
+	flex: 1;
+	padding-top: 0.125rem;
+}
+
+.vu-skeleton-list__request-meta {
+	align-items: center;
+	display: flex;
+	gap: 0.375rem;
+	margin-top: 1rem;
+}
+
+.vu-skeleton-list__request-meta .vu-skeleton-list__line {
+	height: 0.75rem;
+	width: min(70%, 18rem);
+}
+
+.vu-skeleton-list__clock {
+	border-radius: 50%;
+	flex: 0 0 0.875rem;
+	height: 0.875rem;
+}
+
+.vu-skeleton-list__request-problem {
+	background: var(--surface-highlight);
+	border-radius: 0.75rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	margin-top: 1rem;
+	padding: 0.75rem 1rem;
+}
+
+.vu-skeleton-list__request-problem .vu-skeleton-list__label {
+	margin-bottom: 0.125rem;
+}
+
+.vu-skeleton-list__request-address {
+	align-items: flex-start;
+	display: flex;
+	gap: 0.5rem;
+	min-height: 2.8em;
+	margin-top: 0.5rem;
+}
+
+.vu-skeleton-list__request-address .vu-skeleton-list__row-text {
+	flex: 1;
+	gap: 0.375rem;
+	padding-top: 0.125rem;
+}
+
+.vu-skeleton-list__pin {
+	border-radius: 50% 50% 50% 0;
+	flex: 0 0 0.75rem;
+	height: 0.75rem;
+	margin-top: 0.125rem;
+	transform: rotate(-45deg);
+	width: 0.75rem;
+}
+
+.vu-skeleton-list__request .vu-skeleton-list__request-map {
+	border: 1px solid var(--line);
+	border-radius: 0.5rem;
+	height: 9rem;
+	margin-top: 1.25rem;
+	width: 100%;
+}
+
+.vu-skeleton-list__request-reason {
+	background: var(--alert-error-bg);
+	border-radius: 0.375rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	margin-top: 1rem;
+	padding: 0.75rem;
+}
+
+.vu-skeleton-list__request-actions {
+	display: grid;
+	gap: 0.5rem;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	margin-top: auto;
+	padding-top: 1.25rem;
+}
+
+.vu-skeleton-list__request-actions[data-action-count='1'] .vu-skeleton-list__button {
+	grid-column: 2;
+}
+
+.vu-skeleton-list__request-actions .vu-skeleton-list__button {
+	height: 2.25rem;
+	width: 100%;
+}
+
+.vu-skeleton-list__request-rating {
+	border-top: 1px solid var(--line);
+	display: flex;
+	flex-direction: column;
+	gap: 0.625rem;
+	margin-top: 1.25rem;
+	padding-top: 1.25rem;
+}
+
+.vu-skeleton-list__rating-stars {
+	align-items: center;
+	display: flex;
+	gap: 0.25rem;
+}
+
+.vu-skeleton-list__rating-star {
+	border-radius: 0.25rem;
+	height: 1.375rem;
+	width: 1.375rem;
+}
+
+.vu-skeleton-list__request-rating-input {
+	border-radius: 0.375rem;
+	height: 4.5rem;
+	width: 100%;
+}
+
+/* ── Filas de los listados de administración ───────────────────────────── */
+
+.vu-skeleton-list[data-variant^='admin-'] {
+	gap: 0.75rem;
+	margin-top: 1rem;
+}
+
+.vu-skeleton-list__admin-row {
+	background: var(--surface-card);
+	border: 1px solid var(--line);
+	border-radius: 0.75rem;
+	display: grid;
+	gap: 0.85rem;
+	grid-template-columns: minmax(0, 1fr);
+	min-width: 0;
+	padding: 1rem;
+}
+
+.vu-skeleton-list__person {
+	align-items: center;
+	display: flex;
+	gap: 0.75rem;
+	min-width: 0;
+}
+
+.vu-skeleton-list__person .vu-skeleton-list__row-text {
+	flex: 1;
+}
+
+.vu-skeleton-list__field {
+	align-items: flex-start;
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+	min-width: 0;
+}
+
+.vu-skeleton-list__label {
+	border-radius: 0.25rem;
+	height: 0.5rem;
+	width: 4.25rem;
+}
+
+.vu-skeleton-list__chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.375rem;
+	margin-top: 0.125rem;
+}
+
+.vu-skeleton-list__chip--short {
+	width: 3rem;
+}
+
+.vu-skeleton-list__actions {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	min-width: 0;
+}
+
+.vu-skeleton-list__button {
+	border-radius: 0.5rem;
+	height: 2.75rem;
+	width: 100%;
+}
+
+@media (min-width: 900px) {
+	.vu-skeleton-list[data-variant^='admin-'] {
+		gap: 0;
+	}
+
+	.vu-skeleton-list__admin-row {
+		align-items: center;
+		background: transparent;
+		border-radius: 0;
+		border-width: 0 0 1px;
+		gap: 1rem;
+		padding: 0.9rem 0.5rem;
+	}
+
+	.vu-skeleton-list__admin-professional {
+		grid-template-columns:
+			minmax(0, 1.4fr) minmax(0, 1.5fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 1fr);
+	}
+
+	.vu-skeleton-list__admin-client {
+		grid-template-columns:
+			minmax(0, 2fr) minmax(0, 1.1fr) minmax(0, 0.8fr) minmax(0, 1fr);
+	}
+
+	.vu-skeleton-list__admin-category {
+		grid-template-columns: minmax(0, 2fr) minmax(0, 0.8fr);
+	}
+
+	.vu-skeleton-list__label {
+		display: none;
+	}
 }
 
 .vu-skeleton-list__row-text {
@@ -43,37 +274,7 @@
 	min-width: 0;
 }
 
-/* ── Grilla de chips (categorías) ───────────────────────────────────────── */
-
-.vu-skeleton-list[data-variant='grid'] {
-	display: grid;
-	gap: 0.75rem;
-	grid-template-columns: 1fr;
-}
-
-@media (min-width: 640px) {
-	.vu-skeleton-list[data-variant='grid'] {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-	}
-}
-
-.vu-skeleton-list__tile {
-	background: var(--surface-card);
-	border: 1px solid var(--line);
-	border-radius: 1rem;
-	display: flex;
-	flex-direction: column;
-	gap: 0.75rem;
-	padding: 1.25rem;
-}
-
 /* ── Bloques ────────────────────────────────────────────────────────────── */
-
-.vu-skeleton-list__head {
-	align-items: center;
-	display: flex;
-	gap: 0.875rem;
-}
 
 .vu-skeleton-list__avatar {
 	border-radius: 999px;
@@ -95,9 +296,18 @@
 	width: 35%;
 }
 
+.vu-skeleton-list__line--medium {
+	width: 65%;
+}
+
 .vu-skeleton-list__chip {
 	border-radius: 999px;
 	flex-shrink: 0;
 	height: 1.375rem;
 	width: 4.5rem;
+}
+
+.vu-skeleton-list__button,
+.vu-skeleton-list__pin {
+	background: var(--surface-highlight);
 }

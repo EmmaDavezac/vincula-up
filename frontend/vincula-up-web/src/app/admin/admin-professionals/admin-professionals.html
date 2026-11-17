@@ -1,18 +1,9 @@
-<a class="vu-admin-back" routerLink="/admin">← Resumen</a>
-
 <div class="vu-admin-list-head admin-professionals__head">
 	<div>
 		<h1 class="vu-admin-title">Profesionales</h1>
 		<p class="vu-admin-lead admin-professionals__lead">
 			Consultá profesionales, actualizá sus datos y gestioná el acceso a la plataforma. El preregistro queda pendiente
 			hasta que cada profesional active su perfil.
-		</p>
-		<p class="vu-admin-list-count admin-professionals__count">
-			@if (hayBusqueda()) {
-				{{ profesionalesFiltrados().length }} de {{ professionals().length }} profesionales
-			} @else {
-				{{ professionals().length }} profesionales registrados
-			}
 		</p>
 	</div>
 	<a class="vu-btn vu-btn--coral" routerLink="/admin/profesionales/nuevo">
@@ -24,7 +15,7 @@
 	<p class="vu-alert admin-professionals__alert" [class]="avisoClase(aviso().tipo)" role="status">{{ aviso().texto }}</p>
 }
 
-<!-- ── Buscar en el padrón ── -->
+<!-- ── Buscar y filtrar el padrón ── -->
 <div class="vu-admin-search admin-professionals__search">
 	<label class="vu-sr-only" for="admin-search-professionals">Buscar profesionales</label>
 	<div class="vu-field-with-icon">
@@ -38,15 +29,48 @@
 			placeholder="Buscar por nombre, legajo, email o especialidad"
 			autocomplete="off"
 		/>
+		@if (busqueda()) {
+			<button type="button" class="vu-admin-search__clear" aria-label="Borrar búsqueda" title="Borrar búsqueda" (click)="limpiarBusqueda()">
+				<vu-icon name="x" [size]="18" />
+			</button>
+		}
 	</div>
-	@if (hayBusqueda()) {
-		<button type="button" class="vu-btn vu-btn--quiet vu-btn--sm" (click)="limpiarBusqueda()">Limpiar</button>
-	}
+	<div class="admin-professionals__tool-groups">
+		<div class="admin-professionals__tool-group admin-professionals__tool-group--filters">
+			<div class="admin-professionals__filter-row">
+				<div class="admin-professionals__filter-field">
+					<label class="admin-professionals__tool-label" for="admin-professional-status">Filtrar por estado:</label>
+					<select id="admin-professional-status" class="vu-select vu-select--sm admin-professionals__filter" [ngModel]="filtroEstado()" (ngModelChange)="filtroEstado.set($event)">
+						<option value="TODOS">Todos los estados</option>
+						@for (estado of estadosDisponibles(); track estado) {
+							<option [value]="estado">{{ estadoLabel(estado) }}</option>
+						}
+					</select>
+				</div>
+				<div class="admin-professionals__filter-field">
+					<label class="admin-professionals__tool-label" for="admin-professional-specialty">Filtrar por especialidad:</label>
+					<select id="admin-professional-specialty" class="vu-select vu-select--sm admin-professionals__filter" [ngModel]="filtroEspecialidad()" (ngModelChange)="filtroEspecialidad.set($event)">
+						<option value="TODAS">Todas las especialidades</option>
+						@for (specialty of specialties(); track specialty.id) {
+							<option [value]="specialty.id">{{ specialty.nombre }}</option>
+						}
+					</select>
+				</div>
+			</div>
+		</div>
+		<div class="admin-professionals__tool-group admin-professionals__tool-group--order">
+			<label class="admin-professionals__tool-label" for="admin-professional-order">Ordenar por:</label>
+			<select id="admin-professional-order" class="vu-select vu-select--sm admin-professionals__filter" [ngModel]="ordenNombre()" (ngModelChange)="ordenNombre.set($event)">
+				<option value="asc">Nombre: A–Z</option>
+				<option value="desc">Nombre: Z–A</option>
+			</select>
+		</div>
+	</div>
 </div>
 
 <!-- ── Padrón ── -->
 @if (loading()) {
-	<div class="vu-admin-list-skeleton"><vu-skeleton-list variant="row" [count]="4" /></div>
+	<vu-skeleton-list variant="admin-professional" [count]="4" />
 } @else if (professionals().length) {
 	@if (profesionalesFiltrados().length) {
 		<ul class="admin-professionals__list" aria-label="Lista de profesionales">
@@ -113,12 +137,7 @@
 		</ul>
 	} @else {
 		<div class="vu-admin-empty">
-			<p class="vu-admin-panel__hint">
-				Ningún profesional coincide con «{{ consulta() }}».
-			</p>
-			<button type="button" class="vu-btn vu-btn--outline vu-btn--sm admin-professionals__action" (click)="limpiarBusqueda()">
-				Limpiar búsqueda
-			</button>
+			<p class="vu-admin-panel__hint">No hay profesionales que coincidan con los filtros seleccionados.</p>
 		</div>
 	}
 } @else {
@@ -139,7 +158,7 @@
 					<a class="admin-professionals__modal-link" [href]="'mailto:' + email(abierto.profesional)">{{ email(abierto.profesional) }}</a>
 					<span class="vu-state vu-state--sm" [class]="estadoClase(abierto.profesional.estado)">{{ estadoLabel(abierto.profesional.estado) }}</span>
 				</div>
-				<button type="button" mat-button class="vu-btn vu-btn--quiet vu-btn--sm" (click)="cerrarDetalle()" aria-label="Cerrar detalle">
+				<button type="button" mat-button class="vu-btn vu-btn--quiet vu-btn--sm" (click)="cerrarDetalle()" [disabled]="savingEdit()" aria-label="Cerrar detalle">
 					<vu-icon name="x" [size]="19" />
 				</button>
 			</header>
@@ -260,9 +279,9 @@
 				}
 			</div>
 
-			<footer class="admin-professionals__modal-foot">
+			<footer mat-dialog-actions class="admin-professionals__modal-foot">
 				@if (abierto.modo === 'edicion') {
-					<button type="button" mat-button class="vu-btn vu-btn--quiet" (click)="abrirDetalle(abierto.profesional, 'consulta')">Cancelar</button>
+					<button type="button" mat-button class="vu-btn vu-btn--outline" (click)="cancelarEdicion(abierto.profesional)" [disabled]="savingEdit()">Cancelar</button>
 					<button type="button" mat-flat-button class="vu-btn vu-btn--ink" (click)="guardarCambios()" [disabled]="savingEdit()">
 						{{ savingEdit() ? 'Guardando...' : 'Guardar cambios' }}
 					</button>
@@ -281,7 +300,9 @@
 		[mensaje]="pendiente.mensaje"
 		[detalle]="pendiente.detalle ?? ''"
 		[textoConfirmar]="pendiente.confirmar ?? 'Confirmar'"
+		[textoCancelar]="pendiente.textoCancelar ?? 'Cancelar'"
 		[peligro]="pendiente.peligro ?? false"
+		[cancelarPrimario]="pendiente.cancelarPrimario ?? false"
 		[icono]="pendiente.icono ?? 'pencil'"
 		(confirmado)="confirmarAccion()"
 		(cancelado)="cancelarAccion()"

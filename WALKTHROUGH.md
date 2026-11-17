@@ -25,6 +25,15 @@
 
 ## Historial
 
+### [2026-11-16] - ux: unificar navegación admin y skeletons fieles a los listados
+- **Objetivo:** Evitar una navegación administrativa duplicada y hacer que los placeholders reflejen los ítems reales durante la carga.
+- **Cambios realizados:**
+  - Se elimina el pie exclusivo de administración que repetía enlaces de navegación; el panel conserva la navbar y tabbar compartidas.
+  - Se agregan skeletons específicos para filas de profesionales, clientes y categorías, incluyendo sus campos, badges y acciones.
+  - Las solicitudes enviadas y recibidas usan formas distintas; las recibidas incluyen el espacio del mapa.
+  - Archivos modificados: `frontend/vincula-up-web/src/app/app.html`, `app.ts`, los listados administrativos, `my-requests.html` y `shared/skeleton-list/`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build`.
+
 ### [2026-11-16] - ux: unificar botones de acción en listados de administración
 - **Objetivo:** Dar una presentación consistente a las acciones de las filas de profesionales, categorías y clientes.
 - **Cambios realizados:**
@@ -1160,3 +1169,180 @@
   - **`ESPECIFICACION.md`:** Agregada mención de los informes académicos formales en el bloque introductorio.
   - **`WALKTHROUGH.md`:** Esta entrada.
 - **Verificación:** `git diff --stat` confirma que solo se modifican archivos `.md`. No hay cambios de código, por lo que no aplica compilación backend/frontend.
+
+### [2026-11-16] - fix: proteger formularios de administración ante descarte
+- **Objetivo:** Evitar que el alta o la edición de profesionales y categorías pierda datos al cambiar de sección o cancelar.
+- **Cambios realizados:**
+  - Se agregó un guard de salida para altas de profesional/categoría y para los listados con edición inline o modal.
+  - Se reutilizó el diálogo visual de confirmación para confirmar el descarte solo cuando hay cambios; cancelar el diálogo mantiene el formulario abierto.
+  - El botón «Cancelar» del renombre y los controles de cierre/cancelación de la edición modal piden confirmación si se modificaron datos.
+  - Mientras hay un guardado en curso, no se permite abandonar/cerrar el formulario.
+- **Archivos modificados:** rutas y componentes administrativos de profesionales y categorías, el modelo de confirmación y un nuevo guard de administración.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check` finalizaron correctamente.
+
+### [2026-11-16] - feat: filtros y orden en listados administrativos
+- **Objetivo:** Quitar enlaces redundantes al resumen y facilitar la búsqueda, filtrado y orden de los listados del panel.
+- **Cambios realizados:**
+  - Se quitaron los enlaces «← Resumen» de los listados de profesionales, clientes y categorías.
+  - Profesionales ahora permite filtrar por estado y especialidad, además de buscar por texto y ordenar por nombre A–Z/Z–A.
+  - Clientes ahora permite filtrar por estado y ordenar por actividad o por nombre A–Z/Z–A.
+  - Categorías ahora permite ordenar por nombre A–Z/Z–A.
+  - Se actualizaron el [MANUAL.md](./MANUAL.md) y los controles para adaptarse a pantallas angostas.
+- **Archivos modificados:** listados administrativos de profesionales, clientes y categorías, sus estilos y `MANUAL.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó sin errores ni advertencias; `git diff --check` también pasó.
+
+### [2026-11-16] - feat: skeleton de resumen y ajuste de valoración
+- **Objetivo:** Mostrar placeholders del dashboard mientras carga y evitar que el promedio «5.0 / 5» se parta en dos líneas en móvil.
+- **Cambios realizados:**
+  - Se reemplazó el mensaje de carga por skeletons de las seis métricas, la demanda por especialidad y el embudo de solicitudes.
+  - Se redujo el tamaño del promedio y se impidió que se ajuste en dos líneas.
+  - Se documentó la carga visual del resumen en el [MANUAL.md](./MANUAL.md).
+- **Archivos modificados:** dashboard administrativo, estilos globales, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó sin errores ni advertencias; `git diff --check` también pasó.
+
+### [2026-11-16] - fix: alinear controles móviles y clarificar confirmaciones
+- **Objetivo:** Mejorar la disposición móvil de los listados administrativos y hacer explícita la protección de la edición de categorías.
+- **Cambios realizados:**
+  - En móvil, los filtros quedan en una fila y el ordenamiento en otra, ambos alineados a la derecha con etiquetas «Filtrar por» y «Ordenar por».
+  - Los botones «Nuevo» de profesionales y categorías se alinean a la derecha en pantallas estrechas.
+  - La edición de categoría confirma tanto al cancelar como al cambiar de sección, incluso si aún no se modificó el nombre; el mensaje diferencia si se descartarían cambios.
+  - El diálogo de confirmación ahora usa botones nativos del sistema visual para que las variantes primaria y secundaria se distingan claramente.
+  - Se actualizó el [MANUAL.md](./MANUAL.md).
+- **Archivos modificados:** estilos y templates de listados de profesionales, clientes y categorías, el componente compartido de confirmación y documentación.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó sin errores ni advertencias; `git diff --check` también pasó.
+
+### [2026-11-16] - fix: mejorar el perfil y seguridad de cuenta en móvil
+- **Objetivo:** Evitar que la tarjeta de perfil se comprima en móvil y separar la descripción de contraseña de su botón.
+- **Cambios realizados:**
+  - En móvil, la información del perfil se presenta debajo del avatar y ocupa todo el ancho disponible.
+  - Se agregó margen superior al botón «Cambiar contraseña».
+  - Se documentó el ajuste en el [MANUAL.md](./MANUAL.md).
+- **Archivos modificados:** `account.html`, `account.css`, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check` finalizaron correctamente.
+
+### [2026-11-16] - fix: mantener secciones admin en navbar de escritorio
+- **Objetivo:** Evitar que al entrar en «Mi cuenta» desaparezcan las opciones de navegación del panel administrativo.
+- **Cambios realizados:**
+  - La navbar de escritorio muestra Resumen, Profesionales, Categorías y Clientes para administradores desde las pantallas del panel y desde «Mi cuenta».
+  - Se actualizó el [MANUAL.md](./MANUAL.md).
+- **Archivos modificados:** `navbar.html`, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó sin errores ni advertencias; `git diff --check` también pasó.
+
+### [2026-11-16] - fix: alinear etiquetas de filtros en escritorio
+- **Objetivo:** Alinear a la izquierda los textos «Filtrar por» y «Ordenar por» respecto del primer control en los listados administrativos.
+- **Cambios realizados:**
+  - En pantallas de escritorio, los grupos de filtros y ordenamiento alinean su etiqueta y control desde el borde izquierdo; la disposición móvil se mantiene.
+  - Se actualizó el [MANUAL.md](./MANUAL.md).
+- **Archivos modificados:** estilos de los listados de profesionales, clientes y categorías, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó sin errores ni advertencias; `git diff --check` también pasó.
+
+### [2026-11-16] - fix: mostrar footer en secciones de administración
+- **Objetivo:** Reutilizar el footer informativo compartido en todas las rutas del panel administrativo.
+- **Cambios realizados:**
+  - El footer compartido deja de ocultarse en `/admin`; la navegación entre secciones sigue a cargo de las navbars.
+  - Se quitó del componente raíz el estado de ruta que solo se usaba para ocultar el footer.
+  - Se actualizó el [MANUAL.md](./MANUAL.md).
+- **Archivos modificados:** `app.html`, `app.ts`, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó sin errores ni advertencias; `git diff --check` también pasó.
+
+### [2026-11-16] - fix: aclarar filtros y alinear acciones de listados admin
+- **Objetivo:** Hacer más explícitos los criterios de filtrado y simplificar los encabezados de profesionales y clientes.
+- **Cambios realizados:**
+  - Cada filtro visible indica su criterio y queda alineado a la izquierda también en móvil.
+  - Se quitaron los contadores de profesionales y clientes de sus encabezados.
+  - Los botones para crear profesionales y categorías quedan alineados a la izquierda.
+  - Se actualizó el [MANUAL.md](./MANUAL.md).
+- **Archivos modificados:** templates y estilos de profesionales, clientes y categorías, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó sin errores ni advertencias; `git diff --check` también pasó.
+
+### [2026-11-16] - fix: simplificar búsqueda y alinear controles admin
+- **Objetivo:** Evitar acciones duplicadas de limpieza y unificar la ubicación de filtros y ordenamiento en los listados administrativos.
+- **Cambios realizados:**
+  - Se retiraron los botones «Limpiar búsqueda/filtros» de los listados.
+  - El texto de búsqueda ahora se borra con una «×» accesible dentro del campo y conserva los filtros seleccionados.
+  - Filtros y ordenamiento quedan alineados a la izquierda en móvil y escritorio; el ordenamiento de categorías usa una fila propia.
+  - Se actualizó el [MANUAL.md](./MANUAL.md).
+- **Archivos modificados:** templates, estilos y lógica de búsqueda de profesionales, clientes y categorías, estilos globales, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó sin errores ni advertencias; `git diff --check` también pasó.
+
+### [2026-11-16] - fix: unificar diálogos y acciones de confirmación
+- **Objetivo:** Aplicar el mismo tamaño, superficie, paleta y orden de acciones en todos los diálogos de la aplicación.
+- **Cambios realizados:**
+  - Se centralizó el ancho de los diálogos en una configuración compartida y se igualaron las superficies con tokens de tema.
+  - Los botones de los pies de diálogo tienen el mismo ancho; en pares, la acción secundaria va a la izquierda y la confirmación a la derecha, incluso en móvil.
+  - Se diferenciaron las acciones primarias, secundarias y destructivas; la cancelación de solicitudes ahora ofrece «Volver» como acción secundaria.
+  - Se actualizaron la [GUÍA-VISUAL.md](./GUÍA-VISUAL.md) y el [MANUAL.md](./MANUAL.md).
+- **Archivos modificados:** configuración compartida de diálogos, templates y estilos de activación, solicitudes, administración, confirmaciones, términos, estilos globales y documentación.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó sin errores ni advertencias; `git diff --check` también pasó.
+
+### [2026-11-16] - fix: ajustar skeletons y filtros de solicitudes
+- **Objetivo:** Hacer que la carga de solicitudes represente las tarjetas reales y homogeneizar la presentación de filtros y ordenamiento.
+- **Cambios realizados:**
+  - Los skeletons de actualización reflejan campos y acciones de las solicitudes visibles, incluyendo descripción, dirección, mapa, motivo de cierre y calificación cuando corresponda.
+  - Se ordenan las solicitudes por fecha del turno, de la más reciente a la más antigua o al revés.
+  - Las etiquetas de filtro especifican categoría/estado, los controles se alinean a la izquierda y el orden queda en una fila separada; la búsqueda se limpia con una «×».
+  - Se actualizó el [MANUAL.md](./MANUAL.md).
+- **Archivos modificados:** `my-requests.html`, `my-requests.css`, `my-requests.ts`, `shared/skeleton-list/`, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó sin errores ni advertencias; `git diff --check` también pasó.
+
+### [2026-11-16] - fix: ocultar ingreso en footer con sesión activa
+- **Objetivo:** No ofrecer el enlace «Ingresar» del footer a usuarios que ya iniciaron sesión.
+- **Cambios realizados:**
+  - El footer compartido consulta el estado de autenticación y muestra «Ingresar» solo cuando no hay una sesión activa.
+  - Se actualizó el [MANUAL.md](./MANUAL.md).
+- **Archivos modificados:** `shared/footer/footer.ts`, `shared/footer/footer.html`, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó sin errores ni advertencias; `git diff --check` también pasó.
+
+### [2026-11-16] - fix: igualar altura de acciones de navbar
+- **Objetivo:** Dar el mismo tamaño vertical al control de tema, botones de acceso y menú de usuario.
+- **Cambios realizados:**
+  - El control de tema, «Ingresar», «Crear cuenta», notificaciones y el desplegable del usuario comparten una altura de `2.75rem`.
+  - Se actualizó el [MANUAL.md](./MANUAL.md).
+- **Archivos modificados:** `shared/navbar/navbar.css`, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente; `git diff --check` también pasó.
+
+### [2026-11-16] - feat: actualizar contenido de la landing
+- **Objetivo:** Presentar de forma más clara el flujo actual de Vincula-UP y mejorar el acceso inicial desde móviles.
+- **Cambios realizados:**
+  - Se renovaron los mensajes principales para explicar la búsqueda por oficio y disponibilidad, los perfiles incorporados por la Universidad y la gestión de solicitudes, chat y calificaciones.
+  - Se agregó un resumen de beneficios en el hero y se precisaron los pasos de solicitud y activación del perfil.
+  - Los dos CTA principales tienen el mismo ancho y quedan en una fila con espacio entre ellos, también en móvil.
+  - Se actualizaron las notas de uso del [MANUAL.md](./MANUAL.md).
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/home/home.html`, `home.css`, `home.ts`, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente; `git diff --check` también pasó.
+
+### [2026-11-16] - feat: añadir hover a botones y tarjetas de landing
+- **Objetivo:** Hacer más perceptibles las interacciones de botones y tarjetas en la landing.
+- **Cambios realizados:**
+  - Los CTA principales y las tarjetas finales ahora transicionan suavemente sus colores al pasar el puntero o recibir foco.
+  - La tarjeta coral mantiene el contraste de texto y usa el tono de hover de la paleta.
+  - Se desactivan las transiciones si el sistema solicita reducir movimiento.
+  - Se documentó el comportamiento en el [MANUAL.md](./MANUAL.md).
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/home/home.css`, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente; `git diff --check` también pasó.
+
+### [2026-11-16] - feat: dar más vida visual a la landing
+- **Objetivo:** Equilibrar el contenido textual de la landing con elementos visuales vinculados al flujo real.
+- **Cambios realizados:**
+  - Se reemplazó el panel de texto repetitivo del hero por una ilustración responsive de búsqueda por oficio, con iconografía y categorías de ejemplo.
+  - Se añadieron iconos a los pasos del recorrido y a las garantías de la plataforma, además de un acceso directo de activación en la sección para egresados.
+  - Se mantuvieron colores del sistema y la guía de interacción: el movimiento decorativo es estático y las transiciones de hover cambian color.
+  - Se actualizó el [MANUAL.md](./MANUAL.md).
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/home/home.html`, `home.css`, `home.ts`, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente; `git diff --check` también pasó.
+
+### [2026-11-16] - feat: animar ilustraciones con carrusel en landing
+- **Objetivo:** Hacer más dinámica la portada con escenas ilustradas y animaciones al recorrer el contenido.
+- **Cambios realizados:**
+  - El hero muestra tres escenas visualmente diferenciadas: una búsqueda de oficio, una ficha de profesional y una conversación de coordinación.
+  - El carrusel avanza automáticamente, permite navegación manual y se detiene mientras recibe foco o puntero.
+  - Se quitó el botón de pausa; permanecen las flechas y los indicadores de navegación.
+  - Se redujo el texto de cada escena y se reemplazaron los detalles repetitivos por elementos gráficos.
+  - Las tres ilustraciones se enmarcaron con un diseño común de teléfono móvil.
+  - Se ajustó la ficha de profesional para que su contenido no se desborde del bisel.
+  - Se animan suavemente las ilustraciones y la transición de cada escena; `prefers-reduced-motion` desactiva animaciones y avance automático.
+  - Las secciones y elementos del recorrido aparecen al entrar en pantalla, con entradas escalonadas para los pasos y tarjetas.
+  - Se respeta `prefers-reduced-motion` también en las animaciones de entrada al desplazarse.
+  - Se actualizaron las instrucciones del [MANUAL.md](./MANUAL.md).
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/home/home.html`, `home.css`, `home.ts`, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente; `git diff --check` también pasó.

@@ -25,8 +25,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatListModule } from '@angular/material/list';
 import { VuAvatar } from '../../shared/avatar/avatar';
 import { VuConfirm } from '../../shared/confirm/confirm';
+import { VU_DIALOG_SIZE } from '../../shared/dialog-size';
 import { VuIcon } from '../../shared/icon/icon';
 import { VuSkeletonList } from '../../shared/skeleton-list/skeleton-list';
+import { AdminUnsavedChanges } from '../admin-unsaved-changes.guard';
 
 /** Modo del modal: sólo consultar, o consultar y editar a la vez. */
 type ModalModo = 'consulta' | 'edicion';
@@ -42,7 +44,7 @@ type ModalModo = 'consulta' | 'edicion';
 	templateUrl: './admin-professionals.html',
 	styleUrl: './admin-professionals.css',
 })
-export class AdminProfessionals {
+export class AdminProfessionals implements AdminUnsavedChanges {
 	private readonly api = inject(ApiService);
 	private readonly router = inject(Router);
 	private readonly dialog = inject(MatDialog);
@@ -74,7 +76,43 @@ export class AdminProfessionals {
 	}
 
 	cancelarAccion(): void {
+		const pendiente = this.confirmacion();
 		this.confirmacion.set(null);
+		pendiente?.cancelar?.();
+	}
+
+	confirmarSalidaPendiente(): boolean | Promise<boolean> {
+		if (this.savingEdit()) {
+			this.aviso.set(avisoError('Esperá a que termine el guardado antes de cambiar de sección.'));
+			return false;
+		}
+		const abierto = this.modal();
+		if (!abierto) return true;
+		if (abierto.modo !== 'edicion' || !this.hayCambiosEnEdicion(abierto.profesional)) {
+			this.cerrarDetalleSinConfirmar();
+			return true;
+		}
+		if (this.confirmacion()) {
+			this.aviso.set(avisoError('Terminá o cancelá la acción pendiente antes de cambiar de sección.'));
+			return false;
+		}
+		return new Promise((resolve) => {
+			this.confirmacion.set({
+				titulo: '¿Salir sin guardar?',
+				mensaje: `La ficha de ${this.nombre(abierto.profesional)} tiene cambios sin guardar.`,
+				detalle: 'Si salís ahora, vas a perder los cambios realizados en el legajo o las especialidades.',
+				confirmar: 'Salir sin guardar',
+				textoCancelar: 'Seguir editando',
+				peligro: true,
+				cancelarPrimario: true,
+				icono: 'pencil',
+				ejecutar: () => {
+					this.cerrarDetalleSinConfirmar();
+					resolve(true);
+				},
+				cancelar: () => resolve(false),
+			});
+		});
 	}
 
 	/** Navega a la pantalla de alta de un nuevo profesional */
@@ -97,29 +135,41 @@ export class AdminProfessionals {
 	 * especialidades, sin distinguir mayúsculas ni acentos. El filtrado es local:
 	 * la pantalla ya carga el padrón completo.
 	 */
+	readonly filtroEstado = signal('TODOS');
+	readonly filtroEspecialidad = signal('TODAS');
+	readonly ordenNombre = signal<'asc' | 'desc'>('asc');
+	readonly estadosDisponibles = computed(() =>
+		[...new Set(this.professionals().map((item) => this.claveEstado(item.estado)))].sort((a, b) => a.localeCompare(b, 'es')),
+	);
 	readonly profesionalesFiltrados = computed(() => {
 		const q = this.consulta();
-		if (!q) {
-			return this.professionals();
-		}
-		return this.professionals().filter((profesional) =>
-			coincideBusqueda(
-				q,
-				this.nombre(profesional),
-				profesional.legajo,
-				this.email(profesional),
-				this.telefono(profesional),
-				especialidadesLabel(profesional.especialidades),
-			),
-		);
+		const estado = this.filtroEstado();
+		const especialidad = this.filtroEspecialidad();
+		const direccion = this.ordenNombre() === 'asc' ? 1 : -1;
+		return this.professionals()
+			.filter((profesional) =>
+				coincideBusqueda(
+					q,
+					this.nombre(profesional),
+					profesional.legajo,
+					this.email(profesional),
+					this.telefono(profesional),
+					especialidadesLabel(profesional.especialidades),
+				),
+			)
+			.filter((profesional) => estado === 'TODOS' || this.claveEstado(profesional.estado) === estado)
+			.filter((profesional) =>
+				especialidad === 'TODAS' || profesional.especialidades?.some((item) => item.id === especialidad),
+			)
+			.sort((a, b) => direccion * this.nombre(a).localeCompare(this.nombre(b), 'es', { sensitivity: 'base' }));
 	});
-
-	hayBusqueda(): boolean {
-		return this.consulta().length > 0;
-	}
 
 	limpiarBusqueda(): void {
 		this.busqueda.set('');
+	}
+
+	private claveEstado(estado: string | null | undefined): string {
+		return estado?.trim().toUpperCase() || 'SIN_ESTADO';
 	}
 
 	// ── Preregistros ──────────────────────────────────────────────────────
@@ -195,7 +245,8 @@ export class AdminProfessionals {
 			this.detailDialogRef = this.dialog.open(this.professionalDetailDialog, {
 				ariaLabel: 'Detalle del profesional',
 				ariaModal: true,
-				maxWidth: 'min(38rem, calc(100vw - 2rem))',
+				disableClose: true,
+				...VU_DIALOG_SIZE,
 				panelClass: 'vu-details-dialog',
 			});
 			this.detailDialogRef.afterClosed().subscribe(() => {
@@ -206,9 +257,58 @@ export class AdminProfessionals {
 	}
 
 	cerrarDetalle(): void {
+		if (this.savingEdit()) {
+			this.aviso.set(avisoError('Esperá a que termine el guardado para cerrar el detalle.'));
+			return;
+		}
+		const abierto = this.modal();
+		if (abierto?.modo === 'edicion' && this.hayCambiosEnEdicion(abierto.profesional)) {
+			this.confirmarDescarteDeEdicion(abierto.profesional);
+			return;
+		}
+		this.cerrarDetalleSinConfirmar();
+	}
+
+	private cerrarDetalleSinConfirmar(): void {
 		this.detailDialogRef?.close();
 		this.detailDialogRef = undefined;
 		this.modal.set(null);
+	}
+
+	cancelarEdicion(profesional: AdminProfessional): void {
+		if (this.savingEdit()) return;
+		if (this.hayCambiosEnEdicion(profesional)) {
+			this.confirmarDescarteDeEdicion(profesional);
+			return;
+		}
+		this.mostrarDetalle(profesional, 'consulta');
+	}
+
+	private confirmarDescarteDeEdicion(profesional: AdminProfessional): void {
+		if (this.confirmacion()) return;
+		this.confirmacion.set({
+			titulo: 'Descartar los cambios',
+			mensaje: `¿Descartar los cambios de ${this.nombre(profesional)}?`,
+			detalle: 'El legajo y las especialidades volverán a sus valores originales.',
+			confirmar: 'Descartar cambios',
+			textoCancelar: 'Seguir editando',
+			peligro: true,
+			cancelarPrimario: true,
+			icono: 'pencil',
+			ejecutar: () => this.mostrarDetalle(profesional, 'consulta'),
+		});
+	}
+
+	private mostrarDetalle(profesional: AdminProfessional, modo: ModalModo): void {
+		this.abrirDetalle(profesional, modo);
+	}
+
+	private hayCambiosEnEdicion(profesional: AdminProfessional): boolean {
+		const idsOriginales = (profesional.especialidades ?? []).map((item) => item.id).sort();
+		const idsActuales = [...this.editForm.especialidadIds].sort();
+		return (profesional.legajo ?? '') !== this.editForm.legajo ||
+			idsOriginales.length !== idsActuales.length ||
+			idsOriginales.some((id, index) => id !== idsActuales[index]);
 	}
 
 	toggleEditSpecialty(id: string): void {

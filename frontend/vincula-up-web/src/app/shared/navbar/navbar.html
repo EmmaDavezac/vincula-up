@@ -5,27 +5,18 @@
 			<span class="vu-brand-name">Vincula<em>-UP</em></span>
 		</a>
 
-		<!--
-			Secciones de la barra superior. Dentro del panel el administrador recorre
-			sus cuatro secciones desde acá (antes vivían en una columna lateral); en
-			él se enlaza al panel como una sección más. En móvil esta barra no
-			se muestra: las secciones van en la barra inferior.
-		-->
+		<!-- En escritorio, la navegación del panel sigue disponible también desde Mi cuenta. -->
 		<nav class="nav-links" aria-label="Navegación principal">
 			@if (auth.hasRole('ADMIN')) {
-				@if (enPanel()) {
-					<a
-						routerLink="/admin"
-						routerLinkActive="active"
-						[routerLinkActiveOptions]="{ exact: true }"
-						>Resumen</a
-					>
-					<a routerLink="/admin/profesionales" routerLinkActive="active">Profesionales</a>
-					<a routerLink="/admin/categorias" routerLinkActive="active">Categorías</a>
-					<a routerLink="/admin/clientes" routerLinkActive="active">Clientes</a>
-				} @else {
-					<a routerLink="/admin" routerLinkActive="active">Administración</a>
-				}
+				<a
+					routerLink="/admin"
+					routerLinkActive="active"
+					[routerLinkActiveOptions]="{ exact: true }"
+					>Resumen</a
+				>
+				<a routerLink="/admin/profesionales" routerLinkActive="active">Profesionales</a>
+				<a routerLink="/admin/categorias" routerLinkActive="active">Categorías</a>
+				<a routerLink="/admin/clientes" routerLinkActive="active">Clientes</a>
 			}
 
 			@if (auth.hasRole('CLIENTE') && !enPanel()) {

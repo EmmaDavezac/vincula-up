@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, TemplateRef, ViewChild, AfterViewInit, inject, input, output } from '@angular/core';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
-import { MatButtonModule } from '@angular/material/button';
 import { VuIcon, VuIconName } from '../icon/icon';
+import { VU_DIALOG_SIZE } from '../dialog-size';
 
 /**
  * Diálogo de confirmación único para toda la app.
@@ -16,7 +16,7 @@ import { VuIcon, VuIconName } from '../icon/icon';
  */
 @Component({
 	selector: 'vu-confirm',
-	imports: [VuIcon, MatButtonModule],
+	imports: [VuIcon],
 	changeDetection: ChangeDetectionStrategy.OnPush,
 	templateUrl: './confirm.html',
 	styleUrl: './confirm.css',
@@ -61,6 +61,7 @@ export class VuConfirm implements AfterViewInit {
 			disableClose: true,
 			panelClass: 'vu-confirm-dialog',
 			role: 'alertdialog',
+			...VU_DIALOG_SIZE,
 		});
 		this.dialogRef.backdropClick().subscribe(() => this.cancelar());
 		this.dialogRef.keydownEvents().subscribe((event: KeyboardEvent) => {
