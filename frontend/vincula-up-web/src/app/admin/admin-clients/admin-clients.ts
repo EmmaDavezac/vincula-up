@@ -17,6 +17,7 @@ import {
 	nombreCompleto,
 } from '../../core/models/admin';
 import { ApiService } from '../../core/services/api.service';
+import { OperationFeedbackService } from '../../core/services/operation-feedback.service';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatListModule } from '@angular/material/list';
@@ -39,6 +40,7 @@ import { VuSkeletonList } from '../../shared/skeleton-list/skeleton-list';
 })
 export class AdminClients {
 	private readonly api = inject(ApiService);
+	private readonly operationFeedback = inject(OperationFeedbackService);
 	private readonly dialog = inject(MatDialog);
 	@ViewChild('clientDetailDialog') private clientDetailDialog!: TemplateRef<unknown>;
 	private detailDialogRef?: MatDialogRef<unknown>;
@@ -51,8 +53,8 @@ export class AdminClients {
 	readonly avisoClase = avisoClase;
 
 	/**
-	 * Activar o desactivar una cuenta cambia lo que la persona puede hacer, así que
-	 * ambas pasan por confirmación antes de ejecutarse.
+	 * Suspender o reactivar una cuenta cambia lo que la persona puede hacer, así que
+	 * ambas acciones pasan por confirmación antes de ejecutarse.
 	 */
 	readonly confirmacion = signal<AdminConfirmacion | null>(null);
 
@@ -160,7 +162,7 @@ export class AdminClients {
 
 	/**
 	 * Detalle del cliente. Es de solo lectura: muestra los datos de la cuenta y
-	 * permite activar o desactivar el acceso. Los datos de contacto no se editan
+	 * permite suspender o reactivar el acceso. Los datos de contacto no se editan
 	 * desde acá, los edita la persona desde "Mi cuenta".
 	 *
 	 * <p>La suspensión y la reactivación salen de acá y no de la fila: en una
@@ -187,18 +189,18 @@ export class AdminClients {
 
 	// ── Acceso ─────────────────────────────────────────────────────────
 
-	/** Desactivar o reactivar la cuenta: siempre con confirmación previa. */
+	/** Suspender o reactivar la cuenta: siempre con confirmación previa. */
 	toggleAccess(client: AdminUser): void {
 		const suspendiendo = this.estaActivo(client);
 		this.confirmacion.set({
-			titulo: suspendiendo ? 'Desactivar la cuenta' : 'Reactivar la cuenta',
+			titulo: suspendiendo ? 'Suspender la cuenta' : 'Reactivar la cuenta',
 			mensaje: suspendiendo
-				? `¿Desactivás la cuenta de ${this.nombre(client)}?`
+				? `¿Suspendés la cuenta de ${this.nombre(client)}?`
 				: `¿Reactivás la cuenta de ${this.nombre(client)}?`,
 			detalle: suspendiendo
 				? 'No podrá entrar al panel ni hacer pedidos hasta que se reactive. Sus solicitudes y calificaciones se conservan.'
 				: 'Vuelve a poder entrar al panel y hacer pedidos.',
-			confirmar: suspendiendo ? 'Desactivar' : 'Reactivar',
+			confirmar: suspendiendo ? 'Suspender' : 'Reactivar',
 			peligro: suspendiendo,
 			icono: suspendiendo ? 'pause' : 'play',
 			ejecutar: () => this.ejecutarCambioDeAcceso(client, suspendiendo),
@@ -209,12 +211,16 @@ export class AdminClients {
 		this.busyId.set(client.id);
 		const peticion = suspendiendo ? this.api.suspendUser(client.id) : this.api.reactivateUser(client.id);
 
-		peticion.pipe(
+		this.operationFeedback.track(
+			suspendiendo ? 'Suspendiendo la cuenta…' : 'Reactivando la cuenta…',
+			peticion,
+			'Estamos actualizando el acceso del cliente.',
+		).pipe(
 			map(() => true),
 			catchError((error) => {
 				this.busyId.set(null);
 				this.aviso.set(
-					avisoError(this.api.describeError(error, suspendiendo ? 'No se pudo desactivar la cuenta.' : 'No se pudo reactivar la cuenta.')),
+					avisoError(this.api.describeError(error, suspendiendo ? 'No se pudo suspender la cuenta.' : 'No se pudo reactivar la cuenta.')),
 				);
 				return of(false);
 			}),
@@ -233,7 +239,7 @@ export class AdminClients {
 			this.aviso.set(
 				avisoExito(
 					suspendiendo
-						? `${this.nombre(client)} quedó desactivado y no puede entrar al panel.`
+						? `${this.nombre(client)} quedó suspendido y no puede entrar al panel.`
 						: `La cuenta de ${this.nombre(client)} quedó reactivada.`,
 				),
 			);

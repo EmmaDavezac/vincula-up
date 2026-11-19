@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, TemplateRef, ViewChild, AfterViewInit, inject, input, output } from '@angular/core';
+import { Overlay } from '@angular/cdk/overlay';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { VuIcon, VuIconName } from '../icon/icon';
 import { VU_DIALOG_SIZE } from '../dialog-size';
@@ -45,6 +46,7 @@ export class VuConfirm implements AfterViewInit {
 	readonly cancelado = output<void>();
 
 	private readonly dialog = inject(MatDialog);
+	private readonly overlay = inject(Overlay);
 	private readonly destroyRef = inject(DestroyRef);
 	@ViewChild('confirmDialog') private confirmDialog!: TemplateRef<unknown>;
 	private dialogRef?: MatDialogRef<unknown, string>;
@@ -61,6 +63,7 @@ export class VuConfirm implements AfterViewInit {
 			disableClose: true,
 			panelClass: 'vu-confirm-dialog',
 			role: 'alertdialog',
+			scrollStrategy: this.overlay.scrollStrategies.block(),
 			...VU_DIALOG_SIZE,
 		});
 		this.dialogRef.backdropClick().subscribe(() => this.cancelar());

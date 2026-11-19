@@ -132,7 +132,7 @@ Demostrar que el circuito completo funciona de punta a punta con datos reales y 
 - Registro, ingreso y recuperación de contraseña con Keycloak, con los roles Cliente, Profesional y Administrador.
 - Alta de profesionales por el administrador y activación del perfil por el propio profesional.
 - Directorio de profesionales con búsqueda por categoría, disponibilidad y proximidad geográfica.
-- Ciclo completo de la solicitud: crear, aceptar, rechazar con motivo, cancelar, completar y vencimiento automático.
+- Ciclo completo de la solicitud: crear, aceptar/rechazar, acompañar la ejecución hasta la confirmación del cliente, cancelar y vencer automáticamente.
 - Chat por solicitud, calificación del servicio y notificaciones por correo y WebPush.
 - Paneles del administrador: profesionales, categorías, clientes e indicadores.
 
@@ -207,7 +207,7 @@ Se agruparon los sprints en dos épicas de dos sprints cada una:
 | Backend de usuarios | Alta de profesionales por el administrador con contraseña temporal y cambio obligatorio en el primer ingreso | LD | HU-U05, HU-U09 |
 | Backend de usuarios | ms-profesionales: activación del perfil (foto, zona de cobertura) y gestión de horarios | LD | HU-U06, HU-U07 |
 | Backend de usuarios | Almacenamiento privado de fotos en el volumen | LD | HU-U04, HU-U06 |
-| Backend de usuarios | Consulta y edición del padrón, listado de clientes y desactivación o reactivación de cuentas | LD | HU-U10, HU-U11, HU-U13 |
+| Backend de usuarios | Consulta y edición del padrón, listado de clientes y suspensión o reactivación de cuentas | LD | HU-U10, HU-U11, HU-U13 |
 | Backend de usuarios | Alta, edición y baja de categorías | LD | HU-U12 |
 | Frontend de usuarios | Pantallas de registro, login y recuperación de contraseña | AV | HU-U01, HU-U02, HU-U15 |
 | Frontend de usuarios | Pantallas de términos y condiciones y de edición de perfil | AV | HU-U03, HU-U04 |
@@ -221,7 +221,7 @@ Se agruparon los sprints en dos épicas de dos sprints cada una:
 | Integración en BFF y pruebas de integración | Probar el flujo completo: alta, primer ingreso, activación del perfil y aparición en el padrón | NM | HU-U05, HU-U06, HU-U09 |
 
 #### Sprint 3 · 26/10 – 09/11
-**Objetivo:** El backend de solicitudes cubre el ciclo completo: crear, aceptar, rechazar con motivo, completar y cancelar, con las validaciones de transición y de disponibilidad.
+**Objetivo:** El backend de solicitudes cubre el ciclo completo: crear, aceptar/rechazar con motivo opcional, informar el viaje y el trabajo realizado, confirmar con el cliente y cancelar, con validaciones de transición y disponibilidad.
 
 | Actividad | Subtarea | Responsable | Historias |
 |---|---|---|---|
@@ -236,8 +236,8 @@ Se agruparon los sprints en dos épicas de dos sprints cada una:
 | Backend de solicitudes | Ocultar la dirección exacta y exponer solo la zona y un punto aproximado hasta la aceptación | LD | HU-S07 |
 | Backend de solicitudes | Listado de solicitudes según el rol, con filtro por estado | LD | HU-S08 |
 | Backend de solicitudes | Aceptar una solicitud con validación de transición y de turnos superpuestos | LD | HU-S09, HU-S17 |
-| Backend de solicitudes | Rechazar y cancelar con motivo obligatorio, registrando quién canceló | LD | HU-S10, HU-S11 |
-| Backend de solicitudes | Completar la solicitud por cualquiera de las partes | LD | HU-S12 |
+| Backend de solicitudes | Rechazar con motivo opcional y cancelar con motivo obligatorio, registrando quién canceló | LD | HU-S10, HU-S11 |
+| Backend de solicitudes | Gestionar el viaje y trabajo realizado; completar solo tras confirmación del cliente | LD | HU-S12 |
 | Backend de solicitudes | Mensajería por solicitud y calificación única con actualización de la reputación | LD | HU-S13, HU-S14, HU-U08 |
 | Backend de solicitudes | Tarea programada que vence las solicitudes pendientes sin respuesta | LD | HU-S15 |
 
@@ -248,7 +248,7 @@ Se agruparon los sprints en dos épicas de dos sprints cada una:
 |---|---|---|---|
 | Frontend de solicitudes | Flujo de nueva solicitud (/solicitar): ubicación, categoría, descripción, día y horario, profesional y envío | AV | HU-S01 a HU-S06 |
 | Frontend de solicitudes | Pantallas “Mis solicitudes” y “Solicitudes recibidas”, con filtro por estado | AV | HU-S08 |
-| Frontend de solicitudes | Acciones de aceptar, rechazar con motivo, cancelar y completar | AV | HU-S09 a HU-S12 |
+| Frontend de solicitudes | Acciones de aceptar, rechazar, informar el viaje y el trabajo realizado, cancelar y confirmar | AV | HU-S09 a HU-S12 |
 | Frontend de solicitudes | Pantalla de chat y pantalla de calificación | AV | HU-S13, HU-S14 |
 | Frontend de solicitudes | Bandeja de notificaciones y resumen del administrador | AV | HU-S16, HU-U14 |
 | Testing de solicitudes | Diseñar los casos de prueba de las historias HU-S01 a HU-S17 | NV | HU-S01 a HU-S17 |
@@ -345,11 +345,11 @@ Una historia de usuario se considera terminada cuando:
     - `Given` que abro el detalle de un profesional.
     - `When` modifico su legajo o sus especialidades y guardo.
     - `Then` los cambios quedan registrados en el padrón.
-- **HU-U11 · Desactivar y reactivar cuentas**
-  *Como administrador quiero desactivar cuentas para sancionar incumplimientos sin perder el historial.*
-  - **Scenario: Desactivar una cuenta**
+- **HU-U11 · Suspender y reactivar cuentas**
+  *Como administrador quiero suspender cuentas para sancionar incumplimientos sin perder el historial.*
+  - **Scenario: Suspender una cuenta**
     - `Given` que abro el detalle de una cuenta activa.
-    - `When` la desactivo y confirmo.
+    - `When` la suspendo y confirmo.
     - `Then` queda `SUSPENDIDO` y no puede operar.
     - `And` se conserva su historial.
 - **HU-U12 · Gestionar categorías**
@@ -448,28 +448,29 @@ Una historia de usuario se considera terminada cuando:
     - `When` la acepto.
     - `Then` pasa a `ACEPTADA` y veo la dirección exacta.
     - `And` el cliente recibe un aviso.
-- **HU-S10 · Rechazar con motivo**
-  *Como profesional quiero rechazar indicando el motivo para que el cliente busque otro profesional.*
+- **HU-S10 · Rechazar una solicitud**
+  *Como profesional quiero rechazar una solicitud y, si quiero, indicar un motivo para que el cliente sepa por qué.*
   - **Scenario: Rechazo con motivo**
     - `Given` que tengo una solicitud `PENDIENTE`.
-    - `When` la rechazo indicando un motivo obligatorio.
+    - `When` la rechazo y selecciono un motivo común o escribo uno breve.
     - `Then` pasa a `RECHAZADA` y el cliente recibe el motivo.
   - **Scenario: Rechazo sin motivo**
     - `Given` que tengo una solicitud `PENDIENTE`.
-    - `When` intento rechazarla sin motivo.
-    - `Then` el sistema no me lo permite.
+    - `When` la rechazo sin elegir un motivo.
+    - `Then` pasa a `RECHAZADA` sin motivo.
 - **HU-S11 · Cancelar un turno**
   *Como cliente o profesional quiero cancelar con un motivo para avisar si no se puede cumplir.*
   - **Scenario: Cancelación**
-    - `Given` que la solicitud está `PENDIENTE` o `ACEPTADA`.
-    - `When` la cancelo indicando un motivo.
+    - `Given` que la solicitud está en una etapa no final.
+    - `When` la cancelo seleccionando un motivo común o escribiendo uno breve.
     - `Then` pasa a `CANCELADA` y se registra quién canceló.
     - `And` la otra parte recibe un aviso.
+    - `And` el motivo es obligatorio; al elegir «Otro» se pide un texto de hasta 100 caracteres.
 - **HU-S12 · Completar el trabajo**
-  *Como cliente o profesional quiero marcar el trabajo como terminado para cerrar el ciclo.*
-  - **Scenario: Trabajo terminado**
-    - `Given` que la solicitud está `ACEPTADA`.
-    - `When` cualquiera de las dos partes la marca como completada.
+  *Como cliente quiero confirmar el trabajo realizado para cerrar el ciclo y habilitar la calificación.*
+  - **Scenario: Confirmación del cliente**
+    - `Given` que el profesional marcó la solicitud como `TRABAJO_REALIZADO`.
+    - `When` confirmo que el trabajo fue realizado.
     - `Then` pasa a `COMPLETADA` y se habilita la calificación.
 
 #### COORDINACIÓN Y CALIFICACIÓN
@@ -521,11 +522,11 @@ Una historia de usuario se considera terminada cuando:
 | **RF-05** | Alta individual de profesionales por el Administrador, con contraseña temporal y cambio obligatorio en el primer ingreso. | HU-U05, HU-U09 |
 | **RF-06** | Activación del perfil por el propio profesional (foto, zona geográfica de cobertura y horarios semanales). | HU-U06 |
 | **RF-07** | Gestión de la disponibilidad horaria por parte del profesional (franjas semanales por día). | HU-U07 |
-| **RF-08** | Consulta y edición del padrón y de los clientes; desactivación y reactivación de cuentas conservando el historial. | HU-U10, HU-U11, HU-U13 |
+| **RF-08** | Consulta y edición del padrón y de los clientes; suspensión y reactivación de cuentas conservando el historial. | HU-U10, HU-U11, HU-U13 |
 | **RF-09** | Gestión de categorías de oficios técnicos por el Administrador. | HU-U12 |
 | **RF-10** | Directorio con búsqueda de profesionales por categoría, disponibilidad y proximidad geográfica. | HU-S01, HU-S02, HU-S04, HU-S05 |
 | **RF-11** | Creación de solicitudes de turno por el cliente, con protección de su dirección exacta hasta la aceptación. | HU-S01 a HU-S07 |
-| **RF-12** | Gestión del ciclo de la solicitud: consulta, aceptación, rechazo con motivo, cancelación con motivo y finalización por cualquiera de las partes, sin turnos superpuestos. | HU-S08 a HU-S12, HU-S17 |
+| **RF-12** | Gestión del ciclo de la solicitud: consulta, aceptación, rechazo con motivo opcional, inicio del viaje y aviso de trabajo realizado por el profesional, confirmación de finalización por el cliente, cancelación con motivo y control de turnos superpuestos. | HU-S08 a HU-S12, HU-S17 |
 | **RF-13** | Mensajería de texto en vivo asociada a cada solicitud, entre cliente y profesional mediante WebSocket / STOMP. | HU-S13 |
 | **RF-14** | Calificación única de 1 a 5 estrellas con comentario por parte del cliente, y consulta de la reputación por el profesional. | HU-S14, HU-U08 |
 | **RF-15** | Vencimiento automático de las solicitudes pendientes sin respuesta al expirar el plazo configurado. | HU-S15 |
@@ -561,7 +562,7 @@ Una historia de usuario se considera terminada cuando:
 | `HU-U08` | Ver mi reputación | Profesional | RF-14 | 1–2 |
 | `HU-U09` | Dar de alta a un profesional | Administrador | RF-05 | 1–2 |
 | `HU-U10` | Consultar y modificar el padrón | Administrador | RF-08 | 1–2 |
-| `HU-U11` | Desactivar y reactivar cuentas | Administrador | RF-08 | 1–2 |
+| `HU-U11` | Suspender y reactivar cuentas | Administrador | RF-08 | 1–2 |
 | `HU-U12` | Gestionar categorías | Administrador | RF-09 | 1–2 |
 | `HU-U13` | Consultar clientes | Administrador | RF-08 | 1–2 |
 | `HU-U14` | Ver el resumen de la plataforma | Administrador | RF-17 | 3–4 |
@@ -575,9 +576,9 @@ Una historia de usuario se considera terminada cuando:
 | `HU-S07` | Proteger mi domicilio | Cliente | RF-11 | 3–4 |
 | `HU-S08` | Ver mis solicitudes | Cliente y profesional | RF-12 | 3–4 |
 | `HU-S09` | Aceptar una solicitud | Profesional | RF-12, RF-16 | 3–4 |
-| `HU-S10` | Rechazar con motivo | Profesional | RF-12, RF-16 | 3–4 |
+| `HU-S10` | Rechazar una solicitud | Profesional | RF-12, RF-16 | 3–4 |
 | `HU-S11` | Cancelar un turno | Cliente y profesional | RF-12, RF-16 | 3–4 |
-| `HU-S12` | Completar el trabajo | Cliente y profesional | RF-12 | 3–4 |
+| `HU-S12` | Completar el trabajo | Cliente | RF-12 | 3–4 |
 | `HU-S13` | Chatear para coordinar | Cliente y profesional | RF-13 | 3–4 |
 | `HU-S14` | Calificar el servicio | Cliente | RF-14 | 3–4 |
 | `HU-S15` | Vencimiento automático | Sistema | RF-15, RF-16 | 3–4 |
@@ -592,7 +593,7 @@ Una historia de usuario se considera terminada cuando:
 
 Los actores del sistema son el **Cliente**, el **Profesional** y el **Administrador**. Los casos de uso se agrupan en las dos épicas del MVP:
 - **Gestión de usuarios:** registro, ingreso, recuperación de contraseña, perfil, aceptación de términos, alta y administración del padrón de profesionales, categorías y gestión de clientes.
-- **Gestión de solicitudes:** crear solicitud guiada en 6 pasos, aceptar/rechazar con motivo, cancelar, completar, chat en tiempo real, calificación y vencimiento automático.
+- **Gestión de solicitudes:** crear solicitud guiada en 6 pasos, aceptar/rechazar (motivo opcional), marcar `EN_CAMINO` y `TRABAJO_REALIZADO`, confirmar la finalización con el cliente, cancelar, chat en tiempo real, calificación y vencimiento automático.
 
 > Enlace al diagrama de casos de uso:
 > **https://drive.google.com/file/d/1Ju9MOgnjGWvL1gTsbLSjPvBHsg_gcU9h/view?usp=sharing**
@@ -600,7 +601,7 @@ Los actores del sistema son el **Cliente**, el **Profesional** y el **Administra
 ### 5.2 Diagrama de clases
 
 Las entidades del dominio son:
-- **`Usuario`:** datos personales (nombre, apellido, email, teléfono), rol de negocio (`CLIENTE`, `PROFESIONAL`, `ADMIN`), clave de foto de perfil, estado de la cuenta (`CARGADO`, `ACTIVO`, `SUSPENDIDO`, `INACTIVO`) y términos aceptados (versión y fecha).
+- **`Usuario`:** datos personales (nombre, apellido, email, teléfono), rol de negocio (`CLIENTE`, `PROFESIONAL`, `ADMIN`), clave de foto de perfil, estado de cuenta (`ACTIVO`, `SUSPENDIDO`) y términos aceptados (versión y fecha).
 - **`Profesional`:** legajo institucional único, centro de zona de cobertura (latitud/longitud cifradas), radio en kilómetros, estado del perfil (`CARGADO`, `ACTIVO`, `SUSPENDIDO`) y fecha de activación.
 - **`Disponibilidad`:** franjas horarias semanales (`diaSemana`, `horaInicio`, `horaFin`) asociadas a un profesional.
 - **`Especialidad`:** catálogo de oficios técnicos validados por la Universidad Popular.
@@ -615,32 +616,33 @@ Las entidades del dominio son:
 ### 5.3 Diagramas de estados y transiciones
 
 #### 5.3.1 Estados de la solicitud
-Los estados posibles son `PENDIENTE`, `ACEPTADA`, `RECHAZADA`, `COMPLETADA`, `CANCELADA` y `VENCIDA`. Los estados finales son `RECHAZADA`, `COMPLETADA`, `CANCELADA` y `VENCIDA`.
+Los estados posibles son `PENDIENTE`, `ACEPTADA`, `EN_CAMINO`, `TRABAJO_REALIZADO`, `RECHAZADA`, `COMPLETADA`, `CANCELADA` y `VENCIDA`. Los estados finales son `RECHAZADA`, `COMPLETADA`, `CANCELADA` y `VENCIDA`.
 
 | Desde | Evento | Actor | Hacia | Condición o efecto |
 |---|---|---|---|---|
 | *(inicio)* | Crear solicitud | Cliente | `PENDIENTE` | El profesional ve solo la zona y un punto aproximado (~1.1 km de margen); recibe aviso por correo. |
 | `PENDIENTE` | Aceptar | Profesional | `ACEPTADA` | Se revela la dirección exacta y coordenadas reales; valida no superposición; el cliente recibe aviso. |
-| `PENDIENTE` | Rechazar | Profesional | `RECHAZADA` | El motivo es obligatorio y el cliente lo recibe; estado final. |
+| `PENDIENTE` | Rechazar | Profesional | `RECHAZADA` | Motivo opcional, con opciones comunes y «Otro» (hasta 100 caracteres); estado final. |
 | `PENDIENTE` | Cancelar | Cliente o Profesional | `CANCELADA` | Motivo obligatorio; se registra quién canceló y la otra parte recibe aviso; estado final. |
 | `ACEPTADA` | Cancelar | Cliente o Profesional | `CANCELADA` | Motivo obligatorio; se registra quién canceló y la otra parte recibe aviso; estado final. |
-| `ACEPTADA` | Completar | Cliente o Profesional | `COMPLETADA` | Marca el trabajo terminado; habilita la calificación por parte del cliente; estado final. |
+| `ACEPTADA` | Iniciar el viaje | Profesional | `EN_CAMINO` | Se notifica al cliente que el profesional está en camino. |
+| `EN_CAMINO` | Marcar trabajo realizado | Profesional | `TRABAJO_REALIZADO` | Se avisa al cliente para que revise el trabajo y confirme. |
+| `TRABAJO_REALIZADO` | Confirmar trabajo | Cliente | `COMPLETADA` | Cierra el ciclo y habilita la calificación; estado final. |
+| `EN_CAMINO` o `TRABAJO_REALIZADO` | Cancelar | Cliente o Profesional | `CANCELADA` | Motivo obligatorio; se registra quién canceló y la otra parte recibe aviso; estado final. |
 | `PENDIENTE` | Vencer | Sistema (Scheduler) | `VENCIDA` | Supera `SOLICITUDES_TIEMPO_EXPIRACION_HOURS` sin respuesta; ambas partes reciben aviso; estado final. |
 
 > Enlace al diagrama de estados de la solicitud:
 > **https://drive.google.com/file/d/1Em1No0Op45QV2_i3s2ZJCFdKz--MmYk3/view?usp=sharing**
 
 #### 5.3.2 Estados de cuenta
-Los estados son `CARGADO`, `ACTIVO`, `SUSPENDIDO` e `INACTIVO` (este último para clientes baneados).
+Las cuentas de clientes y profesionales comparten `ACTIVO` y `SUSPENDIDO`. `CARGADO` es un estado exclusivo del perfil profesional que todavía no completó la activación; no es un estado de cuenta.
 
 | Desde | Evento | Actor | Hacia | Condición o efecto |
 |---|---|---|---|---|
-| *(inicio)* | Registro | Cliente | `ACTIVO` | Cuenta creada con rol Cliente tras confirmar email. |
-| *(inicio)* | Alta | Administrador | `CARGADO` | Profesional con contraseña temporal creada en Keycloak; todavía no es visible en el padrón. |
-| `CARGADO` | Activar perfil | Profesional | `ACTIVO` | Completa foto, zona de cobertura y horarios semanales; aparece visible en el padrón público. |
-| `ACTIVO` | Suspender | Administrador | `SUSPENDIDO` | No puede operar ninguna acción autenticada (corte en BFF); se conserva todo su historial. |
-| `SUSPENDIDO` | Reactivar | Administrador | `ACTIVO` | Se levanta la sanción; vuelve a operar con normalidad. |
-| `ACTIVO` | Banear | Administrador | `INACTIVO` | Cliente sancionado de forma permanente. |
+| *(inicio)* | Registro / alta de cuenta | Cliente o Administrador | `ACTIVO` | El profesional además recibe un perfil `CARGADO` hasta completar su activación. |
+| `CARGADO` (perfil) | Activar perfil | Profesional | `ACTIVO` (perfil) | Completa foto, zona de cobertura y horarios semanales; aparece visible en el padrón público. |
+| `ACTIVO` | Suspender | Administrador | `SUSPENDIDO` | Se bloquea el acceso a la cuenta; si es profesional, también se suspende el perfil y deja de recibir solicitudes. Se conserva el historial. |
+| `SUSPENDIDO` | Reactivar | Administrador | `ACTIVO` | Se restablece el acceso; el perfil profesional vuelve a `ACTIVO` si ya estaba activado o a `CARGADO` si todavía no. |
 
 > Enlace al diagrama de estados de cuenta:
 > **https://drive.google.com/file/d/1veufyzMZeWApTWF-NPNIUsajX1ZyAODh/view?usp=sharing**
@@ -714,7 +716,7 @@ Las integraciones de infraestructura que no aparecen como microservicios de domi
   5. **Fotos privadas:** valida tipo y tamaño, accede al almacenamiento local respaldado por `fotos_data` y aplica la matriz de visibilidad de fotos.
   6. **Avisos y scheduler:** conecta directamente con el proveedor SMTP para enviar correos de alta y de solicitudes; ejecuta el cron de expiración cada 15 segundos. Keycloak también conecta directamente con SMTP para sus correos de identidad.
   7. **Límite arquitectónico:** es el componente de borde/orquestación específico de la aplicación, no uno de los microservicios de dominio. En el MVP también concentra correo y acceso a fotos por su integración con las operaciones HTTP y la autorización. Si estos procesos requieren escalado, entrega garantizada o ciclo de vida independiente, deben extraerse detrás de contratos/eventos, no convertirlos en dependencias de los servicios de dominio por defecto.
-- **`ms-usuarios` (Puerto 8081):** Cuentas y perfiles de clientes y administradores, estado de negocio (`CARGADO`, `ACTIVO`, `SUSPENDIDO`, `INACTIVO`), vinculación de `keycloakId` y registro de términos y condiciones (versión y fecha).
+- **`ms-usuarios` (Puerto 8081):** Cuentas de clientes, profesionales y administradores, estado de cuenta (`ACTIVO`, `SUSPENDIDO`), vinculación de `keycloakId` y registro de términos y condiciones (versión y fecha).
 - **`ms-profesionales` (Puerto 8082):** Padrón de técnicos, legajos, categorías/especialidades, disponibilidad horaria semanal y activación del perfil.
 - **`ms-solicitudes` (Puerto 8083):** Ciclo de vida completo de solicitudes, validación de turnos superpuestos, geocodificación con Nominatim, chat, calificaciones y vencimiento.
 
@@ -759,7 +761,7 @@ Las integraciones de infraestructura que no aparecen como microservicios de domi
 | Rol | Qué hace | Pantalla principal |
 |---|---|---|
 | **Cliente / Vecino** | Busca oficios, define su ubicación geográfica, solicita turno, chatea para coordinar y califica el servicio finalizado. | `/solicitar` → `/solicitudes` |
-| **Profesional Técnico** | Completa su activación (foto, radio de cobertura, horarios semanales), gestiona solicitudes (acepta/rechaza con motivo), coordina por chat. | `/activar-perfil` → `/solicitudes` |
+| **Profesional Técnico** | Completa su activación (foto, radio de cobertura, horarios semanales), gestiona solicitudes (acepta/rechaza, informa viaje y trabajo realizado), coordina por chat. | `/activar-perfil` → `/solicitudes` |
 | **Administrador Institucional** | Da de alta profesionales al padrón con legajo y especialidades, monitorea el estado (Cargado, Activo, Suspendido), suspende y reactiva cuentas. | `/admin` |
 
 Los roles son **roles de negocio** persistidos en `ms-usuarios` (`Usuario.rolNegocio`) y replicados como roles de realm en Keycloak. En Spring Security se mapean con el prefijo estándar `ROLE_CLIENTE`, `ROLE_PROFESIONAL` y `ROLE_ADMIN`.
@@ -828,8 +830,8 @@ Todos los endpoints cuelgan del prefijo `/api`. El BFF aplica RBAC según la reg
 | POST | `/api/profesionales` | `ADMIN` | Alta tradicional de profesional en el padrón. |
 | POST | `/api/profesionales/alta` | `ADMIN` | Alta en un paso: crea cuenta en Keycloak con contraseña temporal, usuario y perfil pendiente. |
 | PUT | `/api/profesionales/{id}` | `ADMIN` | Edición de legajo y especialidades en el padrón. |
-| PATCH | `/api/profesionales/{id}/suspender` | `ADMIN` | Desactivación / baja lógica (pasa a estado `SUSPENDIDO`). |
-| PATCH | `/api/profesionales/{id}/reactivar` | `ADMIN` | Levanta la suspensión (vuelve a estado `ACTIVO`). |
+| PATCH | `/api/profesionales/{id}/suspender` | `ADMIN` | Suspende el perfil y la cuenta asociada (`SUSPENDIDO`). |
+| PATCH | `/api/profesionales/{id}/reactivar` | `ADMIN` | Reactiva la cuenta y devuelve el perfil a `ACTIVO` o `CARGADO`, según si completó la activación. |
 | PUT | `/api/profesionales/{id}/disponibilidad` | `PROFESIONAL` | Guarda las franjas horarias semanales de atención. |
 | GET | `/api/profesionales/{id}/disponibilidad` | Autenticado | Consulta los horarios semanales de atención. |
 | GET | `/api/mi-reputacion` | `PROFESIONAL` | Consulta el promedio de estrellas y cantidad de calificaciones propias. |
@@ -841,8 +843,10 @@ Todos los endpoints cuelgan del prefijo `/api`. El BFF aplica RBAC según la reg
 | GET | `/api/solicitudes/mias` | Autenticado | Listado de solicitudes del actor (como cliente o profesional). |
 | GET | `/api/solicitudes/panel` | `ADMIN` | Indicadores de demanda y recorrido histórico de solicitudes. |
 | PATCH | `/api/solicitudes/{id}/aceptar` | `PROFESIONAL` | Acepta el turno (pasa a `ACEPTADA`); revela la dirección exacta. |
-| PATCH | `/api/solicitudes/{id}/rechazar` | `PROFESIONAL` | Rechaza el turno con motivo obligatorio (pasa a `RECHAZADA`). |
-| PATCH | `/api/solicitudes/{id}/completar` | `CLIENTE` o `PROFESIONAL` | Marca el trabajo terminado (pasa a `COMPLETADA`); habilita calificar. |
+| PATCH | `/api/solicitudes/{id}/rechazar` | `PROFESIONAL` | Rechaza el turno con motivo opcional (pasa a `RECHAZADA`). |
+| PATCH | `/api/solicitudes/{id}/en-camino` | `PROFESIONAL` | Marca el inicio del viaje (pasa a `EN_CAMINO`). |
+| PATCH | `/api/solicitudes/{id}/trabajo-realizado` | `PROFESIONAL` | Informa que terminó el trabajo (pasa a `TRABAJO_REALIZADO`) y pide confirmación al cliente. |
+| PATCH | `/api/solicitudes/{id}/completar` | `CLIENTE` | Confirma el trabajo realizado (pasa a `COMPLETADA`); habilita calificar. |
 | PATCH | `/api/solicitudes/{id}/cancelar` | `CLIENTE` o `PROFESIONAL` | Cancela el turno con motivo obligatorio (pasa a `CANCELADA`). |
 
 ### 8.3 Mensajes, chat en vivo y calificaciones
@@ -866,7 +870,7 @@ Todos los endpoints cuelgan del prefijo `/api`. El BFF aplica RBAC según la reg
 | POST | `/api/usuarios` | `ADMIN` | Creación administrativa de usuario de negocio. |
 | PATCH | `/api/usuarios/{id}` | `ADMIN` | Edición de datos personales del usuario. |
 | PATCH | `/api/usuarios/yo` | Autenticado | Edición de datos del perfil propio (nombre, apellido, teléfono). |
-| PATCH | `/api/usuarios/{id}/suspender` | `ADMIN` | Desactiva una cuenta de cliente (estado `SUSPENDIDO`). |
+| PATCH | `/api/usuarios/{id}/suspender` | `ADMIN` | Suspende una cuenta de cliente (estado `SUSPENDIDO`). |
 | PATCH | `/api/usuarios/{id}/reactivar` | `ADMIN` | Reactiva una cuenta de cliente. |
 | DELETE | `/api/usuarios/{id}` | `ADMIN` | Baja lógica de la cuenta. |
 
@@ -911,7 +915,7 @@ Los identificadores de todas las entidades son `UUID`. No se utilizan claves for
 | `telefono` | `VARCHAR(50)` | Opcional. |
 | `fotoUrl` | `VARCHAR(512)` | Almacena la **clave** del archivo en el volumen privado (ej: `perfiles/<uuid>.jpg`), no una URL pública. |
 | `rolNegocio` | `ENUM` | `CLIENTE`, `PROFESIONAL`, `ADMIN`. |
-| `estado` | `ENUM` | `CARGADO`, `ACTIVO`, `SUSPENDIDO`, `INACTIVO`. |
+| `estado` | `ENUM` | `ACTIVO`, `SUSPENDIDO`. |
 | `fechaAlta` | `TIMESTAMP WITH TIME ZONE` | Momento de creación del registro. |
 | `terminos_version` | `VARCHAR(32)` | Versión de los términos aceptados (ej: `2026-11-01`). |
 | `terminos_aceptado_en`| `TIMESTAMP WITH TIME ZONE` | Fecha y hora exacta de aceptación de términos. |
@@ -953,8 +957,8 @@ Los identificadores de todas las entidades son `UUID`. No se utilizan claves for
 | `longitud` | `TEXT` | Longitud del domicilio cifrada con AES-256-GCM. |
 | `fechaHoraPropuesta` | `TIMESTAMP` | Inicio del turno acordado. |
 | `fechaHoraFinPropuesta` | `TIMESTAMP` | Fin estimado del turno. |
-| `estado` | `ENUM` | `PENDIENTE`, `ACEPTADA`, `RECHAZADA`, `COMPLETADA`, `CANCELADA`, `VENCIDA`. |
-| `motivoCancelacion` | `VARCHAR(500)` | Obligatorio si el estado es `RECHAZADA` o `CANCELADA`. |
+| `estado` | `ENUM` | `PENDIENTE`, `ACEPTADA`, `EN_CAMINO`, `TRABAJO_REALIZADO`, `RECHAZADA`, `COMPLETADA`, `CANCELADA`, `VENCIDA`. |
+| `motivoCancelacion` | `VARCHAR(500)` | Opcional al rechazar; obligatorio al cancelar. Los textos ingresados por el flujo están limitados a 100 caracteres. |
 | `canceladaPor` | `UUID` | Identificador del usuario que canceló la solicitud. |
 | `fechaCreacion` | `TIMESTAMP` | Fecha de creación del pedido. |
 | `fechaCambioEstado`| `TIMESTAMP` | Fecha de última transición del ciclo de vida. |
@@ -997,9 +1001,9 @@ Ambos modelos (`Usuario` y `Profesional`) guardan en `fotoUrl` la **clave intern
 |---|---|
 | **Público** | `GET /api/profesionales`, `GET /api/calificaciones`, `GET /api/especialidades`, `GET /api/gps`, `GET /actuator/health`, `OPTIONS /**` |
 | **ADMIN** | `GET /api/usuarios`, `POST /api/usuarios`, `PATCH /api/usuarios/{id}`, `PATCH /api/usuarios/{id}/suspender`, `PATCH /api/usuarios/{id}/reactivar`, `DELETE /api/usuarios/{id}`, `POST /api/profesionales`, `POST /api/profesionales/alta`, `PUT /api/profesionales/{id}`, `PATCH /api/profesionales/{id}/suspender`, `PATCH /api/profesionales/{id}/reactivar`, CRUD `/api/especialidades/**`, `GET /api/solicitudes/panel`, `GET /api/usuarios/por-email` |
-| **PROFESIONAL** | `POST /api/profesionales/activar`, `GET /api/profesionales/mi-perfil`, `POST /api/profesionales/vincular`, `PUT /api/profesionales/{id}/disponibilidad`, `GET /api/mi-reputacion`, `PATCH /api/solicitudes/{id}/aceptar`, `PATCH /api/solicitudes/{id}/rechazar` |
-| **CLIENTE** | `POST /api/solicitudes`, `POST /api/solicitudes/{id}/calificacion` |
-| **Cualquiera de los dos** | `PATCH /api/solicitudes/{id}/completar`, `PATCH /api/solicitudes/{id}/cancelar` |
+| **PROFESIONAL** | `POST /api/profesionales/activar`, `GET /api/profesionales/mi-perfil`, `POST /api/profesionales/vincular`, `PUT /api/profesionales/{id}/disponibilidad`, `GET /api/mi-reputacion`, `PATCH /api/solicitudes/{id}/aceptar`, `PATCH /api/solicitudes/{id}/rechazar`, `PATCH /api/solicitudes/{id}/en-camino`, `PATCH /api/solicitudes/{id}/trabajo-realizado` |
+| **CLIENTE** | `POST /api/solicitudes`, `POST /api/solicitudes/{id}/calificacion`, `PATCH /api/solicitudes/{id}/completar` |
+| **CLIENTE o PROFESIONAL** | `PATCH /api/solicitudes/{id}/cancelar` |
 | **Solo Autenticado** | `GET /api/solicitudes/mias`, historial de mensajes, envío de mensajes por chat, ver disponibilidad ajena, `GET /api/usuarios/{id}` |
 
 ### 10.4 Alta del profesional sin auto-registro
@@ -1195,7 +1199,7 @@ La maqueta interactiva original del proyecto se desarrolló en v0 (Next.js) y se
   *(Enlace: https://drive.google.com/file/d/1btT906f3BM3RUKJ19vn9AyYQmFGWjRP4/view?usp=sharing)*
 - **Figura 3:** Pantalla *"Nueva solicitud"*, paso 1: ubicación del servicio por dirección o mapa interactivo (`HU-S01`).
   *(Enlace: https://drive.google.com/file/d/1Em1No0Op45QV2_i3s2ZJCFdKz--MmYk3/view?usp=sharing)*
-- **Figura 4:** Pantalla *"Solicitudes recibidas"* del profesional, con ubicación aproximada y acciones de aceptar o rechazar con motivo (`HU-S07`, `HU-S08`, `HU-S09`, `HU-S10`).
+- **Figura 4:** Pantalla *"Solicitudes recibidas"* del profesional, con ubicación aproximada y acciones de aceptar o rechazar (motivo opcional) (`HU-S07`, `HU-S08`, `HU-S09`, `HU-S10`).
 - **Figura 5:** Chat de la solicitud en tiempo real (`HU-S13`).
   *(Enlace: https://drive.google.com/file/d/1veufyzMZeWApTWF-NPNIUsajX1ZyAODh/view?usp=sharing)*
 - **Figura 6:** Resumen del Administrador con indicadores de demanda y recorrido de solicitudes (`HU-U14`).

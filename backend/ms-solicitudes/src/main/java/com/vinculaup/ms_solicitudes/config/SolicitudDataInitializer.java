@@ -122,6 +122,8 @@ public class SolicitudDataInitializer {
                 "Quiero revisar la instalacion electrica de la casa antes de winter.",
                 ahora.minusDays(3), ahora.minusDays(3).plusHours(2)));
         completada.cambiarEstado(EstadoSolicitud.ACEPTADA);
+        completada.cambiarEstado(EstadoSolicitud.EN_CAMINO);
+        completada.cambiarEstado(EstadoSolicitud.TRABAJO_REALIZADO);
         completada.cambiarEstado(EstadoSolicitud.COMPLETADA);
         solicitudRepo.save(completada);
         calificacionRepo.save(new Calificacion(completada.getId(), 5,
@@ -177,4 +179,3 @@ public class SolicitudDataInitializer {
         }
     }
 }
-

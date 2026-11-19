@@ -362,12 +362,12 @@ export class ApiService {
     return this.http.patch<UserAccount>(`${this.baseUrl}/usuarios/${id}`, request, { headers: this.authHeaders() });
   }
 
-  /** Baneo administrativo de una cuenta (clientes incluidos). */
+  /** Suspensión administrativa reversible de una cuenta. */
   suspendUser(id: string): Observable<unknown> {
     return this.http.patch(`${this.baseUrl}/usuarios/${id}/suspender`, {}, { headers: this.authHeaders() });
   }
 
-  /** Levanta el baneo de una cuenta y la devuelve a ACTIVO. */
+  /** Levanta la suspensión y devuelve la cuenta a ACTIVO. */
   reactivateUser(id: string): Observable<unknown> {
     return this.http.patch(`${this.baseUrl}/usuarios/${id}/reactivar`, {}, { headers: this.authHeaders() });
   }
@@ -471,6 +471,18 @@ export class ApiService {
 
   acceptRequest(requestId: string, actorId: string, motivo = ''): Observable<ServiceRequest> {
     return this.http.patch<ServiceRequest>(`${this.baseUrl}/solicitudes/${requestId}/aceptar`, { actorId, motivo }, { headers: this.authHeaders() }).pipe(
+      map((request) => this.toServiceRequest(request)),
+    );
+  }
+
+  markRequestEnCamino(requestId: string, actorId: string): Observable<ServiceRequest> {
+    return this.http.patch<ServiceRequest>(`${this.baseUrl}/solicitudes/${requestId}/en-camino`, { actorId }, { headers: this.authHeaders() }).pipe(
+      map((request) => this.toServiceRequest(request)),
+    );
+  }
+
+  markRequestTrabajoRealizado(requestId: string, actorId: string): Observable<ServiceRequest> {
+    return this.http.patch<ServiceRequest>(`${this.baseUrl}/solicitudes/${requestId}/trabajo-realizado`, { actorId }, { headers: this.authHeaders() }).pipe(
       map((request) => this.toServiceRequest(request)),
     );
   }
@@ -624,7 +636,7 @@ export class ApiService {
 
   private normalizeStatus(value: RequestStatus | string): RequestStatus {
     const normalized = String(value ?? 'PENDIENTE').toUpperCase();
-    if (normalized === 'ACEPTADA' || normalized === 'RECHAZADA' || normalized === 'COMPLETADA' || normalized === 'CANCELADA' || normalized === 'VENCIDA' || normalized === 'PENDIENTE') {
+    if (normalized === 'ACEPTADA' || normalized === 'EN_CAMINO' || normalized === 'TRABAJO_REALIZADO' || normalized === 'RECHAZADA' || normalized === 'COMPLETADA' || normalized === 'CANCELADA' || normalized === 'VENCIDA' || normalized === 'PENDIENTE') {
       return normalized as RequestStatus;
     }
     return 'PENDIENTE';

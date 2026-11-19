@@ -122,9 +122,20 @@ public class NotificacionService {
                 asunto = "Vincula-UP · Tu solicitud fue aceptada";
                 detalle = "El profesional aceptó tu solicitud. Ya podés entrar para coordinar los detalles del servicio.";
             }
+            case "EN_CAMINO" -> {
+                asunto = "Vincula-UP · El profesional está en camino";
+                detalle = "El profesional inició el viaje hacia el domicilio.";
+            }
+            case "TRABAJO_REALIZADO" -> {
+                asunto = "Vincula-UP · El trabajo fue realizado";
+                detalle = "El profesional marcó el trabajo como realizado. Iniciá sesión para revisarlo y confirmar la finalización.";
+            }
             case "RECHAZADA" -> {
                 asunto = "Vincula-UP · Actualización de tu solicitud";
                 detalle = "El profesional no podrá tomar esta solicitud. Podés volver a buscar otro profesional desde la aplicación.";
+                if (motivo != null && !motivo.isBlank()) {
+                    detalle += " Motivo: " + motivo.trim();
+                }
             }
             case "COMPLETADA" -> {
                 asunto = "Vincula-UP · Solicitud completada";

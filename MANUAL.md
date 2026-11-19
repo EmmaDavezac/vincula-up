@@ -78,7 +78,7 @@ tres reglas de rótulo:
 |---|---|
 | `Nuevo` / `Nueva` | Abre un formulario de alta |
 | `Guardar` | Confirma el envío de un formulario |
-| Verbo de la acción | Todo lo demás ("Desactivar", "Eliminar") |
+| Verbo de la acción | Todo lo demás ("Suspender", "Eliminar") |
 
 **El hover solo cambia el color** (fondo, borde o texto). Ningún botón se levanta,
 escala ni se desplaza: un hover que mueve píxeles empuja el contenido de abajo y
@@ -330,7 +330,9 @@ curl -s -H "Authorization: Bearer $TOKEN" http://localhost:9001/api/usuarios
 Con `SEMBRAR_DEMO=true` (por defecto) se siembran las 3 cuentas de prueba (con
 su rol), 6 especialidades, un profesional de ejemplo con disponibilidad, y **4
 solicitudes en distintos estados** (pendiente, aceptada con chat, completada y
-calificada, rechazada) para que los listados no se vean vacíos.
+calificada, rechazada) para que los listados no se vean vacíos. En las solicitudes
+reales, el profesional informa cuando está en camino y cuando realizó el trabajo;
+el cliente confirma para completar y calificar.
 
 > Las **solicitudes** solo se siembran si el profesional de ejemplo tiene su
 > cuenta resuelta. Es automático: al sembrar las cuentas, `ms-profesionales`

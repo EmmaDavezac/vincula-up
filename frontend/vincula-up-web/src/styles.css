@@ -766,6 +766,16 @@ button.mat-mdc-button.vu-btn--quiet {
 	color: var(--alert-success-ink);
 }
 
+.vu-badge--en-camino {
+	background: var(--alert-warning-bg);
+	color: var(--amber);
+}
+
+.vu-badge--trabajo-realizado {
+	background: var(--alert-info-bg);
+	color: var(--navy);
+}
+
 .vu-badge--completada {
 	background: var(--alert-info-bg);
 	color: var(--navy);

@@ -95,6 +95,17 @@ public class SolicitudController {
         return service.aceptar(id, request);
     }
 
+    @PatchMapping("/{id}/en-camino")
+    public SolicitudResponse marcarEnCamino(@PathVariable UUID id, @Valid @RequestBody CambiarEstadoRequest request) {
+        return service.marcarEnCamino(id, request);
+    }
+
+    @PatchMapping("/{id}/trabajo-realizado")
+    public SolicitudResponse marcarTrabajoRealizado(
+            @PathVariable UUID id, @Valid @RequestBody CambiarEstadoRequest request) {
+        return service.marcarTrabajoRealizado(id, request);
+    }
+
     @PatchMapping("/{id}/rechazar")
     public SolicitudResponse rechazar(@PathVariable UUID id, @Valid @RequestBody CambiarEstadoRequest request) {
         return service.rechazar(id, request);

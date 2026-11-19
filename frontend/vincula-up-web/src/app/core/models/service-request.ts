@@ -1,4 +1,12 @@
-export type RequestStatus = 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA' | 'COMPLETADA' | 'CANCELADA' | 'VENCIDA';
+export type RequestStatus =
+  | 'PENDIENTE'
+  | 'ACEPTADA'
+  | 'EN_CAMINO'
+  | 'TRABAJO_REALIZADO'
+  | 'RECHAZADA'
+  | 'COMPLETADA'
+  | 'CANCELADA'
+  | 'VENCIDA';
 
 export interface ServiceRating {
   puntaje: number;

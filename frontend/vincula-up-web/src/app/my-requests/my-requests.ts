@@ -10,6 +10,7 @@ import { ApiService, ClienteInfo } from '../core/services/api.service';
 import { AuthService } from '../core/services/auth.service';
 import { RequestService } from '../core/services/request.service';
 import { NotificationService } from '../core/services/notification.service';
+import { OperationFeedbackService } from '../core/services/operation-feedback.service';
 import { ChatRealtimeService, RealtimeChatMessage } from '../core/services/chat-realtime.service';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
@@ -53,12 +54,13 @@ interface RatingItem {
 })
 export class MyRequests {
   private readonly api = inject(ApiService);
+  private readonly operationFeedback = inject(OperationFeedbackService);
   private readonly dialog = inject(MatDialog);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   @ViewChild('chatDialog') private chatDialog!: TemplateRef<unknown>;
   @ViewChild('statusDialog') private statusDialog!: TemplateRef<unknown>;
-  @ViewChild('cancelDialog') private cancelDialog!: TemplateRef<unknown>;
+  @ViewChild('reasonDialog') private reasonDialog!: TemplateRef<unknown>;
   @ViewChild('mapDialog') private mapDialog!: TemplateRef<unknown>;
   private mapDialogRef?: MatDialogRef<unknown>;
 
@@ -69,7 +71,7 @@ export class MyRequests {
   });
   private chatDialogRef?: MatDialogRef<unknown>;
   private statusDialogRef?: MatDialogRef<unknown>;
-  private cancelDialogRef?: MatDialogRef<unknown>;
+  private reasonDialogRef?: MatDialogRef<unknown>;
   readonly auth = inject(AuthService);
   private readonly requestService = inject(RequestService);
   private readonly notifications = inject(NotificationService);
@@ -122,6 +124,8 @@ export class MyRequests {
     { value: 'TODAS', label: 'Todas' },
     { value: 'PENDIENTE', label: 'Pendientes' },
     { value: 'ACEPTADA', label: 'Aceptadas' },
+    { value: 'EN_CAMINO', label: 'Profesional en camino' },
+    { value: 'TRABAJO_REALIZADO', label: 'Trabajo realizado' },
     { value: 'RECHAZADA', label: 'Rechazadas' },
     { value: 'COMPLETADA', label: 'Completadas' },
     { value: 'CANCELADA', label: 'Canceladas' },
@@ -193,7 +197,7 @@ export class MyRequests {
 		  hasAddress: Boolean(request.address) || (isProfessional && this.isPending(request)),
 		  hasMap: isProfessional && Boolean(request.address),
 		  hasClosureReason: Boolean(this.cierreLabel(request)),
-		  actionCount: canChangeStatus && request.status === 'ACEPTADA'
+		  actionCount: canChangeStatus && this.puedeChatear(request)
 		    ? 2
 		    : canChangeStatus || hasAlternateAction
 		      ? 1
@@ -254,6 +258,15 @@ export class MyRequests {
   readonly updatingRequestId = signal<string | null>(null);
   /** Mensaje de cancelación: obligatorio para el cliente y para el profesional. */
   readonly motivoEstado = signal('');
+  readonly motivoSeleccionado = signal('');
+  readonly motivosSolicitud = [
+    'Incompatibilidad de horario',
+    'Fuera de la zona de cobertura',
+    'No puedo continuar con el servicio',
+    'Solicitud duplicada',
+    'El servicio ya no es necesario',
+    'Otro',
+  ];
   /** Error del mensaje obligatorio, para dejarlo debajo del campo. */
   readonly motivoError = signal('');
   /** Transición que espera confirmación escribiendo su motivo (solo cancelar). */
@@ -353,7 +366,7 @@ export class MyRequests {
     const request = this.requests().find((item) => String(item.id) === requestId);
     if (!request) return;
 
-    const abrirChat = this.pendingNotificationOpensChat && request.status === 'ACEPTADA';
+    const abrirChat = this.pendingNotificationOpensChat && this.puedeChatear(request);
     this.pendingNotificationRequestId = null;
     this.pendingNotificationOpensChat = false;
     void this.router.navigate([], {
@@ -521,11 +534,17 @@ private mapCoords(request: ServiceRequest): { lat: number; lng: number } | null 
   return { lat: exact.lat + dLat, lng: exact.lng + dLng };
 }
 
-/** Solo con la solicitud aceptada: lleva a la ubicación real. */
+/** Desde la aceptación, lleva a la ubicación real del servicio. */
 googleMapsUrl(request: ServiceRequest): string | null {
-  if (request.status !== 'ACEPTADA') return null;
+  if (!this.puedeChatear(request)) return null;
   const c = this.exactCoords(request);
   return c ? `https://www.google.com/maps/search/?api=1&query=${c.lat},${c.lng}` : null;
+}
+
+puedeChatear(request: ServiceRequest): boolean {
+  return request.status === 'ACEPTADA'
+    || request.status === 'EN_CAMINO'
+    || request.status === 'TRABAJO_REALIZADO';
 }
 
   /**
@@ -569,8 +588,7 @@ googleMapsUrl(request: ServiceRequest): string | null {
   }
 
   /**
-   * Estados a los que se puede llevar la solicitud con un mismo botón, según el rol
-   * y el estado actual. Cliente y profesional comparten completar y cancelar.
+   * Acciones de estado disponibles para cada parte y etapa del servicio.
    */
   estadosDisponibles(request: ServiceRequest): RequestStatus[] {
     const opciones: RequestStatus[] = [];
@@ -582,8 +600,13 @@ googleMapsUrl(request: ServiceRequest): string | null {
     if (this.isProfessional() && request.status === 'PENDIENTE') {
       opciones.push('ACEPTADA', 'RECHAZADA');
     }
-    if (request.status === 'ACEPTADA') {
-      // Completar y cancelar quedan para los dos lados.
+    if (this.isProfessional() && request.status === 'ACEPTADA') {
+      opciones.push('EN_CAMINO', 'CANCELADA');
+    }
+    if (this.isProfessional() && request.status === 'EN_CAMINO') {
+      opciones.push('TRABAJO_REALIZADO', 'CANCELADA');
+    }
+    if (esCliente && request.status === 'TRABAJO_REALIZADO') {
       opciones.push('COMPLETADA', 'CANCELADA');
     }
     return opciones;
@@ -593,6 +616,7 @@ googleMapsUrl(request: ServiceRequest): string | null {
   abrirActualizarEstado(request: ServiceRequest): void {
     this.errorMessage.set('');
     this.motivoEstado.set('');
+    this.motivoSeleccionado.set('');
     this.estadoAConfirmar.set(null);
     this.motivoError.set('');
     this.updatingRequestId.set(String(request.id));
@@ -622,50 +646,55 @@ googleMapsUrl(request: ServiceRequest): string | null {
   etiquetaEstado(estado: RequestStatus): string {
     const textos: Partial<Record<RequestStatus, string>> = {
       ACEPTADA: 'Aceptar la solicitud',
+      EN_CAMINO: 'Marcar que está en camino',
+      TRABAJO_REALIZADO: 'Marcar trabajo realizado',
       RECHAZADA: 'Rechazar la solicitud',
-      COMPLETADA: 'Marcar como completada',
+      COMPLETADA: 'Confirmar trabajo completado',
       CANCELADA: 'Cancelar la solicitud',
     };
     return textos[estado] ?? 'Actualizar';
   }
 
   iconoEstado(estado: RequestStatus): 'check' | 'x' {
-    return estado === 'ACEPTADA' || estado === 'COMPLETADA' ? 'check' : 'x';
+    return estado === 'ACEPTADA' || estado === 'EN_CAMINO'
+      || estado === 'TRABAJO_REALIZADO' || estado === 'COMPLETADA' ? 'check' : 'x';
   }
 
   cerrarActualizarEstado(): void {
     this.statusDialogRef?.close();
-    this.cancelDialogRef?.close();
+    this.reasonDialogRef?.close();
     this.statusDialogRef = undefined;
-    this.cancelDialogRef = undefined;
+    this.reasonDialogRef = undefined;
     this.resetEstadoDialog();
   }
 
   private resetEstadoDialog(): void {
     this.updatingRequestId.set(null);
     this.motivoEstado.set('');
+    this.motivoSeleccionado.set('');
     this.estadoAConfirmar.set(null);
     this.motivoError.set('');
   }
 
   /**
-   * Cualquier cambio de estado pide confirmación. La cancelación tiene su propio
-   * paso (el motivo es obligatorio), y el resto —aceptar, rechazar o completar—
-   * muestra la consecuencia antes de aplicarse.
+   * Rechazo y cancelación comparten el formulario de motivos; las demás acciones
+   * muestran una confirmación antes de aplicarse.
    */
   elegirEstado(request: ServiceRequest, nuevo: RequestStatus): void {
-    if (nuevo === 'CANCELADA') {
+    this.updatingRequestId.set(String(request.id));
+    if (nuevo === 'CANCELADA' || nuevo === 'RECHAZADA') {
       this.estadoAConfirmar.set(nuevo);
       this.motivoEstado.set('');
+      this.motivoSeleccionado.set('');
       this.motivoError.set('');
-      this.cancelDialogRef = this.dialog.open(this.cancelDialog, {
-        ariaLabel: 'Motivo de la cancelación',
+      this.reasonDialogRef = this.dialog.open(this.reasonDialog, {
+        ariaLabel: nuevo === 'CANCELADA' ? 'Motivo de la cancelación' : 'Motivo del rechazo',
         ariaModal: true,
         ...VU_DIALOG_SIZE,
         panelClass: 'vu-details-dialog',
       });
-      this.cancelDialogRef.afterClosed().subscribe(() => {
-        this.cancelDialogRef = undefined;
+      this.reasonDialogRef.afterClosed().subscribe(() => {
+        this.reasonDialogRef = undefined;
         if (this.estadoAConfirmar()) {
           this.volverAEstadoOpciones();
         }
@@ -684,7 +713,7 @@ googleMapsUrl(request: ServiceRequest): string | null {
     this.aplicarEstado(pendiente.request, pendiente.nuevo);
   }
 
-  /** Transición pendiente de confirmación (aceptar, rechazar o completar). */
+  /** Transición pendiente de confirmación que no requiere el formulario de motivos. */
   readonly confirmacionTransicion = signal<{ request: ServiceRequest; nuevo: RequestStatus } | null>(null);
 
   /** Título y consecuencia de la transición elegida. */
@@ -692,8 +721,9 @@ googleMapsUrl(request: ServiceRequest): string | null {
     const nuevo = this.confirmacionTransicion()?.nuevo;
     const titulos: Partial<Record<RequestStatus, string>> = {
       ACEPTADA: 'Aceptar la solicitud',
-      RECHAZADA: 'Rechazar la solicitud',
-      COMPLETADA: 'Marcar como completada',
+      EN_CAMINO: 'Marcar que estás en camino',
+      TRABAJO_REALIZADO: 'Marcar trabajo realizado',
+      COMPLETADA: 'Confirmar trabajo completado',
     };
     return (nuevo && titulos[nuevo]) || 'Actualizar el estado';
   }
@@ -705,8 +735,14 @@ googleMapsUrl(request: ServiceRequest): string | null {
     if (pendiente.nuevo === 'ACEPTADA') {
       return `¿Querés aceptar el turno de ${contraparte}?`;
     }
-    if (pendiente.nuevo === 'RECHAZADA') {
-      return `¿Querés rechazar el pedido de ${contraparte}?`;
+    if (pendiente.nuevo === 'EN_CAMINO') {
+      return '¿Querés avisarle al cliente que ya estás en camino?';
+    }
+    if (pendiente.nuevo === 'TRABAJO_REALIZADO') {
+      return '¿Confirmás que terminaste el trabajo y querés pedirle al cliente que lo revise?';
+    }
+    if (pendiente.nuevo === 'COMPLETADA') {
+      return '¿Confirmás que el trabajo fue realizado correctamente?';
     }
     return `¿Confirmás que el turno con ${contraparte} ya terminó?`;
   }
@@ -716,15 +752,19 @@ googleMapsUrl(request: ServiceRequest): string | null {
     if (nuevo === 'ACEPTADA') {
       return 'Queda confirmado el turno y se habilita el chat para coordinar con la contraparte.';
     }
-    if (nuevo === 'RECHAZADA') {
-      return 'La solicitud se cierra y el cliente puede buscar a otro profesional. No se puede volver atrás.';
+    if (nuevo === 'EN_CAMINO') {
+      return 'El cliente recibirá un aviso y la dirección exacta seguirá disponible para coordinar.';
     }
-    return 'La solicitud se cierra como completada. Después se puede calificar el servicio.';
+    if (nuevo === 'TRABAJO_REALIZADO') {
+      return 'El servicio quedará pendiente de confirmación del cliente antes de habilitar la calificación.';
+    }
+    return 'La solicitud se cierra como completada. Después podés calificar el servicio.';
   }
 
   transicionIcono(): 'check' | 'x' {
     const nuevo = this.confirmacionTransicion()?.nuevo;
-    return nuevo === 'ACEPTADA' || nuevo === 'COMPLETADA' ? 'check' : 'x';
+    return nuevo === 'ACEPTADA' || nuevo === 'EN_CAMINO'
+      || nuevo === 'TRABAJO_REALIZADO' || nuevo === 'COMPLETADA' ? 'check' : 'x';
   }
 
   transicionPeligrosa(): boolean {
@@ -733,39 +773,55 @@ googleMapsUrl(request: ServiceRequest): string | null {
 
   /** Vuelve a la lista de opciones sin cerrar el modal. */
   volverAEstadoOpciones(): void {
-    this.cancelDialogRef?.close();
-    this.cancelDialogRef = undefined;
+    this.reasonDialogRef?.close();
+    this.reasonDialogRef = undefined;
     this.estadoAConfirmar.set(null);
     this.motivoEstado.set('');
+    this.motivoSeleccionado.set('');
     this.motivoError.set('');
   }
 
-  /** Confirma la cancelación: sin motivo no sale, la contraparte tiene que saber por qué. */
-  confirmarCancelacion(): void {
-    const solicitud = this.solicitudDelModal();
-    if (!solicitud) return;
-    if (!this.motivoEstado().trim()) {
-      this.motivoError.set('Contale a la contraparte por qué cancelás.');
-      return;
-    }
-    this.aplicarEstado(solicitud, 'CANCELADA');
+  motivoDeEstado(): string {
+    return this.motivoSeleccionado() === 'Otro'
+      ? this.motivoEstado().trim()
+      : this.motivoSeleccionado();
   }
 
-  aplicarEstado(request: ServiceRequest, nuevo: RequestStatus): void {
+  /** Confirma el rechazo o la cancelación con su regla de motivo correspondiente. */
+  confirmarMotivoEstado(): void {
+    const solicitud = this.solicitudDelModal();
+    const estado = this.estadoAConfirmar();
+    if (!solicitud || (estado !== 'CANCELADA' && estado !== 'RECHAZADA')) return;
+    const motivo = this.motivoDeEstado();
+    if (this.motivoSeleccionado() === 'Otro' && !motivo) {
+      this.motivoError.set('Escribí un motivo breve.');
+      return;
+    }
+    if (estado === 'CANCELADA' && !motivo) {
+      this.motivoError.set('Seleccioná un motivo para cancelar.');
+      return;
+    }
+    this.aplicarEstado(solicitud, estado, motivo);
+  }
+
+  aplicarEstado(request: ServiceRequest, nuevo: RequestStatus, motivo = ''): void {
     const actorId = this.auth.currentUser()?.id;
     if (!actorId) return;
     const id = String(request.id);
     this.errorMessage.set('');
-    // El motivo solo viaja en la cancelación (obligatorio para las dos partes).
-    const motivo = this.motivoEstado().trim();
-
     const llamada =
-      nuevo === 'COMPLETADA' ? this.api.completeRequest(id, actorId)
+      nuevo === 'EN_CAMINO' ? this.api.markRequestEnCamino(id, actorId)
+      : nuevo === 'TRABAJO_REALIZADO' ? this.api.markRequestTrabajoRealizado(id, actorId)
+      : nuevo === 'COMPLETADA' ? this.api.completeRequest(id, actorId)
       : nuevo === 'CANCELADA' ? this.api.cancelRequest(id, actorId, motivo)
-      : nuevo === 'RECHAZADA' ? this.api.rejectRequest(id, actorId, '')
+      : nuevo === 'RECHAZADA' ? this.api.rejectRequest(id, actorId, motivo)
       : this.api.acceptRequest(id, actorId, '');
 
-    llamada.pipe(
+    this.operationFeedback.track(
+      'Actualizando el estado de la solicitud…',
+      llamada,
+      'Estamos guardando el cambio y notificando a la otra persona.',
+    ).pipe(
       catchError((error) => {
         this.errorMessage.set(this.api.describeError(error, 'No se pudo actualizar el estado de la solicitud'));
         return of(null);
@@ -776,7 +832,9 @@ googleMapsUrl(request: ServiceRequest): string | null {
       this.requestService.updateStatus(request.id, updated.status);
       this.notifications.markStatusHandledLocally(request.id, updated.status);
       this.successMessage.set(
-        nuevo === 'COMPLETADA' ? 'La solicitud fue marcada como completada. ¡Ahora podés calificar el servicio!'
+        nuevo === 'EN_CAMINO' ? 'El cliente recibió el aviso de que estás en camino.'
+        : nuevo === 'TRABAJO_REALIZADO' ? 'Avisamos al cliente para que confirme el trabajo realizado.'
+        : nuevo === 'COMPLETADA' ? 'Confirmaste el trabajo realizado. ¡Ahora podés calificar el servicio!'
         : nuevo === 'CANCELADA' ? 'Cancelaste la solicitud. La contraparte ve el motivo que escribiste.'
         : nuevo === 'RECHAZADA' ? 'Solicitud rechazada.'
         : 'Solicitud aceptada. Podés comunicarte por el chat.',
@@ -880,7 +938,11 @@ googleMapsUrl(request: ServiceRequest): string | null {
     if (!text || !userId) return;
 
     this.sendingChat.set(true);
-    this.api.sendMessage(idStr, { emisorId: userId, texto: text }).pipe(
+    this.operationFeedback.track(
+      'Enviando el mensaje…',
+      this.api.sendMessage(idStr, { emisorId: userId, texto: text }),
+      'Estamos compartiéndolo en el chat de la solicitud.',
+    ).pipe(
       catchError((error) => {
         this.errorMessage.set(this.api.describeError(error, 'No se pudo enviar el mensaje'));
         return of(null);
@@ -938,7 +1000,11 @@ googleMapsUrl(request: ServiceRequest): string | null {
 
     this.submittingRating.set(true);
     this.errorMessage.set('');
-    this.api.createRating(reqId, userId, score, comment).pipe(
+    this.operationFeedback.track(
+      'Guardando tu calificación…',
+      this.api.createRating(reqId, userId, score, comment),
+      'Estamos registrando tu opinión sobre el servicio.',
+    ).pipe(
       catchError((error) => {
         this.errorMessage.set(this.api.describeError(error, 'No se pudo registrar la calificación'));
         return of(null);
@@ -974,6 +1040,8 @@ googleMapsUrl(request: ServiceRequest): string | null {
     return {
       PENDIENTE: 'Pendiente',
       ACEPTADA: 'Aceptada',
+      EN_CAMINO: 'Profesional en camino',
+      TRABAJO_REALIZADO: 'Trabajo realizado',
       RECHAZADA: 'Rechazada',
       COMPLETADA: 'Completada',
       CANCELADA: 'Cancelada',
@@ -982,7 +1050,7 @@ googleMapsUrl(request: ServiceRequest): string | null {
   }
 
   /**
-   * Textos que el sistema generaba antes de que el motivo fuera obligatorio. No
+   * Textos genéricos que el sistema generaba antes de solicitar motivos. No
    * los escribió ninguna persona, así que no se muestran como si fueran suyas.
    */
   private readonly MOTIVOS_GENERICOS = [
@@ -1079,6 +1147,10 @@ cerrarMapa(): void {
         return 'vu-badge--pendiente';
       case 'ACEPTADA':
         return 'vu-badge--aceptada';
+      case 'EN_CAMINO':
+        return 'vu-badge--en-camino';
+      case 'TRABAJO_REALIZADO':
+        return 'vu-badge--trabajo-realizado';
       case 'COMPLETADA':
         return 'vu-badge--completada';
       case 'RECHAZADA':

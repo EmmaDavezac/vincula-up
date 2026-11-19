@@ -20,6 +20,7 @@ import {
 	nombreCompleto,
 } from '../../core/models/admin';
 import { ApiService } from '../../core/services/api.service';
+import { OperationFeedbackService } from '../../core/services/operation-feedback.service';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatListModule } from '@angular/material/list';
@@ -46,6 +47,7 @@ type ModalModo = 'consulta' | 'edicion';
 })
 export class AdminProfessionals implements AdminUnsavedChanges {
 	private readonly api = inject(ApiService);
+	private readonly operationFeedback = inject(OperationFeedbackService);
 	private readonly router = inject(Router);
 	private readonly dialog = inject(MatDialog);
 	@ViewChild('professionalDetailDialog') private professionalDetailDialog!: TemplateRef<unknown>;
@@ -368,11 +370,15 @@ export class AdminProfessionals implements AdminUnsavedChanges {
 		// ms-profesionales sólo administra legajo y especialidades: los datos
 		// personales viven en ms-usuarios y no se editan desde este panel.
 		this.savingEdit.set(true);
-		this.api.updateProfessional(profesional.id, {
+		this.operationFeedback.track(
+			'Guardando los cambios del profesional…',
+			this.api.updateProfessional(profesional.id, {
 			usuarioId: profesional.usuarioId,
 			legajo,
 			especialidadIds: this.editForm.especialidadIds,
-		}).pipe(
+			}),
+			'Estamos actualizando sus datos y especialidades.',
+		).pipe(
 			catchError((error) => {
 				this.savingEdit.set(false);
 				this.aviso.set(avisoError(this.api.describeError(error, 'No se pudo actualizar el profesional.')));
@@ -420,7 +426,11 @@ export class AdminProfessionals implements AdminUnsavedChanges {
 
 	private ejecutarReenvio(profesional: AdminProfessional): void {
 		this.busyId.set(profesional.id);
-		this.api.reenviarInvitacion(profesional.id).pipe(
+		this.operationFeedback.track(
+			'Preparando la invitación…',
+			this.api.reenviarInvitacion(profesional.id),
+			'Estamos generando el acceso y enviando el correo.',
+		).pipe(
 			catchError((error) => {
 				this.busyId.set(null);
 				this.aviso.set(avisoError(this.api.describeError(error, 'No se pudo reenviar la invitación.')));
@@ -443,43 +453,45 @@ export class AdminProfessionals implements AdminUnsavedChanges {
 	readonly busyId = signal<string | null>(null);
 
 	/**
-	 * Baja lógica del padrón: se pide confirmación porque saca al profesional del
-	 * directorio.
+	 * Suspensión lógica del perfil: se pide confirmación porque lo saca del directorio.
 	 *
-	 * <p>El panel usa "desactivar" y no "suspender" en los dos listados (clientes y
-	 * profesionales) para que sea la misma palabra para la misma acción. El estado
-	 * que devuelve la API sigue siendo SUSPENDIDO.
+	 * La suspensión del perfil también suspende la cuenta asociada para impedir
+	 * el acceso a la aplicación. El estado del perfil sigue siendo SUSPENDIDO.
 	 */
-	desactivar(profesional: AdminProfessional): void {
+	suspender(profesional: AdminProfessional): void {
 		this.confirmacion.set({
-			titulo: 'Desactivar al profesional',
-			mensaje: `¿Querés desactivar a ${this.nombre(profesional)}?`,
+			titulo: 'Suspender al profesional',
+			mensaje: `¿Querés suspender a ${this.nombre(profesional)}?`,
 			detalle:
-				'Deja de aparecer en el directorio y no puede recibir solicitudes nuevas. No se borra nada: conserva su historial, y más adelante podés reactivarlo.',
-			confirmar: 'Desactivar',
+				'Deja de aparecer en el directorio y no puede acceder a la aplicación. No se borra nada: conserva su historial y más adelante podés reactivarlo.',
+			confirmar: 'Suspender',
 			peligro: true,
 			icono: 'pause',
-			ejecutar: () => this.ejecutarDesactivacion(profesional),
+			ejecutar: () => this.ejecutarSuspension(profesional),
 		});
 	}
 
-	private ejecutarDesactivacion(profesional: AdminProfessional): void {
+	private ejecutarSuspension(profesional: AdminProfessional): void {
 		this.busyId.set(profesional.id);
-		this.api.suspendProfessional(profesional.id).pipe(
+		this.operationFeedback.track(
+			'Suspendiendo al profesional…',
+			this.api.suspendProfessional(profesional.id),
+			'Estamos actualizando el perfil y el acceso a la cuenta.',
+		).pipe(
 			map(() => true),
 			catchError((error) => {
 				this.busyId.set(null);
-				this.aviso.set(avisoError(this.api.describeError(error, 'No se pudo desactivar al profesional.')));
+				this.aviso.set(avisoError(this.api.describeError(error, 'No se pudo suspender al profesional.')));
 				return of(false);
 			}),
 		).subscribe((ok) => {
 			this.busyId.set(null);
 			if (ok) {
-				// El backend devuelve SUSPENDIDO: desactivar no activa perfiles.
+				// La cuenta y el perfil quedaron suspendidos en el backend.
 				this.actualizarEstado(profesional.id, 'SUSPENDIDO');
 				this.reflejarEnModal(profesional.id, 'SUSPENDIDO');
 				this.aviso.set(
-					avisoExito(`${this.nombre(profesional)} quedó desactivado y ya no recibe solicitudes.`),
+					avisoExito(`${this.nombre(profesional)} quedó suspendido y ya no recibe solicitudes.`),
 				);
 			}
 		});
@@ -488,10 +500,10 @@ export class AdminProfessionals implements AdminUnsavedChanges {
 	/** Reactivar también se confirma: devuelve el acceso al directorio. */
 	reactivar(profesional: AdminProfessional): void {
 		this.confirmacion.set({
-			titulo: 'Reactivar la cuenta',
+			titulo: 'Reactivar al profesional',
 			mensaje: `¿Querés volver a habilitar a ${this.nombre(profesional)}?`,
 			detalle:
-				'Vuelve a aparecer en el directorio. Si todavía no completó su activación, queda como preregistro hasta que la termine.',
+				'Se restablece el acceso y vuelve a aparecer en el directorio si ya había completado su activación. En caso contrario, queda pendiente de activación.',
 			confirmar: 'Reactivar',
 			icono: 'play',
 			ejecutar: () => this.ejecutarReactivacion(profesional),
@@ -500,7 +512,11 @@ export class AdminProfessionals implements AdminUnsavedChanges {
 
 	private ejecutarReactivacion(profesional: AdminProfessional): void {
 		this.busyId.set(profesional.id);
-		this.api.reactivateProfessional(profesional.id).pipe(
+		this.operationFeedback.track(
+			'Reactivando al profesional…',
+			this.api.reactivateProfessional(profesional.id),
+			'Estamos restaurando el acceso y la disponibilidad en el directorio.',
+		).pipe(
 			map((result) => (result as { estado?: string } | null)?.estado ?? 'CARGADO'),
 			catchError((error) => {
 				this.busyId.set(null);
@@ -510,7 +526,7 @@ export class AdminProfessionals implements AdminUnsavedChanges {
 		).subscribe((estado) => {
 			this.busyId.set(null);
 			if (estado) {
-				// El backend devuelve CARGADO (no ACTIVO): reactivar no activa perfiles.
+				// El backend devuelve CARGADO si el perfil todavía no se activó.
 				this.actualizarEstado(profesional.id, estado);
 				this.reflejarEnModal(profesional.id, estado);
 				this.aviso.set(avisoExito(`${this.nombre(profesional)} quedó reactivado.`));
@@ -599,13 +615,13 @@ export class AdminProfessionals implements AdminUnsavedChanges {
 		return cuenta ? cuenta.keycloakId == null : (profesional.estado ?? '').toUpperCase() === 'CARGADO';
 	}
 
-	/** El profesional está desactivado: no entra al directorio ni recibe solicitudes. */
-	estaDesactivado(profesional: AdminProfessional): boolean {
+	/** El profesional está suspendido: no entra al directorio ni recibe solicitudes. */
+	estaSuspendido(profesional: AdminProfessional): boolean {
 		return (profesional.estado ?? '').toUpperCase() === 'SUSPENDIDO';
 	}
 
-	/** Sólo se ofrece desactivar a los perfiles que ya pueden operar. */
-	puedeDesactivarse(profesional: AdminProfessional): boolean {
+	/** Sólo se ofrece suspender los perfiles que tienen cuenta vinculada o están activos. */
+	puedeSuspenderse(profesional: AdminProfessional): boolean {
 		const estado = (profesional.estado ?? '').toUpperCase();
 		return estado === 'ACTIVO' || estado === 'CARGADO';
 	}

@@ -213,18 +213,29 @@
 						}
 
 					<div class="req-card__actions">
-						<!--
-							Un único botón para cualquier cambio de estado: el profesional
-							acepta, rechaza, completa o cancela; el cliente completa o cancela.
-						-->
-						@if (estadosDisponibles(request).length) {
-							<button type="button" class="vu-btn vu-btn--outline vu-btn--sm req-card__action--status" (click)="abrirActualizarEstado(request)">
+						@if (isProfessional() && request.status === 'PENDIENTE') {
+							<button
+								type="button"
+								class="vu-btn vu-btn--ink vu-btn--sm req-card__action--accept"
+								(click)="elegirEstado(request, 'ACEPTADA')"
+							>
+								Aceptar
+							</button>
+							<button
+								type="button"
+								class="vu-btn vu-btn--danger vu-btn--sm req-card__action--reject"
+								(click)="elegirEstado(request, 'RECHAZADA')"
+							>
+								Rechazar
+							</button>
+						} @else if (estadosDisponibles(request).length) {
+							<button type="button" class="vu-btn vu-btn--ink vu-btn--sm req-card__action--status" (click)="abrirActualizarEstado(request)">
 								Actualizar estado
 							</button>
 						}
 
-						<!-- El chat queda disponible para los dos lados una vez aceptada. -->
-						@if (request.status === 'ACEPTADA') {
+						<!-- El chat queda disponible durante la coordinación y la ejecución. -->
+						@if (puedeChatear(request)) {
 							<button type="button" class="vu-btn vu-btn--outline vu-btn--sm req-card__action--secondary" (click)="toggleChat(request.id)">
 								{{ activeChatId() === '' + request.id ? 'Cerrar chat' : 'Ir al chat' }}
 							</button>
@@ -322,7 +333,7 @@
 				}
 			</div>
 
-			@if (chat.status === 'ACEPTADA') {
+			@if (puedeChatear(chat)) {
 				<div class="chat-modal__composer">
 					<input class="vu-input chat-modal__input" [ngModel]="chatInput()" (ngModelChange)="chatInput.set($event)"
 						placeholder="Escribí un mensaje..." (keyup.enter)="sendMessage(chat.id)" />
@@ -371,12 +382,13 @@
 	}
 </ng-template>
 
-	<!-- Cancelación: única transición que pide un mensaje, y es obligatorio. -->
-	<ng-template #cancelDialog>
+	<ng-template #reasonDialog>
 		@if (estadoAConfirmar() && solicitudDelModal(); as solicitud) {
 			<section class="status-modal">
 				<header mat-dialog-title class="status-modal__head">
-					<h2 class="status-modal__title">Cancelar la solicitud</h2>
+					<h2 class="status-modal__title">
+						{{ estadoAConfirmar() === 'CANCELADA' ? 'Cancelar la solicitud' : 'Rechazar la solicitud' }}
+					</h2>
 					<button type="button" mat-button class="vu-btn vu-btn--quiet vu-btn--sm" (click)="volverAEstadoOpciones()" aria-label="Cerrar">
 						<vu-icon name="x" [size]="18" />
 					</button>
@@ -387,17 +399,42 @@
 					{{ nombreContraparte(solicitud) }} · {{ solicitud.date }} · {{ horarioLabel(solicitud) }}
 				</p>
 
-				<label class="vu-label status-modal__motivo">
-					Motivo de la cancelación <span class="vu-required">obligatorio</span>
-					<textarea
-						class="vu-textarea"
-						rows="3"
-						maxlength="300"
-						[ngModel]="motivoEstado()"
-						(ngModelChange)="motivoEstado.set($event); motivoError.set('')"
-						placeholder="Contale a la contraparte por qué se cancela el turno."
-					></textarea>
+				<label class="vu-label status-modal__motivo" for="request-reason">
+					Motivo
+					@if (estadoAConfirmar() === 'CANCELADA') {
+						<span class="vu-required">obligatorio</span>
+					} @else {
+						<span class="muted">(opcional)</span>
+					}
+					<select
+						id="request-reason"
+						class="vu-select"
+						[ngModel]="motivoSeleccionado()"
+						(ngModelChange)="motivoSeleccionado.set($event); motivoEstado.set(''); motivoError.set('')"
+					>
+						<option value="">
+							{{ estadoAConfirmar() === 'CANCELADA' ? 'Seleccioná un motivo' : 'Sin motivo' }}
+						</option>
+						@for (motivo of motivosSolicitud; track motivo) {
+							<option [value]="motivo">{{ motivo }}</option>
+						}
+					</select>
 				</label>
+
+				@if (motivoSeleccionado() === 'Otro') {
+					<label class="vu-label status-modal__motivo" for="request-reason-detail">
+						Contanos brevemente
+						<textarea
+							id="request-reason-detail"
+							class="vu-textarea"
+							rows="3"
+							maxlength="100"
+							[ngModel]="motivoEstado()"
+							(ngModelChange)="motivoEstado.set($event); motivoError.set('')"
+							placeholder="Escribí un motivo breve (máximo 100 caracteres)."
+						></textarea>
+					</label>
+				}
 
 				@if (motivoError()) {
 					<p class="status-modal__error" role="alert">{{ motivoError() }}</p>
@@ -406,8 +443,8 @@
 
 				<div mat-dialog-actions class="status-modal__actions">
 					<button type="button" mat-button class="vu-btn vu-btn--outline" (click)="volverAEstadoOpciones()">Volver</button>
-					<button type="button" mat-flat-button class="vu-btn vu-btn--danger" (click)="confirmarCancelacion()">
-						Confirmar cancelación
+					<button type="button" mat-flat-button class="vu-btn vu-btn--danger" (click)="confirmarMotivoEstado()">
+						{{ estadoAConfirmar() === 'CANCELADA' ? 'Confirmar cancelación' : 'Confirmar rechazo' }}
 					</button>
 				</div>
 			</section>
@@ -447,8 +484,7 @@
 </div>
 
 <!--
-	Confirmación de las transiciones que no son cancelación (aceptar, rechazar o
-	completar): la cancelación tiene su propio paso porque además pide el motivo.
+	Confirmación de las transiciones que no requieren el formulario de motivos.
 -->
 @if (confirmacionTransicion()) {
 	<vu-confirm

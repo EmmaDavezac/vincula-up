@@ -78,7 +78,7 @@ public class SecurityConfig {
                 // todo el que entra (cliente, profesional y también el admin).
                 .requestMatchers(HttpMethod.PATCH, "/api/terminos/aceptar").authenticated()
                 // Suspender va por /api/usuarios/*, que es ADMIN: un cliente
-                // desactivado no puede reactivarse a sí mismo.
+                // suspendido no puede reactivarse a sí mismo.
                 .requestMatchers(HttpMethod.PATCH, "/api/usuarios/*/suspender").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/api/usuarios/*/reactivar").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/usuarios/por-email").hasRole("ADMIN")
@@ -86,15 +86,18 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.PUT, "/api/profesionales/*/disponibilidad").hasRole("PROFESIONAL")
                 .requestMatchers(HttpMethod.PATCH, "/api/solicitudes/*/aceptar").hasRole("PROFESIONAL")
                 .requestMatchers(HttpMethod.PATCH, "/api/solicitudes/*/rechazar").hasRole("PROFESIONAL")
+                .requestMatchers(HttpMethod.PATCH, "/api/solicitudes/*/en-camino",
+                        "/api/solicitudes/*/trabajo-realizado").hasRole("PROFESIONAL")
                 // CLIENTE permissions
                 .requestMatchers(HttpMethod.POST, "/api/solicitudes").hasRole("CLIENTE")
                 // Subida de fotos: la usa cualquier cuenta con sesión, porque
                 // cliente, profesional y admin cambian su foto de perfil.
                 .requestMatchers(HttpMethod.POST, "/api/fotos").authenticated()
-                // Completar y cancelar los puede hacer cualquiera de los dos lados:
-                // el profesional que terminó el trabajo o el cliente que lo confirmó.
-                .requestMatchers(HttpMethod.PATCH, "/api/solicitudes/*/completar",
-                        "/api/solicitudes/*/cancelar").hasAnyRole("CLIENTE", "PROFESIONAL")
+                // El cliente confirma el trabajo realizado; cualquiera de las partes
+                // puede cancelar mientras el servicio no esté completado.
+                .requestMatchers(HttpMethod.PATCH, "/api/solicitudes/*/completar").hasRole("CLIENTE")
+                .requestMatchers(HttpMethod.PATCH, "/api/solicitudes/*/cancelar")
+                        .hasAnyRole("CLIENTE", "PROFESIONAL")
                 .requestMatchers(HttpMethod.POST, "/api/solicitudes/*/calificacion").hasRole("CLIENTE")
                 // Sólo el propio profesional: la reputación se resuelve desde la sesión.
                 .requestMatchers(HttpMethod.GET, "/api/mi-reputacion").hasRole("PROFESIONAL")

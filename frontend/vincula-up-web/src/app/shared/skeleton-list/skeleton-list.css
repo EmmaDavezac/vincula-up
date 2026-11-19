@@ -131,7 +131,7 @@
 }
 
 .vu-skeleton-list__request-actions[data-action-count='1'] .vu-skeleton-list__button {
-	grid-column: 2;
+	grid-column: 1 / -1;
 }
 
 .vu-skeleton-list__request-actions .vu-skeleton-list__button {

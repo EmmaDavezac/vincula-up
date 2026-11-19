@@ -5,6 +5,7 @@ import { filter } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { TemaService } from '../../core/services/tema.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { OperationFeedbackService } from '../../core/services/operation-feedback.service';
 import { UserRole } from '../../core/models/user-profile';
 import { VuAvatar } from '../avatar/avatar';
 import { VuConfirm } from '../confirm/confirm';
@@ -24,6 +25,7 @@ export class NavbarComponent {
 	/** Tema claro/oscuro. El toggle vive en la barra y no pide sesión. */
 	protected readonly tema = inject(TemaService);
 	protected readonly notificaciones = inject(NotificationService);
+	private readonly operationFeedback = inject(OperationFeedbackService);
 	protected userMenuOpen = false;
 	protected notificationsOpen = false;
 
@@ -55,6 +57,10 @@ export class NavbarComponent {
 	confirmarCierreDeSesion(): void {
 		this.confirmarSalida.set(false);
 		this.cerrandoSesion.set(true);
+		this.operationFeedback.begin(
+			'Cerrando sesión…',
+			'Estamos finalizando tu sesión de forma segura.',
+		);
 		this.auth.logout();
 	}
 
