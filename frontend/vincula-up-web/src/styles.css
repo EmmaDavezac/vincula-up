@@ -766,6 +766,16 @@ button.mat-mdc-button.vu-btn--quiet {
 	color: var(--alert-success-ink);
 }
 
+.vu-badge--en-camino {
+	background: var(--alert-warning-bg);
+	color: var(--amber);
+}
+
+.vu-badge--trabajo-realizado {
+	background: var(--alert-info-bg);
+	color: var(--navy);
+}
+
 .vu-badge--completada {
 	background: var(--alert-info-bg);
 	color: var(--navy);
@@ -1693,10 +1703,6 @@ button.mat-mdc-button.vu-btn--quiet {
 	display: none;
 	font-size: 0.6875rem;
 	font-weight: 700;
-}
-
-html:has([aria-modal='true']) {
-	overflow: auto;
 }
 
 .mat-mdc-dialog-container {

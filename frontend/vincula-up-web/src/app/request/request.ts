@@ -203,10 +203,29 @@ readonly filteredSpecialties = computed(() => {
   if (this.reverseGeocoding()) return 'Buscando la dirección del punto…';
   return null;
 });
+  readonly bloqueoActivo = computed(() => this.bloqueo() !== null);
+  readonly bloqueoDetalle = computed(() => {
+    if (this.enviandoSolicitud()) return 'Estamos validando el turno y enviando los datos al profesional.';
+    if (this.location().detecting) return 'Buscando la mejor lectura disponible del GPS.';
+    if (this.gpsLoading()) return 'Estamos verificando la dirección ingresada.';
+    if (this.reverseGeocoding()) return 'Estamos obteniendo el nombre asociado al punto elegido.';
+    return '';
+  });
   readonly confirmandoSalida = signal(false);
   private resolverGuardSalida: ((permitir: boolean) => void) | null = null;
 
 private readonly destroyRef = inject(DestroyRef);
+private locationWatchId: number | null = null;
+private locationWatchTimeout: ReturnType<typeof setTimeout> | null = null;
+private scrollLockSnapshot: {
+  scrollY: number;
+  htmlOverflow: string;
+  bodyPosition: string;
+  bodyTop: string;
+  bodyWidth: string;
+  bodyOverflow: string;
+  bodyPaddingRight: string;
+} | null = null;
 private readonly ahora = signal(new Date());
 private readonly MIN_ANTICIPACION_MIN = 60;
 readonly DIAS_VISIBLES = 14;
@@ -351,6 +370,20 @@ elegirHorario(id: string): void {
   constructor() {
     const timer = setInterval(() => this.ahora.set(new Date()), 60_000);
 this.destroyRef.onDestroy(() => clearInterval(timer));
+    this.destroyRef.onDestroy(() => {
+      if (this.locationWatchId !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.clearWatch(this.locationWatchId);
+      }
+      if (this.locationWatchTimeout !== null) {
+        clearTimeout(this.locationWatchTimeout);
+      }
+      this.unlockPageScroll();
+    });
+    effect((onCleanup) => {
+      if (!this.bloqueoActivo()) return;
+      this.lockPageScroll();
+      onCleanup(() => this.unlockPageScroll());
+    });
     this.loadAllProfessionals();
     this.loadCatalogoEspecialidades();
 
@@ -503,6 +536,7 @@ this.destroyRef.onDestroy(() => clearInterval(timer));
 
 
   retryDetectLocation(): void {
+    if (this.location().detecting || this.locationWatchId !== null) return;
     if (typeof window !== 'undefined' && !window.isSecureContext && window.location.hostname !== 'localhost') {
       this.toast.error('El navegador solo permite compartir la ubicación en una conexión segura. Usá HTTPS o ingresá la dirección manualmente.');
       return;
@@ -512,73 +546,174 @@ this.destroyRef.onDestroy(() => clearInterval(timer));
       return;
     }
     this.location.set({ ...this.location(), detecting: true, editing: false });
+    this.lockPageScroll();
 
-    // Umbral de precisión aceptable en metros. El GPS tarda algunos segundos en
-    // fijar satélites; con watchPosition esperamos hasta tener una lectura buena
-    // o agotar el tiempo máximo (12 s).
-    const ACCURACY_THRESHOLD_M = 80;
+    const MAX_ACCEPTABLE_ACCURACY_M = 80;
     const MAX_WAIT_MS = 12000;
 
     try {
-      let watchId: number | null = null;
-      let resolved = false;
-      const deadline = setTimeout(() => {
-        // Si no llegó una lectura precisa a tiempo, cancelamos el watch.
-        // La última posición recibida ya fue aplicada (si hubo alguna).
-        if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-      }, MAX_WAIT_MS);
+      let bestPosition: GeolocationPosition | null = null;
+      let lastError: GeolocationPositionError | undefined;
+      let completed = false;
+      let lastAppliedAccuracy = Number.POSITIVE_INFINITY;
+      let applyRevision = 0;
+      const clearTracking = (): void => {
+        if (this.locationWatchTimeout !== null) {
+          clearTimeout(this.locationWatchTimeout);
+          this.locationWatchTimeout = null;
+        }
+        if (this.locationWatchId !== null) {
+          navigator.geolocation.clearWatch(this.locationWatchId);
+          this.locationWatchId = null;
+        }
+      };
+      const fail = (error?: GeolocationPositionError): void => {
+        this.location.set({ ...this.location(), detecting: false });
+        this.unlockPageScroll();
+        this.toast.error(error
+          ? this.mensajeErrorGeolocalizacion(error)
+          : 'No pudimos obtener una ubicación. Activá los servicios de ubicación o ingresá la dirección manualmente.');
+      };
+      const keepBestPosition = (position: GeolocationPosition): void => {
+        const { latitude, longitude, accuracy } = position.coords;
+        if (
+          !Number.isFinite(latitude) ||
+          !Number.isFinite(longitude) ||
+          !Number.isFinite(accuracy) ||
+          Math.abs(latitude) > 90 ||
+          Math.abs(longitude) > 180 ||
+          accuracy <= 0
+        ) {
+          return;
+        }
+        if (!bestPosition || position.coords.accuracy < bestPosition.coords.accuracy) {
+          bestPosition = position;
+        }
+      };
+      const applyPosition = (position: GeolocationPosition): void => {
+        const { latitude, longitude, accuracy } = position.coords;
+        if (
+          !Number.isFinite(latitude) ||
+          !Number.isFinite(longitude) ||
+          !Number.isFinite(accuracy) ||
+          Math.abs(latitude) > 90 ||
+          Math.abs(longitude) > 180 ||
+          accuracy <= 0
+        ) {
+          fail();
+          return;
+        }
+        if (accuracy >= lastAppliedAccuracy) return;
+        lastAppliedAccuracy = accuracy;
+        const revision = ++applyRevision;
+        const fallbackName = `Ubicación GPS (precisión aproximada: ±${Math.round(accuracy)} m)`;
+        void this.reverseGeocode(latitude, longitude, fallbackName, 5000).then((name) => {
+          if (revision !== applyRevision) return;
+          this.aplicarUbicacionDetectada(latitude, longitude, name);
+          this.unlockPageScroll();
+        });
+      };
+      const finish = (position: GeolocationPosition | null, error?: GeolocationPositionError): void => {
+        if (completed) return;
+        completed = true;
+        clearTracking();
 
-      watchId = navigator.geolocation.watchPosition(
-        async (position) => {
-          const { latitude, longitude, accuracy } = position.coords;
+        const finalPosition = position ?? bestPosition;
+        if (finalPosition) {
+          applyPosition(finalPosition);
+          return;
+        }
+        if (error && error.code === error.PERMISSION_DENIED) {
+          fail(error);
+          return;
+        }
 
-          // Siempre mostramos la primera lectura para dar feedback rápido al usuario,
-          // pero seguimos observando hasta lograr precisión suficiente.
-          if (!resolved) {
-            resolved = true;
-            const name = await this.reverseGeocode(latitude, longitude);
-            this.aplicarUbicacionDetectada(latitude, longitude, name);
+        try {
+          navigator.geolocation.getCurrentPosition(
+            (fallbackPosition) => applyPosition(fallbackPosition),
+            (fallbackError) => fail(fallbackError),
+            { timeout: 20000, maximumAge: 60000, enableHighAccuracy: false },
+          );
+        } catch {
+          fail(error);
+        }
+      };
+
+      this.locationWatchTimeout = setTimeout(() => finish(bestPosition, lastError), MAX_WAIT_MS);
+      this.locationWatchId = navigator.geolocation.watchPosition(
+        (position) => {
+          if (completed) return;
+          keepBestPosition(position);
+          if (bestPosition === position) {
+            applyPosition(position);
           }
-
-          if (accuracy <= ACCURACY_THRESHOLD_M) {
-            // Precisión aceptable: dejamos de observar y refinamos si cambió.
-            clearTimeout(deadline);
-            navigator.geolocation.clearWatch(watchId!);
-            watchId = null;
-            const name = await this.reverseGeocode(latitude, longitude);
-            this.aplicarUbicacionDetectada(latitude, longitude, name);
+          if (position.coords.accuracy <= MAX_ACCEPTABLE_ACCURACY_M) {
+            finish(bestPosition, undefined);
           }
         },
         (error) => {
-          clearTimeout(deadline);
-          if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-          if (!resolved) {
-            if (error.code === error.TIMEOUT || error.code === error.POSITION_UNAVAILABLE) {
-              // Fallback con baja precisión (IP/WiFi)
-              navigator.geolocation.getCurrentPosition(
-                async (pos) => {
-                  const { latitude, longitude } = pos.coords;
-                  const name = await this.reverseGeocode(latitude, longitude);
-                  this.aplicarUbicacionDetectada(latitude, longitude, name);
-                },
-                (fallbackError) => {
-                  this.location.set({ ...this.location(), detecting: false });
-                  this.toast.error(this.mensajeErrorGeolocalizacion(fallbackError));
-                },
-                { timeout: 20000, maximumAge: 60000, enableHighAccuracy: false },
-              );
-              return;
-            }
-            this.location.set({ ...this.location(), detecting: false });
-            this.toast.error(this.mensajeErrorGeolocalizacion(error));
-          }
+          lastError = error;
+          finish(bestPosition, error);
         },
-        { timeout: 15000, maximumAge: 0, enableHighAccuracy: true },
+        { timeout: MAX_WAIT_MS, maximumAge: 0, enableHighAccuracy: true },
       );
     } catch {
+      if (this.locationWatchId !== null) {
+        navigator.geolocation.clearWatch(this.locationWatchId);
+        this.locationWatchId = null;
+      }
+      if (this.locationWatchTimeout !== null) {
+        clearTimeout(this.locationWatchTimeout);
+        this.locationWatchTimeout = null;
+      }
       this.location.set({ ...this.location(), detecting: false });
+      this.unlockPageScroll();
       this.toast.error('El navegador no pudo iniciar la geolocalización. Ingresá la dirección manualmente.');
     }
+  }
+
+  private lockPageScroll(): void {
+    if (this.scrollLockSnapshot || typeof document === 'undefined') return;
+
+    const html = document.documentElement;
+    const body = document.body;
+    const scrollY = window.scrollY;
+    this.scrollLockSnapshot = {
+      scrollY,
+      htmlOverflow: html.style.overflow,
+      bodyPosition: body.style.position,
+      bodyTop: body.style.top,
+      bodyWidth: body.style.width,
+      bodyOverflow: body.style.overflow,
+      bodyPaddingRight: body.style.paddingRight,
+    };
+
+    const scrollbarWidth = window.innerWidth - html.clientWidth;
+    const currentPaddingRight = Number.parseFloat(window.getComputedStyle(body).paddingRight) || 0;
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.width = '100%';
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${currentPaddingRight + scrollbarWidth}px`;
+    }
+  }
+
+  private unlockPageScroll(): void {
+    const snapshot = this.scrollLockSnapshot;
+    if (!snapshot || typeof document === 'undefined') return;
+    this.scrollLockSnapshot = null;
+
+    const html = document.documentElement;
+    const body = document.body;
+    html.style.overflow = snapshot.htmlOverflow;
+    body.style.position = snapshot.bodyPosition;
+    body.style.top = snapshot.bodyTop;
+    body.style.width = snapshot.bodyWidth;
+    body.style.overflow = snapshot.bodyOverflow;
+    body.style.paddingRight = snapshot.bodyPaddingRight;
+    window.scrollTo(0, snapshot.scrollY);
   }
 
   private aplicarUbicacionDetectada(latitude: number, longitude: number, name: string): void {
@@ -1185,11 +1320,17 @@ if (!franja || !this.franjaDisponible(this.date(), franja) || !this.trabajaEn(pr
   }
 
   /** Geocodificación inversa usando Nominatim (OpenStreetMap, gratuito) */
-  private async reverseGeocode(lat: number, lng: number): Promise<string> {
+  private async reverseGeocode(
+    lat: number,
+    lng: number,
+    fallbackName = 'Tu ubicación',
+    timeoutMs = 8000,
+  ): Promise<string> {
     this.reverseGeocoding.set(true);
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=es&addressdetails=1&zoom=18`,
+        { signal: AbortSignal.timeout(timeoutMs) },
       );
       if (!res.ok) {
         throw new Error('No se pudo consultar el servicio de mapas.');
@@ -1208,9 +1349,10 @@ if (!franja || !this.franjaDisponible(this.date(), franja) || !this.trabajaEn(pr
           return parts.join(', ');
         }
       }
-      return data.display_name || 'Tu ubicación';
+      return data.display_name || fallbackName;
     } catch {
-      return 'Tu ubicación';
+      this.toast.info('No se pudo resolver el nombre exacto de la ubicación. Revisá el punto en el mapa.');
+      return fallbackName;
     } finally {
       this.reverseGeocoding.set(false);
     }

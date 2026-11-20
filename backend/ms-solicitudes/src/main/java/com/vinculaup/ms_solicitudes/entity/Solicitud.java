@@ -237,7 +237,7 @@ public class Solicitud {
     }
 
     public void rechazar(String motivo) {
-        this.motivoCancelacion = motivo;
+        this.motivoCancelacion = motivo == null || motivo.isBlank() ? null : motivo;
         cambiarEstado(EstadoSolicitud.RECHAZADA);
     }
 
@@ -247,4 +247,3 @@ public class Solicitud {
         cambiarEstado(EstadoSolicitud.CANCELADA);
     }
 }
-

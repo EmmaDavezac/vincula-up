@@ -17,6 +17,7 @@ import { VuConfirm } from '../../shared/confirm/confirm';
 import { VuIcon } from '../../shared/icon/icon';
 import { VuSkeletonList } from '../../shared/skeleton-list/skeleton-list';
 import { AdminUnsavedChanges } from '../admin-unsaved-changes.guard';
+import { OperationFeedbackService } from '../../core/services/operation-feedback.service';
 
 /**
  * Catálogo de categorías (especialidades): alta, renombre y baja. La baja falla con
@@ -31,6 +32,7 @@ import { AdminUnsavedChanges } from '../admin-unsaved-changes.guard';
 export class AdminCategories implements AdminUnsavedChanges {
 	private readonly api = inject(ApiService);
 	private readonly router = inject(Router);
+	private readonly operationFeedback = inject(OperationFeedbackService);
 
 	readonly categories = signal<AdminSpecialty[]>([]);
 	readonly loading = signal(true);
@@ -201,7 +203,11 @@ export class AdminCategories implements AdminUnsavedChanges {
 
 	private ejecutarRenombrado(category: AdminSpecialty, nombre: string): void {
 		this.busy.set(true);
-		this.api.saveSpecialty(category.id, nombre).pipe(
+		this.operationFeedback.track(
+			'Guardando el nuevo nombre…',
+			this.api.saveSpecialty(category.id, nombre),
+			'Estamos actualizando la categoría en el catálogo.',
+		).pipe(
 			catchError((error) => {
 				this.busy.set(false);
 				this.aviso.set(avisoError(this.api.describeError(error, 'No se pudo renombrar la categoría.')));
@@ -233,7 +239,11 @@ export class AdminCategories implements AdminUnsavedChanges {
 
 	private ejecutarBorrado(category: AdminSpecialty): void {
 		this.busy.set(true);
-		this.api.deleteSpecialty(category.id).pipe(
+		this.operationFeedback.track(
+			'Eliminando la categoría…',
+			this.api.deleteSpecialty(category.id),
+			'Estamos verificando y actualizando el catálogo.',
+		).pipe(
 			map(() => true),
 			catchError((error) => {
 				this.busy.set(false);

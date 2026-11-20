@@ -97,6 +97,22 @@ public class SolicitudesClient {
                 .body(JsonNode.class);
     }
 
+    public JsonNode marcarEnCamino(UUID id, JsonNode body) {
+        return restClient.patch()
+                .uri("/solicitudes/{id}/en-camino", id)
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+    }
+
+    public JsonNode marcarTrabajoRealizado(UUID id, JsonNode body) {
+        return restClient.patch()
+                .uri("/solicitudes/{id}/trabajo-realizado", id)
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+    }
+
     public JsonNode rechazar(UUID id, JsonNode body) {
         return restClient.patch()
                 .uri("/solicitudes/{id}/rechazar", id)

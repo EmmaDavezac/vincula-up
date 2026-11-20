@@ -150,11 +150,33 @@ public class BackendGateway {
     }
 
     public JsonNode suspenderProfesional(UUID id) {
-        return ejecutar(() -> profesionales.suspender(id));
+        JsonNode perfil = ejecutar(() -> profesionales.suspender(id));
+        actualizarEstadoCuentaProfesional(perfil, true);
+        return perfil;
     }
 
     public JsonNode reactivarProfesional(UUID id) {
-        return ejecutar(() -> profesionales.reactivar(id));
+        JsonNode perfil = ejecutar(() -> profesionales.reactivar(id));
+        actualizarEstadoCuentaProfesional(perfil, false);
+        return perfil;
+    }
+
+    private void actualizarEstadoCuentaProfesional(JsonNode perfil, boolean suspender) {
+        if (perfil == null || perfil.path("usuarioId").asText("").isBlank()) {
+            return;
+        }
+        UUID usuarioId;
+        try {
+            usuarioId = UUID.fromString(perfil.path("usuarioId").asText());
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "El perfil profesional devolvió un identificador de usuario inválido", ex);
+        }
+        if (suspender) {
+            suspenderUsuario(usuarioId);
+        } else {
+            reactivarUsuario(usuarioId);
+        }
     }
 
     public JsonNode listarDisponibilidad(UUID profesionalId) {
@@ -218,6 +240,14 @@ public class BackendGateway {
 
     public JsonNode aceptarSolicitud(UUID id, JsonNode body) {
         return ejecutar(() -> solicitudes.aceptar(id, body));
+    }
+
+    public JsonNode marcarSolicitudEnCamino(UUID id, JsonNode body) {
+        return ejecutar(() -> solicitudes.marcarEnCamino(id, body));
+    }
+
+    public JsonNode marcarTrabajoRealizado(UUID id, JsonNode body) {
+        return ejecutar(() -> solicitudes.marcarTrabajoRealizado(id, body));
     }
 
     public JsonNode rechazarSolicitud(UUID id, JsonNode body) {

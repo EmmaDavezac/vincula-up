@@ -2,6 +2,7 @@ package com.vinculaup.ms_solicitudes.dto;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 /**
@@ -14,6 +15,7 @@ import java.util.UUID;
  */
 public record CambiarEstadoRequest(
         @NotNull @JsonAlias({"usuarioId", "actorId"}) UUID actorId,
+        @Size(max = 100, message = "El motivo no puede superar los 100 caracteres")
         String motivo,
         @JsonAlias({"aliasId", "aliasIds", "subject", "keycloakId"}) UUID keycloakId) {
 

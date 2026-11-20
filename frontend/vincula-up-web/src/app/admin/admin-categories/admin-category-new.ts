@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 import { AdminSpecialty, avisoError, avisoExito } from '../../core/models/admin';
 import { ApiService } from '../../core/services/api.service';
+import { OperationFeedbackService } from '../../core/services/operation-feedback.service';
 import { VuConfirm } from '../../shared/confirm/confirm';
 
 /**
@@ -23,6 +24,7 @@ import { VuConfirm } from '../../shared/confirm/confirm';
 export class AdminCategoryNew {
 	private readonly api = inject(ApiService);
 	private readonly router = inject(Router);
+	private readonly operationFeedback = inject(OperationFeedbackService);
 
 	readonly categorias = signal<AdminSpecialty[]>([]);
 	readonly loading = signal(true);
@@ -71,7 +73,11 @@ export class AdminCategoryNew {
 		this.error.set('');
 
 		this.busy.set(true);
-		this.api.saveSpecialty(null, nombre).pipe(
+		this.operationFeedback.track(
+			'Creando la categoría…',
+			this.api.saveSpecialty(null, nombre),
+			'Estamos agregándola al catálogo.',
+		).pipe(
 			catchError((err) => {
 				this.busy.set(false);
 				this.error.set(this.api.describeError(err, 'No se pudo crear la categoría.'));

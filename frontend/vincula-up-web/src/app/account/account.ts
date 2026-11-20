@@ -10,6 +10,7 @@ import { FotoService } from '../core/services/foto.service';
 import { environment } from '../../environments/environment';
 import { VuAvatar } from '../shared/avatar/avatar';
 import { VuConfirm } from '../shared/confirm/confirm';
+import { OperationFeedbackService } from '../core/services/operation-feedback.service';
 
 type CardKey = 'personal' | 'contact' | 'photo';
 
@@ -28,6 +29,7 @@ type CardKey = 'personal' | 'contact' | 'photo';
 })
 export class Account {
   private readonly api = inject(ApiService);
+  private readonly operationFeedback = inject(OperationFeedbackService);
   readonly auth = inject(AuthService);
   /** Pide y cachea la foto guardada (la que sube la persona desde esta pantalla). */
   private readonly fotos = inject(FotoService);
@@ -269,7 +271,11 @@ export class Account {
       return;
     }
     this.saving.set(true);
-    this.api.uploadPhoto(archivo).pipe(
+    this.operationFeedback.track(
+      'Subiendo tu foto…',
+      this.api.uploadPhoto(archivo),
+      'Estamos preparando la imagen para guardarla en tu perfil.',
+    ).pipe(
       catchError((error) => {
         this.photoError.set(this.api.describeError(error, 'No se pudo subir la foto.'));
         this.saving.set(false);
@@ -317,7 +323,14 @@ export class Account {
     this.saving.set(true);
     this.cardError.set('');
     this.cardNotice.set('');
-    this.api.updateMyAccount(request).pipe(
+    const operationMessage = this.editing() === 'photo'
+      ? 'Guardando tu foto de perfil…'
+      : 'Guardando los cambios de tu cuenta…';
+    this.operationFeedback.track(
+      operationMessage,
+      this.api.updateMyAccount(request),
+      'Estamos actualizando tu información.',
+    ).pipe(
       catchError((error) => {
         this.cardError.set(this.api.describeError(error, 'No se pudo guardar tu información.'));
         this.saving.set(false);

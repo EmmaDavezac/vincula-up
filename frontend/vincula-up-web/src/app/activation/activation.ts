@@ -10,6 +10,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { VuIcon } from '../shared/icon/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { VU_DIALOG_SIZE } from '../shared/dialog-size';
+import { OperationFeedbackService } from '../core/services/operation-feedback.service';
 
 interface ValidatedLocation {
   lat: number;
@@ -27,6 +28,8 @@ export class Activation {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
   private readonly dialog = inject(MatDialog);
+  private readonly operationFeedback = inject(OperationFeedbackService);
+  private finishActivationFeedback?: () => void;
   @ViewChild('mapPickerDialog') private mapPickerDialog!: TemplateRef<unknown>;
   private mapDialogRef?: MatDialogRef<unknown>;
 
@@ -413,44 +416,69 @@ export class Activation {
       });
     };
 
-    const intentarFallback = async (codigoError?: number) => {
-      if (codigoError === 1) {
-        this.validatingLocation.set(false);
-        this.locationError.set('Permiso de ubicación denegado. Ingresá la localidad manualmente o usá el mapa.');
-        return;
-      }
-
-      try {
-        const ipRes = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(3000) });
-        if (ipRes.ok) {
-          const ipData = (await ipRes.json()) as { latitude?: number; longitude?: number; city?: string; region?: string };
-          if (typeof ipData.latitude === 'number' && typeof ipData.longitude === 'number') {
-            const ciudad = [ipData.city, ipData.region].filter(Boolean).join(', ');
-            onExito(ipData.latitude, ipData.longitude, ciudad, 'Ubicación aproximada detectada por red.');
-            return;
-          }
-        }
-      } catch {
-        // Fallback institucional
-      }
-
-      onExito(-32.4833, -58.2318, 'Concepción del Uruguay, Entre Ríos', 'Dispositivo sin GPS. Fijamos la ubicación base en Concepción del Uruguay.');
-    };
-
     navigator.geolocation.getCurrentPosition(
-      (pos) => onExito(pos.coords.latitude, pos.coords.longitude),
-      (err1) => {
-        if (err1.code === 1) {
-          void intentarFallback(1);
+      (pos) => {
+        const { latitude, longitude, accuracy } = pos.coords;
+        if (
+          !Number.isFinite(latitude) ||
+          !Number.isFinite(longitude) ||
+          !Number.isFinite(accuracy) ||
+          Math.abs(latitude) > 90 ||
+          Math.abs(longitude) > 180 ||
+          accuracy <= 0
+        ) {
+          this.validatingLocation.set(false);
+          this.locationError.set(Number.isFinite(accuracy)
+            ? `El navegador permitió acceder a la ubicación, pero el dispositivo solo pudo estimarla con un margen de ±${Math.round(accuracy)} m. El permiso no garantiza precisión; revisá los servicios de ubicación o elegí el punto en el mapa.`
+            : 'El dispositivo no informó una precisión válida. Revisá sus servicios de ubicación o elegí el punto en el mapa.');
           return;
         }
-        navigator.geolocation.getCurrentPosition(
-          (pos) => onExito(pos.coords.latitude, pos.coords.longitude),
-          (err2) => void intentarFallback(err2.code),
-          { timeout: 15000, maximumAge: 60000, enableHighAccuracy: false },
+        onExito(
+          latitude,
+          longitude,
+          `Ubicación actual (precisión aproximada: ±${Math.round(accuracy)} m)`,
+          accuracy > 100
+            ? `Ubicación aproximada (margen de ±${Math.round(accuracy)} m). Podés ajustar el punto en el mapa.`
+            : '',
         );
       },
-      { timeout: 12000, maximumAge: 0, enableHighAccuracy: true },
+      (error) => {
+        if (error.code !== error.PERMISSION_DENIED) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const { latitude, longitude, accuracy } = pos.coords;
+              if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !Number.isFinite(accuracy)
+                || Math.abs(latitude) > 90 || Math.abs(longitude) > 180 || accuracy <= 0) {
+                this.validatingLocation.set(false);
+                this.locationError.set('El dispositivo no informó una ubicación válida. Revisá los servicios de ubicación o elegí el punto en el mapa.');
+                return;
+              }
+              onExito(
+                latitude,
+                longitude,
+                `Ubicación aproximada (precisión ±${Math.round(accuracy)} m)`,
+                `Ubicación aproximada (margen de ±${Math.round(accuracy)} m). Podés ajustar el punto en el mapa.`,
+              );
+            },
+            (fallbackError) => {
+              this.validatingLocation.set(false);
+              this.locationError.set(fallbackError.code === fallbackError.TIMEOUT
+                ? 'El dispositivo no obtuvo una ubicación a tiempo. Revisá los servicios de ubicación o elegí el punto en el mapa.'
+                : 'No se pudo obtener la ubicación del dispositivo. Ingresá la localidad manualmente o usá el mapa.');
+            },
+            { timeout: 20000, maximumAge: 60000, enableHighAccuracy: false },
+          );
+          return;
+        }
+
+        this.validatingLocation.set(false);
+        this.locationError.set(error.code === error.PERMISSION_DENIED
+          ? 'Permiso de ubicación denegado. Ingresá la localidad manualmente o usá el mapa.'
+          : error.code === error.TIMEOUT
+            ? 'El dispositivo no obtuvo una ubicación a tiempo. Revisá los servicios de ubicación o elegí el punto en el mapa.'
+            : 'No se pudo obtener la ubicación del dispositivo. Ingresá la localidad manualmente o elegí el punto en el mapa.');
+      },
+      { timeout: 15000, maximumAge: 0, enableHighAccuracy: true },
     );
   }
 
@@ -665,6 +693,11 @@ export class Activation {
 
     const keycloakId = this.auth.getKeycloakId();
     this.submitting.set(true);
+    this.finishActivationFeedback?.();
+    this.finishActivationFeedback = this.operationFeedback.begin(
+      'Activando tu perfil profesional…',
+      'Estamos guardando tu ubicación, disponibilidad y datos de perfil.',
+    );
 
     // La foto se sube primero: la activación solo recibe la clave del archivo, así
     // que el base64 deja de viajar por la API y de guardarse en la base.
@@ -674,6 +707,8 @@ export class Activation {
           catchError((error) => {
             this.errorMessage.set(this.api.describeError(error, 'No se pudo subir la foto.'));
             this.submitting.set(false);
+            this.finishActivationFeedback?.();
+            this.finishActivationFeedback = undefined;
             return of(null);
           }),
         )
@@ -681,6 +716,8 @@ export class Activation {
 
     subirFoto$.subscribe((clave) => {
       if (this.selectedPhotoFile && !clave) {
+        this.finishActivationFeedback?.();
+        this.finishActivationFeedback = undefined;
         return;
       }
       this.activarConFoto(clave, usuarioId, keycloakId, loc);
@@ -710,16 +747,22 @@ export class Activation {
       catchError((error) => {
         this.errorMessage.set(this.api.describeError(error, 'No se pudo activar tu perfil profesional.'));
         this.submitting.set(false);
+        this.finishActivationFeedback?.();
+        this.finishActivationFeedback = undefined;
         return of(null);
       }),
     ).subscribe((result) => {
       if (!result) {
         this.submitting.set(false);
+        this.finishActivationFeedback?.();
+        this.finishActivationFeedback = undefined;
         return;
       }
 
       if (!result.id) {
         this.submitting.set(false);
+        this.finishActivationFeedback?.();
+        this.finishActivationFeedback = undefined;
         this.errorMessage.set('El servidor no devolvió el identificador del perfil.');
         return;
       }
@@ -740,9 +783,13 @@ export class Activation {
       next: () => {
         this.completed.set(true);
         this.submitting.set(false);
+        this.finishActivationFeedback?.();
+        this.finishActivationFeedback = undefined;
       },
       error: () => {
         this.submitting.set(false);
+        this.finishActivationFeedback?.();
+        this.finishActivationFeedback = undefined;
         this.errorMessage.set('El perfil se activó, pero no se guardaron los horarios. Volvé a intentar para guardar los días seleccionados.');
       },
     });

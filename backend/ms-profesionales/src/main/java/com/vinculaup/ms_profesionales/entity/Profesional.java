@@ -153,8 +153,7 @@ public class Profesional {
     }
 
     public void reactivar() {
-        // Levantar un baneo nunca "activa" el perfil: si el profesional todavía
-        // no completó su alta, vuelve a quedar pendiente de activación.
+        // Una suspensión no activa un perfil que todavía no completó su alta.
         this.estado = fechaActivacion == null ? EstadoProfesional.CARGADO : EstadoProfesional.ACTIVO;
     }
 }

@@ -157,7 +157,7 @@ esto; la única acción que altera la cuenta queda adentro, con su confirmación
 							(click)="toggleAccess(abierto)"
 							[disabled]="busyId() === abierto.id"
 						>
-							{{ busyId() === abierto.id ? 'Desactivando...' : 'Desactivar cuenta' }}
+							{{ busyId() === abierto.id ? 'Suspendiendo...' : 'Suspender cuenta' }}
 						</button>
 						<p class="admin-clients__modal-hint">
 							No podrá entrar ni hacer pedidos. Sus solicitudes y calificaciones se conservan y

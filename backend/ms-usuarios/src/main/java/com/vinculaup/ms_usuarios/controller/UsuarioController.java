@@ -91,13 +91,13 @@ public class UsuarioController {
         return service.vincularKeycloak(id, request.keycloakId());
     }
 
-    /** Baneo administrativo: deja la cuenta suspendida (reversible). */
+    /** Suspende administrativamente la cuenta; la operación es reversible. */
     @PatchMapping("/{id}/suspender")
     public UsuarioResponse suspender(@PathVariable UUID id) {
         return service.suspender(id);
     }
 
-    /** Levanta el baneo y devuelve la cuenta a ACTIVO. */
+    /** Levanta la suspensión y devuelve la cuenta a ACTIVO. */
     @PatchMapping("/{id}/reactivar")
     public UsuarioResponse reactivar(@PathVariable UUID id) {
         return service.reactivar(id);

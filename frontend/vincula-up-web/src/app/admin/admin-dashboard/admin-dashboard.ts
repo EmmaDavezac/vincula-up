@@ -87,15 +87,16 @@ export class AdminDashboard {
 		}));
 	});
 
-	/** Recorrido de la solicitud: recibida, aceptada, completada y valorada. */
+	/** Recorrido de la solicitud: recibida, gestionada, completada y valorada. */
 	readonly etapas = computed<ReadonlyArray<Etapa>>(() => {
 		const solicitudes = this.solicitudes();
 		const completadas = solicitudes.filter((item) => item.estado === 'COMPLETADA').length;
-		// Todo lo que avanzó del estado pendiente: aceptada, completada o cancelada.
-		const atendidas = solicitudes.filter((item) => item.estado !== 'PENDIENTE' && item.estado !== 'RECHAZADA').length;
+		const atendidas = solicitudes.filter((item) =>
+			!['PENDIENTE', 'RECHAZADA', 'CANCELADA', 'VENCIDA'].includes(item.estado),
+		).length;
 		return [
 			{ label: 'Solicitudes recibidas', value: solicitudes.length },
-			{ label: 'Aceptadas por profesionales', value: atendidas },
+			{ label: 'En gestión por profesionales', value: atendidas },
 			{ label: 'Servicios completados', value: completadas },
 			{ label: 'Valoraciones recibidas', value: solicitudes.filter((item) => item.puntaje != null).length },
 		];

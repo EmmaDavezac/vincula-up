@@ -100,7 +100,7 @@ export function estadoLabel(estado: string | null | undefined): string {
 
 /**
  * Clase del estado con los colores exactos del prototipo:
- * verde activo, ámbar preregistro, rojo suspendido e inactivo (clientes baneados).
+ * verde activo, ámbar preregistro y rojo suspendido.
  */
 export function estadoClase(estado: string | null | undefined): string {
 	switch ((estado ?? '').toUpperCase()) {

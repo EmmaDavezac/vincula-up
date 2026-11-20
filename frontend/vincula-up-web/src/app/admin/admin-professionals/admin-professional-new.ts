@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 import { AdminSpecialty } from '../../core/models/admin';
 import { ApiService } from '../../core/services/api.service';
+import { OperationFeedbackService } from '../../core/services/operation-feedback.service';
 import { VuConfirm } from '../../shared/confirm/confirm';
 
 /**
@@ -24,6 +25,7 @@ import { VuConfirm } from '../../shared/confirm/confirm';
 export class AdminProfessionalNew {
 	private readonly api = inject(ApiService);
 	private readonly router = inject(Router);
+	private readonly operationFeedback = inject(OperationFeedbackService);
 
 	readonly specialties = signal<AdminSpecialty[]>([]);
 	readonly loadingSpecialties = signal(true);
@@ -130,14 +132,18 @@ export class AdminProfessionalNew {
 
 		// Un solo endpoint: el backend crea la cuenta con contraseña temporal, el
 		// perfil pendiente de activación y manda el acceso; devuelve si el correo salió.
-		this.api.createProfessionalInvite({
+		this.operationFeedback.track(
+			'Creando el perfil del profesional…',
+			this.api.createProfessionalInvite({
 			nombre: this.form.nombre.trim(),
 			apellido: this.form.apellido.trim(),
 			email,
 			telefono: this.form.telefono.trim(),
 			legajo: this.form.legajo.trim(),
 			especialidadIds: [...this.form.especialidadIds],
-		}).pipe(
+			}),
+			'Estamos registrando sus datos y preparando la invitación.',
+		).pipe(
 			catchError((err) => {
 				this.submitting.set(false);
 				this.error.set(this.api.describeError(err, 'No se pudo registrar el profesional.'));

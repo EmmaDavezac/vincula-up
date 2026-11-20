@@ -205,25 +205,37 @@ public class SolicitudService {
         verificarExpiracion(solicitud);
         ensureProfessionalActor(solicitud, request);
         ensureState(solicitud, EstadoSolicitud.PENDIENTE);
-        solicitud.rechazar(request.motivo());
+        solicitud.rechazar(request.motivo() == null ? null : request.motivo().trim());
         return toResponse(solicitud);
     }
 
-    /**
-     * El turno se da por terminado desde cualquiera de los dos lados: el profesional
-     * que terminó el trabajo o el cliente que confirmó que ya está hecho.
-     */
+    public SolicitudResponse marcarEnCamino(UUID id, CambiarEstadoRequest request) {
+        Solicitud solicitud = find(id);
+        ensureProfessionalActor(solicitud, request);
+        ensureState(solicitud, EstadoSolicitud.ACEPTADA);
+        solicitud.cambiarEstado(EstadoSolicitud.EN_CAMINO);
+        return toResponse(solicitud);
+    }
+
+    public SolicitudResponse marcarTrabajoRealizado(UUID id, CambiarEstadoRequest request) {
+        Solicitud solicitud = find(id);
+        ensureProfessionalActor(solicitud, request);
+        ensureState(solicitud, EstadoSolicitud.EN_CAMINO);
+        solicitud.cambiarEstado(EstadoSolicitud.TRABAJO_REALIZADO);
+        return toResponse(solicitud);
+    }
+
     public SolicitudResponse completar(UUID id, CambiarEstadoRequest request) {
         Solicitud solicitud = find(id);
-        ensureParticipante(solicitud, request, "Solo el cliente o el profesional pueden completar la solicitud");
-        ensureState(solicitud, EstadoSolicitud.ACEPTADA);
+        ensureClientActor(solicitud, request);
+        ensureState(solicitud, EstadoSolicitud.TRABAJO_REALIZADO);
         solicitud.cambiarEstado(EstadoSolicitud.COMPLETADA);
         return toResponse(solicitud);
     }
 
     /**
      * Cancelación desde cualquiera de los dos lados. Se puede cancelar mientras el
-     * turno está pendiente de respuesta y también después de haberlo aceptado.
+     * turno está pendiente de respuesta, en coordinación o durante la prestación.
      * <p>
      * El motivo es obligatorio para las dos partes: la contraparte tiene que saber
      * por qué se dio de baja el turno, así que no se acepta una cancelación sin
@@ -235,7 +247,9 @@ public class SolicitudService {
         RolCancelacion rol = rolDeParticipante(solicitud, request,
                 "Solo el cliente o el profesional pueden cancelar la solicitud");
         if (solicitud.getEstado() != EstadoSolicitud.PENDIENTE
-                && solicitud.getEstado() != EstadoSolicitud.ACEPTADA) {
+                && solicitud.getEstado() != EstadoSolicitud.ACEPTADA
+                && solicitud.getEstado() != EstadoSolicitud.EN_CAMINO
+                && solicitud.getEstado() != EstadoSolicitud.TRABAJO_REALIZADO) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "La solicitud no permite esta transicion desde " + solicitud.getEstado());
         }
@@ -243,6 +257,10 @@ public class SolicitudService {
         if (motivo.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Indicá el motivo de la cancelación");
+        }
+        if (motivo.length() > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El motivo no puede superar los 100 caracteres");
         }
         // Se guarda el id canónico de la parte que canceló (no el alias de Keycloak),
         // así cada lado puede mostrar si la canceló él o la contraparte.
@@ -346,6 +364,14 @@ public class SolicitudService {
     }
 
     private record Identidades(Set<UUID> ids, List<ProfesionalIdentidad> perfiles) {
+    }
+
+    private void ensureClientActor(Solicitud solicitud, CambiarEstadoRequest request) {
+        Set<UUID> ids = identidadesDe(request.actorId(), aliasIdsDe(request)).ids();
+        if (!ids.contains(solicitud.getClienteId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Solo el cliente de esta solicitud puede confirmar que el trabajo fue realizado");
+        }
     }
 
     private void ensureState(Solicitud solicitud, EstadoSolicitud expected) {

@@ -85,7 +85,7 @@ public class ApiController {
         keycloakAdmin.promoverAProfesional(authenticatedSubject());
     }
 
-    /** Las cuentas baneadas no pueden operar: corta cualquier llamada autenticada. */
+    /** Las cuentas suspendidas no pueden operar: corta cualquier llamada autenticada. */
     private JsonNode requireActive(JsonNode user) {
         if (user != null && "SUSPENDIDO".equalsIgnoreCase(user.path("estado").asText(""))) {
             throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN,
@@ -728,11 +728,11 @@ public class ApiController {
         return "";
     }
 
-    /** Baneo de una cuenta (clientes incluidos) por incumplimiento de normas. */
+    /** Suspensión administrativa reversible de una cuenta. */
     @PatchMapping("/usuarios/{id}/suspender")
     public JsonNode suspenderUsuario(@PathVariable UUID id) { return gateway.suspenderUsuario(id); }
 
-    /** Levanta el baneo y devuelve la cuenta a ACTIVO. */
+    /** Levanta la suspensión y devuelve la cuenta a ACTIVO. */
     @PatchMapping("/usuarios/{id}/reactivar")
     public JsonNode reactivarUsuario(@PathVariable UUID id) { return gateway.reactivarUsuario(id); }
 
@@ -949,7 +949,25 @@ public class ApiController {
         return actualizada;
     }
 
-    /** Cualquiera de los dos lados puede dar el turno por terminado. */
+    @PatchMapping("/solicitudes/{id}/en-camino")
+    public JsonNode marcarEnCamino(@PathVariable UUID id, @RequestBody JsonNode body) {
+        JsonNode user = authenticatedUser();
+        professionalProfile(user, true);
+        JsonNode actualizada = gateway.marcarSolicitudEnCamino(id, actorIdentityBody(body, user));
+        notificarCambioSolicitud(actualizada, "PROFESIONAL", null);
+        return actualizada;
+    }
+
+    @PatchMapping("/solicitudes/{id}/trabajo-realizado")
+    public JsonNode marcarTrabajoRealizado(@PathVariable UUID id, @RequestBody JsonNode body) {
+        JsonNode user = authenticatedUser();
+        professionalProfile(user, true);
+        JsonNode actualizada = gateway.marcarTrabajoRealizado(id, actorIdentityBody(body, user));
+        notificarCambioSolicitud(actualizada, "PROFESIONAL", null);
+        return actualizada;
+    }
+
+    /** El cliente confirma que el profesional marcó el trabajo como realizado. */
     @PatchMapping("/solicitudes/{id}/completar")
     public JsonNode completar(@PathVariable UUID id, @RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
@@ -999,10 +1017,13 @@ public class ApiController {
             }
 
             JsonNode destinatario;
+            UUID pushDestinatarioId = destinatarioId;
             if (esProfesional) {
                 JsonNode perfil = gateway.buscarProfesionalPorIdOUsuario(destinatarioId);
-                UUID usuarioId = perfil == null ? null : uuidOrNull(perfil.path("usuarioId").asText(null));
+                JsonNode perfilObjeto = primerProfesional(perfil);
+                UUID usuarioId = perfilObjeto == null ? null : uuidOrNull(perfilObjeto.path("usuarioId").asText(null));
                 destinatario = usuarioId == null ? null : gateway.buscarUsuarioPorIdOKeycloakId(usuarioId);
+                pushDestinatarioId = usuarioId;
             } else {
                 destinatario = gateway.buscarUsuarioPorIdOKeycloakId(destinatarioId);
             }
@@ -1013,7 +1034,7 @@ public class ApiController {
             String nombre = (destinatario.path("nombre").asText("") + " "
                     + destinatario.path("apellido").asText("")).trim();
                 try {
-                notificarPushSolicitud(destinatarioId, nombre, estado, solicitud);
+                notificarPushSolicitud(pushDestinatarioId, nombre, estado, solicitud);
                 } catch (RuntimeException pushException) {
                 org.slf4j.LoggerFactory.getLogger(ApiController.class)
                     .warn("No se pudo enviar Web Push para solicitud {}: {}",
@@ -1028,6 +1049,16 @@ public class ApiController {
         }
     }
 
+    private JsonNode primerProfesional(JsonNode perfiles) {
+        if (perfiles == null) {
+            return null;
+        }
+        if (perfiles.isArray()) {
+            return perfiles.isEmpty() ? null : perfiles.get(0);
+        }
+        return perfiles.isObject() ? perfiles : null;
+    }
+
     private void notificarPushSolicitud(UUID destinatarioId, String nombre, String estado, JsonNode solicitud) {
         String title;
         String detail;
@@ -1039,6 +1070,14 @@ public class ApiController {
             case "ACEPTADA" -> {
                 title = "Solicitud aceptada";
                 detail = "Tu solicitud fue aceptada.";
+            }
+            case "EN_CAMINO" -> {
+                title = "Profesional en camino";
+                detail = "El profesional inició el viaje hacia el domicilio.";
+            }
+            case "TRABAJO_REALIZADO" -> {
+                title = "Trabajo realizado";
+                detail = "El profesional marcó el trabajo como realizado. Revisalo para confirmar la finalización.";
             }
             case "RECHAZADA" -> {
                 title = "Solicitud rechazada";
@@ -1057,6 +1096,10 @@ public class ApiController {
                 detail = "El profesional no respondió a tiempo. Podés solicitar a otro profesional.";
             }
             default -> { return; }
+        }
+        if (("RECHAZADA".equalsIgnoreCase(estado) || "CANCELADA".equalsIgnoreCase(estado))
+                && !solicitud.path("motivoCancelacion").asText("").isBlank()) {
+            detail += " Motivo: " + solicitud.path("motivoCancelacion").asText("").trim();
         }
         String especialidad = solicitud.path("especialidadNombre").asText("");
         String body = especialidad.isBlank() ? detail : especialidad + ": " + detail;

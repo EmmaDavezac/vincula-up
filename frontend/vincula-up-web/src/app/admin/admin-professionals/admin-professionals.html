@@ -246,7 +246,7 @@
 							</p>
 						}
 
-						@if (estaDesactivado(abierto.profesional)) {
+						@if (estaSuspendido(abierto.profesional)) {
 							<button
 								type="button"
 								mat-stroked-button
@@ -257,22 +257,22 @@
 								{{ busyId() === abierto.profesional.id ? 'Reactivando...' : 'Reactivar cuenta' }}
 							</button>
 							<p class="admin-professionals__modal-hint">Vuelve a aparecer en el directorio y a recibir solicitudes.</p>
-						} @else if (puedeDesactivarse(abierto.profesional)) {
+						} @else if (puedeSuspenderse(abierto.profesional)) {
 							<button
 								type="button"
 								mat-flat-button
 								class="vu-btn vu-btn--danger vu-btn--block"
-								(click)="desactivar(abierto.profesional)"
+								(click)="suspender(abierto.profesional)"
 								[disabled]="busyId() === abierto.profesional.id"
 							>
-								{{ busyId() === abierto.profesional.id ? 'Desactivando...' : 'Desactivar cuenta' }}
+								{{ busyId() === abierto.profesional.id ? 'Suspendiendo...' : 'Suspender cuenta' }}
 							</button>
 							<p class="admin-professionals__modal-hint">
-								Sale del directorio y deja de recibir solicitudes. No se borra nada y se puede reactivar después.
+								Sale del directorio y no puede acceder a la aplicación. No se borra nada y se puede reactivar después.
 							</p>
 						} @else {
 							<p class="admin-professionals__modal-hint">
-								Este perfil todavía no completó su activación, así que no hay nada que desactivar.
+								Este perfil todavía no completó su activación, así que no hay una cuenta operativa para suspender.
 							</p>
 						}
 					</div>

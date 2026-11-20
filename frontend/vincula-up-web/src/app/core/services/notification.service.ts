@@ -93,7 +93,11 @@ export class NotificationService {
 				this.writeJson(snapshotKey, current);
 
 				messageSubscription?.unsubscribe();
-				const chats = items.filter((request) => request.status === 'ACEPTADA');
+				const chats = items.filter((request) =>
+					request.status === 'ACEPTADA'
+					|| request.status === 'EN_CAMINO'
+					|| request.status === 'TRABAJO_REALIZADO',
+				);
 				if (!chats.length) return;
 				const messagesByRequest = forkJoin(chats.map((request) =>
 					this.api.getMessages(String(request.id), user.id).pipe(
@@ -189,6 +193,8 @@ export class NotificationService {
 		const statusCopy: Record<RequestStatus, { title: string; verb: string }> = {
 			PENDIENTE: { title: 'Nueva solicitud', verb: 'está pendiente de respuesta' },
 			ACEPTADA: { title: 'Solicitud aceptada', verb: 'fue aceptada' },
+			EN_CAMINO: { title: 'Profesional en camino', verb: 'el profesional está en camino' },
+			TRABAJO_REALIZADO: { title: 'Trabajo realizado', verb: 'el profesional marcó el trabajo como realizado' },
 			RECHAZADA: { title: 'Solicitud rechazada', verb: 'fue rechazada' },
 			COMPLETADA: { title: 'Solicitud completada', verb: 'se marcó como completada' },
 			CANCELADA: { title: 'Solicitud cancelada', verb: 'fue cancelada' },

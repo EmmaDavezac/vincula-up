@@ -25,6 +25,109 @@
 
 ## Historial
 
+### [2026-11-18] - fix: explicar y esperar mejoras de precisión GPS
+- **Objetivo:** Aclarar por qué una ubicación puede ser imprecisa aunque el permiso esté concedido, y evitar cortar el intento ante errores transitorios.
+- **Cambios realizados:**
+  - En solicitudes, `watchPosition` ahora continúa hasta 15 segundos después de una lectura imprecisa para permitir que el dispositivo reporte un punto mejor; solo se detiene antes ante una posición de hasta 100 m o si se deniega el permiso.
+  - Los errores explican que el permiso solo autoriza el acceso y no garantiza precisión, y recomiendan revisar los servicios de ubicación del dispositivo o ajustar el pin en el mapa.
+  - La detección GPS durante la activación del perfil también da hasta 15 segundos y muestra un mensaje equivalente ante una lectura imprecisa.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/request/request.ts`, `frontend/vincula-up-web/src/app/activation/activation.ts` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente; `git diff --check` también pasó.
+
+### [2026-11-18] - fix: restaurar detección tolerante de ubicación
+- **Objetivo:** Recuperar el comportamiento de geolocalización que permitía ubicar al usuario aunque el dispositivo no alcanzara una precisión GPS estricta.
+- **Cambios realizados:**
+  - La detección vuelve a aplicar la primera posición válida, refina el punto mientras espera una lectura de hasta 80 m y conserva la mejor posición recibida al vencer el tiempo.
+  - Si no llega ninguna posición de alta precisión, usa una consulta de menor precisión como alternativa en lugar de fallar directamente.
+  - Se cancelan los seguimientos y temporizadores al terminar, se evita iniciar detecciones duplicadas y se libera el bloqueo de desplazamiento al completar o fallar.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/request/request.ts` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente.
+
+### [2026-11-18] - fix: evitar ubicaciones automáticas imprecisas
+- **Objetivo:** Evitar que una ubicación por IP, una lectura obsoleta o una posición demasiado imprecisa se presente como la ubicación actual del usuario.
+- **Cambios realizados:**
+  - Se eliminó por completo la consulta de ubicación por IP. En solicitudes se usa únicamente geolocalización del navegador de alta precisión, sin caché, con un máximo de 10 segundos; solo se acepta una precisión reportada de hasta 100 m.
+  - Se valida que las coordenadas y la precisión sean valores válidos. Si el dispositivo no obtiene una posición confiable, se muestra un error y se pide ajustar el pin o ingresar la dirección, sin aplicar una ubicación aproximada.
+  - La detección durante la activación del perfil también dejó de usar ubicación por IP y el punto institucional como fallback; solo aplica lecturas GPS con precisión reportada de hasta 100 m.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/request/request.ts`, `frontend/vincula-up-web/src/app/activation/activation.ts` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente; `git diff --check` también pasó.
+
+### [2026-11-18] - fix: agregar respaldo de ubicación aproximada por red
+- **Objetivo:** Evitar que la detección termine únicamente con un mensaje genérico cuando el navegador no obtiene coordenadas.
+- **Cambios realizados:**
+  - Si el GPS y la lectura de red del navegador no entregan coordenadas, se intenta obtener una ubicación aproximada por IP, salvo que el usuario haya denegado el permiso de ubicación.
+  - Se valida que las coordenadas recibidas sean válidas y se informa que el punto puede tener varios kilómetros de diferencia para que se ajuste en el mapa.
+  - Si tampoco está disponible la ubicación por IP, se indica que puede ingresarse la dirección manualmente o seleccionar el punto en el mapa.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/request/request.ts` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.
+
+### [2026-11-18] - fix: bloquear el scroll del documento al detectar ubicación
+- **Objetivo:** Impedir el desplazamiento del fondo mientras se muestra la carga de detección de ubicación en el formulario de solicitud.
+- **Cambios realizados:**
+  - El documento conserva su posición y fija `html` y `body` mientras se detecta la ubicación; el scroll se restaura al terminar o salir de la pantalla.
+  - La geolocalización de menor precisión se solicita en paralelo al GPS de alta precisión, para obtener un punto aproximado en dispositivos sin GPS.
+  - Si ambos intentos fallan, se conserva el error real del navegador para mostrar una indicación útil en vez de un mensaje genérico.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/request/request.ts` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.
+
+### [2026-11-18] - ux: mostrar progreso contextual en transacciones
+- **Objetivo:** Reemplazar los indicadores de carga sin contexto por mensajes claros durante operaciones de guardado, borrado, creación, cambios de estado, detección de ubicación y cierre de sesión.
+- **Cambios realizados:**
+  - Se agregó una capa global reutilizable con mensaje, detalle y barra de progreso indeterminada, que bloquea el scroll y se libera al completar la operación.
+  - Se conectó a guardados de cuenta y profesionales, alta de profesionales y categorías, gestión de categorías, suspensión/reactivación, actualización de solicitudes, chat, calificaciones y activación del perfil.
+  - El cierre de sesión informa que está finalizando de forma segura; el flujo de solicitud detalla qué se está haciendo al detectar ubicación o enviar el turno.
+  - Se respetan las preferencias de movimiento reducido para las animaciones de progreso.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/app.ts`, `app.html`, `core/services/operation-feedback.service.ts`, `shared/operation-feedback/`, `shared/navbar/navbar.ts`, `account/account.ts`, `activation/activation.ts`, `admin/admin-categories/admin-categories.ts`, `admin/admin-categories/admin-category-new.ts`, `admin/admin-clients/admin-clients.ts`, `admin/admin-professionals/admin-professionals.ts`, `admin/admin-professionals/admin-professional-new.ts`, `my-requests/my-requests.ts`, `request/request.ts`, `request/request.html`, `request/request.css` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.
+
+### [2026-11-18] - fix: bloquear scroll de fondo y agilizar ubicación en solicitudes
+- **Objetivo:** Evitar el desplazamiento del contenido detrás de los diálogos y la carga de solicitudes, y mejorar el tiempo y precisión de la detección GPS.
+- **Cambios realizados:**
+  - Los diálogos de confirmación y el overlay de carga bloquean el scroll del fondo; el bloqueo se libera al cerrar o terminar la operación.
+  - La detección GPS ahora conserva la lectura más precisa durante un máximo de 8 segundos, usa lecturas recientes y hace una sola geocodificación inversa con timeout reducido.
+  - Si el dispositivo no alcanza una precisión de 75 m, se usa la mejor lectura obtenida y se informa la precisión estimada para que el usuario ajuste el pin.
+  - Se cancelan las lecturas GPS pendientes al salir de la pantalla.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/request/request.ts`, `request.html`, `request.css`, `frontend/vincula-up-web/src/app/shared/confirm/confirm.ts` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente; `git diff --check` también pasó.
+
+### [2026-11-17] - ux: mostrar aceptar y rechazar directamente en solicitudes pendientes
+- **Objetivo:** Evitar que el profesional tenga que abrir «Actualizar estado» para aceptar o rechazar una solicitud pendiente.
+- **Cambios realizados:**
+  - En solicitudes pendientes recibidas por profesionales se muestran directamente los botones «Aceptar» y «Rechazar».
+  - Se conservan las confirmaciones de aceptación y el formulario de motivo opcional del rechazo; las demás transiciones mantienen el acceso existente a «Actualizar estado».
+  - Archivos modificados: `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `my-requests.css` y `my-requests.ts`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.
+
+### [2026-11-17] - fix: evitar carga infinita al detectar ubicación
+- **Objetivo:** Corregir el indicador de carga de ubicación del flujo `/solicitar`, que podía quedar activo si el GPS no entregaba lecturas.
+- **Cambios realizados:**
+  - Si `watchPosition` no obtiene una ubicación inicial en 12 segundos, se detiene y se inicia la consulta de ubicación de menor precisión con tiempo límite.
+  - Si ese intento falla, se apaga el indicador y se informa que puede ingresarse la dirección manualmente.
+  - La geocodificación inversa ahora aborta tras 8 segundos y usa el nombre de respaldo, evitando que una petición de red pendiente prolongue la carga indefinidamente.
+  - Archivo modificado: `frontend/vincula-up-web/src/app/request/request.ts`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.
+
+### [2026-11-17] - feat: ordenar el ciclo de solicitudes y unificar la suspensión de cuentas
+- **Objetivo:** Hacer que la solicitud avance por etapas verificables, separar el aviso del profesional de la confirmación del cliente, y mantener coherentes los motivos de rechazo/cancelación y los estados de cuenta.
+- **Cambios realizados:**
+  - El flujo ahora es `PENDIENTE` → `ACEPTADA` → `EN_CAMINO` → `TRABAJO_REALIZADO` → `COMPLETADA`; el profesional realiza las dos transiciones intermedias y solo el cliente confirma la finalización. Ambas partes pueden cancelar en etapas no finales con motivo obligatorio.
+  - El rechazo admite motivo opcional. Rechazo y cancelación comparten opciones comunes y «Otro»; el texto libre admite hasta 100 caracteres.
+  - Las cuentas de clientes y profesionales usan `ACTIVO`/`SUSPENDIDO`. Suspender o reactivar un profesional sincroniza el perfil y su cuenta; `CARGADO` queda reservado al perfil aún no activado.
+  - Se ajustan las notificaciones, permisos, etiquetas y documentación del flujo.
+  - **Archivos modificados:**
+    - `backend/bff-web/src/main/java/com/vinculaup/bff_web/client/SolicitudesClient.java`, `config/SecurityConfig.java`, `controller/ApiController.java`, `service/BackendGateway.java`, `service/NotificacionService.java`.
+    - `backend/ms-profesionales/src/main/java/com/vinculaup/ms_profesionales/entity/Profesional.java`.
+    - `backend/ms-solicitudes/src/main/java/com/vinculaup/ms_solicitudes/config/SolicitudDataInitializer.java`, `controller/SolicitudController.java`, `dto/CambiarEstadoRequest.java`, `entity/EstadoSolicitud.java`, `entity/Solicitud.java`, `service/SolicitudService.java`.
+    - `backend/ms-usuarios/src/main/java/com/vinculaup/ms_usuarios/controller/UsuarioController.java`, `entity/EstadoUsuario.java`, `entity/Usuario.java`.
+    - `frontend/vincula-up-web/src/app/admin/admin-clients/admin-clients.html` y `admin-clients.ts`; `admin-dashboard/admin-dashboard.ts`; `admin-professionals/admin-professionals.html` y `admin-professionals.ts`.
+    - `frontend/vincula-up-web/src/app/core/models/admin.ts`, `core/models/service-request.ts`, `core/services/api.service.ts`, `core/services/notification.service.ts`.
+    - `frontend/vincula-up-web/src/app/my-requests/my-requests.css`, `my-requests.html`, `my-requests.ts` y `frontend/vincula-up-web/src/styles.css`.
+    - `ESPECIFICACION.md`, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:**
+  - `npm --prefix frontend/vincula-up-web run build` — correcto.
+  - `./mvnw clean compile` en `backend/ms-solicitudes`, `backend/bff-web`, `backend/ms-profesionales` y `backend/ms-usuarios` — correcto.
+  - `git diff --check` — sin errores.
+
 ### [2026-11-17] - docs: actualizar arquitectura y resultados de planificación del MVP
 - **Objetivo:** Alinear la documentación sobre SMTP, almacenamiento de fotos y responsabilidades del BFF; registrar los resultados por tarea planificada y los errores encontrados durante la ejecución.
 - **Cambios realizados:**
@@ -1319,6 +1422,52 @@
 - **Archivos modificados:** `frontend/vincula-up-web/src/app/home/home.html`, `home.css`, `home.ts`, `MANUAL.md` y `WALKTHROUGH.md`.
 - **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente; `git diff --check` también pasó.
 
+### [2026-11-19] - fix: mantener el icono GPS al detectar ubicación
+- **Objetivo:** Evitar que el icono del botón «Mi ubicación» desaparezca y sea reemplazado por un punto durante la detección.
+- **Cambios realizados:** El botón conserva siempre el icono `location-crosshairs`, incluso mientras se detecta la ubicación.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/request/request.html` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.
+
+### [2026-11-19] - fix: recuperar detección aproximada de ubicación en activación
+- **Objetivo:** Evitar que Chromium descarte ubicaciones válidas de baja precisión durante la activación del perfil.
+- **Cambios realizados:**
+  - Se aceptan coordenadas válidas con precisión mayor a 100 m y se informa el margen aproximado.
+  - Si falla la solicitud de alta precisión, se reintenta con baja precisión; si el usuario denegó el permiso, no se hace el reintento.
+  - Se actualizó la especificación del flujo de geolocalización.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/activation/activation.ts`, `ESPECIFICACION.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.
+
+### [2026-11-19] - fix: importar CA de desarrollo en Chromium
+- **Objetivo:** Corregir el script Linux, que instalaba la CA en el store del sistema pero no en la base NSS que Chromium/Chrome pueden usar.
+- **Cambios realizados:**
+  - El script crea la base NSS de Chromium si hace falta e importa/reemplaza `VinculaUP-CA` con confianza para TLS.
+  - La instalación de `libnss3-tools` ya no falla silenciosamente si `certutil` falta.
+  - Se actualizó la documentación para indicar cómo reiniciar Chromium y verificar el dominio local.
+- **Archivos modificados:** `scripts/linux-macos/import-ca.sh`, `README.md`, `MANUAL.md`, `ESPECIFICACION.md` y `WALKTHROUGH.md`.
+- **Verificación:** `bash -n scripts/linux-macos/import-ca.sh`, `git diff --check`, validación de la cadena y hostname con OpenSSL, y apertura exitosa de `https://vincula-up.local` en Chromium headless.
+
+### [2026-11-18] - fix: ajustar ancho y alineación de acciones en solicitudes
+- **Objetivo:** Mantener alineado a la derecha el botón de chat cuando es la única acción y expandir a toda la fila cualquier otra acción individual en las tarjetas de solicitudes.
+- **Cambios realizados:**
+  - El botón único de chat permanece en la columna derecha; cualquier otro botón único ocupa ambas columnas.
+  - Los skeletons de solicitudes con una acción reflejan el ancho completo de la fila.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.css`, `frontend/vincula-up-web/src/app/shared/skeleton-list/skeleton-list.css` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente; `git diff --check` también pasó.
+
+### [2026-11-18] - fix: expandir botón único de chat en solicitudes
+- **Objetivo:** Aplicar el ancho completo de fila a cualquier botón único de una tarjeta, incluido «Ir al chat».
+- **Cambios realizados:** Se eliminó la excepción que mantenía el botón de chat en la columna derecha.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.css` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente; `git diff --check` también pasó.
+
+### [2026-11-18] - fix: diferenciar acciones y reforzar hover en solicitudes
+- **Objetivo:** Distinguir la acción primaria de la secundaria en las tarjetas de solicitudes y hacer más visibles los hover en modo oscuro.
+- **Cambios realizados:**
+  - «Actualizar estado» usa el estilo primario sólido, mientras «Ir al chat» conserva el estilo secundario.
+  - En modo oscuro, los hover de las acciones en las tarjetas resaltan el borde coral; el botón secundario también cambia el color del texto.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `my-requests.css` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente; `git diff --check` también pasó.
+
 ### [2026-11-16] - feat: añadir hover a botones y tarjetas de landing
 - **Objetivo:** Hacer más perceptibles las interacciones de botones y tarjetas en la landing.
 - **Cambios realizados:**
@@ -1354,3 +1503,15 @@
   - Se actualizaron las instrucciones del [MANUAL.md](./MANUAL.md).
 - **Archivos modificados:** `frontend/vincula-up-web/src/app/home/home.html`, `home.css`, `home.ts`, `MANUAL.md` y `WALKTHROUGH.md`.
 - **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente; `git diff --check` también pasó.
+
+### [2026-11-19] - fix: evitar desplazamiento lateral al detectar ubicación
+- **Objetivo:** Mantener estable la posición horizontal de la página mientras se bloquea el scroll durante la detección GPS.
+- **Cambios realizados:** Se compensa temporalmente el ancho de la barra de scroll y se restaura el padding original al desbloquear la página.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/request/request.ts` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.
+
+### [2026-11-19] - fix: evitar desplazamiento lateral al abrir modales
+- **Objetivo:** Evitar que la página cambie de ancho al abrir un diálogo.
+- **Cambios realizados:** Se eliminó una regla global de overflow que anulaba el bloqueo de scroll de Angular CDK y hacía variar el ancho al abrir modales.
+- **Archivos modificados:** `frontend/vincula-up-web/src/styles.css` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.

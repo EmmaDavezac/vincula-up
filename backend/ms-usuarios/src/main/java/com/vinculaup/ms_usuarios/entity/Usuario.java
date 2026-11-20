@@ -44,8 +44,8 @@ public class Usuario {
     private RolNegocio rolNegocio;
 
     /**
-     * Estado administrativo. Se deja nullable a propósito: las filas creadas
-     * antes de incorporar el baneo quedan en {@code null} y se interpretan como
+     * Estado administrativo. Se deja nullable a propósito: las filas previas a
+     * incorporar este campo quedan en {@code null} y se interpretan como
      * {@code ACTIVO}, así la columna nueva no rompe bases ya existentes.
      */
     @Enumerated(EnumType.STRING)
@@ -100,7 +100,7 @@ public class Usuario {
     public RolNegocio getRolNegocio() { return rolNegocio; }
     public OffsetDateTime getFechaAlta() { return fechaAlta; }
 
-    /** Las filas previas al baneo tienen {@code estado} nulo: se leen como ACTIVO. */
+    /** Las filas previas al campo de estado tienen {@code estado} nulo: se leen como ACTIVO. */
     public EstadoUsuario getEstado() { return estado == null ? EstadoUsuario.ACTIVO : estado; }
     public boolean isSuspendido() { return getEstado() == EstadoUsuario.SUSPENDIDO; }
     public boolean isInvitado() { return keycloakId == null; }

@@ -85,6 +85,10 @@ El repositorio trae una CA de desarrollo (`nginx/certs/ca.crt`). Instalala asi:
 **Linux:** `bash scripts/linux-macos/import-ca.sh`
 **Windows:** `powershell -ExecutionPolicy Bypass -File .\scripts\windows\import-ca.ps1`
 
+En Linux, el script instala la CA tanto en el store del sistema como en la base
+NSS que usa Chromium/Chrome. Al terminar, cerrá todas las ventanas del navegador
+y volvé a abrirlo para que recargue los certificados.
+
 > Importa siempre `ca.crt` (la CA), nunca `server.crt`.
 
 ### 3. Configuración opcional
