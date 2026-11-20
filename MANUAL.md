@@ -302,6 +302,12 @@ python3 scripts/generate-logo.py
 Si cambia la marca hay que correr ese script **y** rehacer `favicon.svg`,
 `favicon.ico` y `apple-touch-icon.png`.
 
+La PWA declara en `public/manifest.webmanifest` iconos PNG de 192×192 y 512×512
+para uso normal y para máscaras adaptables (`maskable`). Estos cuatro archivos
+(`icon-192.png`, `icon-512.png`, `icon-maskable-192.png` e
+`icon-maskable-512.png`) deben conservar el fondo coral y la V blanca; el
+`logo-cuadrado.png` oscuro no se usa como icono de instalación.
+
 ### BFF API (para depurar)
 
 No se navega: expone JSON y pide token. Se consulta con `curl`:
@@ -515,6 +521,11 @@ cd frontend/vincula-up-web && npm test
 ### Despliegue y ejecución
 
 Todo el sistema corre de forma homogénea mediante Docker (`docker compose up --build -d`). No se requiere configuración local de bases de datos ni herramientas fuera de Docker.
+
+En una instalación nueva, Keycloak puede tardar un par de minutos en iniciar
+Quarkus y preparar el esquema de PostgreSQL. El healthcheck contempla ese
+arranque en frío; si Compose ya informó que Keycloak está healthy y otros
+servicios quedaron sin iniciar, ejecutá nuevamente `docker compose up -d`.
 
 ### Comandos de uso diario
 

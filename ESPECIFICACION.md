@@ -824,7 +824,7 @@ Todos los endpoints cuelgan del prefijo `/api`. El BFF aplica RBAC según la reg
 ### 8.1 Profesionales
 | Método | Ruta | Rol requerido | Descripción |
 |---|---|---|---|
-| GET | `/api/profesionales` | — | Listado público del padrón. Acepta filtros `estado` y `todos`; incluye franjas de disponibilidad. La búsqueda de clientes excluye perfiles activos cuya cuenta aún no aceptó los términos; `todos=true` conserva los perfiles para gestión administrativa. |
+| GET | `/api/profesionales` | — (público); `ADMIN` para `todos=true` | Listado público del padrón. Acepta filtros `estado` y `todos`; incluye franjas de disponibilidad. La búsqueda de clientes excluye perfiles activos cuya cuenta aún no aceptó los términos; solo administración puede incluir perfiles pendientes. |
 | GET | `/api/profesionales/{id}` | Autenticado | Ficha completa de un profesional y sus horarios semanales. |
 | GET | `/api/profesionales/mi-perfil` | `PROFESIONAL` | Perfil del profesional autenticado. |
 | POST | `/api/profesionales` | `ADMIN` | Alta tradicional de profesional en el padrón. |
@@ -1179,6 +1179,8 @@ Comando de inicio con Docker Compose:
 ```bash
 docker compose up --build -d
 ```
+El healthcheck de Keycloak permite hasta 180 segundos de arranque inicial para
+Quarkus y las migraciones de la base antes de declararlo no saludable.
 Comando de detención:
 ```bash
 docker compose down

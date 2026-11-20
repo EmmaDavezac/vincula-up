@@ -32,6 +32,9 @@
 .hero {
 	display: grid;
 	gap: 2rem;
+	grid-template-areas:
+		"content"
+		"carousel";
 	padding-bottom: 4rem;
 	padding-top: 4rem;
 }
@@ -40,13 +43,15 @@
 	.hero {
 		align-items: center;
 		gap: 4rem;
-		grid-template-columns: minmax(0, 1.08fr) minmax(20rem, 0.92fr);
+		grid-template-areas: "carousel content";
+		grid-template-columns: minmax(20rem, 0.92fr) minmax(0, 1.08fr);
 		padding-bottom: 7rem;
 		padding-top: 7rem;
 	}
 }
 
 .hero__content {
+	grid-area: content;
 	min-width: 0;
 }
 
@@ -78,6 +83,7 @@
 }
 
 .hero-carousel {
+	grid-area: carousel;
 	min-width: 0;
 }
 

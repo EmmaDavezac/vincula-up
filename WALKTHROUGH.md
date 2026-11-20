@@ -1516,6 +1516,12 @@
 - **Archivos modificados:** `frontend/vincula-up-web/src/styles.css` y `WALKTHROUGH.md`.
 - **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.
 
+### [2026-11-20] - fix: agregar iconos de instalación PWA
+- **Objetivo:** Proveer los tamaños requeridos por los instaladores PWA y una variante apta para máscaras adaptables.
+- **Cambios realizados:** Se agregaron iconos PNG de 192×192 y 512×512 en variantes `any` y `maskable`, con el fondo coral y la V blanca de la marca; el manifest ahora declara los cuatro recursos y el manual documenta su uso.
+- **Archivos modificados:** `frontend/vincula-up-web/public/manifest.webmanifest`, los cuatro iconos PNG, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build`, validar que los cuatro archivos tengan el tamaño declarado y `git diff --check`.
+
 ### [2026-11-19] - fix: volver al inicio desde errores de Keycloak
 - **Objetivo:** Dar una salida visible cuando Keycloak detiene el inicio de sesión por un conflicto de sesión u otro error.
 - **Cambios realizados:** Se agregó una plantilla de error del tema con un botón destacado que vuelve a la URL de Vincula-UP, junto con su texto localizado y estilo.
@@ -1536,3 +1542,21 @@
 - **Cambios realizados:** Se agregó «Volver al inicio» al pie común del tema para que esté disponible también en formularios de acceso, registro, recuperación y errores. Se quitó el botón duplicado de la plantilla de error; el destino usa `vinculaUpAppUrl`.
 - **Archivos modificados:** `keycloak/themes/vincula-up/login/footer.ftl`, `login/error.ftl`, `login/messages/messages_es.properties`, `login/resources/css/vincula-up.css`, `login/theme.properties`, `ESPECIFICACION.md` y `WALKTHROUGH.md`.
 - **Verificación:** En Keycloak local, el inicio de sesión renderizó el enlace con HTTP 200 y la respuesta de error también lo incluyó en el pie compartido. Registro y recuperación usan el mismo `registrationLayout`; `git diff --check`.
+
+### [2026-11-19] - ui: intercambiar carrusel y texto en la landing
+- **Objetivo:** Dar prioridad visual al carrusel y ubicarlo a la izquierda del texto en pantallas grandes.
+- **Cambios realizados:** Se invirtieron las áreas de la grilla del hero desde 1024 px; en móvil se mantiene primero el texto y luego el carrusel. Se ajustaron las direcciones de entrada de ambos bloques.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/home/home.html`, `frontend/vincula-up-web/src/app/home/home.css` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.
+
+### [2026-11-20] - fix: restringir listado de profesionales sin términos
+- **Objetivo:** Asegurar que el buscador público nunca muestre profesionales que no aceptaron los términos.
+- **Cambios realizados:** El parámetro `todos=true` ahora requiere rol `ADMIN`; las consultas públicas siempre aplican el filtro de aceptación. Se añadieron pruebas para el listado público y el rechazo del parámetro administrativo sin autenticación.
+- **Archivos modificados:** `backend/bff-web/src/main/java/com/vinculaup/bff_web/controller/ApiController.java`, `backend/bff-web/src/test/java/com/vinculaup/bff_web/controller/ApiControllerTest.java`, `ESPECIFICACION.md` y `WALKTHROUGH.md`.
+- **Verificación:** `cd backend/bff-web && ./mvnw test`, `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.
+
+### [2026-11-20] - fix: tolerar el arranque en frío de Keycloak
+- **Objetivo:** Evitar que Compose declare Keycloak unhealthy durante la inicialización de Quarkus y las migraciones iniciales de PostgreSQL.
+- **Cambios realizados:** Se amplió `healthcheck.start_period` de 60 a 180 segundos y se documentó cómo iniciar los servicios que quedaron pendientes tras un primer arranque lento.
+- **Archivos modificados:** `docker-compose.yml`, `MANUAL.md`, `ESPECIFICACION.md` y `WALKTHROUGH.md`.
+- **Verificación:** Revisar el healthcheck configurado, `docker compose config --quiet` y `git diff --check`.
