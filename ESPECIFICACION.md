@@ -824,7 +824,7 @@ Todos los endpoints cuelgan del prefijo `/api`. El BFF aplica RBAC según la reg
 ### 8.1 Profesionales
 | Método | Ruta | Rol requerido | Descripción |
 |---|---|---|---|
-| GET | `/api/profesionales` | — | Listado público del padrón. Acepta filtros `estado` y `todos`; incluye franjas de disponibilidad. |
+| GET | `/api/profesionales` | — | Listado público del padrón. Acepta filtros `estado` y `todos`; incluye franjas de disponibilidad. La búsqueda de clientes excluye perfiles activos cuya cuenta aún no aceptó los términos; `todos=true` conserva los perfiles para gestión administrativa. |
 | GET | `/api/profesionales/{id}` | Autenticado | Ficha completa de un profesional y sus horarios semanales. |
 | GET | `/api/profesionales/mi-perfil` | `PROFESIONAL` | Perfil del profesional autenticado. |
 | POST | `/api/profesionales` | `ADMIN` | Alta tradicional de profesional en el padrón. |
@@ -839,7 +839,7 @@ Todos los endpoints cuelgan del prefijo `/api`. El BFF aplica RBAC según la reg
 ### 8.2 Solicitudes
 | Método | Ruta | Rol requerido | Descripción |
 |---|---|---|---|
-| POST | `/api/solicitudes` | `CLIENTE` | Crea una solicitud en estado `PENDIENTE`. Valida día y horario contra la disponibilidad y resuelve coordenadas GPS. |
+| POST | `/api/solicitudes` | `CLIENTE` | Crea una solicitud en estado `PENDIENTE`. Valida que el profesional haya aceptado los términos, el día y horario contra la disponibilidad y resuelve coordenadas GPS; responde `409` si falta la aceptación. |
 | GET | `/api/solicitudes/mias` | Autenticado | Listado de solicitudes del actor (como cliente o profesional). |
 | GET | `/api/solicitudes/panel` | `ADMIN` | Indicadores de demanda y recorrido histórico de solicitudes. |
 | PATCH | `/api/solicitudes/{id}/aceptar` | `PROFESIONAL` | Acepta el turno (pasa a `ACEPTADA`); revela la dirección exacta. |
@@ -1020,6 +1020,8 @@ Ambos modelos (`Usuario` y `Profesional`) guardan en `fotoUrl` la **clave intern
 La aceptación se solicita tras el primer ingreso exitoso a la aplicación:
 - La SPA consulta `GET /api/usuarios/yo`. Si el campo `terminos_version` no coincide con la versión vigente (`VERSION_TERMINOS`), se despliega una capa modal sobre `app.html` **sin botón de cierre**.
 - Al confirmar, `PATCH /api/terminos/aceptar` registra la versión y la marca temporal. La identidad se toma siempre del token JWT.
+- Los perfiles profesionales activos solo aparecen en la búsqueda de clientes cuando la cuenta vinculada registra una aceptación. El BFF vuelve a validar esa condición al crear la solicitud para cubrir listados que hayan quedado abiertos antes de aceptar.
+- Todas las pantallas del tema de inicio de sesión de Keycloak muestran en el pie un enlace «Volver al inicio» hacia Vincula-UP, incluso cuando la autenticación falla antes de regresar a la SPA.
 
 ### 10.6 Configuración del realm
 

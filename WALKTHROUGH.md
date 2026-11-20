@@ -1521,3 +1521,24 @@
 - **Cambios realizados:** Se agregaron iconos PNG de 192×192 y 512×512 en variantes `any` y `maskable`, con el fondo coral y la V blanca de la marca; el manifest ahora declara los cuatro recursos y el manual documenta su uso.
 - **Archivos modificados:** `frontend/vincula-up-web/public/manifest.webmanifest`, los cuatro iconos PNG, `MANUAL.md` y `WALKTHROUGH.md`.
 - **Verificación:** `npm --prefix frontend/vincula-up-web run build`, validar que los cuatro archivos tengan el tamaño declarado y `git diff --check`.
+
+### [2026-11-19] - fix: volver al inicio desde errores de Keycloak
+- **Objetivo:** Dar una salida visible cuando Keycloak detiene el inicio de sesión por un conflicto de sesión u otro error.
+- **Cambios realizados:** Se agregó una plantilla de error del tema con un botón destacado que vuelve a la URL de Vincula-UP, junto con su texto localizado y estilo.
+- **Archivos modificados:** `keycloak/themes/vincula-up/login/error.ftl`, `login/messages/messages_es.properties`, `login/resources/css/vincula-up.css`, `ESPECIFICACION.md` y `WALKTHROUGH.md`.
+- **Verificación:** Se provocó un error de autenticación en Keycloak 26.3.3 y se comprobó que la página renderizada muestra el botón con destino `https://vincula-up.local`; `git diff --check` pasó.
+
+### [2026-11-19] - fix: filtrar profesionales sin aceptación y recuperar solicitudes
+- **Objetivo:** Evitar ofrecer profesionales que aún no aceptaron los términos y permitir reutilizar los datos al buscar otro profesional para solicitudes rechazadas o vencidas.
+- **Cambios realizados:**
+  - El BFF filtra esos perfiles de la búsqueda y valida el consentimiento al crear una solicitud, incluso si la lista quedó abierta antes de la aceptación.
+  - «Buscar otro profesional» envía el identificador de la solicitud; el asistente recupera de la API la dirección, categoría, descripción y turno para llegar al paso de elección de profesional.
+  - Se actualizó la especificación de los contratos y del flujo de términos.
+- **Archivos modificados:** `backend/bff-web/src/main/java/com/vinculaup/bff_web/controller/ApiController.java`, `frontend/vincula-up-web/src/app/my-requests/my-requests.html`, `frontend/vincula-up-web/src/app/request/request.ts`, `ESPECIFICACION.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build`, `./mvnw clean compile` en `backend/bff-web` y `git diff --check`.
+
+### [2026-11-19] - fix: volver al inicio en todas las pantallas de Keycloak
+- **Objetivo:** Dar una salida directa a Vincula-UP desde cualquier pantalla del tema de acceso de Keycloak.
+- **Cambios realizados:** Se agregó «Volver al inicio» al pie común del tema para que esté disponible también en formularios de acceso, registro, recuperación y errores. Se quitó el botón duplicado de la plantilla de error; el destino usa `vinculaUpAppUrl`.
+- **Archivos modificados:** `keycloak/themes/vincula-up/login/footer.ftl`, `login/error.ftl`, `login/messages/messages_es.properties`, `login/resources/css/vincula-up.css`, `login/theme.properties`, `ESPECIFICACION.md` y `WALKTHROUGH.md`.
+- **Verificación:** En Keycloak local, el inicio de sesión renderizó el enlace con HTTP 200 y la respuesta de error también lo incluyó en el pie compartido. Registro y recuperación usan el mismo `registrationLayout`; `git diff --check`.

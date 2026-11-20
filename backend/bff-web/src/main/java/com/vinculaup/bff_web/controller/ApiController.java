@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
@@ -194,7 +195,25 @@ public class ApiController {
     public JsonNode listarProfesionales(
             @RequestParam(required = false) String estado,
             @RequestParam(required = false) Boolean todos) {
-        return enriquecerConUsuarios(gateway.listarProfesionales(estado, todos));
+        JsonNode enriquecidos = enriquecerConUsuarios(gateway.listarProfesionales(estado, todos));
+        return filtrarPorAceptacionDeTerminos(enriquecidos, Boolean.TRUE.equals(todos));
+    }
+
+    private JsonNode filtrarPorAceptacionDeTerminos(JsonNode profesionales, boolean incluirPendientes) {
+        if (profesionales == null || !profesionales.isArray()) {
+            return profesionales;
+        }
+        var visibles = tools.jackson.databind.json.JsonMapper.builder().build().createArrayNode();
+        for (JsonNode profesional : profesionales) {
+            boolean aceptoTerminos = profesional.path("terminosAceptado").asBoolean(false);
+            if (profesional instanceof ObjectNode object) {
+                object.remove("terminosAceptado");
+            }
+            if (incluirPendientes || aceptoTerminos) {
+                visibles.add(profesional);
+            }
+        }
+        return visibles;
     }
 
     /**
@@ -233,9 +252,42 @@ public class ApiController {
             } catch (RuntimeException ignored) {
                 // usuarioId inválido: se conserva el nodo original.
             }
-            enriquecidos.add(conReputacion(enriquecerConUsuario(profesional, usuario), reputaciones));
+            JsonNode enriquecido = enriquecerConUsuario(profesional, usuario);
+            if (enriquecido instanceof ObjectNode object) {
+                object.put("terminosAceptado", usuario != null && usuario.path("terminosAceptado").asBoolean(false));
+            }
+            enriquecidos.add(conReputacion(enriquecido, reputaciones));
         }
         return enriquecidos;
+    }
+
+    private void exigirAceptacionDeTerminosProfesional(JsonNode solicitud) {
+        UUID identidadProfesional;
+        try {
+            identidadProfesional = UUID.fromString(solicitud.path("profesionalId").asText(""));
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El profesional seleccionado no es válido");
+        }
+
+        JsonNode perfil = gateway.buscarProfesionalPorIdOUsuario(identidadProfesional);
+        if (perfil != null && perfil.isArray()) {
+            perfil = perfil.isEmpty() ? null : perfil.get(0);
+        }
+        if (perfil == null || !perfil.hasNonNull("usuarioId")) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "El profesional seleccionado no está disponible");
+        }
+
+        UUID usuarioId;
+        try {
+            usuarioId = UUID.fromString(perfil.get("usuarioId").asText());
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No se encontró la cuenta del profesional");
+        }
+        JsonNode usuario = gateway.buscarUsuarioPorIdOKeycloakId(usuarioId);
+        if (usuario == null || !usuario.path("terminosAceptado").asBoolean(false)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El profesional todavía no aceptó los términos de uso y no está disponible para recibir solicitudes");
+        }
     }
 
     /**
@@ -822,6 +874,7 @@ public class ApiController {
     @ResponseStatus(HttpStatus.CREATED)
     public JsonNode crearSolicitud(@RequestBody JsonNode body) {
         JsonNode user = authenticatedUser();
+        exigirAceptacionDeTerminosProfesional(body);
         JsonNode creada = gateway.crearSolicitud(identityBody(body, user, "clienteId"));
         notificarCambioSolicitud(creada, "CLIENTE", null);
         return creada;
