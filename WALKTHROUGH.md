@@ -1509,3 +1509,9 @@
 - **Cambios realizados:** Se compensa temporalmente el ancho de la barra de scroll y se restaura el padding original al desbloquear la página.
 - **Archivos modificados:** `frontend/vincula-up-web/src/app/request/request.ts` y `WALKTHROUGH.md`.
 - **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.
+
+### [2026-11-19] - fix: evitar desplazamiento lateral al abrir modales
+- **Objetivo:** Evitar que la página cambie de ancho al abrir un diálogo.
+- **Cambios realizados:** Se eliminó una regla global de overflow que anulaba el bloqueo de scroll de Angular CDK y hacía variar el ancho al abrir modales.
+- **Archivos modificados:** `frontend/vincula-up-web/src/styles.css` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.

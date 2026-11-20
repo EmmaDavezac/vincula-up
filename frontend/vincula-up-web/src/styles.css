@@ -1705,10 +1705,6 @@ button.mat-mdc-button.vu-btn--quiet {
 	font-weight: 700;
 }
 
-html:has([aria-modal='true']) {
-	overflow: auto;
-}
-
 .mat-mdc-dialog-container {
 	padding: 0.75rem;
 }
