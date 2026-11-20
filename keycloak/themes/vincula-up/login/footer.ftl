@@ -27,11 +27,18 @@
     ahí, y menos en un despliegue donde el hostname cambia.
 -->
 <#macro content>
-    <#if realm.attributes.vinculaUpContacto?? && realm.attributes.vinculaUpContacto?has_content>
+    <#if (properties.vinculaUpAppUrl?? && properties.vinculaUpAppUrl?has_content) || (realm.attributes.vinculaUpContacto?? && realm.attributes.vinculaUpContacto?has_content)>
     <div class="kc-footer">
+        <#if properties.vinculaUpAppUrl?? && properties.vinculaUpAppUrl?has_content>
+        <p class="kc-footer__line">
+            <a href="${properties.vinculaUpAppUrl}">${msg("backToHome")}</a>
+        </p>
+        </#if>
+        <#if realm.attributes.vinculaUpContacto?? && realm.attributes.vinculaUpContacto?has_content>
         <p class="kc-footer__line">
             ¿Necesitás ayuda? <a href="mailto:${realm.attributes.vinculaUpContacto}">${realm.attributes.vinculaUpContacto}</a>
         </p>
+        </#if>
     </div>
     </#if>
 </#macro>

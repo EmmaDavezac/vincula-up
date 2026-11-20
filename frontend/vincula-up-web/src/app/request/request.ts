@@ -1,14 +1,14 @@
 import { AfterViewInit, Component, DestroyRef, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, of } from 'rxjs';
 import { ApiService, GpsPosition } from '../core/services/api.service';
 import { AuthService } from '../core/services/auth.service';
 import { DirectoryService } from '../core/services/directory.service';
 import { RequestService } from '../core/services/request.service';
 import { Professional, ProfessionalAvailability } from '../core/models/professional';
-import { emptyServiceRequest } from '../core/models/service-request';
+import { emptyServiceRequest, ServiceRequest } from '../core/models/service-request';
 import { VuAvatar } from '../shared/avatar/avatar';
 import { VuConfirm } from '../shared/confirm/confirm';
 import { VuIcon } from '../shared/icon/icon';
@@ -62,6 +62,8 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 	templateUrl: './request.html',
 })
 export class Request implements OnInit, AfterViewInit {
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly directoryService = inject(DirectoryService);
   private readonly requestService = inject(RequestService);
   private readonly api = inject(ApiService);
@@ -126,6 +128,9 @@ readonly filteredSpecialties = computed(() => {
    * todavía no tiene ningún técnico asignado.
    */
   readonly catalogoEspecialidades = signal<string[]>([]);
+  private readonly especialidadesPorId = signal<Record<string, string>>({});
+  private solicitudParaReintentar: ServiceRequest | null = null;
+  private solicitudReintentoSolicitada: string | null = null;
 
   
   /** Especialidades de un profesional, con respaldo en su especialidad única. */
@@ -370,6 +375,13 @@ elegirHorario(id: string): void {
   constructor() {
     const timer = setInterval(() => this.ahora.set(new Date()), 60_000);
 this.destroyRef.onDestroy(() => clearInterval(timer));
+    this.route.queryParamMap.subscribe((params) => {
+      const requestId = params.get('reintentar');
+      if (requestId && requestId !== this.solicitudReintentoSolicitada) {
+        this.solicitudReintentoSolicitada = requestId;
+        this.loadRequestToRetry(requestId);
+      }
+    });
     this.destroyRef.onDestroy(() => {
       if (this.locationWatchId !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
         navigator.geolocation.clearWatch(this.locationWatchId);
@@ -1282,6 +1294,7 @@ if (!franja || !this.franjaDisponible(this.date(), franja) || !this.trabajaEn(pr
             : null,
       })));
       this.loadingProfessionals.set(false);
+      this.tryRestoreRequest();
     });
   }
 
@@ -1294,11 +1307,123 @@ if (!franja || !this.franjaDisponible(this.date(), franja) || !this.trabajaEn(pr
     this.api.getSpecialtiesMap().pipe(
       catchError(() => of({} as Record<string, string>)),
     ).subscribe((mapa) => {
-      const nombres = Object.values(mapa ?? {})
+      const porId = Object.fromEntries(
+        Object.entries(mapa ?? {}).filter(([, nombre]) => typeof nombre === 'string' && nombre.trim()),
+      );
+      this.especialidadesPorId.set(porId);
+      const nombres = Object.values(porId)
         .map((n) => (n ?? '').trim())
         .filter((n) => n.length > 0);
       this.catalogoEspecialidades.set([...new Set(nombres)].sort((a, b) => a.localeCompare(b, 'es')));
       this.loadingSpecialties.set(false);
+      this.tryRestoreRequest();
+    });
+  }
+
+  private loadRequestToRetry(requestId: string): void {
+    const userId = this.auth.currentUser()?.id;
+    if (!userId) {
+      this.toast.error('No se pudo identificar tu cuenta para recuperar la solicitud.');
+      this.clearRetryQueryParam();
+      return;
+    }
+
+    const keycloakId = this.auth.getKeycloakId();
+    const aliasIds = keycloakId && keycloakId !== userId ? [keycloakId] : [];
+    this.api.getMyRequests(userId, { rol: 'CLIENTE', tipo: 'ENVIADAS', aliasIds }).pipe(
+      catchError((error) => {
+        this.toast.error(this.api.describeError(error, 'No se pudo recuperar la solicitud anterior.'));
+        this.clearRetryQueryParam();
+        return of(null);
+      }),
+    ).subscribe((requests) => {
+      if (!requests) return;
+      const request = requests.find((item) => String(item.id) === requestId);
+      if (!request || (request.status !== 'RECHAZADA' && request.status !== 'VENCIDA')) {
+        this.toast.error('La solicitud no existe o no se puede volver a solicitar.');
+        this.clearRetryQueryParam();
+        return;
+      }
+      this.solicitudParaReintentar = request;
+      this.tryRestoreRequest();
+    });
+  }
+
+  private tryRestoreRequest(): void {
+    const request = this.solicitudParaReintentar;
+    if (!request || this.loadingProfessionals() || this.loadingSpecialties()) return;
+    this.solicitudParaReintentar = null;
+    this.toast.clear();
+
+    const latitude = request.latitude;
+    const longitude = request.longitude;
+    const hasCoordinates = latitude != null && longitude != null
+      && Number.isFinite(latitude) && Number.isFinite(longitude);
+    this.location.set({
+      lat: hasCoordinates ? latitude : null,
+      lng: hasCoordinates ? longitude : null,
+      displayName: request.address,
+      detecting: false,
+      editing: false,
+    });
+    this.locationQuery.set(request.address);
+    this.address.set(request.address);
+    this.pendingLocation.set(hasCoordinates
+      ? { lat: latitude, lng: longitude, displayName: request.address }
+      : null);
+    this.problemSummary.set(request.description ?? '');
+    this.date.set(request.date);
+    this.selectedDay.set(request.date);
+    this.time.set(request.time);
+    this.timeEnd.set(request.timeEnd ?? '');
+    this.selectedProfessional.set(null);
+
+    const specialtyId = request.especialidadId?.toLowerCase();
+    const specialtyFromProfessional = this.allProfessionals()
+      .flatMap((professional) => professional.especialidades ?? [])
+      .find((specialty) => specialty.id.toLowerCase() === specialtyId)?.nombre;
+    const specialty = (specialtyId ? this.especialidadesPorId()[specialtyId] : undefined)
+      ?? specialtyFromProfessional
+      ?? (request.specialty !== 'Servicio técnico' ? request.specialty : '');
+    this.selectedSpecialty.set(specialty || null);
+    this.selectedSlot.set(
+      this.slotOptions.find((slot) => slot.start === request.time
+        && (!request.timeEnd || slot.end === request.timeEnd))?.id ?? '',
+    );
+    this.form.set(emptyServiceRequest({
+      address: request.address,
+      latitude: hasCoordinates ? latitude : null,
+      longitude: hasCoordinates ? longitude : null,
+      description: request.description ?? '',
+    }));
+    if (hasCoordinates) this.updateDistances(latitude, longitude);
+
+    if (!request.address.trim()) {
+      this.cambiarPaso('location');
+    } else if (!specialty) {
+      this.cambiarPaso('specialty');
+      this.toast.error('Se recuperaron los datos de la solicitud, pero no se pudo identificar su especialidad. Elegí la categoría para continuar.');
+    } else if (!this.resumenValido()) {
+      this.cambiarPaso('problem');
+      this.toast.info('Se recuperaron la ubicación, la categoría y el turno. Completá el resumen del problema para continuar.');
+    } else if (!request.date) {
+      this.cambiarPaso('day');
+    } else if (!this.selectedSlot()) {
+      this.cambiarPaso('time');
+      this.toast.info('Se recuperaron los datos de la solicitud. Elegí una franja horaria para continuar.');
+    } else {
+      this.cambiarPaso('professionals');
+      this.toast.info('Se recuperaron los datos de la solicitud. Elegí un profesional para volver a enviarla.');
+    }
+    this.clearRetryQueryParam();
+  }
+
+  private clearRetryQueryParam(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { reintentar: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   }
 

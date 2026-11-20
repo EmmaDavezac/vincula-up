@@ -242,7 +242,13 @@
 						}
 
 						@if (!isProfessional() && (request.status === 'RECHAZADA' || request.status === 'VENCIDA')) {
-							<a class="vu-btn vu-btn--outline vu-btn--sm vu-btn--coral-text req-card__action--status" routerLink="/solicitar">Buscar otro profesional</a>
+							<a
+								class="vu-btn vu-btn--outline vu-btn--sm vu-btn--coral-text req-card__action--status"
+								routerLink="/solicitar"
+								[queryParams]="{ reintentar: request.id }"
+							>
+								Buscar otro profesional
+							</a>
 						}
 					</div>
 
