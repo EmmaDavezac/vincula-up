@@ -406,15 +406,9 @@ a {
 }
 
 .vu-brand-mark {
-	align-items: center;
-	background: var(--coral);
-	border-radius: 10px;
-	color: var(--surface-input);
-	display: flex;
-	font-family: var(--font-serif);
-	font-size: 1.5rem;
+	display: block;
 	height: 2.5rem;
-	justify-content: center;
+	object-fit: contain;
 	width: 2.5rem;
 }
 

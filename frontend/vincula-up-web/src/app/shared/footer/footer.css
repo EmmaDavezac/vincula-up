@@ -44,15 +44,9 @@ que ella, incluido el safe-area del notch.
 }
 
 .footer-brand__mark {
-	align-items: center;
-	background: var(--coral);
-	border-radius: 8px;
-	color: var(--on-solid);
-	display: flex;
-	font-family: var(--font-serif);
-	font-size: 1.125rem;
+	display: block;
 	height: 2rem;
-	justify-content: center;
+	object-fit: contain;
 	width: 2rem;
 }
 

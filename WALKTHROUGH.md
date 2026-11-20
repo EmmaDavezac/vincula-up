@@ -1572,3 +1572,9 @@
 - **Cambios realizados:** Se agregó un estado vacío accesible que indica si todavía no se recibieron o no se enviaron solicitudes.
 - **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.html` y `WALKTHROUGH.md`.
 - **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.
+
+### [2026-11-20] - ui: unificar el logo de la aplicación con el favicon
+- **Objetivo:** Mostrar en los encabezados y demás espacios de marca de la aplicación el mismo isotipo que se usa como favicon.
+- **Cambios realizados:** Se reemplazaron las marcas tipográficas por el SVG del favicon en la navegación, acceso, pantallas de carga y pie de página, conservando el tamaño y las animaciones existentes.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/shared/navbar/navbar.html`, `frontend/vincula-up-web/src/app/sign-in/sign-in.html`, `frontend/vincula-up-web/src/app/shared/auth-loading/auth-loading.html`, `frontend/vincula-up-web/src/app/shared/loading-screen/loading-screen.ts`, `frontend/vincula-up-web/src/app/shared/footer/footer.html`, `frontend/vincula-up-web/src/styles.css`, `frontend/vincula-up-web/src/app/shared/footer/footer.css` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.

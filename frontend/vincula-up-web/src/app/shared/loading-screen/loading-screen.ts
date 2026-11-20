@@ -7,7 +7,7 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 		<section class="loading-screen" role="status" aria-live="polite">
 			<div class="loading-screen__content">
 				<div class="loading-screen__brand" aria-label="Vincula-UP">
-					<span class="vu-brand-mark" aria-hidden="true">V</span>
+					<img class="vu-brand-mark" src="/favicon.svg" alt="" aria-hidden="true" />
 					<span class="vu-brand-name">Vincula<em>-UP</em></span>
 				</div>
 				<span class="loading-screen__spinner" aria-hidden="true"></span>
