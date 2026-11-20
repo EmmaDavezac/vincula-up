@@ -522,6 +522,11 @@ cd frontend/vincula-up-web && npm test
 
 Todo el sistema corre de forma homogénea mediante Docker (`docker compose up --build -d`). No se requiere configuración local de bases de datos ni herramientas fuera de Docker.
 
+En una instalación nueva, Keycloak puede tardar un par de minutos en iniciar
+Quarkus y preparar el esquema de PostgreSQL. El healthcheck contempla ese
+arranque en frío; si Compose ya informó que Keycloak está healthy y otros
+servicios quedaron sin iniciar, ejecutá nuevamente `docker compose up -d`.
+
 ### Comandos de uso diario
 
 ```bash

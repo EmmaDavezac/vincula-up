@@ -102,7 +102,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
-      start_period: 60s
+      # En una primera instalación, Quarkus y las migraciones de la base pueden
+      # tardar más de dos minutos antes de abrir el puerto.
+      start_period: 180s
 
   keycloak-init:
     image: quay.io/keycloak/keycloak:26.3.3

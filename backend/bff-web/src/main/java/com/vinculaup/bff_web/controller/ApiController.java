@@ -195,8 +195,13 @@ public class ApiController {
     public JsonNode listarProfesionales(
             @RequestParam(required = false) String estado,
             @RequestParam(required = false) Boolean todos) {
-        JsonNode enriquecidos = enriquecerConUsuarios(gateway.listarProfesionales(estado, todos));
-        return filtrarPorAceptacionDeTerminos(enriquecidos, Boolean.TRUE.equals(todos));
+        boolean incluirPendientes = Boolean.TRUE.equals(todos);
+        if (incluirPendientes && !"ADMIN".equals(authenticatedRole())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "Solo administración puede consultar profesionales pendientes de términos");
+        }
+        JsonNode listado = gateway.listarProfesionales(estado, incluirPendientes ? true : null);
+        return filtrarPorAceptacionDeTerminos(enriquecerConUsuarios(listado), incluirPendientes);
     }
 
     private JsonNode filtrarPorAceptacionDeTerminos(JsonNode profesionales, boolean incluirPendientes) {
