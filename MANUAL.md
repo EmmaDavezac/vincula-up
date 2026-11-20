@@ -302,6 +302,12 @@ python3 scripts/generate-logo.py
 Si cambia la marca hay que correr ese script **y** rehacer `favicon.svg`,
 `favicon.ico` y `apple-touch-icon.png`.
 
+La PWA declara en `public/manifest.webmanifest` iconos PNG de 192×192 y 512×512
+para uso normal y para máscaras adaptables (`maskable`). Estos cuatro archivos
+(`icon-192.png`, `icon-512.png`, `icon-maskable-192.png` e
+`icon-maskable-512.png`) deben conservar el fondo coral y la V blanca; el
+`logo-cuadrado.png` oscuro no se usa como icono de instalación.
+
 ### BFF API (para depurar)
 
 No se navega: expone JSON y pide token. Se consulta con `curl`:

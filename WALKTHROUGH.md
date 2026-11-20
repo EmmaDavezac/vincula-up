@@ -1515,3 +1515,9 @@
 - **Cambios realizados:** Se eliminó una regla global de overflow que anulaba el bloqueo de scroll de Angular CDK y hacía variar el ancho al abrir modales.
 - **Archivos modificados:** `frontend/vincula-up-web/src/styles.css` y `WALKTHROUGH.md`.
 - **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.
+
+### [2026-11-20] - fix: agregar iconos de instalación PWA
+- **Objetivo:** Proveer los tamaños requeridos por los instaladores PWA y una variante apta para máscaras adaptables.
+- **Cambios realizados:** Se agregaron iconos PNG de 192×192 y 512×512 en variantes `any` y `maskable`, con el fondo coral y la V blanca de la marca; el manifest ahora declara los cuatro recursos y el manual documenta su uso.
+- **Archivos modificados:** `frontend/vincula-up-web/public/manifest.webmanifest`, los cuatro iconos PNG, `MANUAL.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build`, validar que los cuatro archivos tengan el tamaño declarado y `git diff --check`.
