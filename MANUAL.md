@@ -462,6 +462,12 @@ Después hay que **volver a importar la CA nueva** en los navegadores (usando `s
 la anterior instalada, eliminá `VinculaUP-CA` de los almacenes de confianza
 primero.
 
+En Linux, `import-ca.sh` importa la CA en el store del sistema y en la base NSS
+de Chromium/Chrome (`~/.pki/nssdb`), además de los perfiles de Firefox que
+encuentre. Si Chromium sigue mostrando «No seguro», ejecutá el script desde la
+raíz del repositorio y cerrá todas las ventanas del navegador antes de abrirlo
+otra vez. La app debe abrirse como `https://vincula-up.local`.
+
 ---
 
 ## Desarrollo

@@ -1041,7 +1041,7 @@ La aceptación se solicita tras el primer ingreso exitoso a la aplicación:
 - Implementada en `GeocodingClient` de `ms-solicitudes` y expuesta por el BFF en `/api/gps`.
 - Entrada de dirección en texto con extracción de coordenadas precisas; soporte para geocodificación inversa detallada (`reverseGeocode`).
 - **Caché en memoria LRU de 500 direcciones con TTL de 10 minutos** para respetar la política de uso de 1 req/s de OSM.
-- Detección precisa de hardware GPS en frontend mediante Geolocation API (`enableHighAccuracy: true`, `timeout: 15s`).
+- Detección de ubicación en frontend mediante Geolocation API: primero solicita alta precisión (`enableHighAccuracy: true`, `timeout: 15s`) y, si no está disponible, reintenta con baja precisión (`enableHighAccuracy: false`, `timeout: 20s`). Se aceptan coordenadas válidas aunque sean aproximadas, informando el margen; los permisos denegados no se eluden.
 
 ### 11.2 Cifrado de ubicaciones en reposo (AES-256-GCM)
 
@@ -1169,7 +1169,7 @@ Configuradas en el archivo `.env` en la raíz del repositorio (ignorado en git; 
 |---|---|---|
 | **Despliegue automatizado completo** | `./scripts/deploy.sh` | — |
 | **Bootstrap del realm de Keycloak** | `./scripts/linux-macos/keycloak-bootstrap.sh` | `.\scripts\windows\keycloak-bootstrap.ps1` |
-| **Instalación de la CA en navegadores y sistema**| `bash scripts/linux-macos/import-ca.sh` | `.\scripts\windows\import-ca.ps1` |
+| **Instalación de la CA en navegadores y sistema**| `bash scripts/linux-macos/import-ca.sh` (store del sistema, NSS de Chromium/Chrome y perfiles de Firefox) | `.\scripts\windows\import-ca.ps1` |
 
 > Todo el stack se ejecuta de forma homogénea y estandarizada mediante contenedores Docker (`docker compose`). No se soportan ni requieren ejecuciones locales sueltas.
 

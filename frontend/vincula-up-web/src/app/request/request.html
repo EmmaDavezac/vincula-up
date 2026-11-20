@@ -72,11 +72,7 @@
 										[attr.aria-label]="address() ? 'Mi ubicación: ' + address() : 'Usar mi ubicación'"
 										[title]="address() || 'Usar mi ubicación'"
 									>
-										@if (location().detecting) {
-<vu-spinner [etiqueta]="'Detectando ubicación…'" [size]="'sm'" />
-} @else {
-<vu-icon name="location-crosshairs" [size]="18" class="location-gps__icon" />
-}
+										<vu-icon name="location-crosshairs" [size]="18" class="location-gps__icon" />
 										<span class="location-gps__label">Mi ubicación</span>
 									</button>
 								</div>

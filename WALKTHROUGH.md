@@ -1422,6 +1422,30 @@
 - **Archivos modificados:** `frontend/vincula-up-web/src/app/home/home.html`, `home.css`, `home.ts`, `MANUAL.md` y `WALKTHROUGH.md`.
 - **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente; `git diff --check` también pasó.
 
+### [2026-11-19] - fix: mantener el icono GPS al detectar ubicación
+- **Objetivo:** Evitar que el icono del botón «Mi ubicación» desaparezca y sea reemplazado por un punto durante la detección.
+- **Cambios realizados:** El botón conserva siempre el icono `location-crosshairs`, incluso mientras se detecta la ubicación.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/request/request.html` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.
+
+### [2026-11-19] - fix: recuperar detección aproximada de ubicación en activación
+- **Objetivo:** Evitar que Chromium descarte ubicaciones válidas de baja precisión durante la activación del perfil.
+- **Cambios realizados:**
+  - Se aceptan coordenadas válidas con precisión mayor a 100 m y se informa el margen aproximado.
+  - Si falla la solicitud de alta precisión, se reintenta con baja precisión; si el usuario denegó el permiso, no se hace el reintento.
+  - Se actualizó la especificación del flujo de geolocalización.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/activation/activation.ts`, `ESPECIFICACION.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.
+
+### [2026-11-19] - fix: importar CA de desarrollo en Chromium
+- **Objetivo:** Corregir el script Linux, que instalaba la CA en el store del sistema pero no en la base NSS que Chromium/Chrome pueden usar.
+- **Cambios realizados:**
+  - El script crea la base NSS de Chromium si hace falta e importa/reemplaza `VinculaUP-CA` con confianza para TLS.
+  - La instalación de `libnss3-tools` ya no falla silenciosamente si `certutil` falta.
+  - Se actualizó la documentación para indicar cómo reiniciar Chromium y verificar el dominio local.
+- **Archivos modificados:** `scripts/linux-macos/import-ca.sh`, `README.md`, `MANUAL.md`, `ESPECIFICACION.md` y `WALKTHROUGH.md`.
+- **Verificación:** `bash -n scripts/linux-macos/import-ca.sh`, `git diff --check`, validación de la cadena y hostname con OpenSSL, y apertura exitosa de `https://vincula-up.local` en Chromium headless.
+
 ### [2026-11-18] - fix: ajustar ancho y alineación de acciones en solicitudes
 - **Objetivo:** Mantener alineado a la derecha el botón de chat cuando es la única acción y expandir a toda la fila cualquier otra acción individual en las tarjetas de solicitudes.
 - **Cambios realizados:**
@@ -1479,3 +1503,9 @@
   - Se actualizaron las instrucciones del [MANUAL.md](./MANUAL.md).
 - **Archivos modificados:** `frontend/vincula-up-web/src/app/home/home.html`, `home.css`, `home.ts`, `MANUAL.md` y `WALKTHROUGH.md`.
 - **Verificación:** `npm --prefix frontend/vincula-up-web run build` finalizó correctamente; `git diff --check` también pasó.
+
+### [2026-11-19] - fix: evitar desplazamiento lateral al detectar ubicación
+- **Objetivo:** Mantener estable la posición horizontal de la página mientras se bloquea el scroll durante la detección GPS.
+- **Cambios realizados:** Se compensa temporalmente el ancho de la barra de scroll y se restaura el padding original al desbloquear la página.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/request/request.ts` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.

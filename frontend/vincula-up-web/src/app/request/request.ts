@@ -224,6 +224,7 @@ private scrollLockSnapshot: {
   bodyTop: string;
   bodyWidth: string;
   bodyOverflow: string;
+  bodyPaddingRight: string;
 } | null = null;
 private readonly ahora = signal(new Date());
 private readonly MIN_ANTICIPACION_MIN = 60;
@@ -684,13 +685,19 @@ this.destroyRef.onDestroy(() => clearInterval(timer));
       bodyTop: body.style.top,
       bodyWidth: body.style.width,
       bodyOverflow: body.style.overflow,
+      bodyPaddingRight: body.style.paddingRight,
     };
 
+    const scrollbarWidth = window.innerWidth - html.clientWidth;
+    const currentPaddingRight = Number.parseFloat(window.getComputedStyle(body).paddingRight) || 0;
     html.style.overflow = 'hidden';
     body.style.overflow = 'hidden';
     body.style.position = 'fixed';
     body.style.top = `-${scrollY}px`;
     body.style.width = '100%';
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${currentPaddingRight + scrollbarWidth}px`;
+    }
   }
 
   private unlockPageScroll(): void {
@@ -705,6 +712,7 @@ this.destroyRef.onDestroy(() => clearInterval(timer));
     body.style.top = snapshot.bodyTop;
     body.style.width = snapshot.bodyWidth;
     body.style.overflow = snapshot.bodyOverflow;
+    body.style.paddingRight = snapshot.bodyPaddingRight;
     window.scrollTo(0, snapshot.scrollY);
   }
 

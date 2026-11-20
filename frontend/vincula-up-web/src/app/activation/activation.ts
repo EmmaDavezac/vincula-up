@@ -425,8 +425,7 @@ export class Activation {
           !Number.isFinite(accuracy) ||
           Math.abs(latitude) > 90 ||
           Math.abs(longitude) > 180 ||
-          accuracy <= 0 ||
-          accuracy > 100
+          accuracy <= 0
         ) {
           this.validatingLocation.set(false);
           this.locationError.set(Number.isFinite(accuracy)
@@ -438,9 +437,40 @@ export class Activation {
           latitude,
           longitude,
           `Ubicación actual (precisión aproximada: ±${Math.round(accuracy)} m)`,
+          accuracy > 100
+            ? `Ubicación aproximada (margen de ±${Math.round(accuracy)} m). Podés ajustar el punto en el mapa.`
+            : '',
         );
       },
       (error) => {
+        if (error.code !== error.PERMISSION_DENIED) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const { latitude, longitude, accuracy } = pos.coords;
+              if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !Number.isFinite(accuracy)
+                || Math.abs(latitude) > 90 || Math.abs(longitude) > 180 || accuracy <= 0) {
+                this.validatingLocation.set(false);
+                this.locationError.set('El dispositivo no informó una ubicación válida. Revisá los servicios de ubicación o elegí el punto en el mapa.');
+                return;
+              }
+              onExito(
+                latitude,
+                longitude,
+                `Ubicación aproximada (precisión ±${Math.round(accuracy)} m)`,
+                `Ubicación aproximada (margen de ±${Math.round(accuracy)} m). Podés ajustar el punto en el mapa.`,
+              );
+            },
+            (fallbackError) => {
+              this.validatingLocation.set(false);
+              this.locationError.set(fallbackError.code === fallbackError.TIMEOUT
+                ? 'El dispositivo no obtuvo una ubicación a tiempo. Revisá los servicios de ubicación o elegí el punto en el mapa.'
+                : 'No se pudo obtener la ubicación del dispositivo. Ingresá la localidad manualmente o usá el mapa.');
+            },
+            { timeout: 20000, maximumAge: 60000, enableHighAccuracy: false },
+          );
+          return;
+        }
+
         this.validatingLocation.set(false);
         this.locationError.set(error.code === error.PERMISSION_DENIED
           ? 'Permiso de ubicación denegado. Ingresá la localidad manualmente o usá el mapa.'
