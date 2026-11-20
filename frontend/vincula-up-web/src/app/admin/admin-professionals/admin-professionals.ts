@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal, TemplateRef, ViewChild } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { catchError, forkJoin, map, of } from 'rxjs';
@@ -20,6 +21,7 @@ import {
 	nombreCompleto,
 } from '../../core/models/admin';
 import { ApiService } from '../../core/services/api.service';
+import { DataRefreshService } from '../../core/services/data-refresh.service';
 import { OperationFeedbackService } from '../../core/services/operation-feedback.service';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
@@ -47,6 +49,7 @@ type ModalModo = 'consulta' | 'edicion';
 })
 export class AdminProfessionals implements AdminUnsavedChanges {
 	private readonly api = inject(ApiService);
+	private readonly dataRefresh = inject(DataRefreshService);
 	private readonly operationFeedback = inject(OperationFeedbackService);
 	private readonly router = inject(Router);
 	private readonly dialog = inject(MatDialog);
@@ -184,6 +187,9 @@ export class AdminProfessionals implements AdminUnsavedChanges {
 	constructor() {
 		this.leerAvisoDeAlta();
 		this.cargar();
+		this.dataRefresh.watch(['professionals', 'clients', 'categories'])
+			.pipe(takeUntilDestroyed())
+			.subscribe(() => this.cargar());
 	}
 
 	private leerAvisoDeAlta(): void {
@@ -196,7 +202,6 @@ export class AdminProfessionals implements AdminUnsavedChanges {
 	// ── Carga ─────────────────────────────────────────────────────────────
 
 	private cargar(): void {
-		this.loading.set(true);
 		forkJoin({
 			profesionales: this.api.getProfessionals(undefined, true).pipe(
 				map((items) => (items ?? []) as unknown as AdminProfessional[]),
@@ -389,7 +394,6 @@ export class AdminProfessionals implements AdminUnsavedChanges {
 			if (result) {
 				this.modal.set(null);
 				this.aviso.set(avisoExito(`${this.nombre(profesional)} quedó actualizado en el padrón.`));
-				this.cargar();
 			}
 		});
 	}
@@ -530,7 +534,6 @@ export class AdminProfessionals implements AdminUnsavedChanges {
 				this.actualizarEstado(profesional.id, estado);
 				this.reflejarEnModal(profesional.id, estado);
 				this.aviso.set(avisoExito(`${this.nombre(profesional)} quedó reactivado.`));
-				this.cargar();
 			}
 		});
 	}

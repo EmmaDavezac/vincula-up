@@ -1,4 +1,5 @@
 import { Component, computed, effect, inject, signal, TemplateRef, ViewChild } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -7,6 +8,7 @@ import { catchError, of } from 'rxjs';
 import { RequestStatus, ServiceRequest } from '../core/models/service-request';
 import { Professional } from '../core/models/professional';
 import { ApiService, ClienteInfo } from '../core/services/api.service';
+import { DataRefreshService } from '../core/services/data-refresh.service';
 import { AuthService } from '../core/services/auth.service';
 import { RequestService } from '../core/services/request.service';
 import { NotificationService } from '../core/services/notification.service';
@@ -54,6 +56,7 @@ interface RatingItem {
 })
 export class MyRequests {
   private readonly api = inject(ApiService);
+  private readonly dataRefresh = inject(DataRefreshService);
   private readonly operationFeedback = inject(OperationFeedbackService);
   private readonly dialog = inject(MatDialog);
   private readonly route = inject(ActivatedRoute);
@@ -304,6 +307,9 @@ export class MyRequests {
     });
     this.reloadRequests();
     this.loadEspecialidades();
+    this.dataRefresh.watch(['requests'])
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => this.reloadRequests());
   }
 
   reloadRequests(): void {
@@ -839,7 +845,6 @@ puedeChatear(request: ServiceRequest): boolean {
         : nuevo === 'RECHAZADA' ? 'Solicitud rechazada.'
         : 'Solicitud aceptada. Podés comunicarte por el chat.',
       );
-      this.reloadRequests();
     });
   }
 

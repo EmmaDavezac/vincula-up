@@ -1,12 +1,13 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Observable, catchError, of } from 'rxjs';
+import { Observable, catchError, of, tap } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { AdminRequest } from '../models/admin';
 import { Professional, ProfessionalAvailability } from '../models/professional';
 import { RequestStatus, ServiceRequest } from '../models/service-request';
 import { AuthService } from './auth.service';
+import { DataCollection, DataRefreshService } from './data-refresh.service';
 
 interface BackendRequest {
   id: string;
@@ -128,6 +129,7 @@ export interface AltaProfesionalResultado {
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
+  private readonly dataRefresh = inject(DataRefreshService);
   private readonly http = inject(HttpClient);
   private readonly auth = inject(AuthService);
   private readonly baseUrl = environment.apiUrl;
@@ -233,14 +235,24 @@ export class ApiService {
     return Number.isFinite(n) ? n : null;
   }
 
+  private refreshAfterSuccess<T>(request: Observable<T>, ...collections: DataCollection[]): Observable<T> {
+    return request.pipe(tap(() => this.dataRefresh.notifyChanged(...collections)));
+  }
+
   saveSpecialty(id: string | null, nombre: string): Observable<unknown> {
     const options = { headers: this.authHeaders() };
-    return id ? this.http.put(`${this.baseUrl}/especialidades/${id}`, { nombre }, options)
+    const request = id
+      ? this.http.put(`${this.baseUrl}/especialidades/${id}`, { nombre }, options)
       : this.http.post(`${this.baseUrl}/especialidades`, { nombre }, options);
+    return this.refreshAfterSuccess(request, 'categories', 'professionals');
   }
 
   deleteSpecialty(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.baseUrl}/especialidades/${id}`, { headers: this.authHeaders() });
+    return this.refreshAfterSuccess(
+      this.http.delete<void>(`${this.baseUrl}/especialidades/${id}`, { headers: this.authHeaders() }),
+      'categories',
+      'professionals',
+    );
   }
 
   /**
@@ -257,7 +269,10 @@ export class ApiService {
     email?: string;
     telefono?: string;
   }): Observable<unknown> {
-    return this.http.put(`${this.baseUrl}/profesionales/${id}`, request, { headers: this.authHeaders() });
+    return this.refreshAfterSuccess(
+      this.http.put(`${this.baseUrl}/profesionales/${id}`, request, { headers: this.authHeaders() }),
+      'professionals',
+    );
   }
 
   /**
@@ -274,7 +289,10 @@ export class ApiService {
     legajo: string;
     especialidadIds: string[];
   }): Observable<unknown> {
-    return this.http.post(`${this.baseUrl}/profesionales`, request, { headers: this.authHeaders() });
+    return this.refreshAfterSuccess(
+      this.http.post(`${this.baseUrl}/profesionales`, request, { headers: this.authHeaders() }),
+      'professionals',
+    );
   }
 
   activateProfessional(request: {
@@ -285,7 +303,10 @@ export class ApiService {
     zonaCoberturaLng: number;
     radioKm: number;
   }): Observable<ProfessionalActivationResponse> {
-    return this.http.patch<ProfessionalActivationResponse>(`${this.baseUrl}/profesionales/activar`, request, { headers: this.authHeaders() });
+    return this.refreshAfterSuccess(
+      this.http.patch<ProfessionalActivationResponse>(`${this.baseUrl}/profesionales/activar`, request, { headers: this.authHeaders() }),
+      'professionals',
+    );
   }
 
   getMyProfessionalProfile(usuarioId: string, keycloakId?: string | null): Observable<ProfessionalActivationResponse | null> {
@@ -302,15 +323,24 @@ export class ApiService {
   }
 
   setAvailability(professionalId: string, slots: AvailabilitySlot[]): Observable<unknown> {
-    return this.http.put(`${this.baseUrl}/profesionales/${professionalId}/disponibilidad`, slots, { headers: this.authHeaders() });
+    return this.refreshAfterSuccess(
+      this.http.put(`${this.baseUrl}/profesionales/${professionalId}/disponibilidad`, slots, { headers: this.authHeaders() }),
+      'professionals',
+    );
   }
 
   suspendProfessional(id: string): Observable<unknown> {
-    return this.http.patch(`${this.baseUrl}/profesionales/${id}/suspender`, {}, { headers: this.authHeaders() });
+    return this.refreshAfterSuccess(
+      this.http.patch(`${this.baseUrl}/profesionales/${id}/suspender`, {}, { headers: this.authHeaders() }),
+      'professionals',
+    );
   }
 
   reactivateProfessional(id: string): Observable<unknown> {
-    return this.http.patch(`${this.baseUrl}/profesionales/${id}/reactivar`, {}, { headers: this.authHeaders() });
+    return this.refreshAfterSuccess(
+      this.http.patch(`${this.baseUrl}/profesionales/${id}/reactivar`, {}, { headers: this.authHeaders() }),
+      'professionals',
+    );
   }
 
   getUsers(role?: string, estado?: string): Observable<Array<{ id: string; nombre: string; apellido: string; email: string; telefono?: string; fotoUrl?: string; rolNegocio: string; estado?: string; keycloakId?: string | null }>> {
@@ -341,7 +371,11 @@ export class ApiService {
     legajo: string;
     especialidadIds: string[];
   }): Observable<AltaProfesionalResultado> {
-    return this.http.post<AltaProfesionalResultado>(`${this.baseUrl}/profesionales/alta`, request, { headers: this.authHeaders() });
+    return this.refreshAfterSuccess(
+      this.http.post<AltaProfesionalResultado>(`${this.baseUrl}/profesionales/alta`, request, { headers: this.authHeaders() }),
+      'professionals',
+      'clients',
+    );
   }
 
   /**
@@ -359,17 +393,29 @@ export class ApiService {
    * cliente. El email no viaja: es la identidad con la que se vincula la cuenta.
    */
   updateUser(id: string, request: { nombre?: string; apellido?: string; telefono?: string }): Observable<UserAccount> {
-    return this.http.patch<UserAccount>(`${this.baseUrl}/usuarios/${id}`, request, { headers: this.authHeaders() });
+    return this.refreshAfterSuccess(
+      this.http.patch<UserAccount>(`${this.baseUrl}/usuarios/${id}`, request, { headers: this.authHeaders() }),
+      'clients',
+      'professionals',
+    );
   }
 
   /** Suspensión administrativa reversible de una cuenta. */
   suspendUser(id: string): Observable<unknown> {
-    return this.http.patch(`${this.baseUrl}/usuarios/${id}/suspender`, {}, { headers: this.authHeaders() });
+    return this.refreshAfterSuccess(
+      this.http.patch(`${this.baseUrl}/usuarios/${id}/suspender`, {}, { headers: this.authHeaders() }),
+      'clients',
+      'professionals',
+    );
   }
 
   /** Levanta la suspensión y devuelve la cuenta a ACTIVO. */
   reactivateUser(id: string): Observable<unknown> {
-    return this.http.patch(`${this.baseUrl}/usuarios/${id}/reactivar`, {}, { headers: this.authHeaders() });
+    return this.refreshAfterSuccess(
+      this.http.patch(`${this.baseUrl}/usuarios/${id}/reactivar`, {}, { headers: this.authHeaders() }),
+      'clients',
+      'professionals',
+    );
   }
 
   getUserById(id: string): Observable<ClienteInfo | null> {
@@ -403,7 +449,11 @@ export class ApiService {
   }
 
   updateMyAccount(request: UserAccountUpdate): Observable<UserAccount> {
-    return this.http.patch<UserAccount>(`${this.baseUrl}/usuarios/yo`, request, { headers: this.authHeaders() });
+    return this.refreshAfterSuccess(
+      this.http.patch<UserAccount>(`${this.baseUrl}/usuarios/yo`, request, { headers: this.authHeaders() }),
+      'clients',
+      'professionals',
+    );
   }
 
   getSpecialtiesMap(): Observable<Record<string, string>> {
@@ -435,7 +485,10 @@ export class ApiService {
     /** Obligatorio: es lo que le dice al profesional qué tiene que resolver. */
     descripcion: string;
   }): Observable<ServiceRequest> {
-    return this.http.post<ServiceRequest>(`${this.baseUrl}/solicitudes`, request, { headers: this.authHeaders() });
+    return this.refreshAfterSuccess(
+      this.http.post<ServiceRequest>(`${this.baseUrl}/solicitudes`, request, { headers: this.authHeaders() }),
+      'requests',
+    );
   }
 
   getMyRequests(
@@ -470,43 +523,58 @@ export class ApiService {
   }
 
   acceptRequest(requestId: string, actorId: string, motivo = ''): Observable<ServiceRequest> {
-    return this.http.patch<ServiceRequest>(`${this.baseUrl}/solicitudes/${requestId}/aceptar`, { actorId, motivo }, { headers: this.authHeaders() }).pipe(
-      map((request) => this.toServiceRequest(request)),
+    return this.refreshAfterSuccess(
+      this.http.patch<ServiceRequest>(`${this.baseUrl}/solicitudes/${requestId}/aceptar`, { actorId, motivo }, { headers: this.authHeaders() })
+        .pipe(map((request) => this.toServiceRequest(request))),
+      'requests',
     );
   }
 
   markRequestEnCamino(requestId: string, actorId: string): Observable<ServiceRequest> {
-    return this.http.patch<ServiceRequest>(`${this.baseUrl}/solicitudes/${requestId}/en-camino`, { actorId }, { headers: this.authHeaders() }).pipe(
-      map((request) => this.toServiceRequest(request)),
+    return this.refreshAfterSuccess(
+      this.http.patch<ServiceRequest>(`${this.baseUrl}/solicitudes/${requestId}/en-camino`, { actorId }, { headers: this.authHeaders() })
+        .pipe(map((request) => this.toServiceRequest(request))),
+      'requests',
     );
   }
 
   markRequestTrabajoRealizado(requestId: string, actorId: string): Observable<ServiceRequest> {
-    return this.http.patch<ServiceRequest>(`${this.baseUrl}/solicitudes/${requestId}/trabajo-realizado`, { actorId }, { headers: this.authHeaders() }).pipe(
-      map((request) => this.toServiceRequest(request)),
+    return this.refreshAfterSuccess(
+      this.http.patch<ServiceRequest>(`${this.baseUrl}/solicitudes/${requestId}/trabajo-realizado`, { actorId }, { headers: this.authHeaders() })
+        .pipe(map((request) => this.toServiceRequest(request))),
+      'requests',
     );
   }
 
   rejectRequest(requestId: string, actorId: string, motivo = ''): Observable<ServiceRequest> {
-    return this.http.patch<ServiceRequest>(`${this.baseUrl}/solicitudes/${requestId}/rechazar`, { actorId, motivo }, { headers: this.authHeaders() }).pipe(
-      map((request) => this.toServiceRequest(request)),
+    return this.refreshAfterSuccess(
+      this.http.patch<ServiceRequest>(`${this.baseUrl}/solicitudes/${requestId}/rechazar`, { actorId, motivo }, { headers: this.authHeaders() })
+        .pipe(map((request) => this.toServiceRequest(request))),
+      'requests',
     );
   }
 
   completeRequest(requestId: string, actorId: string): Observable<ServiceRequest> {
-    return this.http.patch<ServiceRequest>(`${this.baseUrl}/solicitudes/${requestId}/completar`, { actorId }, { headers: this.authHeaders() }).pipe(
-      map((request) => this.toServiceRequest(request)),
+    return this.refreshAfterSuccess(
+      this.http.patch<ServiceRequest>(`${this.baseUrl}/solicitudes/${requestId}/completar`, { actorId }, { headers: this.authHeaders() })
+        .pipe(map((request) => this.toServiceRequest(request))),
+      'requests',
     );
   }
 
   cancelRequest(requestId: string, actorId: string, motivo = ''): Observable<ServiceRequest> {
-    return this.http.patch<ServiceRequest>(`${this.baseUrl}/solicitudes/${requestId}/cancelar`, { actorId, motivo }, { headers: this.authHeaders() }).pipe(
-      map((request) => this.toServiceRequest(request)),
+    return this.refreshAfterSuccess(
+      this.http.patch<ServiceRequest>(`${this.baseUrl}/solicitudes/${requestId}/cancelar`, { actorId, motivo }, { headers: this.authHeaders() })
+        .pipe(map((request) => this.toServiceRequest(request))),
+      'requests',
     );
   }
 
   createRating(requestId: string, clienteId: string, puntaje: number, comentario = ''): Observable<unknown> {
-    return this.http.post(`${this.baseUrl}/solicitudes/${requestId}/calificacion`, { clienteId, puntaje, comentario }, { headers: this.authHeaders() });
+    return this.refreshAfterSuccess(
+      this.http.post(`${this.baseUrl}/solicitudes/${requestId}/calificacion`, { clienteId, puntaje, comentario }, { headers: this.authHeaders() }),
+      'requests',
+    );
   }
 
   getRating(requestId: string): Observable<{ id: string; solicitudId: string; puntaje: number; comentario: string } | null> {

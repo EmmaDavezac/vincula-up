@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal, TemplateRef, ViewChild } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { catchError, forkJoin, map, of } from 'rxjs';
@@ -17,6 +18,7 @@ import {
 	nombreCompleto,
 } from '../../core/models/admin';
 import { ApiService } from '../../core/services/api.service';
+import { DataRefreshService } from '../../core/services/data-refresh.service';
 import { OperationFeedbackService } from '../../core/services/operation-feedback.service';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
@@ -40,6 +42,7 @@ import { VuSkeletonList } from '../../shared/skeleton-list/skeleton-list';
 })
 export class AdminClients {
 	private readonly api = inject(ApiService);
+	private readonly dataRefresh = inject(DataRefreshService);
 	private readonly operationFeedback = inject(OperationFeedbackService);
 	private readonly dialog = inject(MatDialog);
 	@ViewChild('clientDetailDialog') private clientDetailDialog!: TemplateRef<unknown>;
@@ -123,10 +126,12 @@ export class AdminClients {
 
 	constructor() {
 		this.cargar();
+		this.dataRefresh.watch(['clients', 'requests'])
+			.pipe(takeUntilDestroyed())
+			.subscribe(() => this.cargar());
 	}
 
 	private cargar(): void {
-		this.loading.set(true);
 		forkJoin({
 			clientes: this.api.getUsers('CLIENTE').pipe(
 				map((items) => (items ?? []) as AdminUser[]),

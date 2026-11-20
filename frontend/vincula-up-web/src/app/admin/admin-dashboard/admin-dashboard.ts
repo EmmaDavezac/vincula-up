@@ -1,7 +1,9 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { catchError, forkJoin, map, of } from 'rxjs';
 import { AdminAviso, AdminRequest, avisoClase, avisoError } from '../../core/models/admin';
 import { ApiService } from '../../core/services/api.service';
+import { DataRefreshService } from '../../core/services/data-refresh.service';
 import { VuIcon } from '../../shared/icon/icon';
 
 /** Barra de demanda: especialidad, solicitudes y nivel calculado. */
@@ -32,6 +34,7 @@ interface Etapa {
 })
 export class AdminDashboard {
 	private readonly api = inject(ApiService);
+	private readonly dataRefresh = inject(DataRefreshService);
 
 	readonly loading = signal(true);
 	/** Mismo aviso tipado que el resto del panel: distingue error de información. */
@@ -53,14 +56,19 @@ export class AdminDashboard {
 			? calificadas.reduce((total, item) => total + (item.puntaje ?? 0), 0) / calificadas.length
 			: 0;
 
-		return [
+		const metricas = [
 			{ label: 'Solicitudes este mes', value: String(mesActual.length), nota: this.porcentajeDe(mesActual.length, solicitudes.length) },
 			{ label: 'Servicios completados', value: String(completadas.length), nota: this.porcentajeDe(completadas.length, solicitudes.length) },
 			{ label: 'Profesionales activos', value: String(this.profesionalesActivos()), nota: 'con perfil activado' },
 			{ label: 'Clientes registrados', value: String(this.clientesRegistrados()), nota: 'en la plataforma' },
-			{ label: 'Tasa de concreción', value: this.tasaConcrecion(solicitudes), nota: 'solicitudes completadas' },
-			{ label: 'Satisfacción promedio', value: promedio > 0 ? `${promedio.toFixed(1)} / 5` : 'Sin datos', nota: `${calificadas.length} valoraciones` },
 		];
+		if (solicitudes.length > 0) {
+			metricas.push({ label: 'Tasa de concreción', value: this.tasaConcrecion(solicitudes), nota: 'solicitudes completadas' });
+		}
+		if (calificadas.length > 0) {
+			metricas.push({ label: 'Satisfacción promedio', value: `${promedio.toFixed(1)} / 5`, nota: `${calificadas.length} valoraciones` });
+		}
+		return metricas;
 	});
 
 	/** Especialidades con más solicitudes, para planificar la oferta académica. */
@@ -105,10 +113,12 @@ export class AdminDashboard {
 
 	constructor() {
 		this.cargar();
+		this.dataRefresh.watch(['requests', 'professionals', 'clients', 'categories'])
+			.pipe(takeUntilDestroyed())
+			.subscribe(() => this.cargar());
 	}
 
 	private cargar(): void {
-		this.loading.set(true);
 		forkJoin({
 			solicitudes: this.api.getAdminRequests().pipe(
 				map((items) => items ?? []),

@@ -308,6 +308,10 @@
 					<p>No encontramos solicitudes con esos filtros.</p>
 				</div>
 			}
+		} @else {
+			<div class="requests__empty-results" role="status">
+				<p>{{ isProfessional() ? 'Todavía no recibiste solicitudes.' : 'Todavía no enviaste solicitudes.' }}</p>
+			</div>
 		}
 		<!-- ── Chat de coordinación ── -->
 		<ng-template #chatDialog>

@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
@@ -12,6 +13,7 @@ import {
 	coincideBusqueda,
 } from '../../core/models/admin';
 import { ApiService } from '../../core/services/api.service';
+import { DataRefreshService } from '../../core/services/data-refresh.service';
 import { MatListModule } from '@angular/material/list';
 import { VuConfirm } from '../../shared/confirm/confirm';
 import { VuIcon } from '../../shared/icon/icon';
@@ -31,6 +33,7 @@ import { OperationFeedbackService } from '../../core/services/operation-feedback
 })
 export class AdminCategories implements AdminUnsavedChanges {
 	private readonly api = inject(ApiService);
+	private readonly dataRefresh = inject(DataRefreshService);
 	private readonly router = inject(Router);
 	private readonly operationFeedback = inject(OperationFeedbackService);
 
@@ -80,6 +83,9 @@ export class AdminCategories implements AdminUnsavedChanges {
 	constructor() {
 		this.leerAvisoDeAlta();
 		this.cargar();
+		this.dataRefresh.watch(['categories'])
+			.pipe(takeUntilDestroyed())
+			.subscribe(() => this.cargar());
 	}
 
 	/** Mensaje que deja la pantalla de alta al volver con `navigate(..., { state })`. */
@@ -100,7 +106,6 @@ export class AdminCategories implements AdminUnsavedChanges {
 	 */
 
 	private cargar(): void {
-		this.loading.set(true);
 		this.api.getSpecialties().pipe(
 			map((items) => (items ?? []) as AdminSpecialty[]),
 			catchError((error) => {
@@ -218,7 +223,6 @@ export class AdminCategories implements AdminUnsavedChanges {
 			if (result) {
 				this.renamingId.set(null);
 				this.aviso.set(avisoExito(`La categoría ahora se llama "${nombre}".`));
-				this.cargar();
 			}
 		});
 	}
@@ -254,7 +258,6 @@ export class AdminCategories implements AdminUnsavedChanges {
 			this.busy.set(false);
 			if (deleted) {
 				this.aviso.set(avisoExito(`"${category.nombre}" se eliminó del catálogo.`));
-				this.cargar();
 			}
 		});
 	}

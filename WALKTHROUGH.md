@@ -1560,3 +1560,15 @@
 - **Cambios realizados:** Se amplió `healthcheck.start_period` de 60 a 180 segundos y se documentó cómo iniciar los servicios que quedaron pendientes tras un primer arranque lento.
 - **Archivos modificados:** `docker-compose.yml`, `MANUAL.md`, `ESPECIFICACION.md` y `WALKTHROUGH.md`.
 - **Verificación:** Revisar el healthcheck configurado, `docker compose config --quiet` y `git diff --check`.
+
+### [2026-11-20] - ui: actualizar listados automáticamente y ocultar indicadores sin datos
+- **Objetivo:** Mantener al día las solicitudes, los clientes, los profesionales y las categorías, y evitar tarjetas de resumen sin información.
+- **Cambios realizados:** Se agregó un mecanismo compartido de actualización cada 30 segundos y al completarse cambios relacionados desde la aplicación. La tasa de concreción se muestra solo si existen solicitudes y la satisfacción promedio solo si hay valoraciones.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/core/services/data-refresh.service.ts`, `frontend/vincula-up-web/src/app/core/services/api.service.ts`, los listados y el resumen del panel de administración, `frontend/vincula-up-web/src/app/my-requests/my-requests.ts` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.
+
+### [2026-11-20] - ui: mostrar mensaje cuando no hay solicitudes
+- **Objetivo:** Informar claramente cuando el listado está vacío, tanto para profesionales como para clientes.
+- **Cambios realizados:** Se agregó un estado vacío accesible que indica si todavía no se recibieron o no se enviaron solicitudes.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/my-requests/my-requests.html` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.
