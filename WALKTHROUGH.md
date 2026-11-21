@@ -1578,3 +1578,9 @@
 - **Cambios realizados:** Se reemplazaron las marcas tipográficas por el SVG del favicon en la navegación, acceso, pantallas de carga y pie de página, conservando el tamaño y las animaciones existentes.
 - **Archivos modificados:** `frontend/vincula-up-web/src/app/shared/navbar/navbar.html`, `frontend/vincula-up-web/src/app/sign-in/sign-in.html`, `frontend/vincula-up-web/src/app/shared/auth-loading/auth-loading.html`, `frontend/vincula-up-web/src/app/shared/loading-screen/loading-screen.ts`, `frontend/vincula-up-web/src/app/shared/footer/footer.html`, `frontend/vincula-up-web/src/styles.css`, `frontend/vincula-up-web/src/app/shared/footer/footer.css` y `WALKTHROUGH.md`.
 - **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.
+
+### [2026-11-20] - feat: permitir editar disponibilidad desde Mi cuenta
+- **Objetivo:** Dar al profesional una sección para consultar y actualizar sus días y horarios de atención desde Mi cuenta.
+- **Cambios realizados:** Se agregó la carga del perfil propio y sus horarios, una vista semanal editable por día con validación de rangos, confirmación antes de guardar y mensajes de error/éxito. Se reutiliza el endpoint existente de disponibilidad.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/account/account.ts`, `frontend/vincula-up-web/src/app/account/account.html`, `frontend/vincula-up-web/src/app/account/account.css`, `frontend/vincula-up-web/src/app/core/services/api.service.ts` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.

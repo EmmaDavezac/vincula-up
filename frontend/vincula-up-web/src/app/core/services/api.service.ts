@@ -314,12 +314,10 @@ export class ApiService {
     if (keycloakId) {
       params = params.set('keycloakId', keycloakId);
     }
-    return this.http.get<ProfessionalActivationResponse>(`${this.baseUrl}/profesionales/mi-perfil`, {
+    return this.http.get<ProfessionalActivationResponse | null>(`${this.baseUrl}/profesionales/mi-perfil`, {
       params,
       headers: this.authHeaders(),
-    }).pipe(
-      catchError(() => of(null)),
-    );
+    });
   }
 
   setAvailability(professionalId: string, slots: AvailabilitySlot[]): Observable<unknown> {

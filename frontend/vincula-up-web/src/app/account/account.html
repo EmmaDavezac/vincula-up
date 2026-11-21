@@ -88,6 +88,74 @@
             <p class="hint">Cargando tu reputación...</p>
           }
         </div>
+
+        <!-- Disponibilidad semanal -->
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2 class="vu-h3">Horario de atención</h2>
+              <p class="hint">Elegí los días y horarios en los que podés recibir solicitudes.</p>
+            </div>
+            @if (editing() === null && puedeEditarDisponibilidad() && !availabilityLoading() && !availabilityError()) {
+              <button type="button" class="vu-btn vu-btn--quiet vu-btn--sm link" (click)="startEdit('availability')">Editar</button>
+            }
+          </div>
+          @if (availabilityLoading()) {
+            <p class="hint" role="status">Cargando tu horario…</p>
+          } @else if (availabilityError() && editing() !== 'availability') {
+            <p class="error" role="alert">{{ availabilityError() }}</p>
+            <button type="button" class="vu-btn vu-btn--outline vu-btn--sm availability__retry" (click)="loadAvailability()">Reintentar</button>
+          } @else if (editing() === 'availability') {
+            <div class="availability-editor">
+              @for (day of availabilityDraft(); track day.id) {
+                <div class="availability-row" [class.availability-row--off]="!day.enabled">
+                  <label class="availability-day">
+                    <input
+                      type="checkbox"
+                      [checked]="day.enabled"
+                      [attr.name]="'availability-' + day.id"
+                      (change)="toggleAvailabilityDay(day.id)"
+                    />
+                    <span>{{ day.name }}</span>
+                  </label>
+                  @if (day.enabled) {
+                    <label class="availability-time">
+                      <span>Desde</span>
+                      <input class="vu-input" type="time" [attr.name]="'start-' + day.id" [ngModel]="day.horaInicio" (ngModelChange)="updateAvailabilityTime(day.id, 'horaInicio', $event)" />
+                    </label>
+                    <label class="availability-time">
+                      <span>Hasta</span>
+                      <input class="vu-input" type="time" [attr.name]="'end-' + day.id" [ngModel]="day.horaFin" (ngModelChange)="updateAvailabilityTime(day.id, 'horaFin', $event)" />
+                    </label>
+                  } @else {
+                    <span class="hint availability__off">No disponible</span>
+                  }
+                </div>
+              }
+            </div>
+            @if (availabilityError()) { <p class="error" role="alert">{{ availabilityError() }}</p> }
+            @if (!puedeEditarDisponibilidad()) {
+              <p class="hint">Completá la activación de tu perfil para modificar la disponibilidad.</p>
+            }
+            <div class="card-actions">
+              <button type="button" class="vu-btn vu-btn--ink primary" [disabled]="saving() || !puedeEditarDisponibilidad()" (click)="saveAvailability()">{{ saving() ? 'Guardando…' : 'Guardar horario' }}</button>
+              <button type="button" class="vu-btn vu-btn--outline secondary" [disabled]="saving()" (click)="cancelEdit()">Cancelar</button>
+            </div>
+          } @else {
+            @if (configuredAvailability().length) {
+              <ul class="availability-list">
+                @for (day of configuredAvailability(); track day.id) {
+                  <li><strong>{{ day.name }}</strong><span>{{ day.horaInicio }} a {{ day.horaFin }}</span></li>
+                }
+              </ul>
+            } @else {
+              <p class="hint">Todavía no configuraste días y horarios de atención.</p>
+            }
+            @if (!puedeEditarDisponibilidad()) {
+              <p class="hint">Completá la activación de tu perfil para modificar la disponibilidad.</p>
+            }
+          }
+        </div>
       }
 
       <!-- Datos personales -->
@@ -159,4 +227,8 @@
 <!-- Confirmación de los guardados -->
 @if (confirmacion(); as pendiente) {
   <vu-confirm [titulo]="pendiente.titulo" [mensaje]="pendiente.mensaje" [detalle]="pendiente.detalle" textoConfirmar="Guardar" [peligro]="pendiente.peligro ?? false" icono="pencil" (confirmado)="confirmarGuardado()" (cancelado)="cancelarGuardado()" />
+}
+
+@if (availabilityConfirmation()) {
+  <vu-confirm titulo="Actualizar tu horario" mensaje="¿Querés guardar estos días y horarios?" detalle="Los clientes verán tu nueva disponibilidad al buscar profesionales." textoConfirmar="Guardar horario" icono="clock" (confirmado)="confirmAvailabilitySave()" (cancelado)="cancelAvailabilitySave()" />
 }

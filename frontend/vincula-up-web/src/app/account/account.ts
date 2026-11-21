@@ -3,7 +3,7 @@ import { Component, ElementRef, computed, inject, signal, viewChild } from '@ang
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-import { catchError, of } from 'rxjs';
+import { catchError, map, of, switchMap, throwError } from 'rxjs';
 import { ApiService, MyReputation, UserAccount, UserAccountUpdate } from '../core/services/api.service';
 import { AuthService } from '../core/services/auth.service';
 import { FotoService } from '../core/services/foto.service';
@@ -12,7 +12,21 @@ import { VuAvatar } from '../shared/avatar/avatar';
 import { VuConfirm } from '../shared/confirm/confirm';
 import { OperationFeedbackService } from '../core/services/operation-feedback.service';
 
-type CardKey = 'personal' | 'contact' | 'photo';
+type CardKey = 'personal' | 'contact' | 'photo' | 'availability';
+
+interface AvailabilityDay {
+  id: string;
+  name: string;
+  enabled: boolean;
+  horaInicio: string;
+  horaFin: string;
+}
+
+interface AvailabilitySlot {
+  diaSemana: string;
+  horaInicio: string;
+  horaFin: string;
+}
 
 /**
  * Sección "Mi cuenta": el usuario ve su información y la actualiza por
@@ -52,6 +66,23 @@ export class Account {
   readonly contactDraft = signal({ telefono: '' });
   readonly cardError = signal('');
   readonly cardNotice = signal('');
+  readonly availabilityDays: ReadonlyArray<{ id: string; name: string }> = [
+    { id: 'LUNES', name: 'Lunes' },
+    { id: 'MARTES', name: 'Martes' },
+    { id: 'MIERCOLES', name: 'Miércoles' },
+    { id: 'JUEVES', name: 'Jueves' },
+    { id: 'VIERNES', name: 'Viernes' },
+    { id: 'SABADO', name: 'Sábado' },
+    { id: 'DOMINGO', name: 'Domingo' },
+  ];
+  readonly professionalId = signal('');
+  readonly professionalState = signal('');
+  readonly availability = signal<AvailabilityDay[]>([]);
+  readonly configuredAvailability = computed(() => this.availability().filter((day) => day.enabled));
+  readonly availabilityDraft = signal<AvailabilityDay[]>([]);
+  readonly availabilityLoading = signal(false);
+  readonly availabilityError = signal('');
+  readonly availabilityConfirmation = signal<AvailabilitySlot[] | null>(null);
 
   // Foto de perfil: vista previa local hasta guardar.
   readonly photoPreview = signal('');
@@ -105,6 +136,7 @@ export class Account {
   readonly reputacionError = signal('');
 
   readonly esProfesional = computed(() => this.account()?.rolNegocio === 'PROFESIONAL');
+  readonly puedeEditarDisponibilidad = computed(() => this.professionalState() === 'ACTIVO');
 
   /** Estrellas de la tarjeta, según el promedio real. */
   estrellas(promedio: number): string {
@@ -164,6 +196,7 @@ export class Account {
         // La reputación sólo existe para el rol profesional.
         if (user.rolNegocio === 'PROFESIONAL') {
           this.cargarReputacion();
+          this.loadAvailability(user);
         }
       }
       this.loading.set(false);
@@ -176,10 +209,13 @@ export class Account {
     this.cardError.set('');
     this.cardNotice.set('');
     this.photoError.set('');
+    this.availabilityError.set('');
     if (card === 'personal') {
       this.personalDraft.set({ nombre: user.nombre ?? '', apellido: user.apellido ?? '' });
     } else if (card === 'contact') {
       this.contactDraft.set({ telefono: user.telefono ?? '' });
+    } else if (card === 'availability') {
+      this.availabilityDraft.set(this.availability().map((day) => ({ ...day })));
     }
     // La tarjeta de foto no precarga nada: la foto guardada la resuelve el avatar
     // por su id, y la vista previa local arranca vacía hasta elegir un archivo.
@@ -192,6 +228,7 @@ export class Account {
     this.editing.set(null);
     this.cardError.set('');
     this.photoError.set('');
+    this.availabilityError.set('');
     this.photoLoading.set(false);
     // Al cancelar, el avatar vuelve a mostrar la foto guardada (la del backend),
     // no la vista previa descartada.
@@ -240,6 +277,110 @@ export class Account {
       false,
       { telefono },
     );
+  }
+
+  loadAvailability(user = this.account()): void {
+    if (!user || user.rolNegocio !== 'PROFESIONAL') return;
+    this.availabilityLoading.set(true);
+    this.availabilityError.set('');
+    this.api.getMyProfessionalProfile(user.id, user.keycloakId).pipe(
+      switchMap((profile) => {
+        if (!profile?.id) {
+          return throwError(() => new Error('No se encontró el perfil profesional asociado a tu cuenta.'));
+        }
+        return this.api.getAvailability(profile.id).pipe(
+          map((slots) => ({ profile, slots })),
+        );
+      }),
+      catchError((error) => {
+        this.availabilityError.set(this.api.describeError(error, 'No se pudo cargar tu horario.'));
+        this.availabilityLoading.set(false);
+        return of(null);
+      }),
+    ).subscribe((result) => {
+      if (!result) return;
+      this.professionalId.set(result.profile.id ?? '');
+      this.professionalState.set(result.profile.estado ?? '');
+      const byDay = new Map(result.slots.map((slot) => [
+        String(slot.diaSemana).toUpperCase(),
+        { horaInicio: slot.horaInicio.slice(0, 5), horaFin: slot.horaFin.slice(0, 5) },
+      ]));
+      const days = this.availabilityDays.map((day) => {
+        const hours = byDay.get(day.id);
+        return {
+          ...day,
+          enabled: Boolean(hours),
+          horaInicio: hours?.horaInicio ?? '09:00',
+          horaFin: hours?.horaFin ?? '18:00',
+        };
+      });
+      this.availability.set(days);
+      this.availabilityLoading.set(false);
+    });
+  }
+
+  toggleAvailabilityDay(dayId: string): void {
+    this.availabilityDraft.update((days) => days.map((day) =>
+      day.id === dayId ? { ...day, enabled: !day.enabled } : day,
+    ));
+    this.availabilityError.set('');
+  }
+
+  updateAvailabilityTime(dayId: string, field: 'horaInicio' | 'horaFin', value: string): void {
+    this.availabilityDraft.update((days) => days.map((day) =>
+      day.id === dayId ? { ...day, [field]: value } : day,
+    ));
+    this.availabilityError.set('');
+  }
+
+  saveAvailability(): void {
+    const selected = this.availabilityDraft().filter((day) => day.enabled);
+    if (selected.length === 0) {
+      this.availabilityError.set('Seleccioná al menos un día disponible.');
+      return;
+    }
+    if (selected.some((day) => !day.horaInicio || !day.horaFin || day.horaInicio >= day.horaFin)) {
+      this.availabilityError.set('Revisá los horarios: la hora de inicio debe ser anterior a la hora de fin.');
+      return;
+    }
+    const slots = selected.map(({ id, horaInicio, horaFin }) => ({
+      diaSemana: id,
+      horaInicio: `${horaInicio}:00`,
+      horaFin: `${horaFin}:00`,
+    }));
+    this.availabilityConfirmation.set(slots);
+  }
+
+  confirmAvailabilitySave(): void {
+    const slots = this.availabilityConfirmation();
+    const professionalId = this.professionalId();
+    if (!slots || !professionalId) return;
+    this.availabilityConfirmation.set(null);
+    this.saving.set(true);
+    this.availabilityError.set('');
+    this.cardNotice.set('');
+    this.operationFeedback.track(
+      'Actualizando tu horario…',
+      this.api.setAvailability(professionalId, slots).pipe(map(() => true)),
+      'Estamos guardando los días y horarios que elegiste.',
+    ).pipe(
+      catchError((error) => {
+        this.availabilityError.set(this.api.describeError(error, 'No se pudo guardar tu horario.'));
+        this.saving.set(false);
+        return of(false);
+      }),
+    ).subscribe((saved) => {
+      if (!saved) return;
+      const updatedDays = this.availabilityDraft().map((day) => ({ ...day }));
+      this.availability.set(updatedDays);
+      this.saving.set(false);
+      this.editing.set(null);
+      this.cardNotice.set('Tu horario se actualizó correctamente.');
+    });
+  }
+
+  cancelAvailabilitySave(): void {
+    this.availabilityConfirmation.set(null);
   }
 
   savePhoto(): void {

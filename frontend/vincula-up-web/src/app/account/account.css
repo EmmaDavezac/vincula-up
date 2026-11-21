@@ -235,6 +235,100 @@ cámara abre el selector) y, al competir por el ancho con el nombre y el email e
 	text-transform: uppercase;
 }
 
+.availability__retry {
+	margin-top: 0.75rem;
+}
+
+.availability-list {
+	list-style: none;
+	margin: 1.25rem 0 0;
+	padding: 0;
+}
+
+.availability-list li {
+	align-items: center;
+	border-bottom: 1px solid var(--line);
+	display: flex;
+	gap: 1rem;
+	justify-content: space-between;
+	padding: 0.75rem 0;
+}
+
+.availability-list li:first-child {
+	border-top: 1px solid var(--line);
+}
+
+.availability-list span {
+	color: var(--muted);
+	font-size: 0.875rem;
+}
+
+.availability-editor {
+	margin-top: 1.25rem;
+}
+
+.availability-row {
+	align-items: center;
+	border-bottom: 1px solid var(--line);
+	display: grid;
+	gap: 0.75rem;
+	grid-template-columns: minmax(7rem, 1fr) repeat(2, minmax(7rem, 9rem));
+	padding: 0.75rem 0;
+}
+
+.availability-row:first-child {
+	border-top: 1px solid var(--line);
+}
+
+.availability-row--off {
+	grid-template-columns: minmax(7rem, 1fr) 1fr;
+}
+
+.availability-day {
+	align-items: center;
+	display: flex;
+	font-size: 0.875rem;
+	font-weight: 700;
+	gap: 0.625rem;
+}
+
+.availability-day input {
+	accent-color: var(--coral);
+	height: 1rem;
+	width: 1rem;
+}
+
+.availability-time {
+	color: var(--muted);
+	display: grid;
+	font-size: 0.6875rem;
+	gap: 0.25rem;
+}
+
+.availability-time .vu-input {
+	min-width: 0;
+	padding: 0.5rem;
+}
+
+.availability__off {
+	margin: 0;
+}
+
+@media (max-width: 520px) {
+	.availability-row {
+		gap: 0.5rem;
+		grid-template-columns: 1fr 1fr;
+	}
+
+	.availability-day {
+		grid-column: 1 / -1;
+	}
+
+	.availability-row--off {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
 .security-row {
 	align-items: center;
 	display: flex;
