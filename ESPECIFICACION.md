@@ -1250,6 +1250,8 @@ La maqueta interactiva original del proyecto se desarrolló en v0 (Next.js) y se
 - Fotos privadas con visibilidad por rol y volumen Docker dedicado.
 - Aceptación obligatoria de términos y condiciones en primer ingreso.
 - Temas claro y oscuro persistidos y sincronizados entre Angular y Keycloak.
+- La navbar muestra el nombre y el avatar en el menú de usuario sin repetir visualmente su rol; la autorización sigue determinada por el token y las reglas RBAC.
+- Los estados de carga del formulario de solicitud usan un único indicador circular con mensaje contextual y respetan la preferencia de movimiento reducido. No se combina con una barra de progreso lineal en el mismo estado.
 
 ### 18.2 Deuda técnica registrada
 - **Pipeline de CI/CD:** Configuración de GitHub Actions para ejecución automatizada de pruebas y builds en cada pull request.

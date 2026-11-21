@@ -120,7 +120,19 @@ El alto de la barra vive en el token `--tabbar-h` y lo comparten la barra (que l
 
 ---
 
-## 6. Documentos relacionados
+## 6. Estados de carga
+
+- Los estados bloqueantes deben informar qué operación está ocurriendo con un
+  mensaje breve y, cuando corresponda, un detalle contextual.
+- La solución reutilizable para carga usa un indicador circular único.
+- No se combinan un spinner circular y una barra de progreso lineal para el
+  mismo estado de carga.
+- Las animaciones deben respetar `prefers-reduced-motion`; en ese modo se
+  desactiva la animación sin eliminar el mensaje ni el bloque de carga.
+
+---
+
+## 7. Documentos relacionados
 
 - [`AGENTS.md`](AGENTS.md): reglas de comportamiento, Git y convenciones (incluye obligación de respetar esta guía visual).
 - [`ESPECIFICACION.md`](ESPECIFICACION.md) §17 y Anexo C: detalle técnico de tokens, tipografía, radios, sombras y tema claro/oscuro.

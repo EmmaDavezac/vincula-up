@@ -24,6 +24,7 @@ Vincula-UP sistematiza y moderniza esta vinculación:
 3. **Gestión de turnos:** El profesional acepta o rechaza indicando motivo obligatorio, validando no superposición de horarios.
 4. **Coordinación:** Ambos participantes coordinan detalles mediante chat en tiempo real por WebSocket.
 5. **Cierre y reputación:** Al completarse el trabajo, el cliente califica el servicio con estrellas y comentario.
+6. **Interfaz consistente:** La navbar presenta la identidad de sesión sin mostrar el rol como texto redundante y los estados de carga críticos usan un único indicador visual contextual.
 
 ## Stack Tecnológico
 

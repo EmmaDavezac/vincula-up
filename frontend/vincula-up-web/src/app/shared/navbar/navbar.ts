@@ -6,7 +6,6 @@ import { AuthService } from '../../core/services/auth.service';
 import { TemaService } from '../../core/services/tema.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { OperationFeedbackService } from '../../core/services/operation-feedback.service';
-import { UserRole } from '../../core/models/user-profile';
 import { VuAvatar } from '../avatar/avatar';
 import { VuConfirm } from '../confirm/confirm';
 import { VuIcon } from '../icon/icon';
@@ -85,11 +84,4 @@ export class NavbarComponent {
 		});
 	}
 
-	roleTexto(role: UserRole | undefined): string {
-		return (
-			{ CLIENTE: 'Cliente', PROFESIONAL: 'Profesional', ADMIN: 'Administrador' }[
-				role ?? 'CLIENTE'
-			] ?? 'Cliente'
-		);
-	}
 }
