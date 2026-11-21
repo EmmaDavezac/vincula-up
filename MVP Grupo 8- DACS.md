@@ -672,9 +672,17 @@ Las pantallas principales del MVP son:
 | :---- | :---- | :---- |
 | *Figura 4\. Pantalla “Solicitudes recibidas” del profesional, con la ubicación aproximada del pedido y los botones para aceptar o rechazar (HU-S07, HU-S08, HU-S09 y HU-S10).* | *Figura 5\.* Chat de la solicitud (HU-S13) | *Figura 6\.* Resumen del administrador (HU-U14) |
 
-**Pantallas todavía sin prototipo** 
+La interfaz final conserva el nombre y el avatar en el menú de usuario de la
+navbar; el rol de autorización no se muestra como texto redundante en ese
+disparador. Durante la creación de una solicitud, los estados de carga muestran
+un único indicador circular con mensaje contextual, sin una barra de progreso
+lineal adicional.
 
-calificación del servicio (HU-S14) y bandeja de notificaciones (HU-S16) 
+**Pantallas todavía sin prototipo**
+
+- Calificación del servicio (HU-S14).
+- Bandeja de notificaciones (HU-S16).
+
 
 Enlace al prototipo:  
 [https\://v0-vincula-up.vercel.app/](https://v0-vincula-up.vercel.app/)

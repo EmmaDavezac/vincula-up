@@ -1584,3 +1584,10 @@
 - **Cambios realizados:** Se agregó la carga del perfil propio y sus horarios, una vista semanal editable por día con validación de rangos, confirmación antes de guardar y mensajes de error/éxito. Se reutiliza el endpoint existente de disponibilidad.
 - **Archivos modificados:** `frontend/vincula-up-web/src/app/account/account.ts`, `frontend/vincula-up-web/src/app/account/account.html`, `frontend/vincula-up-web/src/app/account/account.css`, `frontend/vincula-up-web/src/app/core/services/api.service.ts` y `WALKTHROUGH.md`.
 - **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check`.
+
+### [2026-11-21] - fix: simplificar rol de usuario y carga de solicitudes
+- **Objetivo:** Retirar el rol visible del menú de usuario en la navbar y eliminar la doble animación durante los estados de carga del formulario de solicitud.
+- **Cambios realizados:** Se quitó la etiqueta secundaria de rol del disparador del menú y se eliminó la barra de progreso lineal del overlay de solicitud, conservando el indicador circular único.
+- **Archivos modificados:** `frontend/vincula-up-web/src/app/shared/navbar/navbar.html`, `frontend/vincula-up-web/src/app/shared/navbar/navbar.ts`, `frontend/vincula-up-web/src/app/shared/navbar/navbar.css`, `frontend/vincula-up-web/src/app/request/request.html`, `frontend/vincula-up-web/src/app/request/request.css`, `README.md`, `MANUAL.md`, `ESPECIFICACION.md`, `GUÍA-VISUAL.md`, `MVP Grupo 8- DACS.md` y `WALKTHROUGH.md`.
+- **Verificación:** `npm --prefix frontend/vincula-up-web run build` y `git diff --check` exitosos.
+- **Especificación:** Sin cambios en rutas, endpoints, contratos de API ni modelos de datos. Se documentó la identidad compacta de la navbar y el indicador único de carga.

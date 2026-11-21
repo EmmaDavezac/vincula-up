@@ -118,7 +118,10 @@ El pie informativo del sitio también se muestra en todas las secciones de
 administración, igual que en el resto de la aplicación.
 El enlace «Ingresar» del pie solo aparece cuando no hay una sesión iniciada.
 En la navbar, el control de tema, los botones «Ingresar» y «Crear cuenta», las
-notificaciones y el menú de usuario comparten la misma altura.
+notificaciones y el menú de usuario comparten la misma altura. Cuando hay una
+sesión iniciada, el menú muestra únicamente el nombre del usuario y su avatar;
+el rol sigue aplicándose internamente a la navegación y a los permisos, sin
+repetirse como una etiqueta visual.
 
 La landing explica el recorrido completo: búsqueda por oficio y disponibilidad,
 solicitud y seguimiento del turno, coordinación por chat y calificación. En
@@ -145,6 +148,10 @@ y estado, buscar por contraparte o dirección y ordenar por fecha del turno
 izquierda, con el ordenamiento en su propia fila. Al actualizar la lista, los
 skeletons reproducen las secciones presentes en las tarjetas disponibles, como
 dirección, mapa, acciones y calificación.
+
+Al crear una solicitud, los estados de bloqueo muestran un único indicador
+circular con el mensaje y el detalle de la operación. No se muestran indicadores
+circulares y barras lineales simultáneamente.
 
 ### pgAdmin — ver la base de datos
 
